@@ -33,6 +33,13 @@ Whole Foods' revised green circle reaches the outer edge with white lettering;
 the earlier white-rim candidate is retained in history. These candidates are
 awaiting user approval and are not published runtime artwork.
 
+The separate `batches/2026-11-02-amazon-smile` review replaces Amazon's wordmark
+with the exact supplied white smile on orange. It preserves the reference's own
+framing and does not affect Amazon Prime or the previous ten candidates.
+Reproduce with `BOOKIEBOT_PLAYWRIGHT_MODULE=/path/to/playwright node docs/logo-review/batches/2026-11-02-amazon-smile/prepare.cjs /tmp/amazon-smile.png`.
+Manual review: compare Amazon's Current/Candidate, check the smile at 28px and
+approve the desired version before publishing its saved batch.
+
 Manual review: open the current gallery on a phone; flag an icon, confirm the
 editor appears beside it, enter notes and send with readiness off. The next chat
 intake should invite replacement images before refining. After intake, inspect

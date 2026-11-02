@@ -1,0 +1,16 @@
+{
+  "kind": "bookiebot-logo-feedback",
+  "version": 1,
+  "snapshotId": "11f6086157be9a7a418f55f4906e488b206402a6c940f16d1d905b1dae7464c7",
+  "items": [
+    {
+      "key": "merchant:amazon",
+      "notes": "Use only the smile mark in the supplied reference: white smile on orange, without the Amazon wordmark.",
+      "referenceUrls": [
+        "https://static.vecteezy.com/system/resources/previews/014/018/560/non_2x/amazon-smile-logo-on-transparent-background-free-vector.jpg"
+      ],
+      "ready": true
+    }
+  ],
+  "newRequests": []
+}

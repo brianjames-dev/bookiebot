@@ -1,0 +1,4164 @@
+{
+  "kind": "bookiebot-logo-inventory",
+  "version": 1,
+  "snapshotId": "11f6086157be9a7a418f55f4906e488b206402a6c940f16d1d905b1dae7464c7",
+  "items": [
+    {
+      "key": "company:1password",
+      "kind": "company",
+      "id": "1password",
+      "name": "1Password",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "1Password"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-1password-4463cab6e6e1008a.png",
+      "sha256": "4463cab6e6e1008a99bf73aeabb231c8a555666c300063260585941d99026785",
+      "revision": "51b010aa72b71d19b6d9a4b9bea86c7e5afe410744b581d46a8611c277019c2b",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/1password.svg"
+    },
+    {
+      "key": "company:adobe",
+      "kind": "company",
+      "id": "adobe",
+      "name": "Adobe",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Adobe",
+        "Adobe Creative Cloud",
+        "Adobe Photography"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-adobe-64e14206fcbaf104.png",
+      "sha256": "64e14206fcbaf104db72f5207f89014d242419d6a85eac63b08791103f13b021",
+      "revision": "b7f8b34f0967d13338c27a5e3debfbabec66cd132764f944f9c348c9a2c73d54",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/adobe.svg"
+    },
+    {
+      "key": "company:aidvantage",
+      "kind": "company",
+      "id": "aidvantage",
+      "name": "Aidvantage",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Aidvantage"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-aidvantage-89479e125b7ae1b7.png",
+      "sha256": "89479e125b7ae1b73c0e1996ead12c65a20fe41786e75b782d3e04241a0a2c9e",
+      "revision": "acdd9731894d59dd4a2b5b9906ba59102cb11593c36f23667b3b967b290e9901",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://aidvantage.studentaid.gov/img/aidvantage-favicon.png"
+    },
+    {
+      "key": "company:allstate",
+      "kind": "company",
+      "id": "allstate",
+      "name": "Allstate",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Allstate"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-allstate-8268f5a440c94834.png",
+      "sha256": "8268f5a440c948344dea9b2cb01f45b868e1a05dc58b8b8dba1603c022302923",
+      "revision": "9e54370c03d50e2934b0ca59b2fc48543f2dc90eaa89e4109760e8a1b8fcef91",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.allstate.com&sz=128"
+    },
+    {
+      "key": "company:amazon-prime",
+      "kind": "company",
+      "id": "amazon-prime",
+      "name": "Amazon Prime",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Amazon Prime",
+        "Prime Video",
+        "Amazon Prime Video"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-amazon-prime-7ef9bb86652dc5a3.png",
+      "sha256": "7ef9bb86652dc5a3ef913e94acb176bb3bc183adf5454bf98d7ff03c05a82d12",
+      "revision": "2845a87f34fc488429a052953a8d91e610f9ff37655cc576662eed9bcd90d832",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/amazon-prime.svg"
+    },
+    {
+      "key": "company:american-water",
+      "kind": "company",
+      "id": "american-water",
+      "name": "American Water",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "American Water"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-american-water-26ccbf2f13f73776.png",
+      "sha256": "26ccbf2f13f7377651a24fc824afe0db9859fc5b5548b890b165326ec64389cd",
+      "revision": "7493dddd95673ae366432326a04cc83cf000333242616a87cd3bc1219af74ffb",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.amwater.com&sz=128"
+    },
+    {
+      "key": "company:apple",
+      "kind": "company",
+      "id": "apple",
+      "name": "Apple One",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Apple One",
+        "Apple Arcade",
+        "Apple Fitness+"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-apple-2e074ccd5199eb51.png",
+      "sha256": "2e074ccd5199eb51a9cf2c618ef77ad39c0af7e25d754112a759c7b1ba9d7327",
+      "revision": "9e7f39079b3f0ee1e9c9ea67c05dde193512740eae8f67153a8145c77c3152e7",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple.svg"
+    },
+    {
+      "key": "company:apple-music",
+      "kind": "company",
+      "id": "apple-music",
+      "name": "Apple Music",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Apple Music"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-apple-music-73a80af73dcebe8b.png",
+      "sha256": "73a80af73dcebe8b3ae2bb4e547917637bfb892aa803bd56697b491a71ea2ae6",
+      "revision": "7bf60bae46e346519269fd6df9802e2ae3743758cc1c2cecf5962ef3d8d475fc",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple-music.svg"
+    },
+    {
+      "key": "company:apple-tv-plus",
+      "kind": "company",
+      "id": "apple-tv-plus",
+      "name": "Apple TV+",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Apple TV Plus",
+        "Apple TV+"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-apple-tv-plus-d67af4fa8546a817.png",
+      "sha256": "d67af4fa8546a8176bd60caf7f1a8b4b8b86f664c5055ce13732a68b3961dcf3",
+      "revision": "54e59b5a846798734f3155848a1b0bb6da7242dc0581de7807452c4181e08e6e",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/apple-tv-plus.svg"
+    },
+    {
+      "key": "company:att",
+      "kind": "company",
+      "id": "att",
+      "name": "AT&T",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "AT&T",
+        "AT&T Wireless",
+        "AT&T Internet"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-att-cb7162f3c934b152.png",
+      "sha256": "cb7162f3c934b152e8bec3bccb4d1d66e475a5fa10b8bf586d9d8e7b40bbf289",
+      "revision": "1cce94d2b0ca06b8987c6e457904d80f13fef0989776b498ccaa710ef744d9c8",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/simple-icons@16.0.0/icons/atandt.svg"
+    },
+    {
+      "key": "company:audible",
+      "kind": "company",
+      "id": "audible",
+      "name": "Audible",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Audible",
+        "Audible Premium Plus"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-audible-9b649025a063f9b4.png",
+      "sha256": "9b649025a063f9b4f08b4a53967d923377b445c33757a85c13b2438d1e02ddbf",
+      "revision": "5953b99280f4389ca25eae683215707816967bd037d42d4f26c80d3bab14f03d",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://m.media-amazon.com/images/G/01/seo/creative/Audible_Google_Favicon_192px.png"
+    },
+    {
+      "key": "company:backblaze",
+      "kind": "company",
+      "id": "backblaze",
+      "name": "Backblaze",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Backblaze"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-backblaze-1a38dfaacd8e2206.png",
+      "sha256": "1a38dfaacd8e22065b61da7b38ceed6f7e6fadc9eb897f8c482780986330389f",
+      "revision": "563f790bc71c38486a750f6134590ff0887d51c9dcc81685e4faab2dbe8044ed",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/backblaze.svg"
+    },
+    {
+      "key": "company:bitwarden",
+      "kind": "company",
+      "id": "bitwarden",
+      "name": "Bitwarden",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Bitwarden"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-bitwarden-a61395cc2ce5a593.png",
+      "sha256": "a61395cc2ce5a5932a7504af5d2311be02248c325f326373d36eda445431527a",
+      "revision": "a23d8c5cecaf4a16729cf886b221691aac361f3dd8593d20018cdfd2dc229bf3",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/bitwarden.svg"
+    },
+    {
+      "key": "company:brianjames",
+      "kind": "company",
+      "id": "brianjames",
+      "name": "brianjames.dev",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "brianjames.dev"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-brianjames-e4bce980a901be0e.png",
+      "sha256": "e4bce980a901be0eb226d25262a87be1528dd3e3a6d4416beea49bfc94e640ce",
+      "revision": "47aea70ffbeea22482f1f79b3ec5b7fc9b5f5db470314dd517b01d2683fb7862",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "portfolio-website/public/favicon_io/favicon-baj-dark.png"
+    },
+    {
+      "key": "company:canva",
+      "kind": "company",
+      "id": "canva",
+      "name": "Canva",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Canva",
+        "Canva Pro"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-canva-0a9aefde23ba54e8.png",
+      "sha256": "0a9aefde23ba54e883b429a50ccfdcd311f668330e6525f04dfa975f8f9cb77f",
+      "revision": "f1c3113c921d4ff781279e4ee935e1201c5175f6c3160ffdfa98b2881f817b47",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://static.canva.com/domain-assets/canva/static/images/apple-touch-152x152-1.png"
+    },
+    {
+      "key": "company:chatgpt",
+      "kind": "company",
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "ChatGPT",
+        "ChatGPT Pro",
+        "ChatGPT Plus",
+        "OpenAI"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-chatgpt-c4ad7933876a4e6a.png",
+      "sha256": "c4ad7933876a4e6a588a1cafc54a9e4ed13c70c1b9865975831839938156860c",
+      "revision": "0a5a54420eed607b44d3a6c3dd83e1f2a243732aef2aee8f6e0afc2520c7cd55",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/gilbarbara/logos@d6960edc1b7309d392c76e40d3a320df7f9ff85d/logos/openai-icon.svg"
+    },
+    {
+      "key": "company:cloudflare",
+      "kind": "company",
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Cloudflare"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-cloudflare-5062e71e95b3f975.png",
+      "sha256": "5062e71e95b3f975e6624a4b4cf13cae5c1db74d5f86a03e3cfdb485685d84e1",
+      "revision": "25721d90f845bb8346105a1c0bf514f3dde1ec7dc80d2738265a162559f4cec6",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/cloudflare.svg"
+    },
+    {
+      "key": "company:con-edison",
+      "kind": "company",
+      "id": "con-edison",
+      "name": "Con Edison",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Con Edison",
+        "ConEd"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-con-edison-da66737b7062decd.png",
+      "sha256": "da66737b7062decd2b1f381edb25920ac763ce63962cd3ce11c75ac1a127123e",
+      "revision": "8f8baf73b70f416f516476ca66600df7119020597ed533f5f44ae11d17dba817",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://edge-c-dcxprod-web-enfbhbfkb2fghhey.a03.azurefd.net/-/media/images/coned/common/ce-apple-touch-icon.png?rev=cd163ba4d9cf4a9ab611a91f86dcfb3d"
+    },
+    {
+      "key": "company:cox",
+      "kind": "company",
+      "id": "cox",
+      "name": "Cox",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Cox",
+        "Cox Communications"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-cox-02f0393d5052d5cc.png",
+      "sha256": "02f0393d5052d5cce2d8132722a5f591b9c59ae098b55b3dbacc9dc2456c44d2",
+      "revision": "4a019bd9283e8bfe3f36d5b1fa217a1e295a3986c529e594c93035c358bc452e",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.cox.com/favicon.ico"
+    },
+    {
+      "key": "company:crunchyroll",
+      "kind": "company",
+      "id": "crunchyroll",
+      "name": "Crunchyroll",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Crunchyroll"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-crunchyroll-9929ef7175c0dfcf.png",
+      "sha256": "9929ef7175c0dfcf6f4f0367132680cc6a9c7ae9a30bba091dc0b2af38ec7818",
+      "revision": "39b103e1a64466eb833bd9673098dd61fd62ddfdb0de21885da5fda0ad1c7f26",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/crunchyroll.svg"
+    },
+    {
+      "key": "company:deezer",
+      "kind": "company",
+      "id": "deezer",
+      "name": "Deezer",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Deezer"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-deezer-66e6d84c75bbcb5e.png",
+      "sha256": "66e6d84c75bbcb5ecfaae95e156e94acce2ff1d62f36252d728bfbecca374695",
+      "revision": "43b5a1adb4e0a3ed196fb17266cec3a3fb1f32ee703d9c95662a1b4703d7cda5",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/deezer.svg"
+    },
+    {
+      "key": "company:discord",
+      "kind": "company",
+      "id": "discord",
+      "name": "Discord",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Discord",
+        "Discord Nitro"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-discord-b12e15168d83b829.png",
+      "sha256": "b12e15168d83b829d048455ea43b2e7a8b1003b9be7b1a78b07af8b723a20df4",
+      "revision": "bf3b4653e106d9deb68e826431eee70dbe0c870d6660ba9e34cf0effb6a4318c",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/discord.svg"
+    },
+    {
+      "key": "company:disney-plus",
+      "kind": "company",
+      "id": "disney-plus",
+      "name": "Disney+",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Disney Plus",
+        "Disney+"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-disney-plus-1f294150455abc75.png",
+      "sha256": "1f294150455abc751f24ef8105248203810ecc6191364b8d12d754dcc11dc696",
+      "revision": "5ca9b4e8f00d2930b24093c9d42fc768c6773f66ef2e3de6227d32ab0dabde60",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/disney-plus.svg"
+    },
+    {
+      "key": "company:dominion-energy",
+      "kind": "company",
+      "id": "dominion-energy",
+      "name": "Dominion Energy",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Dominion Energy"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-dominion-energy-1a2bd2dbea7c5ff0.png",
+      "sha256": "1a2bd2dbea7c5ff0d690e2e351208cc6bd4481ededa806f05c2954c0075bddf9",
+      "revision": "0bddce11446c1fa8e57b86036f264d3b454e02a028b7102d2732a02f38955019",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn-dominionenergy-prd-001.azureedge.net/-/media/project/dominionenergy/header/mobile-level2-logo.svg?rev=b6c54cf2090e45379992c1aaf9b170f1&la=en&hash=96D87DBF7BB42355581C2841E2269940"
+    },
+    {
+      "key": "company:dropbox",
+      "kind": "company",
+      "id": "dropbox",
+      "name": "Dropbox",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Dropbox"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-dropbox-bd9a9f592b957dd6.png",
+      "sha256": "bd9a9f592b957dd685a8fc37ceedfde98a36796e3278dff3b10a0749cde93ef4",
+      "revision": "747c9030a2e85b75d956fe764a654c85a4b0e6cb14526b7d3342555b158e2a52",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/dropbox.svg"
+    },
+    {
+      "key": "company:duke-energy",
+      "kind": "company",
+      "id": "duke-energy",
+      "name": "Duke Energy",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Duke Energy"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-duke-energy-d63be9f616b608a3.png",
+      "sha256": "d63be9f616b608a36f5e8f39074f968fd73bb4401247eec3e2bc6e7d6dbad63e",
+      "revision": "3e39a4d75c4aaf034c89182eebd9c6c2ddb7c7460bd390fca3b33470851881b9",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.duke-energy.com&sz=128"
+    },
+    {
+      "key": "company:duolingo",
+      "kind": "company",
+      "id": "duolingo",
+      "name": "Duolingo",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Duolingo",
+        "Super Duolingo",
+        "Duolingo Max"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-duolingo-d7a0b9b2bfdd544d.png",
+      "sha256": "d7a0b9b2bfdd544de58f535427ea157332c5be115384b84b52da30630e9a1446",
+      "revision": "97b43a4336bb5fef79d883a0200533d900c29ad839115303a2b86f39497c1ae2",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/duolingo.svg"
+    },
+    {
+      "key": "company:evernote",
+      "kind": "company",
+      "id": "evernote",
+      "name": "Evernote",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Evernote"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-evernote-d11cf580eb5b81a2.png",
+      "sha256": "d11cf580eb5b81a2c1db83b5533d741f66565fbe3d866685cd8932e7273fcea5",
+      "revision": "aaaf5a226945577dab42e4b836f96f93566a6b68772e3c309c9e31dab67c76bd",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/evernote.svg"
+    },
+    {
+      "key": "company:expressvpn",
+      "kind": "company",
+      "id": "expressvpn",
+      "name": "ExpressVPN",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "ExpressVPN"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-expressvpn-c80d868ef819ebfe.png",
+      "sha256": "c80d868ef819ebfee4e64004304f3552ac223764d711a476da106c6e89f0445d",
+      "revision": "08806b1c071797543aa01de0deb0f6c715a20f80831e25258f7bbe316d261a2c",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/expressvpn.svg"
+    },
+    {
+      "key": "company:farmers",
+      "kind": "company",
+      "id": "farmers",
+      "name": "Farmers Insurance",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Farmers Insurance"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-farmers-f2133bd4bbce44fe.png",
+      "sha256": "f2133bd4bbce44fea0d90076cb5a29fc156ce72ca5b2b85ff04a5c6091686751",
+      "revision": "57a73d96031fad9b97b9573fc7f3f484851d8cd77dad5266ef693deac9b0b689",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.farmers.com/favicon.ico"
+    },
+    {
+      "key": "company:figma",
+      "kind": "company",
+      "id": "figma",
+      "name": "Figma",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Figma"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-figma-98fb5bedd2bc9e3b.png",
+      "sha256": "98fb5bedd2bc9e3bbb989971c294541d23faeefbdc15c4d2ac9e3258b1424f9e",
+      "revision": "7bb282c4a541efa5358d790ea3b70bc576c3903c8aa044d623a4365579787f05",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/figma.svg"
+    },
+    {
+      "key": "company:fpl",
+      "kind": "company",
+      "id": "fpl",
+      "name": "FPL",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "FPL",
+        "Florida Power & Light"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-fpl-8efa03a6caa68b28.png",
+      "sha256": "8efa03a6caa68b28bd10b07e2c74aa67c6bfd55c8dc122ee37ed2a9d9f7ce770",
+      "revision": "95517c234df713ddb00da3d1f7f0320dea7ecbd20d31d14f4226e9b791db208f",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://newsroom.fpl.com/images/logo.svg"
+    },
+    {
+      "key": "company:frontier",
+      "kind": "company",
+      "id": "frontier",
+      "name": "Frontier",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Frontier",
+        "Frontier Internet"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-frontier-8aeabdc52e597de1.png",
+      "sha256": "8aeabdc52e597de18a584b05edd6ab5c9c8c66b59154d84c014d053731462f5c",
+      "revision": "27481644e21b548bf3ca86b786d2913f57aba787fa967d7daf58a8fa5413029d",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://frontier.com/frontier-com-marketing-assets/img/favicons/apple-touch-icon-iphone-retina.png"
+    },
+    {
+      "key": "company:fubo",
+      "kind": "company",
+      "id": "fubo",
+      "name": "Fubo",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Fubo",
+        "FuboTV"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-fubo-36541aa4283e1097.png",
+      "sha256": "36541aa4283e1097f5a889ec00f7796c97430f1d62d5560ad908b218a7a08243",
+      "revision": "9653a3d2844837db19f586e894f15b455c0314581b9238f58106bea78fd3f939",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/npm/simple-icons@16.0.0/icons/fubo.svg"
+    },
+    {
+      "key": "company:geico",
+      "kind": "company",
+      "id": "geico",
+      "name": "GEICO",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "GEICO"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-geico-87891b7fa055319c.png",
+      "sha256": "87891b7fa055319cb2f162168bd10f62f6953e6fd5fe58569d88442b0cb20b9e",
+      "revision": "96e74fd382a8f020c1109f7a191688bd8a5279000a6c80842f5cf0b1d4a37965",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.geico.com/favicon.ico?aa55dd60d3f7931a"
+    },
+    {
+      "key": "company:github",
+      "kind": "company",
+      "id": "github",
+      "name": "GitHub",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "GitHub",
+        "GitHub Pro",
+        "GitHub Copilot"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-github-37b5ddac32539b8a.png",
+      "sha256": "37b5ddac32539b8a52b286157d04093cd281fde28551a8ad368ca43c1d57bd4c",
+      "revision": "74a1000fcfa02553bdfade032f88eb16f53d768e73d5f9fee77b77dccd9b0039",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://brand.github.com/GitHub_Logos.zip"
+    },
+    {
+      "key": "company:google-drive",
+      "kind": "company",
+      "id": "google-drive",
+      "name": "Google Drive",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Google Drive"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-google-drive-1a7252922a49af7f.png",
+      "sha256": "1a7252922a49af7f20e66a465a52090a7c59c68c4f4c3f9662fd9598dfadce32",
+      "revision": "57028d48af6e3dbe375493577cf6582199d3f20788897461c8793b8d4f339b04",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/google-drive.svg"
+    },
+    {
+      "key": "company:google-one",
+      "kind": "company",
+      "id": "google-one",
+      "name": "Google One",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Google One",
+        "Google Storage"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-google-one-623eaad854293b97.png",
+      "sha256": "623eaad854293b978c2abe3beeca763d068db4236a58ae62ecfb19f740d348e8",
+      "revision": "d919735ae40683deac6cbd08f933d7b603ac3ce184ad1197da2bc085e4058045",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/google-one.svg"
+    },
+    {
+      "key": "company:hulu",
+      "kind": "company",
+      "id": "hulu",
+      "name": "Hulu",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Hulu"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-hulu-b0e37e1e5a599405.png",
+      "sha256": "b0e37e1e5a599405a7792a22cdd48df5397dcdee085418c8cc998c4f2b119a84",
+      "revision": "b467a2347f94183a806d715a0942c5d4fc293c1a0d2b9ae67102a1e2390dc986",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/hulu.svg"
+    },
+    {
+      "key": "company:icloud",
+      "kind": "company",
+      "id": "icloud",
+      "name": "iCloud",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "iCloud",
+        "iCloud Storage",
+        "iCloud+",
+        "Apple iCloud"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-icloud-f7cf1ff3a6300231.png",
+      "sha256": "f7cf1ff3a6300231605600543a0f0fffa5ed2b9168d87af9cb4924619349d148",
+      "revision": "4555123ce7ce1ec22aeff18d48f68eb68487e6fdec22aaccf1f11df658eb8cbf",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/icloud.svg"
+    },
+    {
+      "key": "company:liberty-mutual",
+      "kind": "company",
+      "id": "liberty-mutual",
+      "name": "Liberty Mutual",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Liberty Mutual"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-liberty-mutual-ab3d3a3e2cd6f90f.png",
+      "sha256": "ab3d3a3e2cd6f90f5d01753b0b18b81a01dd45bcdfe6ac21eb8d83dc0213be80",
+      "revision": "c0ebf4d6fb1005532ef321de8e62dc8b97d68bb518c0ae7723980ccc23ead8e6",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.libertymutual.com/"
+    },
+    {
+      "key": "company:linkedin",
+      "kind": "company",
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "LinkedIn Premium",
+        "LinkedIn"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-linkedin-29dbb38dd34b4298.png",
+      "sha256": "29dbb38dd34b42985e0808e09af6803e994e9ebf3c5c65f3011c0415e3f61777",
+      "revision": "eadd6ba7405914258e4741e57e1fd979d68b392c7813811ec9b6c3272309acdc",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/linkedin.svg"
+    },
+    {
+      "key": "company:macrofactor",
+      "kind": "company",
+      "id": "macrofactor",
+      "name": "MacroFactor",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "MacroFactor",
+        "MacroFactor Nutrition"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-macrofactor-b8eb22746823410c.png",
+      "sha256": "b8eb22746823410c977142e158dcfc7aa1594beec212cbab615f61d05b598013",
+      "revision": "275933fd2cb2dd3ed4d268aebca8b7dec8e28056f56cd65cc5164dc7990b7f8c",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://macrofactor.com/wp-content/uploads/2025/09/cropped-MF_Avatar_Square_150ppi-192x192.png"
+    },
+    {
+      "key": "company:max",
+      "kind": "company",
+      "id": "max",
+      "name": "HBO Max",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Max",
+        "HBO",
+        "HBO Max"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-max-b601085f9deabb0c.png",
+      "sha256": "b601085f9deabb0c3d1ef8c795c0df8a8cd1593533ac1160c3d38eab8ba2ae30",
+      "revision": "079c8edf257639f03edf26dba808f193691638a92b647d4567e3883e20142bf2",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/max.svg"
+    },
+    {
+      "key": "company:microsoft-365",
+      "kind": "company",
+      "id": "microsoft-365",
+      "name": "Microsoft 365",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Microsoft 365",
+        "Office 365"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-microsoft-365-09a0f5397a74c0c3.png",
+      "sha256": "09a0f5397a74c0c392d7f766d8b659fae346541137357ca07273066b814bf8b0",
+      "revision": "1462a3ae12fc86172b59ec33aea932b37103fcd57ddd0129a8ef5675c3270338",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/microsoft-365.svg"
+    },
+    {
+      "key": "company:national-grid",
+      "kind": "company",
+      "id": "national-grid",
+      "name": "National Grid",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "National Grid"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-national-grid-a8170259323d6029.png",
+      "sha256": "a8170259323d60297e95646c5241fcc65544f829b57a47e6bdf5c110095502d4",
+      "revision": "ebf5c258bc0d4f1908d7229c079e96c8a849aae8a5d3e2c86bee3fa6b8fd4731",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.nationalgridus.com/assets/images/favicons/apple-touch-icon.png?v=OmJ605EadX"
+    },
+    {
+      "key": "company:netflix",
+      "kind": "company",
+      "id": "netflix",
+      "name": "Netflix",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Netflix"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-netflix-4a318aed131701d4.png",
+      "sha256": "4a318aed131701d4de4c52f24b2617b309e984969e8efcee5ef256194c53cf26",
+      "revision": "cf24b4bc895d3bef2a637a44d86f3030558e45f91d2aa3bb49cb7569782f81b2",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/netflix.svg"
+    },
+    {
+      "key": "company:nordvpn",
+      "kind": "company",
+      "id": "nordvpn",
+      "name": "NordVPN",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "NordVPN"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-nordvpn-940008d40777980d.png",
+      "sha256": "940008d40777980d305ad14d68ea8d52f45c30f5689e9e0d840d4ff08e2cb5d1",
+      "revision": "866cd1b3d11eddcd26f5a771361e74ba80611e49a2a6e5f56c64e98876214bf2",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/nordvpn.svg"
+    },
+    {
+      "key": "company:notion",
+      "kind": "company",
+      "id": "notion",
+      "name": "Notion",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Notion",
+        "Notion Plus"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-notion-d766a8a72d4a1d21.png",
+      "sha256": "d766a8a72d4a1d21b7068d0ed18d3c4a32ec6d467e5b983ed47c729cdbc67a02",
+      "revision": "6ebd85e74b387bf4df661d11c1d93f327cd5711cca70f0c7c252cc407de3e12f",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/notion.svg"
+    },
+    {
+      "key": "company:paramount-plus",
+      "kind": "company",
+      "id": "paramount-plus",
+      "name": "Paramount+",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Paramount Plus",
+        "Paramount+"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-paramount-plus-3b7df761d2299731.png",
+      "sha256": "3b7df761d22997310bd2eaf5dc3cff70eac293dc08b78d242e751397ef85f82a",
+      "revision": "f7279949eb58aba9ddf41bb0b967ee0adf9a0f82d6f3b7ce80498a7d937b06d6",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/paramount-plus.svg"
+    },
+    {
+      "key": "company:patreon",
+      "kind": "company",
+      "id": "patreon",
+      "name": "Patreon",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Patreon"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-patreon-47cfdf2d85fca9a6.png",
+      "sha256": "47cfdf2d85fca9a68297c52baa527917d6aafd4d1bc96c464f743c381fef1cbc",
+      "revision": "11d817cae3cccdc0e3283212becd50b494f016fefc2ad74ffebf7cee2459ccdc",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/patreon.svg"
+    },
+    {
+      "key": "company:peacock",
+      "kind": "company",
+      "id": "peacock",
+      "name": "Peacock",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Peacock",
+        "Peacock Premium"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-peacock-b970a86f2be4c2ba.png",
+      "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+      "revision": "4edcd32b878543b073d47ab56dbf9355af1913247dea9073113714f4c7413f7f",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg"
+    },
+    {
+      "key": "company:peloton",
+      "kind": "company",
+      "id": "peloton",
+      "name": "Peloton",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Peloton"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-peloton-f08b6df19ca56e00.png",
+      "sha256": "f08b6df19ca56e00aedef62fd8345a061e09a605c85a726022ae0b733d883ffe",
+      "revision": "08223e720926cdcd605eb154427b2350d9efe989b48e042575e0262d8de990f3",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.onepeloton.com/images/apple-touch-icon-192.png"
+    },
+    {
+      "key": "company:pge",
+      "kind": "company",
+      "id": "pge",
+      "name": "PG&E",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "PG&E",
+        "PGE",
+        "Pacific Gas and Electric"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-pge-50f203cf0ab8750d.png",
+      "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+      "revision": "bb5f5071152fe373e44fada1c3d977ce0d19956131efc4058b3f6d6922f4a29e",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg"
+    },
+    {
+      "key": "company:playstation",
+      "kind": "company",
+      "id": "playstation",
+      "name": "PlayStation",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "PlayStation Plus",
+        "PlayStation Network"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-playstation-23df6d45be9b7f8d.png",
+      "sha256": "23df6d45be9b7f8d7986424f65efdcfcb8626b28bed3af4aac64715e84782da5",
+      "revision": "7fc3911af7e5a2ae3ffd5541dc0847fb6b4b6dfb81ecddc33e1d2fd96c026883",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/playstation.svg"
+    },
+    {
+      "key": "company:plex",
+      "kind": "company",
+      "id": "plex",
+      "name": "Plex",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Plex",
+        "Plex Pass"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-plex-ff24c8f12aebf372.png",
+      "sha256": "ff24c8f12aebf372890fe7c244b1e16c21c7915cf2f47416c77c4d6a59ebcf4d",
+      "revision": "af6ecd7f1b697fe1b7da6539441ad1a1c1a6add8f5935e194c0d4fc4254726d6",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/plex.svg"
+    },
+    {
+      "key": "company:progressive",
+      "kind": "company",
+      "id": "progressive",
+      "name": "Progressive",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Progressive"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-progressive-770286cb9bfd1c60.png",
+      "sha256": "770286cb9bfd1c60ad078ea7717b2c5ebfb464a0833370119eeb7e52fdad61c5",
+      "revision": "7f57cabc75220ae156344edc79acf0ef3639711610183936f82d5b4b69ddb106",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.progressive.com/apple-touch-icon.png"
+    },
+    {
+      "key": "company:proton-mail",
+      "kind": "company",
+      "id": "proton-mail",
+      "name": "Proton",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Proton",
+        "Proton Mail",
+        "Proton Unlimited"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-proton-mail-5d296f1d39b8218d.png",
+      "sha256": "5d296f1d39b8218d3b57b7722554dd17020de6b56bec8738e09cc3cb8a7c11fc",
+      "revision": "7019648cd12f0ad878ac869b90d6fcbd3496866932ec552eb1ced0f7ede43c8e",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/proton-mail.svg"
+    },
+    {
+      "key": "company:railway",
+      "kind": "company",
+      "id": "railway",
+      "name": "Railway",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Railway"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-railway-e90b60cbeb1ccea6.png",
+      "sha256": "e90b60cbeb1ccea6b0cdcb60b20c6fe6aaea61570a40eee0de7a1c45d481393b",
+      "revision": "baa68f45a7d5331e439a943e6015e4ad8f5a625052c6ddad19591e121e5e6e8d",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/railway.svg"
+    },
+    {
+      "key": "company:raycast",
+      "kind": "company",
+      "id": "raycast",
+      "name": "Raycast",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Raycast",
+        "Raycast Pro"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-raycast-a51bb09684913de4.png",
+      "sha256": "a51bb09684913de4d9bd2d0cc547e1c90a178ce5f8d1b6b8edfdb34b320f0f87",
+      "revision": "cb162e923de29ee605e1147aba286ce70a487f049a3a7e4886c5879ed25f3b1a",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.raycast.com/favicon-production.png"
+    },
+    {
+      "key": "company:recology",
+      "kind": "company",
+      "id": "recology",
+      "name": "Recology",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Recology",
+        "Recology Sonoma Marin"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-recology-d6ee8d4ec6d5d7d6.png",
+      "sha256": "d6ee8d4ec6d5d7d6a86b1f9b1cf83597df75b1788a1808be50bfc75c815da2cf",
+      "revision": "211695d343421ea3a4057341dfe26fa46889f77ad249bd449fc7af164fe76c99",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=recology.com&sz=128"
+    },
+    {
+      "key": "company:republic-services",
+      "kind": "company",
+      "id": "republic-services",
+      "name": "Republic Services",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Republic Services"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-republic-services-63637e04a5fe5754.png",
+      "sha256": "63637e04a5fe5754e9b79407efda697b3733155e1c438aa7d4a6de6424fcf19e",
+      "revision": "76d59951c9e5d914da9f14f2785c9c3b84685ed9b6b61f6bd8bd52ac3deba6fb",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.republicservices.com/favicon.ico"
+    },
+    {
+      "key": "company:santa-rosa-water",
+      "kind": "company",
+      "id": "santa-rosa-water",
+      "name": "Santa Rosa Water",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Santa Rosa Water",
+        "Santa Rosa City Water"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-santa-rosa-water-bc29b931c66f0af9.png",
+      "sha256": "bc29b931c66f0af9cd13fcd2f819b35cb2ad243e8b3bd302ca49c176a1110d90",
+      "revision": "b02a57e858f693ffc4ded98c1febb0a966fda891dca26f685cca3018032c7c9d",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=srcity.org&sz=128"
+    },
+    {
+      "key": "company:sdge",
+      "kind": "company",
+      "id": "sdge",
+      "name": "SDG&E",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "SDG&E",
+        "San Diego Gas and Electric"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-sdge-5d20c2d0c552aea8.png",
+      "sha256": "5d20c2d0c552aea85ca3bced92746c59c8abb341f090a3eb43d73db069bcb399",
+      "revision": "efeacaf124ef22af62250bcab1ef78572f135d89b6f360752559922f21c889a7",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.sdge.com/sites/default/files/logo_r.svg"
+    },
+    {
+      "key": "company:slate-digital",
+      "kind": "company",
+      "id": "slate-digital",
+      "name": "Slate Digital",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Slate Digital",
+        "Slate Digital All Access",
+        "Slate Digital All Access Pass"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-slate-digital-27783d1dc474e093.png",
+      "sha256": "27783d1dc474e09317ec0d46148972ab5d8986e735727fc8e1243e4bf1b706c7",
+      "revision": "33dbf65f23be451ceae5aafd9cd82a2c60f5821715a10c6ddf38afd1296e0d53",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=slatedigital.com&sz=128"
+    },
+    {
+      "key": "company:sling",
+      "kind": "company",
+      "id": "sling",
+      "name": "Sling TV",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Sling TV",
+        "Sling"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-sling-2248a814adfb1053.png",
+      "sha256": "2248a814adfb10532e668e1c0b4b39c18190b4189f75d588585862cdea2c9ef7",
+      "revision": "4c140223a00057712b8df9084728a7e64682a5400d1265f2dfae7e1e62e69083",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.sling.com/content/dam/sling-television/icons/logo-sling.svg"
+    },
+    {
+      "key": "company:socalgas",
+      "kind": "company",
+      "id": "socalgas",
+      "name": "SoCalGas",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "SoCalGas",
+        "Southern California Gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-socalgas-7569b1ee20be16dc.png",
+      "sha256": "7569b1ee20be16dc97eb523e7172b05872611ef0598174e65b6541582a61f0b9",
+      "revision": "8628fb2d60c03308935a9944058cad1971b878f92564f430dcbed439426e3baf",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.socalgas.com/sites/default/files/images/logo/scg-logo-white.svg"
+    },
+    {
+      "key": "company:soundcloud",
+      "kind": "company",
+      "id": "soundcloud",
+      "name": "SoundCloud",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "SoundCloud",
+        "SoundCloud Go"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-soundcloud-49c7dbefe9f72b0f.png",
+      "sha256": "49c7dbefe9f72b0f7aaa354ea4f22efd1135198b8e284d44c8a82a3838249d5c",
+      "revision": "1db2442328c44486501a812309f3ff4e51b18121831fd027c0670a261adedfb8",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/soundcloud.svg"
+    },
+    {
+      "key": "company:southern-california-edison",
+      "kind": "company",
+      "id": "southern-california-edison",
+      "name": "Southern California Edison",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Southern California Edison",
+        "SCE"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-southern-california-edison-ae1f5636383f66c6.png",
+      "sha256": "ae1f5636383f66c6881be132be1e42d2c9534532d933006c590f5dbd804e8d0a",
+      "revision": "948c408caf91a21be13ab9878b4600d57bf246a75eed18b787f681c24628d66d",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.sce.com/themes/custom/sce_redesign/images/Logo-180.png"
+    },
+    {
+      "key": "company:spectrum",
+      "kind": "company",
+      "id": "spectrum",
+      "name": "Spectrum",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Spectrum",
+        "Charter Spectrum"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-spectrum-59bca6b07bc4e1be.png",
+      "sha256": "59bca6b07bc4e1beced3571e0767df7be11b06878186f6ac875df945227c80cb",
+      "revision": "58c736b55e84c60706a1aee60dcc55e6aca3990fc8a8b2cc25efa7c832bf22e6",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.spectrum.com&sz=128"
+    },
+    {
+      "key": "company:spotify",
+      "kind": "company",
+      "id": "spotify",
+      "name": "Spotify",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Spotify",
+        "Spotify Premium"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-spotify-68f0c1767ea2fb76.png",
+      "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+      "revision": "8a484e5744b6b3b7ff57ed73e4d5e0da9746e214fce0fbb31a707bafb2f17a85",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg"
+    },
+    {
+      "key": "company:state-farm",
+      "kind": "company",
+      "id": "state-farm",
+      "name": "State Farm",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "State Farm"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-state-farm-b590f921898f9821.png",
+      "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+      "revision": "6ed1ca59d64d747d0fc3dbc2fbd533ace513d826c55f16daf0f9122d2b790823",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.statefarm.com/favicon.ico"
+    },
+    {
+      "key": "company:steam",
+      "kind": "company",
+      "id": "steam",
+      "name": "Steam",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Steam"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-steam-c121b94740628999.png",
+      "sha256": "c121b94740628999175edac62cd4583b63ab5eb17393a729f3d919cba274e853",
+      "revision": "0aa499b50e271d0358c7641456353a6d525282fa1f8703b793057ef8a58c7f34",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/steam.svg"
+    },
+    {
+      "key": "company:strava",
+      "kind": "company",
+      "id": "strava",
+      "name": "Strava",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Strava"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-strava-f52c9aa83b509ff6.png",
+      "sha256": "f52c9aa83b509ff6cded179ba35bb59e9418a330ae3584899edd451ab2a9c050",
+      "revision": "2c75484cf0f49877861c221c4d1468d7d98afec6c1678d591036e75d329f0000",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/strava.svg"
+    },
+    {
+      "key": "company:surfshark",
+      "kind": "company",
+      "id": "surfshark",
+      "name": "Surfshark",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Surfshark"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-surfshark-b4727e24812c7298.png",
+      "sha256": "b4727e24812c729870be1a40a44e27856b5c3b052daac4632fdf9feb56be6155",
+      "revision": "203bb654dd03045ea79ba892e38ffb596d7cce648b3da7cfa4e14ad411cb3322",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/surfshark.svg"
+    },
+    {
+      "key": "company:t-mobile",
+      "kind": "company",
+      "id": "t-mobile",
+      "name": "T-Mobile",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "T-Mobile",
+        "T-Mobile Internet",
+        "T-Mobile Wireless"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-t-mobile-458c5a66112a1805.png",
+      "sha256": "458c5a66112a180542c053de00b1b13f01eecf10a5aa1c982a3e3e9ce3ba1da5",
+      "revision": "f02e50f68cb685c168867c75da0dd7b85230e204e620707312296ab381556d10",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.t-mobile.com/content/dam/t-mobile/ntm/branding/logos/corporate/tmo-logo-v4.svg"
+    },
+    {
+      "key": "company:tidal",
+      "kind": "company",
+      "id": "tidal",
+      "name": "Tidal",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Tidal"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-tidal-d4d199c15719bc03.png",
+      "sha256": "d4d199c15719bc035ae141ff41c10237dec931ffd3c7179af3b88d434755a2dd",
+      "revision": "7b13d7f35b651355baf719031ab897bcbb712de6bffccaa539e0a3674d0205b4",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/tidal.svg"
+    },
+    {
+      "key": "company:todoist",
+      "kind": "company",
+      "id": "todoist",
+      "name": "Todoist",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Todoist"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-todoist-1edb4375028f71a8.png",
+      "sha256": "1edb4375028f71a812eb32628fccb785dcb6463797f0907149d5c09b70b86cce",
+      "revision": "806cf2c0e0dd88fce113806101036b93008874669d9286c13e527b643c8b3086",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/todoist.svg"
+    },
+    {
+      "key": "company:travelers",
+      "kind": "company",
+      "id": "travelers",
+      "name": "Travelers Insurance",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Travelers Insurance",
+        "Travelers"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-travelers-35c8edc4c7edfe70.png",
+      "sha256": "35c8edc4c7edfe701f5068a34773b8838eab0a2a8f7d65877ca1a850b6fc1bce",
+      "revision": "cb4f359d2aebfe3cf4b897f2ec52d5a4aae07877b204814199ad02298a0d8619",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.travelers.com/ClientResources/tds-icons/assets/icons/logos/svg/trv-logo-2color-small.svg"
+    },
+    {
+      "key": "company:twitch",
+      "kind": "company",
+      "id": "twitch",
+      "name": "Twitch",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Twitch",
+        "Twitch Turbo"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-twitch-19060bc6504763bb.png",
+      "sha256": "19060bc6504763bb0fb9e5be7a6e64b1e09bebc5b382d155ab466b7ccb433b87",
+      "revision": "da2ebed6a7498c6956d22e296c72e981262d2c914c2f5a29d791761c10d2d154",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/twitch.svg"
+    },
+    {
+      "key": "company:usaa",
+      "kind": "company",
+      "id": "usaa",
+      "name": "USAA",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "USAA"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-usaa-61435393039854af.png",
+      "sha256": "61435393039854af80b06d671364506966f7720007281aae8fe1212416f47867",
+      "revision": "fbb93c076a92b2b952ac52a310125ea12723359efb5c3dc673fc222d2a4e8e89",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=www.usaa.com&sz=128"
+    },
+    {
+      "key": "company:verizon",
+      "kind": "company",
+      "id": "verizon",
+      "name": "Verizon",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Verizon",
+        "Verizon Wireless"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-verizon-25c80d68ec39840b.png",
+      "sha256": "25c80d68ec39840b1fdfdab01b7df6f9717f2378a5458ac77ede61ee9d30caf5",
+      "revision": "87b59a4c568e52d5ae4d09926b62801f158ce222d23a041711805178068316a5",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/verizon.svg"
+    },
+    {
+      "key": "company:waste-management",
+      "kind": "company",
+      "id": "waste-management",
+      "name": "Waste Management",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Waste Management",
+        "WM"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-waste-management-9fabb1f052543cb6.png",
+      "sha256": "9fabb1f052543cb6a5f36c898a0bb92938fbbf769967c1754c1caf6cb2db8594",
+      "revision": "16b83b83887545e8ec4bed1c3fea1029994f727d0f188d4709a494e5ec60c713",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.wm.com/content/dam/wm/assets/op/brand/WM-Primary-Logo.svg"
+    },
+    {
+      "key": "company:xbox",
+      "kind": "company",
+      "id": "xbox",
+      "name": "Xbox",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Xbox Game Pass",
+        "Xbox Live",
+        "Xbox Game Pass Ultimate"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-xbox-6ef9662a5932443f.png",
+      "sha256": "6ef9662a5932443fd5232cf2401620826cb92a963cdff89e332b15572d16b687",
+      "revision": "f02b112ce887e139f50ae6c879ad2f2d6fa25219224871cf4af39ba4877171ab",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cms-assets.xboxservices.com/assets/bf/a7/bfa78b03-47f1-4113-94a0-0094e615a81a.svg?n=Favicon.svg"
+    },
+    {
+      "key": "company:xfinity",
+      "kind": "company",
+      "id": "xfinity",
+      "name": "Xfinity",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Xfinity",
+        "Comcast",
+        "Comcast Xfinity"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-xfinity-91c15f5ede14fb17.png",
+      "sha256": "91c15f5ede14fb176382042a4740b3d44c0bd0f8bc7cc6be09efea34b0ebf620",
+      "revision": "c678f63b3d65a09850ecdb670135438cba3816d86a606069cc252c17af2a13e0",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.xfinity.com/favicon.ico"
+    },
+    {
+      "key": "company:youtube",
+      "kind": "company",
+      "id": "youtube",
+      "name": "YouTube Premium",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "YouTube",
+        "YouTube Premium"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-youtube-1b12a2bf6cb661e3.png",
+      "sha256": "1b12a2bf6cb661e33f2086a7777749a627f608fafbb5e090cc0dc1e77dc5e098",
+      "revision": "18f3a701f69fb48ec7332e87ee4d0bca94502d75a836cadbe13b6b5490930559",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.gstatic.com/youtube/img/promos/growth/53723e837c902a1ea814db4f77832f38a6bb3e101fb5933c4f85636a218bb70b_382x62.png"
+    },
+    {
+      "key": "company:youtube-music",
+      "kind": "company",
+      "id": "youtube-music",
+      "name": "YouTube Music",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "YouTube Music",
+        "YouTube Music Premium"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-youtube-music-9744ecab81dafdf5.png",
+      "sha256": "9744ecab81dafdf5a231e4e56071fc59fa14ea9a532c19609dcc7255d19bce70",
+      "revision": "3d89930f3891d9862e6641fd0494191df97fb5e7323aedbc1bdd51c79d9cdef7",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/youtube-music.svg"
+    },
+    {
+      "key": "company:youtube-tv",
+      "kind": "company",
+      "id": "youtube-tv",
+      "name": "YouTube TV",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "YouTube TV"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-youtube-tv-747f257bb1c68b9d.png",
+      "sha256": "747f257bb1c68b9d243359f6efe95281664cd42932e8a84a90b554b20e032197",
+      "revision": "ef42dd71e27b24de950552561565427c22fe6ed7ef022722bbbdd3721265a026",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://www.google.com/s2/favicons?domain=tv.youtube.com&sz=128"
+    },
+    {
+      "key": "company:zoom",
+      "kind": "company",
+      "id": "zoom",
+      "name": "Zoom",
+      "group": "Bills & subscriptions",
+      "aliases": [
+        "Zoom",
+        "Zoom Pro"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-zoom-4b9b5c1b2a937a4d.png",
+      "sha256": "4b9b5c1b2a937a4d36f07465a5de0fe035ea8d54a9073d6ff91c06d718e0fc6a",
+      "revision": "0f58d6acbec137c466f65ec155618e461389a35530149ca82e155bb687cdab91",
+      "background": "transparent",
+      "inset": 0,
+      "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/zoom.svg"
+    },
+    {
+      "key": "merchant:aldinord",
+      "kind": "merchant",
+      "id": "aldinord",
+      "name": "Aldi Nord",
+      "group": "Groceries",
+      "aliases": [
+        "ALDI Nord"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-aldinord-5871b646a553c74a.svg",
+      "sha256": "5871b646a553c74a46a09d39dd95e7aa28e7baa92c265a1aa7a490ffd236b046",
+      "revision": "3f529cc064107f739cfcc7599cd06b80d6a716ed8f3293970292179353a55ca4",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Aldi_Nord_201x_logo.svg"
+    },
+    {
+      "key": "merchant:aldisud",
+      "kind": "merchant",
+      "id": "aldisud",
+      "name": "Aldi Süd",
+      "group": "Groceries",
+      "aliases": [
+        "ALDI",
+        "ALDI Süd"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-aldisud-baab43b749300bed.svg",
+      "sha256": "baab43b749300bed4b9920d654f2f90f6d29196c9b8cc71c511cd04697e5c484",
+      "revision": "f60c0033187ab1d3752879f1189b54947a53003a6f3771dcc2c361d8a9963d41",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.aldi-sued.de"
+    },
+    {
+      "key": "merchant:lidl",
+      "kind": "merchant",
+      "id": "lidl",
+      "name": "Lidl",
+      "group": "Groceries",
+      "aliases": [
+        "Lidl"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-lidl-41bd332b82577848.svg",
+      "sha256": "41bd332b825778485277525bc0a878dd3454fc1189c1110851dc2f0c8497f3a9",
+      "revision": "73699cdee41737514047d670d3d516d7e08eefde3451a9d59baa188ad18b124b",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.lidl.de"
+    },
+    {
+      "key": "merchant:instacart",
+      "kind": "merchant",
+      "id": "instacart",
+      "name": "Instacart",
+      "group": "Groceries",
+      "aliases": [
+        "Instacart"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-instacart-2e731af892aad8e4.svg",
+      "sha256": "2e731af892aad8e4cdb5a53fa658eb80176bb4c22485625deeaf55af14be9baf",
+      "revision": "798fe07a9d750947aeeaa955e4a8077d82ba3df1b63c887c4e7bea5d0379e265",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.instacart.com/press"
+    },
+    {
+      "key": "merchant:carrefour",
+      "kind": "merchant",
+      "id": "carrefour",
+      "name": "Carrefour",
+      "group": "Groceries",
+      "aliases": [
+        "Carrefour"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-carrefour-5e2c36ae5bc236a3.svg",
+      "sha256": "5e2c36ae5bc236a35377ccd8eb2439c3591ced6d231caca9e6c59bfb21c95b89",
+      "revision": "71577583896f902639f1cc76a8144eecd4e85020b709515be12399d4fe71f981",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:Carrefour_logo_no_tag.svg"
+    },
+    {
+      "key": "merchant:tesco",
+      "kind": "merchant",
+      "id": "tesco",
+      "name": "Tesco",
+      "group": "Groceries",
+      "aliases": [
+        "Tesco"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-tesco-523e4d5d376f8430.svg",
+      "sha256": "523e4d5d376f8430c7e33cc2521fabbe12b83f82e008afa017242a5a4138d5c0",
+      "revision": "dc2a104ffc441473026b589b0f6b0a002d4bee3ed214566151c6cd720985ed63",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.tesco.com"
+    },
+    {
+      "key": "merchant:asda",
+      "kind": "merchant",
+      "id": "asda",
+      "name": "ASDA",
+      "group": "Groceries",
+      "aliases": [
+        "ASDA"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-asda-892da0a0bb922260.svg",
+      "sha256": "892da0a0bb9222603bc31da7434c4c6a09c747957300d885dfe4eb0999d23bbf",
+      "revision": "43e0ba06898d9d3a12107ab73bb0709bc6661fdee7d6ab132425c5c6782aaf48",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.asda.com"
+    },
+    {
+      "key": "merchant:rewe",
+      "kind": "merchant",
+      "id": "rewe",
+      "name": "REWE",
+      "group": "Groceries",
+      "aliases": [
+        "REWE"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-rewe-a1ccaa5c11ee97f5.svg",
+      "sha256": "a1ccaa5c11ee97f52e08004ff75acc35151cb7adb19d2dd727c77d1818770a0c",
+      "revision": "45accdd5298cc3bdb682676e49a0f016b2b7e8233418fecaeda3673e7ec53560",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.rewe.de"
+    },
+    {
+      "key": "merchant:mcdonalds",
+      "kind": "merchant",
+      "id": "mcdonalds",
+      "name": "McDonald's",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "McDonald's",
+        "McDonalds"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-mcdonalds-4d8c4362f7ec6eed.svg",
+      "sha256": "4d8c4362f7ec6eeda6f3d0092ffd750b350939a29206773be5d195bad8f83ae2",
+      "revision": "75023b8f3b9d4b198a6aad1b33b4d50362f8a8313718e35b354604cda1c2b3ab",
+      "background": "#db0007",
+      "inset": 8,
+      "sourceUrl": "https://www.mcdonalds.com/gb/en-gb/newsroom.html"
+    },
+    {
+      "key": "merchant:burgerking",
+      "kind": "merchant",
+      "id": "burgerking",
+      "name": "Burger King",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Burger King"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-burgerking-ac22ecc1c3cc9f90.svg",
+      "sha256": "ac22ecc1c3cc9f90c45717eaaa819787c3709cc2ff02d37de6d1af6d017c3709",
+      "revision": "e70f97bf1618305403ee71a536ffb95c25339095482d722abdb73b159b29668c",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.bk.com"
+    },
+    {
+      "key": "merchant:tacobell",
+      "kind": "merchant",
+      "id": "tacobell",
+      "name": "Taco Bell",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Taco Bell"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-tacobell-2efd69221b0e07c1.svg",
+      "sha256": "2efd69221b0e07c14fabef7799623a697051debc56f02b1281fae1be40e6797a",
+      "revision": "2495d141ab45a6ef4e95f940a9a9beeb39d4ad7614a503f9084e7fcdbd8f9f21",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.tacobell.com"
+    },
+    {
+      "key": "merchant:starbucks",
+      "kind": "merchant",
+      "id": "starbucks",
+      "name": "Starbucks",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Starbucks"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-starbucks-e8a397a07e93c0a4.svg",
+      "sha256": "e8a397a07e93c0a4167c84707e4b6a825b3ec652cb6e7a0d463f3bdb95269a85",
+      "revision": "dd410cf40414a906994e648ce8c4216aa38f3b65dedac05f92b2dbc82a12f985",
+      "background": "#ffffff",
+      "inset": 0,
+      "sourceUrl": "https://starbucks.com"
+    },
+    {
+      "key": "merchant:kfc",
+      "kind": "merchant",
+      "id": "kfc",
+      "name": "KFC",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "KFC"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-kfc-1bf88da1c178143e.svg",
+      "sha256": "1bf88da1c178143e6ffd30231f12c18099f650c2ac18c9c71b7047cffc367697",
+      "revision": "4630be269c1b706dca73cbb7c78bde893ca99518ddf66337268464c0535ef18d",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://global.kfc.com/asset-library/"
+    },
+    {
+      "key": "merchant:ubereats",
+      "kind": "merchant",
+      "id": "ubereats",
+      "name": "Uber Eats",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Uber Eats"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ubereats-b0e0cbe54184ebb7.svg",
+      "sha256": "b0e0cbe54184ebb7a714e110d4aaaa2d648a35e5671c995549703d0132749ca8",
+      "revision": "5be2da03ed52ea6eeaed9888f080910d7318db4b4ddfead556ba8a0e13b2af9c",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://assets.uber.com/d/k4nuxdZ8MC7E/logos/collection/150"
+    },
+    {
+      "key": "merchant:doordash",
+      "kind": "merchant",
+      "id": "doordash",
+      "name": "DoorDash",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "DoorDash"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-doordash-e20dcdb67abbdbde.svg",
+      "sha256": "e20dcdb67abbdbdebf0506e05fefce874b5b9bbdf1e37fd4f7437241d86fe524",
+      "revision": "cf952c8e6e6793f61af134c82d28ca800dec8130b400f32364b50ebae37efd4e",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.doordash.com/about/"
+    },
+    {
+      "key": "merchant:deliveroo",
+      "kind": "merchant",
+      "id": "deliveroo",
+      "name": "Deliveroo",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Deliveroo"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-deliveroo-66c646a52fcdd871.svg",
+      "sha256": "66c646a52fcdd871300cb5419f0305eba1af577cdf111d61a1bbc1e77ee8e36a",
+      "revision": "1f549c062a2e40f97b5990381182b4a1183cbcd7832bc7690584b133b68d673a",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://deliveroo.com"
+    },
+    {
+      "key": "merchant:target",
+      "kind": "merchant",
+      "id": "target",
+      "name": "Target",
+      "group": "General stores",
+      "aliases": [
+        "Target",
+        "Target store"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-target-511fdc936522719f.svg",
+      "sha256": "511fdc936522719f761d7042f88d20239b3077976c09afc426f0ba0f6a2c6fae",
+      "revision": "779523f373eaf6311e8e37e2422055abe5293ccc109b5d6a468982248c4ebf28",
+      "background": "#ffffff",
+      "inset": 0,
+      "sourceUrl": "https://www.target.com"
+    },
+    {
+      "key": "merchant:ikea",
+      "kind": "merchant",
+      "id": "ikea",
+      "name": "IKEA",
+      "group": "General stores",
+      "aliases": [
+        "IKEA"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ikea-3c87b16786036f20.svg",
+      "sha256": "3c87b16786036f20b7fd7fd40e94647576fb5ac9b78382836073aa6b66d7a4fd",
+      "revision": "fe169408456aca256874e8d9e851fa5cb976bafabb28260f9630ebb7730f664b",
+      "background": "#ffda1a",
+      "inset": 4,
+      "sourceUrl": "https://www.ikea.com"
+    },
+    {
+      "key": "merchant:nike",
+      "kind": "merchant",
+      "id": "nike",
+      "name": "Nike",
+      "group": "General stores",
+      "aliases": [
+        "Nike"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-nike-bafb08923ddd2d4c.svg",
+      "sha256": "bafb08923ddd2d4ca56d49c191fb0b4533046e0300ae3165acf12f7874b9de8c",
+      "revision": "08cb0ba20228574df8ce5bb92cdd7fdc5fce1ef040203787f7a65ceeec06a68f",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.nike.com"
+    },
+    {
+      "key": "merchant:adidas",
+      "kind": "merchant",
+      "id": "adidas",
+      "name": "Adidas",
+      "group": "General stores",
+      "aliases": [
+        "Adidas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-adidas-360ad2feb672d470.svg",
+      "sha256": "360ad2feb672d4704d2ec6ca27a396668904602ff654dff6ca2bd9bf3bc4c677",
+      "revision": "11530e8f241397835a3291f90c88d1883ae69fa5be247d8ad99bcb99839ab129",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.adidas.com"
+    },
+    {
+      "key": "merchant:etsy",
+      "kind": "merchant",
+      "id": "etsy",
+      "name": "Etsy",
+      "group": "General stores",
+      "aliases": [
+        "Etsy"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-etsy-1871eb705d39d14f.svg",
+      "sha256": "1871eb705d39d14f72fe71e0cac23fea7ebb05ab01870214d5ebf3eaba9a2d70",
+      "revision": "17b620fc4fdb6cbb58862a03fbe28387feca366094ff6c339d74b3a8d9820be2",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.etsy.com/uk/press"
+    },
+    {
+      "key": "merchant:ebay",
+      "kind": "merchant",
+      "id": "ebay",
+      "name": "eBay",
+      "group": "General stores",
+      "aliases": [
+        "eBay"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ebay-4f7e56c62a82e464.svg",
+      "sha256": "4f7e56c62a82e464de70b405e09eb7bc9d5c2036aef069acfcfae9f3efcf53fa",
+      "revision": "8e3ced8fd2f42c151aef8d6b96c647e9a490d213ebd79e9297d45ad97a76a5b4",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://go.developer.ebay.com/logos"
+    },
+    {
+      "key": "merchant:handm",
+      "kind": "merchant",
+      "id": "handm",
+      "name": "H&M",
+      "group": "General stores",
+      "aliases": [
+        "H&M",
+        "H and M"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-handm-d912ba3b66c494b9.svg",
+      "sha256": "d912ba3b66c494b9ce71a9dd8a3fc78603160618c524903a6190bed9cb2a9201",
+      "revision": "0fdd288a0da4f24d9021fee55d60fde60207a7bf44c37d0ea523cae04f7bb2bd",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www2.hm.com/en_gb/index.html"
+    },
+    {
+      "key": "merchant:uniqlo",
+      "kind": "merchant",
+      "id": "uniqlo",
+      "name": "Uniqlo",
+      "group": "General stores",
+      "aliases": [
+        "Uniqlo"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-uniqlo-85432a91a2001050.svg",
+      "sha256": "85432a91a2001050c423b6649f13b5bb5779833dcdfe4c4a893e681f2f1906d2",
+      "revision": "1c4d3d451a7965d171b1c5302fd16d86eab5caf1471cb03dcbb39c586d83ddc1",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.uniqlo.com"
+    },
+    {
+      "key": "merchant:puma",
+      "kind": "merchant",
+      "id": "puma",
+      "name": "Puma",
+      "group": "General stores",
+      "aliases": [
+        "Puma"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-puma-9c7c03af3b191935.svg",
+      "sha256": "9c7c03af3b1919351f5a5e43ca9f98dd3f2cb6dd6ca8dce3512cc850ad962420",
+      "revision": "5b48adbd971ba7e5077e638ac2b88df25623daaa8bc33053ed56d6439db30b67",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://us.puma.com"
+    },
+    {
+      "key": "merchant:newbalance",
+      "kind": "merchant",
+      "id": "newbalance",
+      "name": "New Balance",
+      "group": "General stores",
+      "aliases": [
+        "New Balance"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-newbalance-b56a1ea12db89503.svg",
+      "sha256": "b56a1ea12db895038f4fe0450d9cd163b1b6f2c7bdfe37ac4bb0e5b630122e56",
+      "revision": "8b843c2ac9de0ba6bb9558da665816d1924832a6583998ed9ff92d79912caaf5",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.newbalance.com"
+    },
+    {
+      "key": "merchant:underarmour",
+      "kind": "merchant",
+      "id": "underarmour",
+      "name": "Under Armour",
+      "group": "General stores",
+      "aliases": [
+        "Under Armour"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-underarmour-72281bd9303768af.svg",
+      "sha256": "72281bd9303768af49a44d258feee1d3f89ff376654c3386cfb39a218933da3f",
+      "revision": "50addea863e69a22d4a8490e6d8c3c074514e6ad8c5d6e5075dd17e8390d7027",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.underarmour.com/en-us"
+    },
+    {
+      "key": "merchant:zara",
+      "kind": "merchant",
+      "id": "zara",
+      "name": "Zara",
+      "group": "General stores",
+      "aliases": [
+        "Zara"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-zara-7a2db869f3860f6b.svg",
+      "sha256": "7a2db869f3860f6ba8fb05af857caf22ff3e2e967d4595c7a61265b13a5b14b1",
+      "revision": "bb381d8a1e9c88581a53f1836fc2b7cceed242fed9201f29150c67e167e8fe36",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.zara.com"
+    },
+    {
+      "key": "merchant:aliexpress",
+      "kind": "merchant",
+      "id": "aliexpress",
+      "name": "AliExpress",
+      "group": "General stores",
+      "aliases": [
+        "AliExpress"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-aliexpress-cbe0d1e22542fe70.svg",
+      "sha256": "cbe0d1e22542fe70487c5d02889cf3f1c4050473f9f2ebdbdc16b0efc0dd19d7",
+      "revision": "921f471272d1548b164cd8df26d97061c61a667ec56fbc02f45f1318ceaf7122",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.alibabagroup.com/en/ir/reports"
+    },
+    {
+      "key": "merchant:wish",
+      "kind": "merchant",
+      "id": "wish",
+      "name": "Wish",
+      "group": "General stores",
+      "aliases": [
+        "Wish"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-wish-22ea3c573ee39670.svg",
+      "sha256": "22ea3c573ee39670d6c4e3df8ee9a685881f78db487699b50ce1e6b58e20e780",
+      "revision": "2e589a8060062123918506519c830dd8939f75b7c773ea9397a561e2b1d0e4f1",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://wish.com"
+    },
+    {
+      "key": "merchant:samsung",
+      "kind": "merchant",
+      "id": "samsung",
+      "name": "Samsung",
+      "group": "General stores",
+      "aliases": [
+        "Samsung"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-samsung-f187e2e69fcdc4f1.svg",
+      "sha256": "f187e2e69fcdc4f119707652bcd97a1516d796442d7790e8d7a129f771c1e36e",
+      "revision": "4a2615271a623e3b70a7fbea3ba9aeffca37a1d8278d55d8f6f9caafe51d39b1",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://www.samsung.com/us/about-us/brand-identity/logo/"
+    },
+    {
+      "key": "merchant:shell",
+      "kind": "merchant",
+      "id": "shell",
+      "name": "Shell",
+      "group": "Gas stations",
+      "aliases": [
+        "Shell",
+        "Shell gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-shell-cb024c31adf023ef.svg",
+      "sha256": "cb024c31adf023ef0a00907b907229139e2ca4eb98c5f4743a0e8695227f9772",
+      "revision": "a13be7f94b0780714af1a3b552d3134c38af16707989a6d80c9526fe8de7ccc4",
+      "background": "#ffffff",
+      "inset": 6,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:Shell_logo.svg"
+    },
+    {
+      "key": "merchant:uber",
+      "kind": "merchant",
+      "id": "uber",
+      "name": "Uber",
+      "group": "Travel & transport",
+      "aliases": [
+        "Uber"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-uber-29eaa0ec30571c06.svg",
+      "sha256": "29eaa0ec30571c0694e7e42ab34816adb5955e414248c240b2b82dee3d8b75ca",
+      "revision": "6de25421ab7badd2c927c4f3f99cea96ce781f7639c9335947ab4d265749dfc1",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://assets.uber.com/d/k4nuxdZ8MC7E/logos/collection/151"
+    },
+    {
+      "key": "merchant:lyft",
+      "kind": "merchant",
+      "id": "lyft",
+      "name": "Lyft",
+      "group": "Travel & transport",
+      "aliases": [
+        "Lyft"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-lyft-5c700a0a8447613d.svg",
+      "sha256": "5c700a0a8447613d0517f6671c4cfd10679ca4d32b1c6a67da0b62b2c87a945f",
+      "revision": "0c6732a061dca5d7e3ef10b8b0db7e62bacc61f5598de08c7bc3678b223aa5df",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.lyft.com/press"
+    },
+    {
+      "key": "merchant:airbnb",
+      "kind": "merchant",
+      "id": "airbnb",
+      "name": "Airbnb",
+      "group": "Travel & transport",
+      "aliases": [
+        "Airbnb"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-airbnb-730875628a7f14b9.svg",
+      "sha256": "730875628a7f14b9682469d0a1da3a66397029c3e46b43540e3d3de5af11b2dd",
+      "revision": "65780101f22d4ccf313e1f06878149f5a4271c15dd15ab47a153de5b4d84f22f",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.airbnb.com"
+    },
+    {
+      "key": "merchant:marriott",
+      "kind": "merchant",
+      "id": "marriott",
+      "name": "Marriott",
+      "group": "Travel & transport",
+      "aliases": [
+        "Marriott"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-marriott-d8e5f2d0c6110434.svg",
+      "sha256": "d8e5f2d0c6110434cc4f601ceda87b54b368720dec394adfde9aa80ee541c1d5",
+      "revision": "a275e5c5a009a7c26c3b07637ab23816a6d97ea4c42ee0102a75aa6654aca3bd",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://marriott-hotels.marriott.com"
+    },
+    {
+      "key": "merchant:hilton",
+      "kind": "merchant",
+      "id": "hilton",
+      "name": "Hilton",
+      "group": "Travel & transport",
+      "aliases": [
+        "Hilton"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-hilton-330c02529b1afb68.svg",
+      "sha256": "330c02529b1afb68eef0102336c0aeced4fb7b710f710478ca70fb0d026a1500",
+      "revision": "6fcca25d198c0fccb4b47e61394f2175208f7dfc5699d7e8153f6878dab6b1f6",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://www.hilton.com"
+    },
+    {
+      "key": "merchant:delta",
+      "kind": "merchant",
+      "id": "delta",
+      "name": "Delta",
+      "group": "Travel & transport",
+      "aliases": [
+        "Delta"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-delta-6d02d9e343ef1046.svg",
+      "sha256": "6d02d9e343ef104672dcc54853033b20c894281dbedbcb34b94997cbd0daf74a",
+      "revision": "d3542ab3ca5d90b551faf3778caa7b620c2acd8b49404a514148943c763cc3a5",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://news.delta.com/delta-air-lines-logos-brand-guidelines"
+    },
+    {
+      "key": "merchant:unitedairlines",
+      "kind": "merchant",
+      "id": "unitedairlines",
+      "name": "United Airlines",
+      "group": "Travel & transport",
+      "aliases": [
+        "United Airlines"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-unitedairlines-88bc9677345c5b6e.svg",
+      "sha256": "88bc9677345c5b6e19db9f2cd2369f03d26c241c02d103ebe77f996df5df81bf",
+      "revision": "ac5ba2ecccf41463683866acde6d6afb55d197b5fe503278310ef3bc1912d568",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.united.com"
+    },
+    {
+      "key": "merchant:southwestairlines",
+      "kind": "merchant",
+      "id": "southwestairlines",
+      "name": "Southwest Airlines",
+      "group": "Travel & transport",
+      "aliases": [
+        "Southwest",
+        "Southwest Airlines"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-southwestairlines-ce7a3812696a54e5.svg",
+      "sha256": "ce7a3812696a54e5015df579deb149fb6b200bc5642ec7d1254040636ca7868c",
+      "revision": "a0c7b7ca639e972158f903376cb045c83ac5321a1d62701a926664d21fa04c0c",
+      "background": "#ffffff",
+      "inset": 6,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Southwest_Airlines_logo_2014.svg"
+    },
+    {
+      "key": "merchant:bookingdotcom",
+      "kind": "merchant",
+      "id": "bookingdotcom",
+      "name": "Booking.com",
+      "group": "Travel & transport",
+      "aliases": [
+        "Booking.com"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-bookingdotcom-a17e2305c35e85a5.png",
+      "sha256": "a17e2305c35e85a537029ef3eaf44413535cc177912a75ef62784938aba3c57b",
+      "revision": "1e6bd3c1e1318372ab82d65af590c045efe9afd89f28b2433c9afcfcd4e1ebf4",
+      "background": "#003a9a",
+      "inset": 0,
+      "sourceUrl": "user-provided Booking.com reference"
+    },
+    {
+      "key": "merchant:expedia",
+      "kind": "merchant",
+      "id": "expedia",
+      "name": "Expedia",
+      "group": "Travel & transport",
+      "aliases": [
+        "Expedia"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-expedia-a83ff3e3aa86e6da.svg",
+      "sha256": "a83ff3e3aa86e6da776829e4457ef9abb077f2a2ebb4f7dd134d6f63651faa87",
+      "revision": "49978344387f89c94c30cb685af6d412c00dfbcbd8e98f4507503281168a40e9",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://brandfolder.com/portals/brand-expedia"
+    },
+    {
+      "key": "merchant:tripadvisor",
+      "kind": "merchant",
+      "id": "tripadvisor",
+      "name": "Tripadvisor",
+      "group": "Travel & transport",
+      "aliases": [
+        "Tripadvisor"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-tripadvisor-c45f380331a1213d.svg",
+      "sha256": "c45f380331a1213dec6565c75adc26a6d61d1bd8833a416f04e960c35dd87102",
+      "revision": "1d0394d024ad177f716a8db375eb249f8aa34957f822b1fb519b7cb5ff13a087",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://tripadvisor.mediaroom.com/logo-guidelines"
+    },
+    {
+      "key": "merchant:fedex",
+      "kind": "merchant",
+      "id": "fedex",
+      "name": "FedEx",
+      "group": "Shipping",
+      "aliases": [
+        "FedEx"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-fedex-fe9f8efbe1648b6e.svg",
+      "sha256": "fe9f8efbe1648b6e113bf8c4c3424e406ed54f1b55e52e0fc05b8308e2e9dde4",
+      "revision": "bf9f9ec1b76ab2b373f3b845feaf882f7a2e01aa54f724167142c370c765009c",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://newsroom.fedex.com"
+    },
+    {
+      "key": "merchant:ups",
+      "kind": "merchant",
+      "id": "ups",
+      "name": "UPS",
+      "group": "Shipping",
+      "aliases": [
+        "UPS"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ups-580e99311274c347.svg",
+      "sha256": "580e99311274c34782ded6873e72b5b958cf7ce698f071bd597aef40eecc1902",
+      "revision": "046bb90fd724629fc8f501b84715dfe6c31f50d12dabb2996c8cc51c8b3fc589",
+      "background": "#ffffff",
+      "inset": 6,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:United_Parcel_Service_logo_2014.svg"
+    },
+    {
+      "key": "merchant:usps",
+      "kind": "merchant",
+      "id": "usps",
+      "name": "USPS",
+      "group": "Shipping",
+      "aliases": [
+        "USPS"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-usps-a38dc7d740123c28.svg",
+      "sha256": "a38dc7d740123c280461552c5f661e9abea2ba49077c7e43c43bb021d688993e",
+      "revision": "63112a41cfd93d1548e67f3ff5b953a0de159e0232c8b1321297b4235c8bfd14",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://www.usps.com"
+    },
+    {
+      "key": "merchant:dhl",
+      "kind": "merchant",
+      "id": "dhl",
+      "name": "DHL",
+      "group": "Shipping",
+      "aliases": [
+        "DHL"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-dhl-dc8038665792a80a.svg",
+      "sha256": "dc8038665792a80ab968dc08fdc505b4a97d7d34bfa41c53e22c344c795e2873",
+      "revision": "3ea622a6a271d4f2040a7af6a015e0771ae3480e70d72784243ceab665e10472",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://www.dpdhl-brands.com/dhl/en/guides/design-basics/logo-and-claim.html"
+    },
+    {
+      "key": "merchant:grubhub",
+      "kind": "merchant",
+      "id": "grubhub",
+      "name": "Grubhub",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Grubhub",
+        "Grub Hub"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-grubhub-64c5257b826ad061.svg",
+      "sha256": "64c5257b826ad061cdcd32423dadfbebfe2e057202fef6d9eac56939dd16120d",
+      "revision": "774b26d1ff2473cab23895cd5c6fb7ac25501653e39e9a4509594d4c5296ae99",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/grubhub.svg"
+    },
+    {
+      "key": "merchant:amazon",
+      "kind": "merchant",
+      "id": "amazon",
+      "name": "Amazon",
+      "group": "General stores",
+      "aliases": [
+        "Amazon",
+        "Amazon.com",
+        "AMZN Mktp US",
+        "Amazon Marketplace"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-amazon-ec401e732753cdc5.svg",
+      "sha256": "ec401e732753cdc53ffe77e28b201409be53fc5447947689db3c36524951bb49",
+      "revision": "03e17412fdc82591cd5218a01eb26d12a7d76b0884f818a7985d838e1b74b3ad",
+      "background": "#ff9400",
+      "inset": 7,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Amazon_logo.svg"
+    },
+    {
+      "key": "merchant:walmart",
+      "kind": "merchant",
+      "id": "walmart",
+      "name": "Walmart",
+      "group": "General stores",
+      "aliases": [
+        "Walmart",
+        "Wal-Mart",
+        "Walmart Supercenter",
+        "Walmart gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
+      "sha256": "c1e12ba4f8a11a419e957fee26a9e41901019658a54c2507687ce46c8d92f432",
+      "revision": "a0f693ed5244c52cb340e2940251457f994fb5846601278e115015381c712411",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/walmart.svg"
+    },
+    {
+      "key": "merchant:trader-joes",
+      "kind": "merchant",
+      "id": "trader-joes",
+      "name": "Trader Joe’s",
+      "group": "Groceries",
+      "aliases": [
+        "Trader Joe’s",
+        "Trader Joe's",
+        "Trader Joes"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-trader-joes-503e83d3207938d2.svg",
+      "sha256": "503e83d3207938d283c565f96f2bdfa09fac55a8184b5624d72d735d205edb6a",
+      "revision": "243a6be756547102d93a55b2b0a6069db482af471378e5120240eedb2dcb39a7",
+      "background": "#fffaf0",
+      "inset": 3,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Trader_Joes_Logo.svg"
+    },
+    {
+      "key": "merchant:whole-foods",
+      "kind": "merchant",
+      "id": "whole-foods",
+      "name": "Whole Foods",
+      "group": "Groceries",
+      "aliases": [
+        "Whole Foods",
+        "Whole Foods Market"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
+      "sha256": "d548ef550b066f1caea51efc632d626aed0bf0ea2506f8d295ea33a01d5b034e",
+      "revision": "ad86fb8c6c34adffaa0c9c9075394015c528c9ada0135ef51e8fc34a1db481ce",
+      "background": "#ffffff",
+      "inset": 0,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Whole_Foods_Market_201x_logo.svg"
+    },
+    {
+      "key": "merchant:chevron",
+      "kind": "merchant",
+      "id": "chevron",
+      "name": "Chevron",
+      "group": "Gas stations",
+      "aliases": [
+        "Chevron"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-chevron-9493eafb2e48bf90.svg",
+      "sha256": "9493eafb2e48bf909a88c744006d8c37e4973d1bad8abcde2db306f92d7adffc",
+      "revision": "1db9e2a41e789864c576073e30ef7452632c50eeb6c5e84e715a10df64230bcf",
+      "background": "#ffffff",
+      "inset": 7,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chevron_Logo.svg"
+    },
+    {
+      "key": "merchant:home-depot",
+      "kind": "merchant",
+      "id": "home-depot",
+      "name": "Home Depot",
+      "group": "General stores",
+      "aliases": [
+        "Home Depot",
+        "The Home Depot"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-home-depot-72dc07b8739d9c1d.svg",
+      "sha256": "72dc07b8739d9c1dc287a5b53cd1e8beb7fe78c11919942d88e9927dc07d77e9",
+      "revision": "797f79b653cb3b0f3374ffbe75d1521545374867f3d7b006534f5da7ee2b8549",
+      "background": "#f96302",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_Home_Depot_logo.svg"
+    },
+    {
+      "key": "merchant:costco",
+      "kind": "merchant",
+      "id": "costco",
+      "name": "Costco",
+      "group": "General stores",
+      "aliases": [
+        "Costco",
+        "Costco Wholesale",
+        "Costco gas",
+        "Costco gasoline"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-costco-9c769076aaad8c2c.svg",
+      "sha256": "9c769076aaad8c2cf16a888dee9326df7e67c4cf350fab0574209366e1fb61ac",
+      "revision": "5e953e0aa545d1e5aaf8e70e518c69b9f12bed8f060c6040c2ad30a7b0b2780b",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Costco_Wholesale_logo_2010-10-26.svg"
+    },
+    {
+      "key": "merchant:chipotle",
+      "kind": "merchant",
+      "id": "chipotle",
+      "name": "Chipotle",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Chipotle",
+        "Chipotle Mexican Grill"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-chipotle-e4bd47f46d31e3c9.svg",
+      "sha256": "e4bd47f46d31e3c98533c8ed2c172bd5996e1699f780c35749f661f907fe183c",
+      "revision": "2cde3cf4186d3c9fad8109465bff41ce3531448b6d3c5ba96a3c08992fa855f3",
+      "background": "#a81612",
+      "inset": 0,
+      "sourceUrl": "https://www.chipotle.com/"
+    },
+    {
+      "key": "merchant:safeway",
+      "kind": "merchant",
+      "id": "safeway",
+      "name": "Safeway",
+      "group": "Groceries",
+      "aliases": [
+        "Safeway",
+        "Safeway gas",
+        "Safeway Fuel",
+        "Safeway fuel station"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+      "sha256": "85938b09a89cdbd4eb9e10752c7a9d3a9399cb08d4e9e891d45939633476575a",
+      "revision": "37204b00e32c14e603894fae13ac443dec01b5cb8af81cba4c88951a5f78e6ee",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Safeway_Logo.svg"
+    },
+    {
+      "key": "merchant:raley-s",
+      "kind": "merchant",
+      "id": "raley-s",
+      "name": "Raley’s",
+      "group": "Groceries",
+      "aliases": [
+        "Raley’s",
+        "Raley's",
+        "Raleys"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-raley-s-974e90d00f7d74cb.svg",
+      "sha256": "974e90d00f7d74cb062d87e51b2a4b1203b3f8f3796744912498aaacfcacdbe1",
+      "revision": "2132297c7d08cfea9d110f88d370b92e24e1da33bf2a814529f88091359f8795",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Raleys_logo.svg"
+    },
+    {
+      "key": "merchant:lucky",
+      "kind": "merchant",
+      "id": "lucky",
+      "name": "Lucky",
+      "group": "Groceries",
+      "aliases": [
+        "Lucky",
+        "Lucky Stores",
+        "Lucky Supermarket"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-lucky-6fddcad7c6d57b39.svg",
+      "sha256": "6fddcad7c6d57b3918340bc64d2cbdb15056e6d4c44d20787224a5c25fe1c92d",
+      "revision": "7a102bdac09ed40821cc6b1953f3f0d7cf4af5edcffb395f622eaa6547746172",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lucky_Stores_logo.svg"
+    },
+    {
+      "key": "merchant:h-e-b",
+      "kind": "merchant",
+      "id": "h-e-b",
+      "name": "H-E-B",
+      "group": "Groceries",
+      "aliases": [
+        "H-E-B",
+        "HEB"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-h-e-b-99e39d881090cec1.svg",
+      "sha256": "99e39d881090cec1033c43110506bfe0cadcc723a383ef3b8baa0e85c69c0c41",
+      "revision": "80591dfe7b2bec1a474d0c87812916762bc24ec291169084bd08760d90f92829",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:HEB_logo.svg"
+    },
+    {
+      "key": "merchant:ralphs",
+      "kind": "merchant",
+      "id": "ralphs",
+      "name": "Ralphs",
+      "group": "Groceries",
+      "aliases": [
+        "Ralphs"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ralphs-907338af30435f9d.svg",
+      "sha256": "907338af30435f9d044a61dffa4eeb3a85dcb52fb6734a79c7faf57ae9293794",
+      "revision": "0019d27230408889f5033ac88860dbb1a44d1f946f84adf29b3e615d519e3698",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ralphs.svg"
+    },
+    {
+      "key": "merchant:food-4-less",
+      "kind": "merchant",
+      "id": "food-4-less",
+      "name": "Food 4 Less",
+      "group": "Groceries",
+      "aliases": [
+        "Food 4 Less",
+        "Food4Less"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-food-4-less-72b5c3c24bfe4187.svg",
+      "sha256": "72b5c3c24bfe41872731a406c34fc94ad6364b512bf85c31669bb6dc0e687d06",
+      "revision": "4e2409055985ce476eb2aba0d22e6c5cd612d532691e32d197f16410084366f8",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Food4Less_logo.svg"
+    },
+    {
+      "key": "merchant:macy-s",
+      "kind": "merchant",
+      "id": "macy-s",
+      "name": "Macy’s",
+      "group": "General stores",
+      "aliases": [
+        "Macy’s",
+        "Macy's",
+        "Macys"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-macy-s-c12efe01dd06232d.svg",
+      "sha256": "c12efe01dd06232d3dfa20745085f17a90f5be6183a3e06438147269f71abaac",
+      "revision": "670b1018675b5701457ec1a10ea61cb03410fadbd520bd2d7e6ed6f016105d64",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Macy%27s_logo.svg"
+    },
+    {
+      "key": "merchant:grocery-outlet",
+      "kind": "merchant",
+      "id": "grocery-outlet",
+      "name": "Grocery Outlet",
+      "group": "Groceries",
+      "aliases": [
+        "Grocery Outlet",
+        "Grocery Outlet Bargain Market"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-grocery-outlet-c01ed8af3f2518f6.svg",
+      "sha256": "c01ed8af3f2518f634ace30c65809cbb49c42aab69ae75665fc0103d4cf1abde",
+      "revision": "24d880757d51b3927924cdc23791eb65e02b1d0506cf14adb4ef0322e8dbc980",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Grocery_Outlet_logo.svg"
+    },
+    {
+      "key": "merchant:foodmaxx",
+      "kind": "merchant",
+      "id": "foodmaxx",
+      "name": "FoodMaxx",
+      "group": "Groceries",
+      "aliases": [
+        "FoodMaxx",
+        "Food Maxx"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-foodmaxx-e265c11c54b7e299.svg",
+      "sha256": "e265c11c54b7e299f7b83f52c3e5c9989c6a7c4034cd5f6029fcee9ec95cce56",
+      "revision": "a3b56303efc740fed62849aa4554f70a447bdb6c84c39f9cc296335f67bcd68a",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:FoodMaxx_logo.svg"
+    },
+    {
+      "key": "merchant:smart-final",
+      "kind": "merchant",
+      "id": "smart-final",
+      "name": "Smart & Final",
+      "group": "Groceries",
+      "aliases": [
+        "Smart & Final",
+        "Smart and Final",
+        "Smart & Final Extra"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-smart-final-0596fc9122ad6066.svg",
+      "sha256": "0596fc9122ad6066de905f711f2c6259f0b3cda3074d0ce4851db015c91e8c90",
+      "revision": "ecdcf5eea9b7275102b32f243887e2f5ffdd0deff32f4affb6d5a852f29ee3fd",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Smart%26Final_logo.svg"
+    },
+    {
+      "key": "merchant:winco",
+      "kind": "merchant",
+      "id": "winco",
+      "name": "WinCo",
+      "group": "Groceries",
+      "aliases": [
+        "WinCo",
+        "WinCo Foods"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-winco-a69f576a3b6a27ef.svg",
+      "sha256": "a69f576a3b6a27ef7310ce1e80d2581f41322d1109cc67d8eeb7361debf90b66",
+      "revision": "88d7699b520057c65d2eadbb2e25733842561e1b689c70d6227170c8565778cc",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:WinCo_Foods_Logo.svg"
+    },
+    {
+      "key": "merchant:nugget-markets",
+      "kind": "merchant",
+      "id": "nugget-markets",
+      "name": "Nugget Markets",
+      "group": "Groceries",
+      "aliases": [
+        "Nugget Markets",
+        "Nugget Market"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-nugget-markets-dcb2c550169515ab.svg",
+      "sha256": "dcb2c550169515abc4a65d79c41488f2691e44d12320e816e897940bcfbf212f",
+      "revision": "b40152da7cdd9877999788ed843e0e1dd94bd9b45776efaaf17fdb7dcb2e76d9",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Nugget_Markets_logo.svg"
+    },
+    {
+      "key": "merchant:publix",
+      "kind": "merchant",
+      "id": "publix",
+      "name": "Publix",
+      "group": "Groceries",
+      "aliases": [
+        "Publix",
+        "Publix Super Market"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-publix-3f95ae939457559d.svg",
+      "sha256": "3f95ae939457559d24a7baa2918c10dc7a2309e90f60bda9085dc2ec2879e791",
+      "revision": "399717dfa66f2ff0be4c07ff57d79d30801544333a79b14098bcc4de9e1e3d38",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Publix_Logo.svg"
+    },
+    {
+      "key": "merchant:wegmans",
+      "kind": "merchant",
+      "id": "wegmans",
+      "name": "Wegmans",
+      "group": "Groceries",
+      "aliases": [
+        "Wegmans"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-wegmans-cc8b573678019ff2.svg",
+      "sha256": "cc8b573678019ff2de42fb6a0f4a52890190c38144215d7c3ffba0f21801ad6f",
+      "revision": "9afa6c2bf289195a9a63184044ddfdb13025bcdda49628110aaacb9dbb2d9cbb",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:WegmansLogo.svg"
+    },
+    {
+      "key": "merchant:meijer",
+      "kind": "merchant",
+      "id": "meijer",
+      "name": "Meijer",
+      "group": "Groceries",
+      "aliases": [
+        "Meijer"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-meijer-e18564fd4251801a.svg",
+      "sha256": "e18564fd4251801a105950055a47344868634210b7d92c88e4a2dce1485471ec",
+      "revision": "a59b5358d58d31b4eaca752d36898eea9ad83398765f528bc85df465a9d7a106",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Meijer_logo.svg"
+    },
+    {
+      "key": "merchant:hy-vee",
+      "kind": "merchant",
+      "id": "hy-vee",
+      "name": "Hy-Vee",
+      "group": "Groceries",
+      "aliases": [
+        "Hy-Vee",
+        "Hy Vee"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-hy-vee-3094e6bf49b43fae.svg",
+      "sha256": "3094e6bf49b43fae790512998fd534963ed8e3aa037524714820d7652730462a",
+      "revision": "8f56d235c8a9cc1067144dbebf98f40f1100577c882091299c6f80ff7cea61a8",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hy-Vee_logo.svg"
+    },
+    {
+      "key": "merchant:vons",
+      "kind": "merchant",
+      "id": "vons",
+      "name": "Vons",
+      "group": "Groceries",
+      "aliases": [
+        "Vons"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-vons-e40b948bbd18cb95.svg",
+      "sha256": "e40b948bbd18cb959ee856d476ba5b6ca4558483c2392490ad654575a426b35f",
+      "revision": "0fbde668d6bd73a1ebd6087b7d9bc36d3c66a515245149af9a6f7afb901caf6f",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Vons_logo.svg"
+    },
+    {
+      "key": "merchant:fred-meyer",
+      "kind": "merchant",
+      "id": "fred-meyer",
+      "name": "Fred Meyer",
+      "group": "Groceries",
+      "aliases": [
+        "Fred Meyer"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-fred-meyer-868e07919a461778.svg",
+      "sha256": "868e07919a461778b3c8489594f46f924820ff7f14fb7e696afcd78a93386947",
+      "revision": "550f5f2a49e318d305aabe4c0759ecf39c6ea3662378619851e3adb3ba87a283",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fred_Meyer_logo_(2021).svg"
+    },
+    {
+      "key": "merchant:fry-s",
+      "kind": "merchant",
+      "id": "fry-s",
+      "name": "Fry’s",
+      "group": "Groceries",
+      "aliases": [
+        "Fry’s",
+        "Fry's",
+        "Frys Food",
+        "Fry's Food"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-fry-s-43349a40a9579f22.svg",
+      "sha256": "43349a40a9579f224e784b57e6031754d090baf8755bb035d9e52fce49a0f37b",
+      "revision": "9721e78a1675d208f3c55730a32052b827e7bbf889bfabb72fd7833562d78215",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Fry%27s_Logo.svg"
+    },
+    {
+      "key": "merchant:king-soopers",
+      "kind": "merchant",
+      "id": "king-soopers",
+      "name": "King Soopers",
+      "group": "Groceries",
+      "aliases": [
+        "King Soopers"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-king-soopers-3e3c1549beb32fab.svg",
+      "sha256": "3e3c1549beb32fab88d23aae049ad75762bf854ee47cfd2c956d753fc9b6c791",
+      "revision": "d6e315bd7ea188d53e053d8c778d30a62fb30ef8a135715c8fcd5dd651b5a234",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:King_Soopers_logo.svg"
+    },
+    {
+      "key": "merchant:giant-eagle",
+      "kind": "merchant",
+      "id": "giant-eagle",
+      "name": "Giant Eagle",
+      "group": "Groceries",
+      "aliases": [
+        "Giant Eagle"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-giant-eagle-de1988a27f88a30b.svg",
+      "sha256": "de1988a27f88a30b8c641ecd8c355b1b0f06e06bfb82017d3bc29d1ce5f7e381",
+      "revision": "1195f36a889e4477ab26ff93d2e22da72d5cf5053493bce9115102f9363d2b71",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:GiantEagle.svg"
+    },
+    {
+      "key": "merchant:jewel-osco",
+      "kind": "merchant",
+      "id": "jewel-osco",
+      "name": "Jewel-Osco",
+      "group": "Groceries",
+      "aliases": [
+        "Jewel-Osco",
+        "Jewel Osco"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-jewel-osco-80f8a9327431f6d6.svg",
+      "sha256": "80f8a9327431f6d664bbe45d588e732c5708f8c8b973ef602daf0e636ce20314",
+      "revision": "704887c5955b534d33e2601128133206b904542b9aa0ca373f92c8d249e3a620",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jewel-Osco_logo.svg"
+    },
+    {
+      "key": "merchant:stop-shop",
+      "kind": "merchant",
+      "id": "stop-shop",
+      "name": "Stop & Shop",
+      "group": "Groceries",
+      "aliases": [
+        "Stop & Shop",
+        "Stop and Shop"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-stop-shop-22e83d328051015c.svg",
+      "sha256": "22e83d328051015ce02eaa11773d63beeae5b50c4cda594b3be3ee11854060a0",
+      "revision": "81451bc8175522c6b7a69895bc966f6f6c14c8ace4ceacbc3cc08eae515e59ef",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Stop_%26_Shop_2018_logo.svg"
+    },
+    {
+      "key": "merchant:the-fresh-market",
+      "kind": "merchant",
+      "id": "the-fresh-market",
+      "name": "The Fresh Market",
+      "group": "Groceries",
+      "aliases": [
+        "The Fresh Market"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-the-fresh-market-392f2695694f8b98.svg",
+      "sha256": "392f2695694f8b98ad97b4a01b859ce1c1f40d1fd2915cef67a95a2c141faac5",
+      "revision": "1e2bebfa737a8e819bded48f846490164306d436181be587ec9cd992bcdb0414",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_Fresh_Market_logo.svg"
+    },
+    {
+      "key": "merchant:sam-s-club",
+      "kind": "merchant",
+      "id": "sam-s-club",
+      "name": "Sam’s Club",
+      "group": "Groceries",
+      "aliases": [
+        "Sam’s Club",
+        "Sam's Club",
+        "Sams Club",
+        "Sam's Club gas",
+        "Sams Club gas",
+        "Sam’s Club fuel"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sam-s-club-c6b487847135e78f.svg",
+      "sha256": "c6b487847135e78f908f989ba9b302f7d3bcd328bcf50dbb3310c5fa83d208ec",
+      "revision": "f4bbb55cb5aa3e1371e706b7bde91783b0e43168c1ed23ee122f537dec084b59",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sam%27s_Club_Logo_2020.svg"
+    },
+    {
+      "key": "merchant:bj-s-wholesale",
+      "kind": "merchant",
+      "id": "bj-s-wholesale",
+      "name": "BJ’s Wholesale",
+      "group": "Groceries",
+      "aliases": [
+        "BJ’s Wholesale",
+        "BJ's Wholesale",
+        "BJ's Wholesale Club",
+        "BJs Wholesale",
+        "BJs gas",
+        "BJ's gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-bj-s-wholesale-7ae53be1b570871e.svg",
+      "sha256": "7ae53be1b570871ec0d67acfcea36c726bad1f3f39b349beb83c4afc51145cce",
+      "revision": "5432691187f4376d56ec12897e10579ba8bcef916f855e0c585684c01c815dfc",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:BJs_Wholesale_Club_Logo.svg"
+    },
+    {
+      "key": "merchant:save-a-lot",
+      "kind": "merchant",
+      "id": "save-a-lot",
+      "name": "Save A Lot",
+      "group": "Groceries",
+      "aliases": [
+        "Save A Lot",
+        "Save-A-Lot"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-save-a-lot-f8a0e6f228c6604e.svg",
+      "sha256": "f8a0e6f228c6604e6aa4b8504e7b7c21863c65b5dca7dde1a7644e5fe3fc0882",
+      "revision": "26876e5c1e5a77e4abceff93cba687f8985325b82d711726f6b2a5046ebb46ee",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Save_A_Lot_logo.svg"
+    },
+    {
+      "key": "merchant:weis-markets",
+      "kind": "merchant",
+      "id": "weis-markets",
+      "name": "Weis Markets",
+      "group": "Groceries",
+      "aliases": [
+        "Weis Markets"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-weis-markets-d9029efff94e9986.svg",
+      "sha256": "d9029efff94e9986a48b96ac9bb5d5c92502bb8d25f3ed56be3b79ffc4351705",
+      "revision": "535456274534dac5ad669a539d7a0bfcafe8614c8c995385cb469a0c9f73fbc5",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Weis_Markets_logo.svg"
+    },
+    {
+      "key": "merchant:76",
+      "kind": "merchant",
+      "id": "76",
+      "name": "76",
+      "group": "Gas stations",
+      "aliases": [
+        "76",
+        "Union 76",
+        "76 gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-76-b0be97cf09fd26e9.svg",
+      "sha256": "b0be97cf09fd26e9781d6254dbd13dc4d76458017b81a4f028002c97f2954a60",
+      "revision": "e178ffcf74cba5fd9100831791acd80d1589c4c6129299b4949e638e2d642cc5",
+      "background": "#ffffff",
+      "inset": 0,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:76_Orange_Logo.svg"
+    },
+    {
+      "key": "merchant:arco",
+      "kind": "merchant",
+      "id": "arco",
+      "name": "ARCO",
+      "group": "Gas stations",
+      "aliases": [
+        "ARCO",
+        "ARCO gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-arco-c3571b59c0c3c136.svg",
+      "sha256": "c3571b59c0c3c13642f406e16da28eaaf4037f84ce1c09d882529da21a732865",
+      "revision": "b17e3cc75b50b68eb34c705849bc346ba542d9a52ec608a8d0baf2703bc236be",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:ARCO.svg"
+    },
+    {
+      "key": "merchant:exxon",
+      "kind": "merchant",
+      "id": "exxon",
+      "name": "Exxon",
+      "group": "Gas stations",
+      "aliases": [
+        "Exxon",
+        "Exxon gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-exxon-6b5ffc23a9a4aa5f.svg",
+      "sha256": "6b5ffc23a9a4aa5fcb067601fac3a61acedb9b2aa9fedee0f360f3cda7ca0826",
+      "revision": "0b5c84d05b7bc04e3485de6ef4a09af31be6774d0951d1d31a25f139d374c7d6",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Exxon_logo_2016.svg"
+    },
+    {
+      "key": "merchant:mobil",
+      "kind": "merchant",
+      "id": "mobil",
+      "name": "Mobil",
+      "group": "Gas stations",
+      "aliases": [
+        "Mobil",
+        "Mobil gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-mobil-75891324a28740f1.svg",
+      "sha256": "75891324a28740f12e66e37f63687742f3cd36d725e0a7e3f3f20fea51aef15a",
+      "revision": "7954ae2d8b35f0df8010e6c75e1e12475ccd278ecd8304761a97930b33817445",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Mobil-logo.svg"
+    },
+    {
+      "key": "merchant:texaco",
+      "kind": "merchant",
+      "id": "texaco",
+      "name": "Texaco",
+      "group": "Gas stations",
+      "aliases": [
+        "Texaco",
+        "Texaco gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-texaco-a1fc3248eb55b923.svg",
+      "sha256": "a1fc3248eb55b9232dc012b813a509bd42abf624faffe3bd0321a2003bd8c8c2",
+      "revision": "9fc001b8e7f471c2242bef5e04f6fb04e5b3bf8141b0a7cbf1002f2cf4aff7e0",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Texaco_logo.svg"
+    },
+    {
+      "key": "merchant:sunoco",
+      "kind": "merchant",
+      "id": "sunoco",
+      "name": "Sunoco",
+      "group": "Gas stations",
+      "aliases": [
+        "Sunoco",
+        "Sunoco gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sunoco-60bf24e2bbe02a22.svg",
+      "sha256": "60bf24e2bbe02a22ea1602fa043c1117b9dd510fb94f061829ccfddf7be2e54e",
+      "revision": "90b9cacde44b8bf4235dd8bd8e605b4f26a6248db72f35e81ece429cd252fbf5",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sunoco_1999_logo.svg"
+    },
+    {
+      "key": "merchant:phillips-66",
+      "kind": "merchant",
+      "id": "phillips-66",
+      "name": "Phillips 66",
+      "group": "Gas stations",
+      "aliases": [
+        "Phillips 66",
+        "Phillips66"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-phillips-66-a579cafed870b23a.svg",
+      "sha256": "a579cafed870b23aa1389c91073616101cfd7d78c3a9123c24d99ad501e9ecfa",
+      "revision": "43c6145c66e56873539434f3248dd4976efa2dbfcacd46bed112df60a01ea81a",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Phillips_66_logo.svg"
+    },
+    {
+      "key": "merchant:conoco",
+      "kind": "merchant",
+      "id": "conoco",
+      "name": "Conoco",
+      "group": "Gas stations",
+      "aliases": [
+        "Conoco",
+        "Conoco gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-conoco-c63e487ab9afe78a.svg",
+      "sha256": "c63e487ab9afe78a3980367815dca161111c8c832391401c2e621047c70475f4",
+      "revision": "e2e16194c75c278ac77f6820dba78c662c11e3e3cccc85eebed5020c86432d85",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Conoco_logo.svg"
+    },
+    {
+      "key": "merchant:citgo",
+      "kind": "merchant",
+      "id": "citgo",
+      "name": "CITGO",
+      "group": "Gas stations",
+      "aliases": [
+        "CITGO",
+        "Citgo gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-citgo-82071e9a6a9621c4.svg",
+      "sha256": "82071e9a6a9621c4c4c0c008ae9a185bff19e5b126b26a2888945156abc3aab7",
+      "revision": "dac1cac411ea37b08ff2e5f228185638ced5fc75bac39928368cbabdfc9da870",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Citgo_logo.svg"
+    },
+    {
+      "key": "merchant:marathon",
+      "kind": "merchant",
+      "id": "marathon",
+      "name": "Marathon",
+      "group": "Gas stations",
+      "aliases": [
+        "Marathon",
+        "Marathon gas",
+        "Marathon Petroleum"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-marathon-640b728d446b52fa.svg",
+      "sha256": "640b728d446b52faf183469fe26a175cf070c2bc640a1018c4ee7b3653950a20",
+      "revision": "1347755db025b60a365db702208cb6975565d75710135925baee6ec92bcae556",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Marathon_Petroleum_logo_2022.svg"
+    },
+    {
+      "key": "merchant:7-eleven",
+      "kind": "merchant",
+      "id": "7-eleven",
+      "name": "7-Eleven",
+      "group": "Gas stations",
+      "aliases": [
+        "7-Eleven",
+        "7 Eleven",
+        "7Eleven"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-7-eleven-2696fb9fd35ae97a.svg",
+      "sha256": "2696fb9fd35ae97ade4451d94172237dbd580561ff2ae166e21e5462e929df27",
+      "revision": "e187740a0cce3ca03a2a5c7bd0b1becad67410fe39feba28d78cab9af25d9954",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:7-eleven_logo.svg"
+    },
+    {
+      "key": "merchant:casey-s",
+      "kind": "merchant",
+      "id": "casey-s",
+      "name": "Casey’s",
+      "group": "Gas stations",
+      "aliases": [
+        "Casey’s",
+        "Casey's",
+        "Caseys",
+        "Casey's General Store"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-casey-s-91360eb1cd7be2d1.svg",
+      "sha256": "91360eb1cd7be2d11634270dece1a937ac995bbb0fd4bf48857faac4b6a894df",
+      "revision": "828559e1d2615ffd2c8367bbda9b3a594833afcc904c666a26d619dfb2fbb6db",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Casey%27s_logo.svg"
+    },
+    {
+      "key": "merchant:circle-k",
+      "kind": "merchant",
+      "id": "circle-k",
+      "name": "Circle K",
+      "group": "Gas stations",
+      "aliases": [
+        "Circle K",
+        "CircleK"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-circle-k-1e61fb816fae4afc.svg",
+      "sha256": "1e61fb816fae4afc3cd3ee0622baf6bcf085e38d2b35e177787f6f95b6a1ba64",
+      "revision": "43260957d5457d521d28726bd76ccb3063c7bc85da001c2774db0192bf09b562",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circle_K_logo_2015.svg"
+    },
+    {
+      "key": "merchant:sheetz",
+      "kind": "merchant",
+      "id": "sheetz",
+      "name": "Sheetz",
+      "group": "Gas stations",
+      "aliases": [
+        "Sheetz"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sheetz-774e74d49b65e776.svg",
+      "sha256": "774e74d49b65e776a4274d5921dc3df570f07673d71bf3c9a8c08b6f9409aebd",
+      "revision": "3453c9959b69b3077200a5af99cfd07c684d8b1ba0f23965ffe022b8dc5c5308",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sheetz_logo.svg"
+    },
+    {
+      "key": "merchant:speedway",
+      "kind": "merchant",
+      "id": "speedway",
+      "name": "Speedway",
+      "group": "Gas stations",
+      "aliases": [
+        "Speedway",
+        "Speedway gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-speedway-de389d384eb4a634.svg",
+      "sha256": "de389d384eb4a6347bbbd9fae80d8598ce85af124883aa971bc4c3865f80c774",
+      "revision": "c50c3c5c66832ef222e0d7ac0a6d960b68ee02a3d148c5525ec08b13aad6917b",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Speedway_LLC_logo.svg"
+    },
+    {
+      "key": "merchant:in-n-out",
+      "kind": "merchant",
+      "id": "in-n-out",
+      "name": "In-N-Out",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "In-N-Out",
+        "In N Out",
+        "In-N-Out Burger"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-in-n-out-71aef5413caff248.svg",
+      "sha256": "71aef5413caff248bff15e5fee1d0001e074d9bd0720e12681da53b99d991b40",
+      "revision": "49669515fa1700947e558fb6ee8b1a19962e7e24bb6d14080144b5d53ea9f073",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:InNOut_2021_logo.svg"
+    },
+    {
+      "key": "merchant:chick-fil-a",
+      "kind": "merchant",
+      "id": "chick-fil-a",
+      "name": "Chick-fil-A",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Chick-fil-A",
+        "Chick Fil A",
+        "Chickfila"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-chick-fil-a-0c22a8e7be811629.svg",
+      "sha256": "0c22a8e7be811629f8f75767cf8283086119124e9426a9abad456c928176b30a",
+      "revision": "1d5eb4febddbfd11de5adfbf646f84e8028dd44940c56417608bf384d5852ad3",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chick-fil-A_Logo.svg"
+    },
+    {
+      "key": "merchant:wendy-s",
+      "kind": "merchant",
+      "id": "wendy-s",
+      "name": "Wendy’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Wendy’s",
+        "Wendy's",
+        "Wendys"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-wendy-s-e967f279cfb5bdec.svg",
+      "sha256": "e967f279cfb5bdecb452b206a8f960d4c5d8ec2f87bb311510db113f3adf9fca",
+      "revision": "9bd8fd0702476c36b85e30f4f7df55cecbecbe512a5b751f86503befc2859fc2",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Wendy%27s_logo_2012.svg"
+    },
+    {
+      "key": "merchant:jack-in-the-box",
+      "kind": "merchant",
+      "id": "jack-in-the-box",
+      "name": "Jack in the Box",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Jack in the Box"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-jack-in-the-box-b76b31392df7db97.svg",
+      "sha256": "b76b31392df7db97b4f5233d4a01c2b7c1dc6044f2268d5d16f5c59d9866748b",
+      "revision": "d0f84cabfcfb1626d8b33f71376a88f5151088a1d0d8cc3e00451e822d33a7ad",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jack_in_the_Box_2009_logo.svg"
+    },
+    {
+      "key": "merchant:subway",
+      "kind": "merchant",
+      "id": "subway",
+      "name": "Subway",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Subway"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-subway-6495f02e1b66570e.svg",
+      "sha256": "6495f02e1b66570e5134bb9ef36298b03cc534b51abb66e203ccdf6b06cfc859",
+      "revision": "cc009844af69c7169f27745ff1f7dca6941fec90819fa7c6838ac1eec5e7045b",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Subway_2016_logo.svg"
+    },
+    {
+      "key": "merchant:dunkin",
+      "kind": "merchant",
+      "id": "dunkin",
+      "name": "Dunkin’",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Dunkin’",
+        "Dunkin",
+        "Dunkin'",
+        "Dunkin Donuts"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-dunkin-8a812437781138b2.svg",
+      "sha256": "8a812437781138b24679ccd82b1536ef3000107aeb0c8a0c4f1ad3c692ad0ed6",
+      "revision": "f1013d659bd4dce5e48a1f57ad2490206b6b2e78b11d948662aa2cf4b753e034",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dunkin%27_2022.svg"
+    },
+    {
+      "key": "merchant:arby-s",
+      "kind": "merchant",
+      "id": "arby-s",
+      "name": "Arby’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Arby’s",
+        "Arby's",
+        "Arbys"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-arby-s-b73df46b4afb3a81.svg",
+      "sha256": "b73df46b4afb3a818d43d9bf492739eb2261fbb82f4c42684806278da3be2b39",
+      "revision": "bc8d09595d4167e6928c28602a454b353a644a8f165229f599e3622ec1dc94b6",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Arby%27s_logo.svg"
+    },
+    {
+      "key": "merchant:carl-s-jr",
+      "kind": "merchant",
+      "id": "carl-s-jr",
+      "name": "Carl’s Jr.",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Carl’s Jr.",
+        "Carl's Jr",
+        "Carls Jr",
+        "Carl's Jr."
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-carl-s-jr-ac0b7df46ee5440b.svg",
+      "sha256": "ac0b7df46ee5440bfec9304cd9bb4e52745b619fe22752c7b9c5481a019cb7d9",
+      "revision": "b4ceaa9bbcb789b77453d2c07a237b3336f602385b87121836ed771cab1f0a33",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Carl%27s_Jr_logo.svg"
+    },
+    {
+      "key": "merchant:five-guys",
+      "kind": "merchant",
+      "id": "five-guys",
+      "name": "Five Guys",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Five Guys"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-five-guys-551df34bbd29ccbc.svg",
+      "sha256": "551df34bbd29ccbc7bfce873d3a0fa992fd1518ddced6f13192c9c67fea3cfd9",
+      "revision": "028666502e966be1eefd2284b1b8b927210f3aad05feec87503494e92e28a031",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Five_Guys_logo.svg"
+    },
+    {
+      "key": "merchant:jersey-mike-s",
+      "kind": "merchant",
+      "id": "jersey-mike-s",
+      "name": "Jersey Mike’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Jersey Mike’s",
+        "Jersey Mike's",
+        "Jersey Mikes",
+        "Jersey Mike's Subs"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-jersey-mike-s-ba21c0c6dbf17b6d.svg",
+      "sha256": "ba21c0c6dbf17b6d4ad60a1195b523c104e056d01a7281761dcd1c3642d80e49",
+      "revision": "f480c82bc45bd003f4b40bb008a58e6c2dfd8d151fa4fbb9c3d96cdf42295637",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jersey_Mike%27s_logo.svg"
+    },
+    {
+      "key": "merchant:shake-shack",
+      "kind": "merchant",
+      "id": "shake-shack",
+      "name": "Shake Shack",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Shake Shack"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-shake-shack-23c88cd6111fa5d5.svg",
+      "sha256": "23c88cd6111fa5d5e7b95167749a6febb21aa6c69e6035f01ef6f0de0795414c",
+      "revision": "a3e6f719992c07975dec92005a94aa763a3b8947477ef03091a2927a8f75840e",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Shake_Shack_logo.svg"
+    },
+    {
+      "key": "merchant:sonic",
+      "kind": "merchant",
+      "id": "sonic",
+      "name": "Sonic",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Sonic",
+        "Sonic Drive-In"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sonic-dc9853920176eef7.svg",
+      "sha256": "dc9853920176eef7be65a3cf4bd73afc599945eb4be985fcc49cc1fc0ff9eec9",
+      "revision": "e7fc181994511fecfa237d50021805bc811cf44472660b54373be74705f6dcf5",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:SONIC_New_Logo_2020.svg"
+    },
+    {
+      "key": "merchant:culver-s",
+      "kind": "merchant",
+      "id": "culver-s",
+      "name": "Culver’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Culver’s",
+        "Culver's",
+        "Culvers"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-culver-s-f7cb9031879997d9.svg",
+      "sha256": "f7cb9031879997d990d8fc5c20bb40504fdf1722ccc33aecd579d55963b2be05",
+      "revision": "b3a5eacd94b91ef29a66971b2155632c03ae2bd89d5836517b42169d805b711c",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Culver%27s_logo.svg"
+    },
+    {
+      "key": "merchant:raising-cane-s",
+      "kind": "merchant",
+      "id": "raising-cane-s",
+      "name": "Raising Cane’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Raising Cane’s",
+        "Raising Cane's",
+        "Raising Canes"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-raising-cane-s-9bce2ddd7335b29e.svg",
+      "sha256": "9bce2ddd7335b29e5dc11a9f2cd3dac1e3b6bcd525116a33e592143bae6b6c8e",
+      "revision": "3413233fed88abafd34486ec60535e8718fe75728612ae79a90f486bceedfce2",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Raising_Cane%27s_Chicken_Fingers_logo.svg"
+    },
+    {
+      "key": "merchant:popeyes",
+      "kind": "merchant",
+      "id": "popeyes",
+      "name": "Popeyes",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Popeyes",
+        "Popeyes Louisiana Kitchen"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-popeyes-70a4320b60c8979a.svg",
+      "sha256": "70a4320b60c8979af9ac88a933299d6bc69c2d1252eac76253e5917868225276",
+      "revision": "4916f5810212e922720b44a9df7332b021eb6d47b011f77ee6c6620f0422d1f4",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Popeyes_logo.svg"
+    },
+    {
+      "key": "merchant:qdoba",
+      "kind": "merchant",
+      "id": "qdoba",
+      "name": "Qdoba",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Qdoba",
+        "Qdoba Mexican Eats"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-qdoba-627d8269d46edb4b.svg",
+      "sha256": "627d8269d46edb4b4a95103ba3386b951ac08ffd5778de6843f10f0b18064a39",
+      "revision": "4ab91703947ddb3aa5941bfdf1b5e2684e393e4e0c457b3c7d0fec96a1506199",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Qdoba_Logo.svg"
+    },
+    {
+      "key": "merchant:cinnabon",
+      "kind": "merchant",
+      "id": "cinnabon",
+      "name": "Cinnabon",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Cinnabon"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-cinnabon-b49464063e396552.svg",
+      "sha256": "b49464063e39655287342c850988a7fa1a88fe9327d5db462794ef0a5725bba4",
+      "revision": "76e7c001ddf965fb9c8b0b053b98761b9e83a23217eb5dcff27859ad473351fc",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Cinnabon_logo.svg"
+    },
+    {
+      "key": "merchant:crumbl",
+      "kind": "merchant",
+      "id": "crumbl",
+      "name": "Crumbl",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Crumbl",
+        "Crumbl Cookies"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-crumbl-23aaee41ceafec3a.svg",
+      "sha256": "23aaee41ceafec3a9e6176fbeb80fec9ff2b9a031ae7d260f2c5afc164a16d8c",
+      "revision": "73447c9247b79eb816eb7ee1dd585f5cb9abfb1459a145369370fca47a33a2b0",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Crumbl_logo_updated.svg"
+    },
+    {
+      "key": "merchant:tim-hortons",
+      "kind": "merchant",
+      "id": "tim-hortons",
+      "name": "Tim Hortons",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Tim Hortons"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-tim-hortons-e518a41c61d60c40.svg",
+      "sha256": "e518a41c61d60c404530a52fcd46f11b1024539722685ef656b9c1baf66ef057",
+      "revision": "70ebe40b00590b3f5bb6902ef18c816fc8f694a972d495cdc3f3ddf6b5a5c781",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tim_Hortons_Logo.svg"
+    },
+    {
+      "key": "merchant:tropical-smoothie-cafe",
+      "kind": "merchant",
+      "id": "tropical-smoothie-cafe",
+      "name": "Tropical Smoothie Cafe",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Tropical Smoothie Cafe"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-tropical-smoothie-cafe-1ad444001a4fedf3.svg",
+      "sha256": "1ad444001a4fedf3ee8ea3a12f360121d39cf32de45c51918efac68e2707ddb4",
+      "revision": "aa80e27214ed1f0eef0b2143acbb613d1693ea3d191f51c4400a4bb5b9566a45",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Tropical_Smoothie_Cafe_logo.svg"
+    },
+    {
+      "key": "merchant:domino-s",
+      "kind": "merchant",
+      "id": "domino-s",
+      "name": "Domino’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Domino’s",
+        "Domino's",
+        "Dominos",
+        "Domino's Pizza"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-domino-s-d10312514bb7e2fe.svg",
+      "sha256": "d10312514bb7e2fe70611db6afb2644f5e066ba021514c959795c4b3e0a955e1",
+      "revision": "5a520a5dd39d28c0d299c87763b4ba93f8d77afa08e6dcdae0bf76d9a431db77",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Domino%27s_pizza_logo.svg"
+    },
+    {
+      "key": "merchant:pizza-hut",
+      "kind": "merchant",
+      "id": "pizza-hut",
+      "name": "Pizza Hut",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Pizza Hut"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-pizza-hut-3219458988d3cbf0.svg",
+      "sha256": "3219458988d3cbf0ec815c87c12eafbe8cc46fa201f25eb3788c0c7ac7c100ef",
+      "revision": "4aa257587437db92dec172de7881ef68164f803d4d53dee49de2f7db12ddf864",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Pizza_Hut_(2019).svg"
+    },
+    {
+      "key": "merchant:papa-johns",
+      "kind": "merchant",
+      "id": "papa-johns",
+      "name": "Papa Johns",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Papa Johns",
+        "Papa John's",
+        "Papa Johns Pizza"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-papa-johns-636d4bb27ccf656d.svg",
+      "sha256": "636d4bb27ccf656d96ac535f6df78475aae0497a989dfc7a8856585ad5b042dc",
+      "revision": "2ce63e0bc33816a9ea26af575e88be7efd8cb75c715bff3b3b97622531a0a0e4",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Papa_Johns_logo.svg"
+    },
+    {
+      "key": "merchant:papa-murphy-s",
+      "kind": "merchant",
+      "id": "papa-murphy-s",
+      "name": "Papa Murphy’s",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Papa Murphy’s",
+        "Papa Murphy's",
+        "Papa Murphys"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-papa-murphy-s-6a7c9786642bc51b.svg",
+      "sha256": "6a7c9786642bc51bb77bc5cb336da82155c963b24316354ef1b392095c368fe5",
+      "revision": "9468e5847af521f714589a3d1cb7cb5ff8863179f9cc11ab42ed0ab43b4ca089",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Papa_Murphy%27s_logo.svg"
+    },
+    {
+      "key": "merchant:peet-s-coffee",
+      "kind": "merchant",
+      "id": "peet-s-coffee",
+      "name": "Peet’s Coffee",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Peet’s Coffee",
+        "Peet's Coffee",
+        "Peets Coffee",
+        "Peet's"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-peet-s-coffee-e2130b972040ba84.svg",
+      "sha256": "e2130b972040ba847c6470b97e665a4db5aa72b429d5a5b17acc50e5d2147c09",
+      "revision": "28908aee6107884e403ae3959856322e82cdde596cadf2b064dcab1114222444",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Peet%27s_Coffee_logo.svg"
+    },
+    {
+      "key": "merchant:best-buy",
+      "kind": "merchant",
+      "id": "best-buy",
+      "name": "Best Buy",
+      "group": "General stores",
+      "aliases": [
+        "Best Buy",
+        "BestBuy"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-best-buy-93a954f0e658c43e.svg",
+      "sha256": "93a954f0e658c43ec6b1c51c445c280a9fe161f0527a127080761d4f789e707b",
+      "revision": "5588c22fb4c5fbc230b0c5e141e01d613388403480332dde5f7f0d9ad1cc652d",
+      "background": "#ffffff",
+      "inset": 5,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Best_Buy_logo_2018.svg"
+    },
+    {
+      "key": "merchant:world-market",
+      "kind": "merchant",
+      "id": "world-market",
+      "name": "World Market",
+      "group": "General stores",
+      "aliases": [
+        "World Market",
+        "Cost Plus World Market",
+        "Cost Plus"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-world-market-f79784e5924a7cf0.png",
+      "sha256": "f79784e5924a7cf0602220121ba83d88ce2ce105ab9e9b71cdaa855f5b8d100f",
+      "revision": "d749d1bef474607df10f0f3fa19bc2d7a495d374bad43998d80233da12e0cd27",
+      "background": "#fff8eb",
+      "inset": 3,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:World_Market_logo.png"
+    },
+    {
+      "key": "merchant:lowe-s",
+      "kind": "merchant",
+      "id": "lowe-s",
+      "name": "Lowe’s",
+      "group": "General stores",
+      "aliases": [
+        "Lowe’s",
+        "Lowe's",
+        "Lowes",
+        "Lowe's Home Improvement"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-lowe-s-a080212b39ddd1ae.svg",
+      "sha256": "a080212b39ddd1ae2f03662c8df2470c796e4b0e51260605d5f88cc4e4d12787",
+      "revision": "0cfc944b0f5efb57097288ce209339eaae8e78141423a9a4199686ca4acc0f15",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Lowes_Companies_Logo.svg"
+    },
+    {
+      "key": "merchant:ace-hardware",
+      "kind": "merchant",
+      "id": "ace-hardware",
+      "name": "Ace Hardware",
+      "group": "General stores",
+      "aliases": [
+        "Ace Hardware"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ace-hardware-142f94cc18508f09.svg",
+      "sha256": "142f94cc18508f09298ae04d292b133eeefe1d467a3d28ffa3f245b6ecaa9839",
+      "revision": "5c65e967577da507f4ed12c959e4ab022d80ed4f131466faad675b431092109c",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ace_Hardware_Logo.svg"
+    },
+    {
+      "key": "merchant:michaels",
+      "kind": "merchant",
+      "id": "michaels",
+      "name": "Michaels",
+      "group": "General stores",
+      "aliases": [
+        "Michaels"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-michaels-d7d01232bdf2a807.svg",
+      "sha256": "d7d01232bdf2a8075040b8e915877cf6d494df224aacde44359b219ee3e0af7e",
+      "revision": "e4f7054fa22797ba3f0c33d8cfd27ea4d13ac2cbe339c3fbc805e9d84858c658",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Michaels_logo.svg"
+    },
+    {
+      "key": "merchant:hobby-lobby",
+      "kind": "merchant",
+      "id": "hobby-lobby",
+      "name": "Hobby Lobby",
+      "group": "General stores",
+      "aliases": [
+        "Hobby Lobby"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-hobby-lobby-a155b51d89faeccc.svg",
+      "sha256": "a155b51d89faeccc98b35dee06f8b2255239ffbaf460e34b324ddbb133080bf9",
+      "revision": "204872f203b3cadd1dc44eb5e3a21c434a061be62036a892faa005f73ff1f416",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hobby_Lobby_logo.svg"
+    },
+    {
+      "key": "merchant:cvs",
+      "kind": "merchant",
+      "id": "cvs",
+      "name": "CVS",
+      "group": "General stores",
+      "aliases": [
+        "CVS",
+        "CVS Pharmacy"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-cvs-00f1f34aa253030a.svg",
+      "sha256": "00f1f34aa253030a224765d5039f0d38d9d941c8cd0a39a8baa29d858f898b47",
+      "revision": "e20e3188054aad2679d2f7146787058933d440b167ae06f62dec084db4459b1b",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:CVS_Pharmacy_Logo.svg"
+    },
+    {
+      "key": "merchant:walgreens",
+      "kind": "merchant",
+      "id": "walgreens",
+      "name": "Walgreens",
+      "group": "General stores",
+      "aliases": [
+        "Walgreens"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-walgreens-bd7018f2285d0cf0.svg",
+      "sha256": "bd7018f2285d0cf0f1e501bd33f51579eba7affbe62cd9a1b741a862493aaf6b",
+      "revision": "be337dbda5122e3400716af5f2717396b3e525a08309238b163383486e27b7f8",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Walgreens_2020_initial_W_logo.svg"
+    },
+    {
+      "key": "merchant:dollar-general",
+      "kind": "merchant",
+      "id": "dollar-general",
+      "name": "Dollar General",
+      "group": "General stores",
+      "aliases": [
+        "Dollar General"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-dollar-general-f10add8673e88821.svg",
+      "sha256": "f10add8673e888218ab0b54f0014b186618a26cc0029f0d3ae575845f4c7a096",
+      "revision": "4890d14e72440a8acf9290cf3fa53a2cc80b344cb2da378885f3554ac0dbded6",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dollar_General_logo.svg"
+    },
+    {
+      "key": "merchant:dollar-tree",
+      "kind": "merchant",
+      "id": "dollar-tree",
+      "name": "Dollar Tree",
+      "group": "General stores",
+      "aliases": [
+        "Dollar Tree"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-dollar-tree-0450608d08d5e567.svg",
+      "sha256": "0450608d08d5e5670cd4041393a27187c3edca641284700ad24b911a98213f1b",
+      "revision": "149a7db64c1957d0191fbcc24647c0bbbe5474e644d566d110903c3629f791f0",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Dollar_Tree_logo.svg"
+    },
+    {
+      "key": "merchant:five-below",
+      "kind": "merchant",
+      "id": "five-below",
+      "name": "Five Below",
+      "group": "General stores",
+      "aliases": [
+        "Five Below"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-five-below-eac28a0d27ddf792.svg",
+      "sha256": "eac28a0d27ddf792cabaf094e1cc8aca27abc274df639923a71c2ef67eb5be71",
+      "revision": "1ad4276ea0a4acef3ff5e8e9a4a21a874cc0bb7f4a55fed8b2c8f3aeb15538ff",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Five_Below_logo.svg"
+    },
+    {
+      "key": "merchant:tj-maxx",
+      "kind": "merchant",
+      "id": "tj-maxx",
+      "name": "TJ Maxx",
+      "group": "General stores",
+      "aliases": [
+        "TJ Maxx",
+        "TJMaxx",
+        "T.J. Maxx"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-tj-maxx-392a47b18690e5c1.svg",
+      "sha256": "392a47b18690e5c17150e7f6970b335340a29e9b71ecf4fb8f32c18cbac1fa3e",
+      "revision": "ab64cad401822982c00877d65040482b9167a8becfad3ec2ac7b94d98da250dc",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:TJ_Maxx_Logo.svg"
+    },
+    {
+      "key": "merchant:marshalls",
+      "kind": "merchant",
+      "id": "marshalls",
+      "name": "Marshalls",
+      "group": "General stores",
+      "aliases": [
+        "Marshalls"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-marshalls-095359cecdee76b3.svg",
+      "sha256": "095359cecdee76b3f0c49ac9ce582c8b83db8dc87d3702eaf1f1b57d92e8ffc2",
+      "revision": "1355daffcb8dad69be1b2425a963e124739ddeaf51090859e1b990eab50ba748",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Marshalls_Logo.svg"
+    },
+    {
+      "key": "merchant:burlington",
+      "kind": "merchant",
+      "id": "burlington",
+      "name": "Burlington",
+      "group": "General stores",
+      "aliases": [
+        "Burlington",
+        "Burlington Coat Factory"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-burlington-01fcd8610f4b8995.svg",
+      "sha256": "01fcd8610f4b899534eed2eecb17e10f64508d63913bed1b28f5b78d67a59537",
+      "revision": "d581e8d272e75c89973a14eda5e037c2ba0c577e2d5af5c8dccdb9531d0542b1",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Burlington_Stores_logo.svg"
+    },
+    {
+      "key": "merchant:kohl-s",
+      "kind": "merchant",
+      "id": "kohl-s",
+      "name": "Kohl’s",
+      "group": "General stores",
+      "aliases": [
+        "Kohl’s",
+        "Kohl's",
+        "Kohls"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-kohl-s-9f2ca2622f374465.svg",
+      "sha256": "9f2ca2622f3744652e6c48b9960d00c5c632726e5e912c3dee0815172e1fce52",
+      "revision": "d62e3749cb596e271e0c862d6f0545fc18f4f831c7ca2d5cdd34fecd0f6ee206",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Kohl%27s_logo.svg"
+    },
+    {
+      "key": "merchant:nordstrom",
+      "kind": "merchant",
+      "id": "nordstrom",
+      "name": "Nordstrom",
+      "group": "General stores",
+      "aliases": [
+        "Nordstrom"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-nordstrom-d0c687ba2ddf2e60.svg",
+      "sha256": "d0c687ba2ddf2e60b8b19acc366db49315d3ba4540c06089e548a27f3951d4ec",
+      "revision": "1681fff1cc47d16736824ca76541254cafb7c90e65188745a0cf664875d7dfe2",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Nordstrom_Logo_2019.svg"
+    },
+    {
+      "key": "merchant:nordstrom-rack",
+      "kind": "merchant",
+      "id": "nordstrom-rack",
+      "name": "Nordstrom Rack",
+      "group": "General stores",
+      "aliases": [
+        "Nordstrom Rack"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-nordstrom-rack-0eccccb846ee1151.svg",
+      "sha256": "0eccccb846ee115157dfe12dce728c1ddf8333171fa8027080a1df0d778c009a",
+      "revision": "991fefabc3ada4633f967e368388128fa69d3d73fc47ae5da52556e5a377b76e",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Nordstrom_Rack_logo_2023.svg"
+    },
+    {
+      "key": "merchant:jcpenney",
+      "kind": "merchant",
+      "id": "jcpenney",
+      "name": "JCPenney",
+      "group": "General stores",
+      "aliases": [
+        "JCPenney",
+        "J C Penney",
+        "JC Penney"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-jcpenney-370bdce74bcc21b7.svg",
+      "sha256": "370bdce74bcc21b7fcabc34b3089d62fe41b34df88f3e72cef8005c78ed89a4d",
+      "revision": "52a4fb59f23615f29db0fbc57ab85093aaab6f877779a030f5a5c1f628109adb",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:JCPenney_logo_(2019).svg"
+    },
+    {
+      "key": "merchant:ulta-beauty",
+      "kind": "merchant",
+      "id": "ulta-beauty",
+      "name": "Ulta Beauty",
+      "group": "General stores",
+      "aliases": [
+        "Ulta Beauty",
+        "Ulta"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-ulta-beauty-10820dc34674ff7c.svg",
+      "sha256": "10820dc34674ff7c0a0c9bfc63aebe6d9bb5177bbb247c25c59309e50aaf148b",
+      "revision": "9fcf58d169f227fb63e7d1db252c6b42fd697b5047cbf3e82122176456b8df44",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Ulta_Beauty_logo.svg"
+    },
+    {
+      "key": "merchant:petco",
+      "kind": "merchant",
+      "id": "petco",
+      "name": "Petco",
+      "group": "General stores",
+      "aliases": [
+        "Petco"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-petco-e9e14d69337cd32c.svg",
+      "sha256": "e9e14d69337cd32cdeff2ff6eee965ed5449da54107bebc9e828404d32d21524",
+      "revision": "b381dd98ed8a9ff58684bc271f978e707405356933d1385f855c3753725bf8b6",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Petco_Logo.svg"
+    },
+    {
+      "key": "merchant:chewy",
+      "kind": "merchant",
+      "id": "chewy",
+      "name": "Chewy",
+      "group": "General stores",
+      "aliases": [
+        "Chewy",
+        "Chewy.com"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-chewy-3ac28cc8c07faa14.svg",
+      "sha256": "3ac28cc8c07faa14b9c0316d5816a58784aebd7b09607660aa78749c87cd15de",
+      "revision": "5bd000a1b0612438adcffb07319e1e6bb94846344fdcb1ad6a6817406165e602",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chewy_pet_food_logo.svg"
+    },
+    {
+      "key": "merchant:barnes-noble",
+      "kind": "merchant",
+      "id": "barnes-noble",
+      "name": "Barnes & Noble",
+      "group": "General stores",
+      "aliases": [
+        "Barnes & Noble",
+        "Barnes and Noble"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-barnes-noble-b78c7443ae9a67d2.svg",
+      "sha256": "b78c7443ae9a67d211472fad45e22e6369a539da40a140041d54bcacc2cc9d1b",
+      "revision": "0f49510619c240bf2ddbc409157751b42ebc7c0229e5a0d02c10db1b0eb0170a",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Barnes_%26_Noble_logo_(2021).svg"
+    },
+    {
+      "key": "merchant:staples",
+      "kind": "merchant",
+      "id": "staples",
+      "name": "Staples",
+      "group": "General stores",
+      "aliases": [
+        "Staples"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-staples-440e774437f550cc.svg",
+      "sha256": "440e774437f550cc414416785b6566cd925433011e9f2defd49b529c20fbab3f",
+      "revision": "241eb483d1aa587a538088d880bb27c95ad7c6039b51b8bf6d9aef6a9c194b43",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Staples_2019.svg"
+    },
+    {
+      "key": "merchant:o-reilly-auto-parts",
+      "kind": "merchant",
+      "id": "o-reilly-auto-parts",
+      "name": "O’Reilly Auto Parts",
+      "group": "General stores",
+      "aliases": [
+        "O’Reilly Auto Parts",
+        "O'Reilly Auto Parts",
+        "OReilly Auto Parts"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-o-reilly-auto-parts-401cbc08d7ae88a1.svg",
+      "sha256": "401cbc08d7ae88a161f28ca62b14ae995fda53fd522e102808d6027ff79cf361",
+      "revision": "ca8975ea42f4a3136e6cb25d74694678e50fdd5e95dabe4972adc09968873b81",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:O%27Reilly_Auto_Parts_Logo.svg"
+    },
+    {
+      "key": "merchant:petsmart",
+      "kind": "merchant",
+      "id": "petsmart",
+      "name": "PetSmart",
+      "group": "General stores",
+      "aliases": [
+        "PetSmart",
+        "Pet Smart"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-petsmart-94557634c6211f95.svg",
+      "sha256": "94557634c6211f95b80008c1d15d6b7f9c4b8f9efe07b097ad5ed9b45d2b7485",
+      "revision": "98803381ab0264bb363a522fcf9981e41e7494f998ea99c11c7ab636007eff1e",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:PetSmart.svg"
+    },
+    {
+      "key": "merchant:sephora",
+      "kind": "merchant",
+      "id": "sephora",
+      "name": "Sephora",
+      "group": "General stores",
+      "aliases": [
+        "Sephora"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sephora-b6248eb3d6e5b05f.svg",
+      "sha256": "b6248eb3d6e5b05fca71611be7f93d562b12901f74c50f6a1e8b5278cc7c95b3",
+      "revision": "ee40f8962299319e9f859b2dd06d7c633a90444bc3c8904381357a3628b103fa",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sephora_logo.svg"
+    },
+    {
+      "key": "merchant:bp",
+      "kind": "merchant",
+      "id": "bp",
+      "name": "BP",
+      "group": "Gas stations",
+      "aliases": [
+        "BP",
+        "British Petroleum",
+        "BP gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-bp-9dad127421af0a14.svg",
+      "sha256": "9dad127421af0a14172ee55627e2c06f24ebe5593510428812c16f29dabfcd7f",
+      "revision": "77d42fdc1e7fc58d15eb8d10042126960bd21cc2ece9074d0ad2833f477d291e",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:BP_Helios_logo.svg"
+    },
+    {
+      "key": "merchant:wawa",
+      "kind": "merchant",
+      "id": "wawa",
+      "name": "Wawa",
+      "group": "Gas stations",
+      "aliases": [
+        "Wawa"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-wawa-ca88e6273dfadcb5.svg",
+      "sha256": "ca88e6273dfadcb5a3b90fe3463b5e73436683d22c4bb78f45e414ce6add0ee7",
+      "revision": "7c828a1aad5129a63d867477031816b016a70de26a7ab1bb35a453d885804c0b",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:Wawa_logo.svg"
+    },
+    {
+      "key": "merchant:sinclair",
+      "kind": "merchant",
+      "id": "sinclair",
+      "name": "Sinclair",
+      "group": "Gas stations",
+      "aliases": [
+        "Sinclair",
+        "Sinclair Oil"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sinclair-31fbe7c76af23129.svg",
+      "sha256": "31fbe7c76af23129bd86ef2fb1e7f0cd081c3b6db482de7ba73a0215d79d377d",
+      "revision": "1ee10a79ce22eacf7ce5536ade711924759be012e700a2dcb3c4c0031b2331d1",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:Sinclair_Oil_logo.svg"
+    },
+    {
+      "key": "merchant:panda-express",
+      "kind": "merchant",
+      "id": "panda-express",
+      "name": "Panda Express",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Panda Express"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+      "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+      "revision": "93c63e4a69611697385e848e5e77a74594542fb1824a58f7ab3a9e7153cc8187",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg"
+    },
+    {
+      "key": "merchant:wingstop",
+      "kind": "merchant",
+      "id": "wingstop",
+      "name": "Wingstop",
+      "group": "Fast food & coffee",
+      "aliases": [
+        "Wingstop"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-wingstop-36b97fd75ddebe47.svg",
+      "sha256": "36b97fd75ddebe478f8dc38d13cdaeed319ca529b6475bb62f8a81a57f7a4581",
+      "revision": "3818f7f8f07a8e3451d89ac192793a9e53822d0bd09f11def0a9ea78299659d1",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:Wingstop_logo.svg"
+    },
+    {
+      "key": "merchant:rei",
+      "kind": "merchant",
+      "id": "rei",
+      "name": "REI",
+      "group": "General stores",
+      "aliases": [
+        "REI",
+        "REI Co-op",
+        "Recreational Equipment Inc"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-rei-ff63311059336afc.svg",
+      "sha256": "ff63311059336afc140db5fe775ad447cac26f2588ca0ff765ea040a48291347",
+      "revision": "34cf588237fe844c535d8ae3bfc3d160710aeefda2c10991425882b282217954",
+      "background": "#ffffff",
+      "inset": 5,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:REI_logo.svg"
+    },
+    {
+      "key": "merchant:autozone",
+      "kind": "merchant",
+      "id": "autozone",
+      "name": "AutoZone",
+      "group": "General stores",
+      "aliases": [
+        "AutoZone",
+        "Auto Zone"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-autozone-a6efca13aa81be7c.svg",
+      "sha256": "a6efca13aa81be7c127851345fd29ebe97543d3ff12b0ff151c1375fcd3f9564",
+      "revision": "9f52bac33fd5b4bd7931115bca6bb5e297f54aac13340e3644155cc0e7310804",
+      "background": "#ffffff",
+      "inset": 4,
+      "sourceUrl": "https://en.wikipedia.org/wiki/File:AutoZone_logo.svg"
+    },
+    {
+      "key": "merchant:kroger",
+      "kind": "merchant",
+      "id": "kroger",
+      "name": "Kroger",
+      "group": "Groceries",
+      "aliases": [
+        "Kroger",
+        "Kroger gas"
+      ],
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-kroger-2204dd1bb885a8af.svg",
+      "sha256": "2204dd1bb885a8af5f180ce40064312089952faec4701e2e3bdee9c6dfa00e89",
+      "revision": "5f0d906badf0ffbcf92114f66cce2256a21257233b682f888331ed03f7687a6d",
+      "background": "#ffffff",
+      "inset": 3,
+      "sourceUrl": "https://github.com/GLINCKER/thesvg/blob/ea47400094ad2849240546826a54a10ff833e64c/public/icons/kroger/wordmark.svg"
+    }
+  ]
+}
