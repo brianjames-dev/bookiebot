@@ -70,6 +70,9 @@ const fragment=template.replace('__STUDIO_DATA__',JSON.stringify(payload).replac
     feedback=JSON.parse((await page.evaluate(()=>window.sent.at(-1).prompt)).split('\n\n').at(-1))
     assert.equal(feedback.items[0].decision,undefined,'new artwork must invalidate restored approval')
     assert.equal(feedback.items[0].notes,'Keep these notes')
+    const unrelated={...stale,modelContent:{...stale.modelContent,batchRef:'another/batch.json',items:[{key:'merchant:one',notes:'Unrelated review',referenceUrls:[],ready:true}]}}
+    await page.evaluate(state=>window.dispatchEvent(new CustomEvent('openai:set_globals',{detail:{globals:{widgetState:state}}})),unrelated)
+    assert.equal(await q('[data-notes]').inputValue(),'Keep these notes','another batch must not restore into this review')
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
     assert.deepEqual(errors,[])
     await page.close();cases++

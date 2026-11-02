@@ -122,7 +122,7 @@
         }catch(e){error(e.message||'Could not submit the review. Your selections remain here.')}
       }
       function restore(state,privateState){
-        if(!state||state.version!==1||state.snapshotId!==data.snapshotId)return
+        if(!state||state.version!==1||state.snapshotId!==data.snapshotId||state.batchRef!==data.batchRef)return
         clearTimeout(saveTimer);selected=null;q('[data-editor]').hidden=true
         choices={};for(const item of state.items||[])if(items.has(item.key)){const {key,...value}=item;if(value.decision==='approve'&&value.candidateSha256!==items.get(key).candidateSha256){delete value.decision;delete value.candidateSha256}choices[key]=value}
         newRequests=state.newRequests||[];q('[data-new]').value=newRequests.join('\n')
