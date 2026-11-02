@@ -615,18 +615,19 @@ button.bb-left-categories { cursor: pointer; }
 .bb-daily-amount-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; min-width: 0; }
 .bb-daily-amount-row > .bb-chart-total { display: flex; align-items: center; flex: 1 1 0; min-width: 0; margin-top: 0; }
 .bb-daily-morph-control { position: relative; flex: none; width: min(132px, 55%); height: 46px; min-width: 0; max-width: 100%; margin-left: auto; transition: width 280ms var(--bb-daily-ease); }
-.bb-daily-amount-row[data-open="true"] .bb-daily-morph-control { width: min(190px, 55%); }
+.bb-daily-amount-row[data-open="true"] .bb-daily-morph-control { width: min(var(--bb-daily-filter-width, 190px), 190px, 55%); }
 .bb-daily-filter-pane, .bb-daily-trigger-pane { position: absolute; inset: 0; display: flex; align-items: center; transition: opacity 140ms ease; }
 .bb-daily-filter-pane[aria-hidden="true"], .bb-daily-trigger-pane[aria-hidden="true"] { opacity: 0; pointer-events: none; }
 .bb-daily-trigger-pane .bb-daily-transactions-toggle { justify-content: center; width: 100%; height: 46px; padding: 8px 10px; }
 .bb-daily-filter-pane .bb-daily-active-filter { width: 100%; }
 .bb-daily-active-filter .bb-category-mix-filter { flex: 1 1 auto; }
-.bb-daily-transactions-toggle.bb-details-toggle { align-self: center; min-height: 44px; gap: 8px; border-radius: 24px; padding: 8px 13px; background: transparent; color: hsl(var(--foreground)); font-size: 14px; font-weight: 400; white-space: nowrap; }
+.bb-daily-trigger-pane .bb-daily-transactions-toggle.bb-details-toggle { align-self: center; min-height: 44px; gap: 8px; border-color: hsl(var(--border)); border-radius: 24px; padding: 8px 13px; background: hsl(var(--primary) / .08); color: hsl(var(--foreground)); font-size: 14px; font-weight: 400; white-space: nowrap; }
 .bb-daily-transactions-toggle svg { width: 16px; height: 16px; flex: none; color: hsl(var(--muted-foreground)); }
-.bb-daily-active-filter { display: flex; align-items: center; max-width: 190px; min-width: 0; border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--card)); }
+.bb-daily-active-filter { display: flex; align-items: center; max-width: 190px; min-width: 0; border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--primary) / .08); }
 .bb-daily-active-filter .bb-category-mix-filter { min-width: 0; }
-.bb-daily-active-filter .bb-category-mix-filter select { border: 0; background: transparent; border-radius: 24px; }
-.bb-daily-active-filter .bb-category-filter-label { overflow: hidden; text-overflow: ellipsis; }
+.bb-daily-active-filter .bb-category-mix-filter select { border: 0; background: transparent; border-radius: 24px; opacity: 0; }
+.bb-daily-active-filter .bb-category-filter-label { display: block; visibility: visible; overflow: hidden; text-overflow: ellipsis; line-height: 26px; }
+.bb-daily-active-filter .bb-category-mix-filter:not([data-pointer-focus="true"]):focus-within { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; border-radius: 24px; }
 .bb-daily-transactions-close { position: relative; display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 0; border-radius: 24px; background: transparent; color: hsl(var(--muted-foreground)); }
 .bb-daily-transactions-close::before { content: ""; position: absolute; left: 0; top: 13px; bottom: 13px; width: 1px; background: hsl(var(--border)); }
 .bb-daily-transactions-close > svg { width: 16px; height: 16px; }

@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-02 - Fit Transaction Filter Labels Within The Inline Capsule
+
+Use the category dropdown primary/8% tint for both Transactions states, including hover. Measure the selected label’s text plus its real padding/borders and fixed 44px X after category changes, font readiness or window resize; write a CSS width target only when it changes. CSS animates that target within the existing 190px/55% row cap. Do not observe the animated capsule or add per-frame React/measurement work.
+
+Paint an ellipsized label over the same native select’s interactive area. The native select remains accessible and retains full option values; its wrapper carries keyboard focus indication. Keep the separate first-tap reveal, inline alignment, filter persistence, amount fitting and existing financial definitions. No new dependency, saved preference or finance lifecycle changes.
+
 ## 2026-11-02 - Keep The Transactions Morph Inline And Native Picker Deliberate
 
 Opening Daily Spending transactions reveals the existing Type/X capsule and itemized list without invoking the native picker. Focus a labeled, programmatically focusable group instead of the select; a separate tap or keyboard step enters the native filter, and closing restores the original trigger. Keep the same controls, inert/accessibility state, filter persistence and chart isolation.

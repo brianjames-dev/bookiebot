@@ -11,8 +11,14 @@ not the select, so iPhone does not open the picker as a side effect. Tab enters
 the selector; closing restores the Transactions trigger. Both surfaces remain
 mounted and inactive controls are inert and hidden from accessibility.
 CSS interpolates width and crossfade in the same amount row at every width.
-The right edge stays anchored; the expanded capsule uses up to 190px or 55% of
-the row, leaving the existing amount fitter room without a second row or slide.
+The right edge stays anchored. The selected text determines the left filter's
+width; the X stays 44px. The whole capsule is capped at 190px or 55% of the row,
+leaving room for the amount without a second row. A visible label supplies real
+ellipsis while the native select remains over it for touch, keyboard and full
+option values. Label changes, font readiness and window resize update the width
+target; CSS interpolates it without observing the animated capsule or running
+per-frame JavaScript. Both collapsed and expanded surfaces use the same primary
+8% tint as the category dropdowns, including the collapsed hover state.
 Type changes only entries/day totals, never the chart total. Close/reopen retains
 Type and expanded days; month/scope changes reset Type, and month resets days.
 
@@ -105,4 +111,4 @@ both themes, live theme switching, failed images and moving persistent circles.
 in actual Daily Spending/Calendar components, the Starbucks alias/display name,
 zero extra padding and persistent image identity during expansion/collapse.
 All browser checks use synthetic data and blocked external requests. Native acceptance is checklist
-240 in `.agent/STATUS.md`; physical-device appearance still needs phone review.
+241 in `.agent/STATUS.md`; physical-device appearance still needs phone review.
