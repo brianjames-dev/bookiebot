@@ -5,9 +5,14 @@ The chart, axes, Current/Projected, All/Needs/Wants scopes and financial totals
 retain their existing definitions. The Needs/Wants legend shares the bar colors.
 
 Transactions sits beside Total Spent and morphs into the existing All types
-selector and X. Both control surfaces remain mounted; CSS interpolates width,
-crossfade and the narrow-screen slide/space. Inactive controls are inert and
-hidden from accessibility. Keyboard focus follows the replacement control.
+selector and X. The first tap reveals these controls and the list; only a separate
+tap on the selector opens its native picker. Focus lands on the labeled group,
+not the select, so iPhone does not open the picker as a side effect. Tab enters
+the selector; closing restores the Transactions trigger. Both surfaces remain
+mounted and inactive controls are inert and hidden from accessibility.
+CSS interpolates width and crossfade in the same amount row at every width.
+The right edge stays anchored; the expanded capsule uses up to 190px or 55% of
+the row, leaving the existing amount fitter room without a second row or slide.
 Type changes only entries/day totals, never the chart total. Close/reopen retains
 Type and expanded days; month/scope changes reset Type, and month resets days.
 
@@ -100,4 +105,4 @@ both themes, live theme switching, failed images and moving persistent circles.
 in actual Daily Spending/Calendar components, the Starbucks alias/display name,
 zero extra padding and persistent image identity during expansion/collapse.
 All browser checks use synthetic data and blocked external requests. Native acceptance is checklist
-238 in `.agent/STATUS.md`; physical-device appearance still needs phone review.
+240 in `.agent/STATUS.md`; physical-device appearance still needs phone review.
