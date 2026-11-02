@@ -336,7 +336,9 @@ def main() -> None:
                         raise ValueError("Candidate changed before comparison")
                     row["candidate"] = {**candidate, "asset": str((args.batch.parent / candidate["asset"]).resolve())}
                 rows.append(row)
-            snapshot = {**snapshot, "items": rows}
+            batch_file = args.batch.resolve()
+            batch_ref = str(batch_file.relative_to(repo)) if batch_file.is_relative_to(repo) else str(batch_file)
+            snapshot = {**snapshot, "items": rows, "batchRef": batch_ref}
         args.out.parent.mkdir(parents=True, exist_ok=True)
         job = args.out.with_suffix(".preview-job.json")
         write(job, {"repo": str(repo), "snapshot": snapshot, "out": str(args.out.resolve()), "template": str(SKILL / "assets/review-board.html")})

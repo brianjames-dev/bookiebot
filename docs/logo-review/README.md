@@ -23,6 +23,16 @@ python -m pytest unit_tests/reports/test_logo_studio.py unit_tests/reports/test_
 BOOKIEBOT_PLAYWRIGHT_MODULE=/path/to/playwright node unit_tests/reports/logo_studio_browser_test.cjs
 ```
 
+The first ten-item refinement lives in `batches/2026-11-02-first-refinement`.
+It retains the exact supplied references, input feedback, original inventory,
+versioned candidates and deterministic framing/rendering records. Reproduce with
+`BOOKIEBOT_PLAYWRIGHT_MODULE=/path/to/playwright node docs/logo-review/batches/2026-11-02-first-refinement/prepare.cjs /tmp/logo-candidates`.
+This exports review images only. Candidate galleries send their saved `batchRef`
+so subsequent approvals continue that batch; never re-import it as a fresh intake.
+Whole Foods' revised green circle reaches the outer edge with white lettering;
+the earlier white-rim candidate is retained in history. These candidates are
+awaiting user approval and are not published runtime artwork.
+
 Manual review: open the current gallery on a phone; flag an icon, confirm the
 editor appears beside it, enter notes and send with readiness off. The next chat
 intake should invite replacement images before refining. After intake, inspect

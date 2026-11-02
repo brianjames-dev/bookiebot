@@ -72,7 +72,7 @@ For `--method ai`, also supply `--prompt-file /absolute/prompt.txt --generated /
 python "$STUDIO/scripts/studio.py" --repo "$REPO" gallery --snapshot "$REVIEW/inventory.json" --batch "$REVIEW/batch.json" --out "$REVIEW/candidate-review.html"
 ```
 
-Show Current/Candidate comparisons and collect approval or another refinement request. Approval from the gallery is in its explicit Send payload, with `decision=approve` and `candidateSha256`; saving widget state alone is not approval. Import an initial flag batch only once. For subsequent candidate feedback, update that existing batch's notes/references; do not run intake again and erase candidate history. If the user requests another change, stage a new candidate and re-review. Apply an explicit approval with its exact latest hash:
+Show Current/Candidate comparisons and collect approval or another refinement request. Approval from the gallery is in its explicit Send payload, with `decision=approve` and `candidateSha256`; saving widget state alone is not approval. Import an initial flag batch only once. Candidate handoffs include `batchRef`: resolve it to the saved review batch and verify the snapshot/identities before continuing. For subsequent candidate feedback, update that existing batch's notes/references; do not run intake again and erase candidate history. Explicit candidate approvals do not require another intake. If the user requests another change, stage a new candidate and re-review. Apply an explicit approval with its exact latest hash:
 
 ```bash
 python "$STUDIO/scripts/studio.py" --repo "$REPO" approve --batch "$REVIEW/batch.json" --key merchant:example --sha256 EXACT_REVIEWED_HASH

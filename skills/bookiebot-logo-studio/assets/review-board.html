@@ -46,7 +46,7 @@
         Object.assign(span.style,{width:size+'px',height:size+'px',backgroundSize:data.atlas.width*ratio+'px '+data.atlas.height*ratio+'px',backgroundPosition:-(index%data.atlas.columns)*size+'px '+-Math.floor(index/data.atlas.columns)*size+'px'})
         return span
       }
-      function feedback(){return{kind:'bookiebot-logo-feedback',version:1,snapshotId:data.snapshotId,items:Object.entries(choices).map(([key,value])=>({key,...value})),newRequests}}
+      function feedback(){return{kind:'bookiebot-logo-feedback',version:1,snapshotId:data.snapshotId,batchRef:data.batchRef,items:Object.entries(choices).map(([key,value])=>({key,...value})),newRequests}}
       function error(message){q('[data-error]').textContent=message;q('[data-error]').hidden=!message}
       function persist(){
         const state=feedback()
@@ -57,7 +57,7 @@
       }
       function update(){
         const count=Object.keys(choices).length,ready=Object.values(choices).filter(item=>item.ready).length,approved=Object.values(choices).filter(item=>item.decision==='approve').length
-        q('[data-count]').textContent=data.items.length+' icons · tap to flag'
+        q('[data-count]').textContent=data.items.length+(data.items.some(item=>item.candidateSha256)?' candidates · tap to compare':' icons · tap to flag')
         for(const summary of root.querySelectorAll('[data-summary]'))summary.textContent=count+' flagged · '+ready+' ready'+(approved?' · '+approved+' approved':'')
         for(const send of root.querySelectorAll('[data-send]')){send.textContent=approved?'Send review decisions':ready?'Refine ready icons':'Send for intake';send.disabled=!count&&!newRequests.length}
         for(const button of root.querySelectorAll('[data-key]'))button.setAttribute('aria-pressed',String(Boolean(choices[button.dataset.key])))
@@ -84,6 +84,7 @@
         q('[data-editor]').scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})
       }
       function saveEditor(){
+        clearTimeout(saveTimer);saveTimer=null
         if(!selected)return
         const old=choices[selected],url=q('[data-url]').value.trim()
         if(url){try{const parsed=new URL(url);if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw Error()}catch(e){error('Use a public HTTPS logo URL, or leave the reference blank.');return false}}
@@ -97,7 +98,7 @@
         const title=document.createElement('h3');title.textContent=kind==='company'?'Bills & subscriptions':'Merchants'
         const grid=document.createElement('div');grid.className='studio-grid'
         for(const item of rows){
-          const button=document.createElement('button');button.type='button';button.className='btn viz-tile';button.dataset.key=item.key;button.setAttribute('aria-pressed','false');button.setAttribute('aria-label','Flag '+item.name)
+          const button=document.createElement('button');button.type='button';button.className='btn viz-tile';button.dataset.key=item.key;button.setAttribute('aria-pressed','false');button.setAttribute('aria-label',(item.candidateSha256?'Review ':'Flag ')+item.name)
           const content=document.createElement('span');content.className='studio-tile-content'
           const images=document.createElement('span');images.className='studio-images'
           const index=item.candidateIndex===undefined?item.currentIndex:item.candidateIndex
@@ -113,16 +114,17 @@
       q('[data-new]').oninput=()=>{newRequests=[...new Set(q('[data-new]').value.split('\n').map(name=>name.trim()).filter(Boolean))];persist()}
       for(const send of root.querySelectorAll('[data-send]'))send.onclick=async()=>{
         if(saveEditor()===false||!persist())return
-        const prompt='Use $bookiebot-logo-studio for this review. Import the feedback into a versioned batch. Items with ready=false need an intake in chat for my optional replacement images or further notes before any refinement. Refine only ready items, show current/candidate comparisons, and publish only exact candidates I approve. New merchant requests also need intake first.\n\n'+JSON.stringify(feedback())
+        const context=data.batchRef?'Continue the existing batch named by batchRef; do not re-import intake or erase candidate history. Explicit approval decisions name exact candidate hashes and do not need a new intake. ':'Import the feedback into a versioned batch. '
+        const prompt='Use $bookiebot-logo-studio for this review. '+context+'Items without an approval decision and with ready=false need an intake in chat for my optional replacement images or further notes before any refinement. Refine only ready items, show current/candidate comparisons, and publish only exact candidates I approve. New merchant requests also need intake first.\n\n'+JSON.stringify(feedback())
         try{
           if(!window.openai||!window.openai.sendFollowUpMessage)throw Error('Open this review in Codex to send it to the pipeline.')
           await window.openai.sendFollowUpMessage({prompt,title:'Review flagged transaction icons'})
         }catch(e){error(e.message||'Could not submit the review. Your selections remain here.')}
       }
       function restore(state,privateState){
-        if(!state||state.version!==1||state.snapshotId!==data.snapshotId)return
+        if(!state||state.version!==1||state.snapshotId!==data.snapshotId||state.batchRef!==data.batchRef)return
         clearTimeout(saveTimer);selected=null;q('[data-editor]').hidden=true
-        choices={};for(const item of state.items||[])if(items.has(item.key)){const {key,...value}=item;choices[key]=value}
+        choices={};for(const item of state.items||[])if(items.has(item.key)){const {key,...value}=item;if(value.decision==='approve'&&value.candidateSha256!==items.get(key).candidateSha256){delete value.decision;delete value.candidateSha256}choices[key]=value}
         newRequests=state.newRequests||[];q('[data-new]').value=newRequests.join('\n')
         update()
         const key=privateState&&privateState.selectedKey

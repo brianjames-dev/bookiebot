@@ -1,0 +1,18 @@
+{
+  "kind": "bookiebot-logo-feedback",
+  "version": 1,
+  "snapshotId": "11f6086157be9a7a418f55f4906e488b206402a6c940f16d1d905b1dae7464c7",
+  "items": [
+    {"key":"company:pge","notes":"The right of the E shouldn't have a white vertical line","referenceUrls":["https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png"],"ready":true},
+    {"key":"company:peacock","notes":"Try using this logo, it might be higher fidelity","referenceUrls":["https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png"],"ready":true},
+    {"key":"company:spotify","notes":"Logo should take up the whole circle","referenceUrls":["https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail"],"ready":true},
+    {"key":"company:state-farm","notes":"This image is higher fidelity","referenceUrls":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10"],"ready":true},
+    {"key":"merchant:usps","notes":"Higher fidelity image","referenceUrls":["https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg"],"ready":true},
+    {"key":"merchant:walmart","notes":"","referenceUrls":["https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg"],"ready":true},
+    {"key":"merchant:trader-joes","notes":"make sure new logo fills up entire logo circle","referenceUrls":["https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg"],"ready":true},
+    {"key":"merchant:whole-foods","notes":"Higher quality photo, should have white background","referenceUrls":["https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail"],"ready":true},
+    {"key":"merchant:safeway","notes":"Needs a white background","referenceUrls":["https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png"],"ready":true},
+    {"key":"merchant:panda-express","notes":"The logo should fully fill in the circle","referenceUrls":[],"ready":true}
+  ],
+  "newRequests": []
+}

@@ -1,0 +1,216 @@
+{
+  "version": 1,
+  "method": "native artwork / deterministic canvas framing",
+  "items": [
+    {
+      "key": "company:pge",
+      "source": "sources/company-pge-82f3338868653b14.png",
+      "sourceSha256": "82f3338868653b1472fc26b8d0f57f966b3ad6ebe15e00d0de96b84518a83895",
+      "background": "#0089c4",
+      "fill": 0.72,
+      "trim": "pge",
+      "treatment": "Clean supplied mark; remove former right-edge stripe",
+      "crop": [
+        108,
+        88,
+        260,
+        238
+      ],
+      "sourceSize": [
+        480,
+        480
+      ],
+      "sha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
+      "prepared": "company-pge.png"
+    },
+    {
+      "key": "company:peacock",
+      "source": "sources/company-peacock-c4fbe6ea59351fe4.png",
+      "sourceSha256": "c4fbe6ea59351fe4a7e1da5ebda08a462cbf3bb2cb6cb8305a577341da103347",
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": "alpha",
+      "treatment": "Higher-resolution supplied P and six-dot emblem",
+      "crop": [
+        1171,
+        98,
+        1498,
+        1964
+      ],
+      "sourceSize": [
+        3840,
+        2160
+      ],
+      "sha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
+      "prepared": "company-peacock.png"
+    },
+    {
+      "key": "company:spotify",
+      "source": "sources/company-spotify-f803bde3cca6ceaf.png",
+      "sourceSha256": "f803bde3cca6ceaf280d45bc470377994adc983cb4e411ec0e602a8ac821ca3f",
+      "background": "#1ed760",
+      "fill": 1.012,
+      "trim": "alpha",
+      "treatment": "Native green circle fills the complete medallion",
+      "crop": [
+        0,
+        20,
+        1280,
+        1281
+      ],
+      "sourceSize": [
+        1280,
+        1322
+      ],
+      "sha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
+      "prepared": "company-spotify.png"
+    },
+    {
+      "key": "company:state-farm",
+      "source": "sources/company-state-farm-14ae7b02e47e865f.png",
+      "sourceSha256": "14ae7b02e47e865fe4a451fdf2038faf8b4ecc701b3ad2bcec4ba5ec0e05f977",
+      "background": "#ffffff",
+      "fill": 0.84,
+      "trim": "red",
+      "treatment": "Crop to native red symbol; discard grey rounded-square frame",
+      "crop": [
+        58,
+        117,
+        330,
+        212
+      ],
+      "sourceSize": [
+        448,
+        446
+      ],
+      "sha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
+      "prepared": "company-state-farm.png"
+    },
+    {
+      "key": "merchant:usps",
+      "source": "sources/merchant-usps-6ee5fd5b64ea6e37.jpg",
+      "sourceSha256": "6ee5fd5b64ea6e374bb2810dc6df18cdc72ad86215c27082af13642b939c17c2",
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": "blue",
+      "treatment": "Higher-resolution supplied eagle with balanced circle padding",
+      "crop": [
+        18,
+        38,
+        2366,
+        1401
+      ],
+      "sourceSize": [
+        2400,
+        1500
+      ],
+      "sha256": "565b2978786c54422b1779d109d6ab5c04117555b7d7879553511fe5c49ff9dd",
+      "prepared": "merchant-usps.png"
+    },
+    {
+      "key": "merchant:walmart",
+      "source": "sources/merchant-walmart-3f556fb6c344a9e4.jpg",
+      "sourceSha256": "3f556fb6c344a9e49eb04ce63bddb14dd91ecb826beffbaf8f5de64ca60cd259",
+      "background": "#0153e3",
+      "fill": 0.74,
+      "trim": "yellow",
+      "treatment": "Supplied yellow spark with full-bleed blue field",
+      "crop": [
+        523,
+        306,
+        454,
+        513
+      ],
+      "sourceSize": [
+        1500,
+        1125
+      ],
+      "sha256": "0f2f06cef4ab7d3c62cfd5b383989aa89325b109c04fe3e6a33f2147b1b7ae82",
+      "prepared": "merchant-walmart.png"
+    },
+    {
+      "key": "merchant:trader-joes",
+      "source": "sources/merchant-trader-joes-b949368110f17c47.jpg",
+      "sourceSha256": "b949368110f17c47341515144b04ca9882bf9b9004c03dbd5f0644ad169b2af3",
+      "background": "#cd0e2d",
+      "fill": 1.012,
+      "trim": "full",
+      "treatment": "Supplied round red badge fills the complete medallion",
+      "crop": [
+        0,
+        0,
+        900,
+        900
+      ],
+      "sourceSize": [
+        900,
+        900
+      ],
+      "sha256": "f97e72dd46e5d30efec6f8fa4debf699cda8693042aef3561e80c3944fbfc2e7",
+      "prepared": "merchant-trader-joes.png"
+    },
+    {
+      "key": "merchant:whole-foods",
+      "source": "sources/merchant-whole-foods-65d2ef50b33cf9c7.png",
+      "sourceSha256": "65d2ef50b33cf9c7e92bb252054170486acf6e6555de3af0d8f3eac490e2763e",
+      "background": "#ffffff",
+      "fill": 1.012,
+      "trim": "alpha",
+      "treatment": "Full-bleed green circle with white lettering; no outer white ring",
+      "crop": [
+        0,
+        0,
+        3840,
+        3840
+      ],
+      "sourceSize": [
+        3840,
+        3840
+      ],
+      "sha256": "000cf9fe7f128aeda25f92275c27568ad350e133434b8a9ccdc8b1dd233968fa",
+      "prepared": "merchant-whole-foods.png"
+    },
+    {
+      "key": "merchant:safeway",
+      "source": "sources/merchant-safeway-93776f049fa7c37e.png",
+      "sourceSha256": "93776f049fa7c37eb8a6aeb310afdeebf21278592cb8e26c7a429e718867c586",
+      "background": "#ffffff",
+      "fill": 0.9,
+      "trim": "alpha",
+      "treatment": "Supplied red S on an opaque white circle",
+      "crop": [
+        813,
+        70,
+        2214,
+        2020
+      ],
+      "sourceSize": [
+        3840,
+        2160
+      ],
+      "sha256": "b2dad9ba0601efd0acbd8b449f14cf84e55eb1c3089f89e62be3b6b6ef0acc6f",
+      "prepared": "merchant-safeway.png"
+    },
+    {
+      "key": "merchant:panda-express",
+      "source": "sources/merchant-panda-express-dd57da67b81d91e1.svg",
+      "sourceSha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+      "background": "#ce0e2d",
+      "fill": 1.012,
+      "trim": "alpha",
+      "treatment": "Native vector circle fills the medallion without runtime inset",
+      "crop": [
+        0,
+        0,
+        150,
+        150
+      ],
+      "sourceSize": [
+        150,
+        150
+      ],
+      "sha256": "9be10ad32406fd7796bbf55c559b65d1dbafd681076092206a6ab7015848fcb4",
+      "prepared": "merchant-panda-express.png"
+    }
+  ]
+}

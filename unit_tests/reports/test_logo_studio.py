@@ -212,3 +212,41 @@ def test_publication_plan_only_contains_approved_items_and_never_writes_catalog(
     assert len(changes) == 1 and changes[0]['key'] == 'merchant:same'
     assert changes[0]['destination'].endswith(art['sha256'][:16] + '.png')
     assert before == {str(file): file.read_bytes() for file in project.rglob('*') if file.is_file()}
+
+
+def test_first_review_batch_retains_exact_sources_and_candidate_history():
+    folder = ROOT / 'docs/logo-review/batches/2026-11-02-first-refinement'
+    review = studio.read(folder / 'batch.json')
+    snapshot = studio.read(folder / 'inventory.json')
+    assert review['snapshotId'] == snapshot['snapshotId'] == studio.digest(studio.encoded(snapshot['items']))
+    expected = {row['key']: row for row in snapshot['items']}
+    rendered = {row['key']: row for row in studio.read(folder / 'rendering.json')['items']}
+    assert len(review['items']) == len(rendered) == 10
+    for item in review['items']:
+        assert item['expectedRevision'] == expected[item['key']]['revision']
+        assert item['candidates'][-1]['sha256'] == rendered[item['key']]['sha256']
+        for art in item['candidates']:
+            assert studio.digest(studio.circle(folder / art['asset'])) == art['sha256']
+            assert studio.digest(studio.checked_image(folder / art['source']['path'])) == art['source']['sha256']
+            assert art['method'] == 'reframe' and not art['prompt']
+        original = rendered[item['key']]
+        assert studio.digest(studio.checked_image(folder / original['source'])) == original['sourceSha256']
+    whole_foods = next(item for item in review['items'] if item['key'] == 'merchant:whole-foods')
+    assert len(whole_foods['candidates']) >= 2, 'Retain the previous white-rim version for review history'
+
+
+@pytest.mark.parametrize('key,color', [
+    ('merchant:whole-foods', (0, 111, 70)),
+    ('company:spotify', (30, 215, 96)),
+    ('merchant:trader-joes', (205, 14, 45)),
+    ('merchant:walmart', (1, 83, 227)),
+])
+def test_reviewed_full_bleed_circles_have_no_white_rim(key, color):
+    folder = ROOT / 'docs/logo-review/batches/2026-11-02-first-refinement'
+    item = next(row for row in studio.read(folder / 'batch.json')['items'] if row['key'] == key)
+    with Image.open(folder / item['candidates'][-1]['asset']) as image:
+        for point in [(128, 2), (253, 128), (128, 253), (2, 128)]:
+            pixel = image.convert('RGBA').getpixel(point)
+            assert pixel[3] == 255
+            # Browser color management may shift the source RGB by a few levels.
+            assert all(abs(actual - expected) <= 8 for actual, expected in zip(pixel[:3], color))
