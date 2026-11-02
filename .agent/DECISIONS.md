@@ -1,5 +1,22 @@
 # Agent Decisions
 
+## 2026-11-02 - Animate Daily Cutouts On Their Paint Owners
+
+Replace referenced SVG masks and animated circle cx/cy/r with constant-topology
+CSS path clips on persistent HTML layers. The user's native screenshot shows
+initial overlap bites lingering after the icons separate, then resolving at
+settle. Desktop engines do not reproduce that native failure directly, but
+freezing SVG geometry during motion reproduces the missing wedges and fails the
+new pixel regression. Direct clip paths remain correct in that same case.
+
+Keep a separate nested clip for each preceding circle/badge, so their intersection
+subtracts the union of holes without refilling overlaps. Self badge gaps use the
+same direct path, with unready/failed-logo fallbacks left whole. Read current
+badge scale on reversal and normalize clipPath to clip-path when committing final
+styles. No image replacement/crossfade, background-colored borders, per-frame
+JavaScript, new dependency, financial scope or stored preference is introduced.
+
+
 ## 2026-11-01 - Publish Date Column With Persistent Expense Motion
 
 Implement the approved six-circle Date column at 28px, 8px overlap and 2px true

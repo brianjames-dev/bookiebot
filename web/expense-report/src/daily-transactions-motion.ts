@@ -3,62 +3,26 @@
 export const DAILY_PREVIEW_COUNT = 6
 export const DAILY_CASCADE_WINDOW_MS = 216
 const motion = { duration: 500, cascade: 36, curve: 34, spring: 5 }
-let maskSequence = 0
 
 type Point = { x: number; y: number }
 type Pose = Point & { width: number; scale: number; opacity: number; badge: number }
 type Geometry = { cx: number; cy: number; r: number }
 type ManagedAnimation = Animation & { bsProperties: string[] }
-type Flight = { ghost: HTMLElement; paint: HTMLElement; badge: HTMLElement | null; selfHole: SVGCircleElement | null; neighborHoles?: SVGCircleElement[] }
-type Controller = { section: HTMLElement; panel: HTMLElement; button: HTMLButtonElement; layer: HTMLElement; entryCount: number; target: boolean; instant: boolean; sequence: number; animations: Set<ManagedAnimation>; flights: Map<number, Flight>; echoHoles?: SVGCircleElement[] }
+type Flight = { ghost: HTMLElement; badge: HTMLElement | null; selfHole: HTMLElement | null; neighborClips?: HTMLElement[] }
+type Controller = { section: HTMLElement; panel: HTMLElement; button: HTMLButtonElement; layer: HTMLElement; entryCount: number; target: boolean; instant: boolean; sequence: number; animations: Set<ManagedAnimation>; flights: Map<number, Flight>; echoClips?: HTMLElement[] }
 
 export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)')
   const controller: Controller = { section, panel: section.querySelector<HTMLElement>('.bb-daily-day-panel')!, button: section.querySelector<HTMLButtonElement>('.bb-daily-day-header')!, layer: section.querySelector<HTMLElement>('.bb-daily-icon-layer')!, entryCount: Number(section.dataset.entryCount), target: initialOpen, instant: false, sequence: 0, animations: new Set(), flights: new Map() }
   const hasLogo = (scene: Controller, index: number) => scene.section.querySelector<HTMLElement>(`.bb-daily-bead[data-entry="${index}"]`)?.dataset.logo === 'true'
-  function circleMask(container: HTMLElement, owner: HTMLElement, size: number, holes: Geometry[], bodyOnly = false) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    svg.classList.add('bb-daily-mask-defs');
-    svg.setAttribute('width', '0');
-    svg.setAttribute('height', '0');
-    svg.setAttribute('aria-hidden', 'true');
-    const defs = document.createElementNS(ns, 'defs');
-    const mask = document.createElementNS(ns, 'mask');
-    const id = `bb-daily-mask-${++maskSequence}`;
-    for (const [name, value] of Object.entries({ id, maskUnits: 'userSpaceOnUse', maskContentUnits: 'userSpaceOnUse', x: 0, y: 0, width: size, height: size })) mask.setAttribute(name, String(value));
-    mask.style.maskType = 'alpha';
-    const filter = document.createElementNS(ns, 'filter');
-    for (const [name, value] of Object.entries({ id: `${id}-alpha`, filterUnits: 'userSpaceOnUse', x: 0, y: 0, width: size, height: size, 'color-interpolation-filters': 'sRGB' })) filter.setAttribute(name, String(value));
-    const matrix = document.createElementNS(ns, 'feColorMatrix');
-    // Geometry is monochrome: copying red to alpha avoids the rounding of a
-    // weighted luminance sum, keeping fully visible brand colors unchanged.
-    matrix.setAttribute('type', 'matrix');
-    matrix.setAttribute('values', '0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1 0 0 0 0');
-    filter.append(matrix);
-    const geometry = document.createElementNS(ns, 'g');
-    geometry.setAttribute('filter', `url(#${id}-alpha)`);
-    const rect = document.createElementNS(ns, 'rect');
-    for (const [name, value] of Object.entries({ width: size, height: size, fill: 'white' })) rect.setAttribute(name, String(value));
-    geometry.append(rect);
-    const circles = holes.map(hole => {
-      const circle = document.createElementNS(ns, 'circle');
-      circle.setAttribute('fill', 'black');
-      for (const key of ['cx', 'cy', 'r'] as const) circle.setAttribute(key, String(hole[key] || 0));
-      geometry.append(circle);
-      return circle;
-    });
-    mask.append(geometry);
-    defs.append(filter, mask);
-    svg.append(defs);
-    container.append(svg);
-    if (bodyOnly) owner.style.setProperty('--bb-daily-body-mask', `url(#${id})`)
-    else { owner.style.maskImage = `url(#${id})`; owner.style.webkitMaskImage = `url(#${id})` }
-    // Normalize the geometric cutouts to alpha inside SVG, giving both
-    // browser engines identical transparent gaps without tinting the logo.
-    owner.style.maskMode = 'alpha';
-    return circles;
+  // A constant path topology lets the browser interpolate every cutout directly
+  // on its painted layer. SVG mask descendants can remain at an old paint while
+  // their parent icon moves, leaving a bite until the animation is cancelled.
+  function cutout({ cx, cy, r }: Geometry, size: number) {
+    const n = (value: number) => Number(value.toFixed(4))
+    return `path(evenodd, "M0 0H${size}V${size}H0Z M${n(cx - r)} ${n(cy)}A${n(r)} ${n(r)} 0 1 0 ${n(cx + r)} ${n(cy)}A${n(r)} ${n(r)} 0 1 0 ${n(cx - r)} ${n(cy)}Z")`
   }
+  const cssProperty = (property: string) => property.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
   function cancel(controller: Controller, clear = false) {
     controller.sequence++;
     // Keep the same painted elements when motion ends or reverses. Swapping
@@ -67,14 +31,13 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
     if (!clear) for (const animation of controller.animations) {
       const target = (animation.effect as KeyframeEffect).target as HTMLElement | SVGElement;
       const style = getComputedStyle(target);
-      for (const property of animation.bsProperties) target.style.setProperty(property, style.getPropertyValue(property));
+      for (const property of animation.bsProperties) target.style.setProperty(cssProperty(property), style.getPropertyValue(cssProperty(property)));
     }
     for (const animation of controller.animations) animation.cancel();
     controller.animations.clear();
     if (clear) {
       controller.flights.clear();
-      controller.section.querySelectorAll('.bb-daily-mask-host').forEach(host => host.replaceChildren());
-      controller.echoHoles = undefined;
+      controller.echoClips = undefined;
     }
   }
   function settle(controller: Controller, open = controller.target) {
@@ -108,7 +71,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
     if (controller.instant) {
       const target = element as HTMLElement | SVGElement
       for (const [property, value] of Object.entries(frames[frames.length - 1])) {
-        if (!['offset', 'easing', 'composite'].includes(property)) target.style.setProperty(property, String(value))
+        if (!['offset', 'easing', 'composite'].includes(property)) target.style.setProperty(cssProperty(property), String(value))
       }
       return { finished: Promise.resolve() }
     }
@@ -134,18 +97,16 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
       y: u ** 3 * a.y + 3 * u ** 2 * t * p1.y + 3 * u * t ** 2 * p2.y + t ** 3 * b.y,
     };
   }
-  function flyer(controller: Controller, index: number, count: number, base: number): Flight {
+  function flyer(controller: Controller, index: number, count: number): Flight {
     const ghost = controller.section.querySelector<HTMLElement>(`.bb-daily-bead[data-entry="${index}"]`)!
-    const paint = ghost.querySelector<HTMLElement>('.bb-daily-bead-paint')!
     const body = ghost.querySelector<HTMLElement>('.bb-daily-bead-body')!
-    const host = ghost.querySelector<HTMLElement>('.bb-daily-mask-host')!
     let badge: HTMLElement | null = null
-    let selfHole: SVGCircleElement | null = null
+    let selfHole: HTMLElement | null = null
     if (hasLogo(controller, index) && index < count) {
       badge = ghost.querySelector<HTMLElement>('.bb-daily-preview-dot')!
-      ;[selfHole] = circleMask(host, body, base, [{ cx: base - 3, cy: base - 3, r: 0 }], true)
+      selfHole = body
     }
-    return { ghost, paint, badge, selfHole }
+    return { ghost, badge, selfHole }
   }
   function transition(controller: Controller, open: boolean, instant = false) {
     const { section, panel, button } = controller;
@@ -170,7 +131,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
       return { header, expanded, start,
         opacity: active ? Number(getComputedStyle(active.ghost).opacity) : previousTarget || i < count ? 1 : 0,
         animate: i < count || (expanded.y + origin.top < innerHeight + 80 && expanded.y + origin.top + expanded.height > -80),
-        badge: active?.selfHole ? parseFloat(getComputedStyle(active.selfHole).r) / 4 : previousTarget ? 0 : 1,
+        badge: active?.badge ? new DOMMatrix(getComputedStyle(active.badge).transform).a : previousTarget ? 0 : 1,
         copy: [...row.querySelectorAll<HTMLElement>(':scope > :not(.bb-daily-row-icon-anchor)')].map(element => ({ element, opacity: Number(getComputedStyle(element).opacity) })),
       };
     });
@@ -238,7 +199,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
       const delay = (open ? i : rows.length - 1 - i) * cascade;
       const anchor = row.querySelector<HTMLElement>('.bb-daily-row-icon-anchor');
       if (anchor) anchor.style.visibility = 'hidden';
-      const flight = controller.flights.get(i) || flyer(controller, i, count, base);
+      const flight = controller.flights.get(i) || flyer(controller, i, count);
       flight.ghost.dataset.entry = String(i);
       controller.flights.set(i, flight);
       const frames = times.map((time, frame) => {
@@ -254,7 +215,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
       }
       const moving = animate(controller, flight.ghost, frames, { duration: total, easing: 'linear' });
       if (flight.selfHole) {
-        animate(controller, flight.selfHole, times.map((time, frame) => ({ offset: time / total, r: `${4 * poses[frame][i].badge}px` })), { duration: total, easing: 'linear' });
+        animate(controller, flight.selfHole, times.map((time, frame) => ({ offset: time / total, clipPath: cutout({ cx: base - 3, cy: base - 3, r: 4 * poses[frame][i].badge }, base) })), { duration: total, easing: 'linear' });
         animate(controller, flight.badge!, times.map((time, frame) => ({ offset: time / total, transform: `scale(${poses[frame][i].badge})` })), { duration: total, easing: 'linear' });
       }
       const neighbors: { previous: number; badge: boolean }[] = [];
@@ -263,12 +224,12 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
         if (logos[previous]) neighbors.push({ previous, badge: true });
       }
       if (neighbors.length) {
-        const holes = flight.neighborHoles || circleMask(flight.ghost.querySelector<HTMLElement>('.bb-daily-mask-host')!, flight.paint, base, neighbors.map(({ previous, badge }) => neighborHole(poses[0][i], poses[0][previous], badge)));
-        flight.neighborHoles = holes;
+        const holes = flight.neighborClips || [...flight.ghost.querySelectorAll<HTMLElement>('.bb-daily-clip')];
+        flight.neighborClips = holes;
         neighbors.forEach(({ previous, badge }, hole) => {
           animate(controller, holes[hole], times.map((time, frame) => {
             const geometry = neighborHole(poses[frame][i], poses[frame][previous], badge);
-            return { offset: time / total, cx: `${geometry.cx}px`, cy: `${geometry.cy}px`, r: `${geometry.r}px` };
+            return { offset: time / total, clipPath: cutout(geometry, base) };
           }), { duration: total, easing: 'linear' });
         });
       }
@@ -292,12 +253,12 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
         if (logos[previous]) neighbors.push({ previous, badge: true });
       }
       const echoPose = { ...rect, scale: 1, opacity: 1, badge: 0 };
-      const holes = controller.echoHoles || circleMask(echo.querySelector<HTMLElement>('.bb-daily-mask-host')!, echo, base, neighbors.map(({ previous, badge }) => neighborHole(echoPose, poses[0][previous], badge)));
-      controller.echoHoles = holes;
+      const holes = controller.echoClips || [...echo.querySelectorAll<HTMLElement>('.bb-daily-clip')];
+      controller.echoClips = holes;
       neighbors.forEach(({ previous, badge }, hole) => {
         animate(controller, holes[hole], times.map((time, frame) => {
           const geometry = neighborHole(echoPose, poses[frame][previous], badge);
-          return { offset: time / total, cx: `${geometry.cx}px`, cy: `${geometry.cy}px`, r: `${geometry.r}px` };
+          return { offset: time / total, clipPath: cutout(geometry, base) };
         }), { duration: total, easing: 'linear' });
       });
       animate(controller, echo, [{ opacity: overflowOpacity, transform: 'scale(1)' }, { opacity: open ? 0 : 1, transform: `scale(${open ? .8 : 1})` }], { duration: duration * .25, delay: open ? count * cascade : duration * .75, easing: 'ease-in-out' });
