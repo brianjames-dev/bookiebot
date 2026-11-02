@@ -16,15 +16,20 @@ for(const view of Object.values(report.modeViews)){
 }
 const assets=path.join(root,'src/bookiebot/reports/assets'),css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(assets,'expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script id="bookiebot-expense-report-data" type="application/json">${JSON.stringify(report)}</script><script type="module" src="/app.js"></script></body></html>`
-async function settle(section){await section.evaluate(async el=>{await Promise.allSettled(el.getAnimations({subtree:true}).map(animation=>animation.finished))})}
+async function settle(section){await section.evaluate(async el=>{
+ await Promise.allSettled(el.getAnimations({subtree:true}).map(animation=>animation.finished))
+ // Reduced motion has no transition promise. Allow its resulting ResizeObserver
+ // notification and the amount fitter's queued frame to finish before geometry.
+ await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+})}
 async function closedLayout(section){return section.evaluate(section=>{
  const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,center:r.top+r.height/2}}
  const dropdown=section.querySelector('select[aria-label="Daily spending filter"]'),title=section.querySelector('h2'),button=section.querySelector('.bb-daily-transactions-toggle'),row=section.querySelector('.bb-daily-amount-row'),amount=row.querySelector('.bb-fitted-amount-text'),integer=amount.querySelector('.bb-amount-integer')||amount,reference=document.querySelector('select[aria-label="Category mix filter"]')
  return {dropdown:rect(dropdown),title:rect(title),button:rect(button),row:rect(row),amount:rect(amount),integer:rect(integer),overflow:document.documentElement.scrollWidth>innerWidth,styles:[dropdown,reference].map(el=>{const s=getComputedStyle(el);return[s.borderRadius,s.padding,s.fontSize,s.backgroundColor]}),radius:getComputedStyle(button).borderRadius}
 })}
 ;(async()=>{let cases=0
- for(const engine of [chromium,webkit]){const browser=await engine.launch({headless:true})
- try{for(const width of [320,390,861,1280])for(const dark of [false,true]){
+ for(const engine of [chromium,webkit].filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){const browser=await engine.launch({headless:true})
+ try{for(const width of [320,390,861,1280].filter(w=>!process.env.ONLY_WIDTH||w===Number(process.env.ONLY_WIDTH)))for(const dark of [false,true].filter(d=>!process.env.ONLY_DARK||String(d)===process.env.ONLY_DARK)){
   const page=await browser.newPage({viewport:{width,height:900},hasTouch:true,isMobile:width<768,colorScheme:dark?'dark':'light',reducedMotion:dark?'reduce':'no-preference'})
   const errors=[],traffic=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000)
   await page.route('**/*',async route=>{const url=new URL(route.request().url()),name=path.basename(url.pathname)
@@ -54,11 +59,17 @@ async function closedLayout(section){return section.evaluate(section=>{
     const legend=el.querySelector('.bb-daily-legend'),plot=el.querySelector('.bb-chart-box');return {below:legend.getBoundingClientRect().top>=plot.getBoundingClientRect().bottom,colors:[...legend.querySelectorAll('li')].map(li=>({name:li.textContent,color:getComputedStyle(li.firstElementChild).backgroundColor,bar:getComputedStyle(el.querySelector(`.recharts-rectangle[fill="${li.textContent==='Needs'?'hsl(var(--chart-1))':'hsl(var(--chart-2))'}"]`)||el.querySelector('.recharts-rectangle')).fill}))}
    })
    assert.ok(colors.below);for(const item of colors.colors)assert.equal(item.color,item.bar)
-   await button.click();await section.locator('.bb-daily-transactions').waitFor({state:'visible'})
+   await section.evaluate(el=>{const select=el.querySelector('[aria-label="Transaction type"]');window.dailyTypeEvents=[];for(const name of ['focus','pointerdown'])select.addEventListener(name,()=>dailyTypeEvents.push(name))})
+   await button.tap();await section.locator('.bb-daily-transactions').waitFor({state:'visible'});await settle(section)
    const type=section.getByRole('combobox',{name:'Transaction type',exact:true}),close=section.getByRole('button',{name:'Close transactions',exact:true})
    assert.equal(await button.count(),0);assert.equal(await section.locator('.bb-daily-day-group').count(),days);assert.equal(await filter.inputValue(),scope);assert.equal(await type.inputValue(),'');assert.equal(await section.locator('.bb-daily-bead').first().evaluate(n=>getComputedStyle(n).visibility),'visible')
    assert.equal(await amount.textContent(),total,'Disclosure does not alter the total')
-   assert.equal(await type.evaluate(el=>el===document.activeElement),true,'Focus follows the morphing control')
+   assert.deepEqual(await page.evaluate(()=>dailyTypeEvents),[],'The first tap must not focus or activate the native picker')
+   assert.equal(await section.locator('.bb-daily-active-filter').evaluate(el=>el===document.activeElement),true,'Focus follows the revealed group without opening its select')
+   const inline=await section.evaluate(el=>{const rect=n=>n.getBoundingClientRect(),row=rect(el.querySelector('.bb-daily-amount-row')),capsule=rect(el.querySelector('.bb-daily-active-filter')),amount=rect(el.querySelector('.bb-daily-amount-row .bb-fitted-amount-text')),integer=rect(el.querySelector('.bb-daily-amount-row .bb-amount-integer')||el.querySelector('.bb-daily-amount-row .bb-fitted-amount-text'));return{right:row.right-capsule.right,center:integer.top+integer.height/2-capsule.top-capsule.height/2,gap:capsule.left-amount.right,width:capsule.width,rowHeight:row.height}})
+   assert(Math.abs(inline.right)<1&&Math.abs(inline.center)<2&&inline.gap>=10,JSON.stringify(inline));assert(Math.abs(inline.rowHeight-m.row.height)<1,'Opening cannot add a second row');assert(inline.width>m.button.width,'The capsule expands in place')
+   await page.keyboard.press('Tab');assert.equal(await type.evaluate(el=>el===document.activeElement),true,'Tab enters the native category selector')
+   await section.locator('.bb-daily-active-filter').focus();await page.evaluate(()=>dailyTypeEvents=[]);await type.tap();assert((await page.evaluate(()=>dailyTypeEvents)).includes('pointerdown'),'A separate tap activates the selector');await page.keyboard.press('Escape')
    const id=await close.getAttribute('aria-controls');assert.equal(await page.locator(`[id="${id}"]`).getAttribute('inert'),null)
    await close.focus();await page.keyboard.press('Space');assert.equal(await button.getAttribute('aria-expanded'),'false');assert.equal(await button.evaluate(el=>el===document.activeElement),true)
   }
@@ -69,8 +80,8 @@ async function closedLayout(section){return section.evaluate(section=>{
    trigger.click();await new Promise(r=>setTimeout(r,80));close.click();await new Promise(r=>setTimeout(r,60));trigger.click();await new Promise(r=>setTimeout(r,60));close.click();while(!done)await new Promise(r=>setTimeout(r,10));return{frames,same:carrier===section.querySelector('.bb-daily-morph-control')&&trigger===section.querySelector('.bb-daily-transactions-toggle')&&select===section.querySelector('[aria-label="Transaction type"]')}
   })
   assert.equal(morph.same,true,'Micro taps retain the same controls')
-  for(const frame of morph.frames)assert.ok(Math.abs(frame.right)<1,'Capsule stays anchored during rapid reversals')
-  if(!dark){assert.ok(new Set(morph.frames.map(frame=>Math.round(frame.width))).size>4,'Capsule width interpolates');if(width<=390)assert.ok(new Set(morph.frames.map(frame=>Math.round(frame.y))).size>4,'Wrapping follows a continuous slide')}
+  for(const frame of morph.frames){assert.ok(Math.abs(frame.right)<1,'Capsule stays anchored during rapid reversals');assert.ok(Math.abs(frame.y)<1,'Capsule never slides below the amount')}
+  if(!dark)assert.ok(new Set(morph.frames.map(frame=>Math.round(frame.width))).size>4,'Capsule width interpolates')
   await button.click()
   const headers=section.locator('.bb-daily-day-header'),type=section.getByRole('combobox',{name:'Transaction type',exact:true}),close=section.getByRole('button',{name:'Close transactions',exact:true})
   assert.deepEqual(await headers.locator('.bb-daily-day').allTextContents(),['8','5','No date'])
@@ -95,7 +106,7 @@ async function closedLayout(section){return section.evaluate(section=>{
   for(const color of categoryColors)assert.equal(color.actual,color.expected)
   assert.equal(await type.evaluate(el=>getComputedStyle(el).borderTopWidth),'0px','One capsule border around Type and Close')
   assert.equal(geometry.overflow,false);assert.equal(geometry.rail,1);for(const size of geometry.icons)assert.deepEqual(size,[28,28]);for(const row of geometry.scheduled){assert.ok(Math.abs(row.meta-row.status)<1,JSON.stringify(row));assert.ok(Math.abs(row.name-row.amount)<1)}
-  if(width<=390)assert.ok(Math.abs(geometry.widths[0]-geometry.widths[1])<1)
+  assert(geometry.widths[0]<=geometry.widths[1]*.55+1,'The expanded capsule leaves inline space for the amount')
   await busy.locator('.bb-daily-day-entries').scrollIntoViewIfNeeded()
   await page.waitForFunction(()=>[...document.querySelectorAll('.bb-daily-icon-layer img')].every(img=>img.complete&&img.naturalWidth>0))
   if(width===390){
@@ -111,6 +122,13 @@ async function closedLayout(section){return section.evaluate(section=>{
   await filter.selectOption('needs');assert.equal(await type.inputValue(),'','Scope changes reset Type');await close.click()
   await page.evaluate(()=>localStorage.setItem('bookiebot-amount-appearance:v1:brian',JSON.stringify({version:1,raisedCents:false})));await page.reload();await section.waitFor();assert.equal(await section.locator('.bb-daily-amount-row .bb-amount-fraction').count(),0)
   const plain=await closedLayout(section);assert.ok(Math.abs(plain.integer.center-plain.button.center)<2);assert.equal(plain.overflow,false)
+  await button.tap();await settle(section)
+  const plainOpen=await closedLayout(section)
+  assert.ok(plainOpen.amount.right+10<=plainOpen.button.left&&Math.abs(plainOpen.integer.center-plainOpen.button.center)<2,'Full-size cents also fit beside the expanded capsule '+JSON.stringify(plainOpen))
+  assert.ok(Math.abs(plainOpen.row.height-plain.row.height)<1&&!plainOpen.overflow)
+  const longest=await type.locator('option').evaluateAll(options=>options.reduce((a,b)=>a.text.length>b.text.length?a:b).value)
+  await type.selectOption(longest);assert.equal(await type.inputValue(),longest,'Long categories retain their complete native option value')
+  const longLabel=await closedLayout(section);assert.ok(longLabel.amount.right+10<=longLabel.button.left&&!longLabel.overflow)
   assert.deepEqual(errors,[]);assert.deepEqual(traffic,[]);cases++;console.log(engine.name(),width,dark?'dark/reduced':'light','PASS');await page.close()
  }}finally{await browser.close()}}
  console.log(`${cases} Chromium/WebKit Quiet indent, morph, legend, day/category order, logo sizing and Scheduled alignment cases passed.`)

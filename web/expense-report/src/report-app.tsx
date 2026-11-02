@@ -2197,14 +2197,16 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   useEffect(() => { setCategory("") }, [year, month, filter])
   useEffect(() => {
     if (!restoreControlFocus.current) return
-    controlsRef.current?.querySelector<HTMLElement>(open ? 'select' : '.bb-daily-transactions-toggle')?.focus({ preventScroll: true })
+    // A trusted tap can open iOS's picker when focus lands on the native select.
+    // Focus the group first; its selector needs a separate tap or keyboard step.
+    controlsRef.current?.querySelector<HTMLElement>(open ? '.bb-daily-active-filter' : '.bb-daily-transactions-toggle')?.focus({ preventScroll: true })
     restoreControlFocus.current = false
   }, [open])
 
   const transactionList = useMemo(() => <DailyEntriesTable entries={filteredEntries} categoryColors={categoryColors} aliases={aliases} year={year} month={month} />,
     [filteredEntries, categoryColors, aliases, year, month])
   const controls = <div className="bb-daily-morph-control" ref={controlsRef}>
-    <div className="bb-daily-filter-pane" aria-hidden={!open} inert={!open}><div className="bb-daily-active-filter">
+    <div className="bb-daily-filter-pane" aria-hidden={!open} inert={!open}><div className="bb-daily-active-filter" role="group" aria-label="Transaction filters" tabIndex={-1}>
       <CategoryFilterControl filter={selectedCategory} onFilterChange={setCategory}
         filters={[{ value: "", label: "All types" }, ...categories.map(value => ({ value, label: value }))]}
         label="Transaction type" dismissTrigger="daily-transactions" />

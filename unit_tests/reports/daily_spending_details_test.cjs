@@ -65,7 +65,10 @@ let inspections = []
 let props = { entries, year: 2026, month: 10, filter: "all", data: [{ label: "1", amount: 100, needsAmount: 0, wantsAmount: 100 }],
   total: 903, categoryColors: { Food: "red", Shopping: "blue" }, onInspectDay: (...args) => inspections.push(args) }
 let renderer
-act(() => { renderer = create(React.createElement(Section, props)) })
+const controlFocus=[]
+act(() => { renderer = create(React.createElement(Section, props), {createNodeMock: element => element.props.className === 'bb-daily-morph-control' ? {
+ querySelector: selector => ({focus: options => controlFocus.push({selector,options})}),
+} : null}) })
 const toggle = () => renderer.root.findByProps({ className: "bb-details-toggle bb-daily-transactions-toggle" })
 const disclosure = () => renderer.root.findAllByProps({ className: "bb-details-content" })[0]
 const select = () => renderer.root.findByType("select")
@@ -84,6 +87,11 @@ assert.equal(renderer.root.findAllByType(runtime.DailyEntriesTable).length, 0, "
 assert.equal(disclosure().props.inert, true)
 assert.equal(toggle().props["aria-controls"], disclosure().props.id)
 act(() => toggle().props.onClick())
+assert.equal(controlFocus.at(-1).selector,'.bb-daily-active-filter','Opening must focus the group rather than invoke the native select picker')
+const filterGroup=renderer.root.findByProps({className:'bb-daily-active-filter'})
+assert.equal(filterGroup.props.role,'group')
+assert.equal(filterGroup.props.tabIndex,-1)
+assert.equal(filterGroup.props['aria-label'],'Transaction filters')
 assert.equal(renderer.root.findByProps({ "aria-label": "Close transactions" }).props["aria-expanded"], true)
 assert.equal(disclosure().props.inert, false)
 assert.equal(table().props.entries.length, 42, "Details includes every entry without truncation")
@@ -111,6 +119,7 @@ assert.ok(days().every(day => day.props["aria-controls"]), "Day headers expand t
 act(() => renderer.root.findByType(runtime.DailySpendingPlot).props.onInspectDay("1"))
 assert.deepEqual(inspections.pop(), ["1"], "The chart keeps its full daily inspection")
 act(() => renderer.root.findByProps({ "aria-label": "Close transactions" }).props.onClick())
+assert.equal(controlFocus.at(-1).selector,'.bb-daily-transactions-toggle','Closing restores the original trigger')
 assert.equal(disclosure().props.inert, true)
 act(() => toggle().props.onClick())
 assert.equal(select().props.value, "Shopping", "Collapse/reopen retains the filter")

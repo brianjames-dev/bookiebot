@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-02 - Keep The Transactions Morph Inline And Native Picker Deliberate
+
+Opening Daily Spending transactions reveals the existing Type/X capsule and itemized list without invoking the native picker. Focus a labeled, programmatically focusable group instead of the select; a separate tap or keyboard step enters the native filter, and closing restores the original trigger. Keep the same controls, inert/accessibility state, filter persistence and chart isolation.
+
+Remove the narrow-container second-row slide and padding reservation. Animate only capsule width and pane opacity beside Total Spent, with the right edge fixed and a target capped at 190px/55% of the row. The existing amount fitter retains exact values within the remaining width; no new observer, per-frame React work, financial flow or preference is introduced.
+
 ## 2026-11-02 - Publish The Settled Logo Refinements And Retain Exact Alias Matching
 
 The user expects the revised logos to be live after accepting the refinements in chat. Resolve that instruction to the exact latest hashes of the ten-item batch and separate Amazon smile; record the chat context, previous assets and published candidate bytes in `docs/logo-review/publications/2026-11-02-reviewed-logos.json`. Candidate approval does not require repeating the review through a gallery button when chat already authorizes applying the settled versions. Retain all original/candidate/source history and the existing hash/active-art checks. Prepared merchant circles use zero inset and their own background; approved company audit/recipe/runtime pins move together.
