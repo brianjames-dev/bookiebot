@@ -56,7 +56,7 @@ async function closedLayout(section){return section.evaluate(section=>{
    assert.ok(colors.below);for(const item of colors.colors)assert.equal(item.color,item.bar)
    await button.click();await section.locator('.bb-daily-transactions').waitFor({state:'visible'})
    const type=section.getByRole('combobox',{name:'Transaction type',exact:true}),close=section.getByRole('button',{name:'Close transactions',exact:true})
-   assert.equal(await button.count(),0);assert.equal(await section.locator('.bb-daily-day-group').count(),days);assert.equal(await filter.inputValue(),scope);assert.equal(await type.inputValue(),'')
+   assert.equal(await button.count(),0);assert.equal(await section.locator('.bb-daily-day-group').count(),days);assert.equal(await filter.inputValue(),scope);assert.equal(await type.inputValue(),'');assert.equal(await section.locator('.bb-daily-bead').first().evaluate(n=>getComputedStyle(n).visibility),'visible')
    assert.equal(await amount.textContent(),total,'Disclosure does not alter the total')
    assert.equal(await type.evaluate(el=>el===document.activeElement),true,'Focus follows the morphing control')
    const id=await close.getAttribute('aria-controls');assert.equal(await page.locator(`[id="${id}"]`).getAttribute('inert'),null)
@@ -83,13 +83,13 @@ async function closedLayout(section){return section.evaluate(section=>{
   const groups=section.locator('.bb-daily-day-group'),busy=groups.nth(1)
   assert.deepEqual(await busy.locator('.bb-daily-transaction').evaluateAll(rows=>rows.map(el=>el.dataset.category)),['Food','Food','Gas','Groceries','Groceries','Shopping'])
   assert.deepEqual(await busy.locator('.bb-daily-transaction-name').allTextContents(),['Chipotle','Corner café','Chevron','Whole Foods','Neighborhood market','Target'])
-  assert.deepEqual(await headers.locator('.bb-daily-preview-item').evaluateAll(items=>items.map(item=>item.parentElement.children.length)),[2,2,3,3,3,1])
-  assert.equal(await busy.locator('.bb-daily-preview-more').textContent(),'+4')
+  assert.deepEqual(await headers.locator('.bb-daily-preview-item').evaluateAll(items=>items.map(item=>item.parentElement.children.length)),[2,2,6,6,6,6,6,6,1])
+  assert.equal(await busy.locator('.bb-daily-preview-more').count(),0)
   assert.equal(await busy.locator('.bb-daily-preview').getAttribute('role'),'img')
   await settle(section)
   const geometry=await section.evaluate(el=>{
    const rect=n=>n.getBoundingClientRect(),rows=[...el.querySelectorAll('.bb-daily-transaction')],rail=el.querySelector('.bb-daily-day-entries')
-   return {overflow:document.documentElement.scrollWidth>innerWidth,rail:parseFloat(getComputedStyle(rail).borderLeftWidth),icons:rows.map(row=>{const r=rect(row.querySelector('.bb-transaction-icon'));return[r.width,r.height]}),scheduled:rows.filter(row=>row.dataset.scheduled==='true').map(row=>({meta:rect(row.querySelector('.bb-daily-transaction-meta')).top,status:rect(row.querySelector('.bb-daily-transaction-status')).top,name:rect(row.querySelector('.bb-daily-transaction-name')).top,amount:rect(row.querySelector('.bb-daily-transaction-money')).top})),widths:[rect(el.querySelector('.bb-daily-active-filter')).width,rect(el.querySelector('.bb-daily-amount-row')).width]}
+   return {overflow:document.documentElement.scrollWidth>innerWidth,rail:parseFloat(getComputedStyle(rail).borderLeftWidth),icons:rows.map(row=>{const r=rect(row.querySelector('.bb-daily-row-icon-anchor'));return[r.width,r.height]}),scheduled:rows.filter(row=>row.dataset.scheduled==='true').map(row=>({meta:rect(row.querySelector('.bb-daily-transaction-meta')).top,status:rect(row.querySelector('.bb-daily-transaction-status')).top,name:rect(row.querySelector('.bb-daily-transaction-name')).top,amount:rect(row.querySelector('.bb-daily-transaction-money')).top})),widths:[rect(el.querySelector('.bb-daily-active-filter')).width,rect(el.querySelector('.bb-daily-amount-row')).width]}
   })
   const categoryColors=await section.locator('.bb-daily-transaction-category').evaluateAll(labels=>labels.map(label=>{const tokens={'Groceries':'grocery','Food':'food','Gas':'gas','Shopping':'shopping','Bills & utilities':'bills','Subs (Wants)':'subs-wants'},probe=document.createElement('span');label.append(probe);probe.style.color='hsl(var(--category-'+tokens[label.firstChild.textContent]+'))';const expected=getComputedStyle(probe).color;probe.remove();return{actual:getComputedStyle(label).color,expected}}))
   for(const color of categoryColors)assert.equal(color.actual,color.expected)
@@ -97,11 +97,13 @@ async function closedLayout(section){return section.evaluate(section=>{
   assert.equal(geometry.overflow,false);assert.equal(geometry.rail,1);for(const size of geometry.icons)assert.deepEqual(size,[28,28]);for(const row of geometry.scheduled){assert.ok(Math.abs(row.meta-row.status)<1,JSON.stringify(row));assert.ok(Math.abs(row.name-row.amount)<1)}
   if(width<=390)assert.ok(Math.abs(geometry.widths[0]-geometry.widths[1])<1)
   await busy.locator('.bb-daily-day-entries').scrollIntoViewIfNeeded()
-  await page.waitForFunction(()=>[...document.querySelectorAll('.bb-daily-day-entries img')].every(img=>img.complete&&img.naturalWidth>0))
+  await page.waitForFunction(()=>[...document.querySelectorAll('.bb-daily-icon-layer img')].every(img=>img.complete&&img.naturalWidth>0))
   if(width===390){
-   const preview=headers.first().locator('.bb-daily-preview'),file=`/private/tmp/bookiebot-preview-gap-${engine.name()}-${dark}.png`
-   await preview.evaluate(el=>{el.style.background='#234c63'});await preview.screenshot({path:file});await preview.evaluate(el=>{el.style.removeProperty('background')})
-   execFileSync(process.env.BOOKIEBOT_TEST_PYTHON||'python',['-c',"from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert('RGB'); assert im.getpixel((15,12)) == (35,76,99), im.getpixel((15,12))",file])
+   const header=headers.first(),file=`/private/tmp/bookiebot-preview-gap-${engine.name()}-${dark}.png`
+   await header.click();await settle(section)
+   const point=await groups.first().evaluate(el=>{const header=el.querySelector('.bb-daily-day-header'),h=header.getBoundingClientRect(),b=el.querySelector('.bb-daily-bead').getBoundingClientRect();header.style.background='#234c63';return[Math.round(b.left-h.left+28),Math.round(b.top-h.top+14)]})
+   await header.screenshot({path:file});await header.evaluate(el=>el.style.removeProperty('background'))
+   execFileSync(process.env.BOOKIEBOT_TEST_PYTHON||'python',['-c',"from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert('RGB'); point=(int(sys.argv[2]),int(sys.argv[3])); assert im.getpixel(point) == (35,76,99), im.getpixel(point)",file,...point.map(String)])
   }
   if(width===390&&dark){await page.waitForTimeout(350);await section.screenshot({path:`/private/tmp/bookiebot-daily-quiet-${engine.name()}.png`})}
   await type.selectOption('Shopping');assert.equal(await amount.textContent(),'$506.49');assert.equal(await section.locator('.bb-daily-day-group').count(),2);assert.equal(await section.locator('.bb-daily-transaction').count(),2)

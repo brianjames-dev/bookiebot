@@ -67,16 +67,17 @@ def test_two_week_calendar_model_and_logo_matching():
                    check=True, capture_output=True, text=True)
 
 
-def test_daily_today_color_and_weight_override_the_button_reset():
+def test_daily_today_marker_overrides_the_button_reset_without_layout_changes():
     styles = (FRONTEND / "styles.css").read_text()
     base = styles.split("\n.bb-daily-day {", 1)[1].split("}", 1)[0]
-    today = styles.split(".bb-daily-day-today {", 1)[1].split("}", 1)[0]
+    today = styles.split('.bb-daily-day-date[data-today="true"] .bb-daily-day {', 1)[1].split("}", 1)[0]
+    circle = styles.split('.bb-daily-day-date[data-today="true"] .bb-daily-day::before {', 1)[1].split("}", 1)[0]
 
-    # A later same-specificity reset previously replaced the contrasting date
-    # color with inherited pale text, and also undid its bold weight.
+    # The more specific current-date selector survives the later button reset.
+    # Its soft circle is outside layout, preserving the approved row height.
     assert styles.count("\n.bb-daily-day {") == 1
-    assert styles.index("\n.bb-daily-day {") < styles.index(".bb-daily-day-today {")
     assert "color: inherit;" in base and "font: inherit;" in base
-    assert "background: hsl(var(--primary));" in today
-    assert "color: hsl(var(--primary-foreground));" in today
-    assert "font-weight: 750;" in today
+    assert "color: hsl(var(--primary));" in today
+    assert "position: absolute;" in circle
+    assert "background: hsl(var(--primary) / .16);" in circle
+    assert "width: 34px; height: 34px;" in circle

@@ -12,7 +12,7 @@ const bundle=req('esbuild').buildSync({stdin:{resolveDir:frontend,loader:'tsx',c
 `},bundle:true,write:false,format:'iife',define:{'process.env.NODE_ENV':'"production"'}}).outputFiles[0].text
 async function record(page,selector,action,delay=0){return page.evaluate(async({selector,action,delay})=>{
  const frames=[],start=performance.now(),target=document.querySelector(selector);let done=false
- const tick=t=>{frames.push({t:t-start,h:target.getBoundingClientRect().height,y:scrollY});if(t-start<480)requestAnimationFrame(tick);else done=true};requestAnimationFrame(tick)
+ const tick=t=>{frames.push({t:t-start,h:target.getBoundingClientRect().height,y:scrollY});if(t-start<850)requestAnimationFrame(tick);else done=true};requestAnimationFrame(tick)
  if(delay)await new Promise(r=>setTimeout(r,delay));document.querySelector(action).click();while(!done)await new Promise(r=>setTimeout(r,10));return frames
 },{selector,action,delay})}
 ;(async()=>{for(const engine of[chromium,webkit]){const browser=await engine.launch({headless:true});try{
@@ -23,7 +23,7 @@ async function record(page,selector,action,delay=0){return page.evaluate(async({
  const rapid=await page.evaluate(async()=>{
   const button=document.querySelector('.bb-daily-day-header'),target=document.querySelector('.bb-daily-day-group:first-child > .bb-details-content'),rows=[...target.querySelectorAll('.bb-daily-transaction')],samples=[]
   for(let i=0;i<4;i++){await new Promise(r=>setTimeout(r,60));const before=target.getBoundingClientRect().height;button.click();await new Promise(requestAnimationFrame);samples.push({before,after:target.getBoundingClientRect().height})}
-  await new Promise(r=>setTimeout(r,320));return{samples,retained:rows.every((row,index)=>row===target.querySelectorAll('.bb-daily-transaction')[index]),inert:target.inert,rows:target.querySelectorAll('.bb-daily-transaction').length}
+  await new Promise(r=>setTimeout(r,850));return{samples,retained:rows.every((row,index)=>row===target.querySelectorAll('.bb-daily-transaction')[index]),inert:target.inert,rows:target.querySelectorAll('.bb-daily-transaction').length}
  })
  const summary=frames=>{const end=frames.at(-1).h,start=frames[0].h,span=Math.abs(end-start),steps=frames.slice(1).map((v,i)=>Math.abs(v.h-frames[i].h));return{start,end,intermediate:frames.filter(f=>f.h>Math.min(start,end)+1&&f.h<Math.max(start,end)-1).length,maxStepFraction:Math.max(...steps)/span,gapsOver40:frames.slice(1).filter((v,i)=>v.t-frames[i].t>40).length,scroll:[frames[0].y,frames.at(-1).y]}}
  console.log(engine.name(),JSON.stringify({first:summary(first),opening:summary(opening),closing:summary(closing),reopening:summary(reopening)}))
