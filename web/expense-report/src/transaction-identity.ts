@@ -24,10 +24,11 @@ const families = [
   { categories: ['Need Expenses', 'Need', 'Needs', 'Other needs', 'Need transactions', 'Needs transactions'], label: 'Other needs', icon: 'package', token: 'need' },
   { categories: ['Subs (Needs)', 'Needs subscriptions', 'Need sub'], label: 'Subs (Needs)', icon: 'repeat', token: 'subs-needs' },
   { categories: ['Subs (Wants)', 'Wants subs', 'Wants subscriptions', 'Want sub'], label: 'Subs (Wants)', icon: 'repeat', token: 'subs-wants' },
-  { categories: ['Static Bills & Subscriptions'], label: 'Bills & subs', icon: 'receipt', token: 'bills' },
+  { categories: ['Static Bills & Subscriptions'], label: 'Bills & subs', icon: 'receipt', token: 'subs-needs' },
   { categories: ['Bills & Utilities', 'Bills and Utilities', 'Bills', 'Utilities'], label: 'Bills & utilities', icon: 'receipt', token: 'bills' },
   { categories: ['Income'], label: 'Income', icon: 'dollar', token: 'income' },
-  { categories: ['Savings', 'Saved', 'ESPP', 'SpaceX ESPP'], label: 'Savings', icon: 'piggy', token: 'savings' },
+  { categories: ['Savings', 'Saved'], label: 'Savings', icon: 'piggy', token: 'savings' },
+  { categories: ['ESPP', 'SpaceX ESPP'], label: 'Savings', icon: 'piggy', token: 'espp' },
 ]
 
 export function transactionCategory(entry: DailyTransaction) {
@@ -35,7 +36,7 @@ export function transactionCategory(entry: DailyTransaction) {
   let base = families.find(row => row.categories.some(category => companyIdentity(category) === key)) ?? { label: entry.category || 'Transaction', icon: 'receipt', token: 'need' }
   if (key === 'mortgage') base = { ...base, label: 'Mortgage' }
   if (key === 'static bills and subscriptions' && (entry.kind === 'subscription' || (!entry.kind && ['Need sub', 'Want sub'].includes(entry.person)))) return { ...base, icon: 'repeat' }
-  if (base.token === 'bills') {
+  if (base.token === 'bills' || key === 'static bills and subscriptions') {
     const bill = companyIdentity(entry.item)
     if (/\brent\b|\bmortgage\b/.test(bill)) return { ...base, icon: 'house' }
     if (/\bwater\b/.test(bill)) return { ...base, icon: 'droplets' }
