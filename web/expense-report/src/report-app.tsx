@@ -2186,37 +2186,40 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   const [open, setOpen] = useState(false)
   const [category, setCategory] = useState("")
   const detailsId = useId()
+  const opened = useRef(false)
   const controlsRef = useRef<HTMLDivElement>(null)
   const restoreControlFocus = useRef(false)
   const categories = useMemo(() => Array.from(new Set(entries.map(entry => entry.category))).sort((left, right) => left.localeCompare(right)), [entries])
   const selectedCategory = categories.includes(category) ? category : ""
   const filteredEntries = useMemo(() => selectedCategory ? entries.filter(entry => entry.category === selectedCategory) : entries, [entries, selectedCategory])
-  const toggleDetails = useCallback(() => { restoreControlFocus.current = true; setOpen(current => !current) }, [])
+  const toggleDetails = useCallback(() => { opened.current = true; restoreControlFocus.current = true; setOpen(current => !current) }, [])
 
   useEffect(() => { setCategory("") }, [year, month, filter])
   useEffect(() => {
     if (!restoreControlFocus.current) return
-    controlsRef.current?.querySelector<HTMLElement>(open ? 'select' : 'button')?.focus({ preventScroll: true })
+    controlsRef.current?.querySelector<HTMLElement>(open ? 'select' : '.bb-daily-transactions-toggle')?.focus({ preventScroll: true })
     restoreControlFocus.current = false
   }, [open])
 
+  const transactionList = useMemo(() => <DailyEntriesTable entries={filteredEntries} categoryColors={categoryColors} aliases={aliases} year={year} month={month} />,
+    [filteredEntries, categoryColors, aliases, year, month])
   const controls = <div className="bb-daily-morph-control" ref={controlsRef}>
-    {open ? <div className="bb-daily-active-filter">
+    <div className="bb-daily-filter-pane" aria-hidden={!open} inert={!open}><div className="bb-daily-active-filter">
       <CategoryFilterControl filter={selectedCategory} onFilterChange={setCategory}
         filters={[{ value: "", label: "All types" }, ...categories.map(value => ({ value, label: value }))]}
         label="Transaction type" dismissTrigger="daily-transactions" />
-      <button type="button" className="bb-daily-transactions-close" aria-label="Close transactions" aria-controls={detailsId} aria-expanded={true} onClick={toggleDetails}><X aria-hidden="true" /></button>
-    </div> : <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={false} aria-controls={detailsId} onClick={toggleDetails}>
+      <button type="button" className="bb-daily-transactions-close" aria-label="Close transactions" aria-controls={detailsId} aria-expanded={open} onClick={toggleDetails}><X aria-hidden="true" /></button>
+    </div></div><div className="bb-daily-trigger-pane" aria-hidden={open} inert={open}><button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={open} aria-controls={detailsId} onClick={toggleDetails}>
       <span>Transactions</span><ChevronDown aria-hidden="true" />
-    </button>}
+    </button></div>
   </div>
 
   return <>
     <MemoizedDailySpendingChart data={data} total={total} filter={filter} onInspectDay={onInspectDay}
       detailsOpen={open} detailsId={detailsId} onToggleDetails={toggleDetails} transactionControl={controls} />
-    <CollapsibleContent open={open} id={detailsId} lazy>
+    <CollapsibleContent open={open} id={detailsId} lazy={!opened.current}>
       <div className="bb-daily-transactions">
-        <DailyEntriesTable entries={filteredEntries} categoryColors={categoryColors} aliases={aliases} year={year} month={month} />
+        {transactionList}
       </div>
     </CollapsibleContent>
   </>

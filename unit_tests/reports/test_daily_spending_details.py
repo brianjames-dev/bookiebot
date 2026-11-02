@@ -29,6 +29,14 @@ def test_daily_transaction_identity_runtime():
                    check=True, capture_output=True, text=True)
 
 
+def test_day_icon_previews_and_retained_disclosures_runtime():
+    root = Path(__file__).resolve().parents[2]
+    if not (root / "web/expense-report/node_modules/typescript").exists():
+        pytest.skip("Install frontend dependencies to execute presentation checks")
+    subprocess.run(["node", "unit_tests/reports/daily_transaction_preview_test.cjs"], cwd=root,
+                   check=True, capture_output=True, text=True)
+
+
 def test_approved_merchant_art_is_local_content_addressed_and_inert():
     root = Path(__file__).resolve().parents[2]
     catalog = json.loads((root / "web/expense-report/src/merchant-logos.json").read_text())

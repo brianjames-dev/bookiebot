@@ -600,7 +600,8 @@ button.bb-left-categories { cursor: pointer; }
   color: hsl(var(--destructive));
 }
 
-.bb-daily-spending-content { display: grid; gap: 0; container-type: inline-size; }
+.bb-daily-spending-content { display: grid; gap: 0; container-type: inline-size; overflow-anchor: none; --bb-daily-ease: cubic-bezier(.2, .65, .3, 1); }
+.bb-daily-spending-content .bb-details-content { opacity: 1; transition: grid-template-rows 280ms var(--bb-daily-ease); }
 .bb-daily-spending-content > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
 .bb-daily-transactions { min-width: 0; padding-top: 20px; }
 .bb-daily-heading { gap: 8px; }
@@ -613,7 +614,13 @@ button.bb-left-categories { cursor: pointer; }
 .bb-chart-side.bb-daily-summary { display: flex; flex-direction: column; justify-content: flex-end; gap: 0; }
 .bb-daily-amount-row { display: flex; align-items: center; gap: 12px; margin-top: 4px; min-width: 0; }
 .bb-daily-amount-row > .bb-chart-total { display: flex; align-items: center; flex: 1 1 0; min-width: 0; margin-top: 0; }
-.bb-daily-morph-control { display: flex; min-width: 0; max-width: 100%; margin-left: auto; }
+.bb-daily-morph-control { position: relative; flex: none; width: 132px; height: 46px; min-width: 0; max-width: 100%; margin-left: auto; transition: width 280ms var(--bb-daily-ease), transform 280ms var(--bb-daily-ease); }
+.bb-daily-amount-row[data-open="true"] .bb-daily-morph-control { width: 190px; }
+.bb-daily-filter-pane, .bb-daily-trigger-pane { position: absolute; inset: 0; display: flex; align-items: center; transition: opacity 140ms ease; }
+.bb-daily-filter-pane[aria-hidden="true"], .bb-daily-trigger-pane[aria-hidden="true"] { opacity: 0; pointer-events: none; }
+.bb-daily-trigger-pane .bb-daily-transactions-toggle { justify-content: center; width: 100%; height: 46px; padding: 8px 10px; }
+.bb-daily-filter-pane .bb-daily-active-filter { width: 100%; }
+.bb-daily-active-filter .bb-category-mix-filter { flex: 1 1 auto; }
 .bb-daily-transactions-toggle.bb-details-toggle { align-self: center; min-height: 44px; gap: 8px; border-radius: 24px; padding: 8px 13px; background: transparent; color: hsl(var(--foreground)); font-size: 14px; font-weight: 400; white-space: nowrap; }
 .bb-daily-transactions-toggle svg { width: 16px; height: 16px; flex: none; color: hsl(var(--muted-foreground)); }
 .bb-daily-active-filter { display: flex; align-items: center; max-width: 190px; min-width: 0; border: 1px solid hsl(var(--border)); border-radius: 24px; background: hsl(var(--card)); }
@@ -627,13 +634,24 @@ button.bb-left-categories { cursor: pointer; }
 .bb-daily-day-header { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 64px; padding: 10px 0; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; text-align: left; }
 .bb-daily-day-date { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .bb-daily-day-header[data-undated="true"] .bb-daily-day { font-size: 16px; letter-spacing: 0; }
-.bb-daily-date-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; }
+.bb-daily-date-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
 .bb-daily-date-copy strong { font-size: 13px; line-height: 1.35; font-weight: 500; }
-.bb-daily-day-count { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.35; }
+/* Rotate Calendar's hard transparent stack cutouts onto the horizontal axis. */
+.bb-daily-preview { --bb-preview-size: 24px; --bb-preview-pitch: 16px; display: inline-flex; align-items: center; flex: none; height: 24px; margin-left: 2px; }
+.bb-daily-preview-item { position: relative; isolation: isolate; flex: none; width: var(--bb-preview-size); height: var(--bb-preview-size); }
+.bb-daily-preview-item + .bb-daily-preview-item { margin-left: -8px; }
+.bb-daily-preview-layer { position: absolute; inset: -1px; }
+.bb-daily-preview-item:not(:last-child) .bb-daily-preview-layer { -webkit-mask-image: radial-gradient(circle at calc(50% + var(--bb-preview-pitch)) 50%, transparent calc(var(--bb-preview-size) / 2 + 2px), black calc(var(--bb-preview-size) / 2 + 2px)); mask-image: radial-gradient(circle at calc(50% + var(--bb-preview-pitch)) 50%, transparent calc(var(--bb-preview-size) / 2 + 2px), black calc(var(--bb-preview-size) / 2 + 2px)); }
+.bb-daily-preview .bb-transaction-icon { position: absolute; inset: 1px; width: 24px; min-width: 24px; max-width: 24px; height: 24px; min-height: 24px; max-height: 24px; }
+.bb-daily-preview .bb-transaction-icon > img { padding: calc(var(--bb-merchant-inset) * .8571429); }
+.bb-daily-preview .bb-transaction-icon[data-ready="true"] { -webkit-mask-image: radial-gradient(circle at calc(100% - 3px) calc(100% - 3px), transparent 4px, black 4px); mask-image: radial-gradient(circle at calc(100% - 3px) calc(100% - 3px), transparent 4px, black 4px); }
+.bb-daily-preview-dot { position: absolute; right: 1px; bottom: 1px; display: none; width: 6px; height: 6px; border-radius: 50%; background: var(--bb-preview-category); }
+.bb-daily-preview-layer:has(> [data-ready="true"]) > .bb-daily-preview-dot { display: block; }
+.bb-daily-preview-more { position: absolute; inset: 1px; display: grid; place-items: center; border-radius: 50%; background: hsl(var(--foreground) / .095); color: hsl(var(--foreground)); font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .bb-daily-day-total { margin-left: auto; white-space: nowrap; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.bb-daily-day-header > svg { flex: none; width: 16px; height: 16px; color: hsl(var(--muted-foreground)); transition: transform 240ms ease; }
+.bb-daily-day-header > svg { flex: none; width: 16px; height: 16px; color: hsl(var(--muted-foreground)); transition: transform 280ms var(--bb-daily-ease); }
 .bb-daily-day-header[aria-expanded="true"] > svg { transform: rotate(180deg); }
-.bb-daily-day-entries { margin: 0 0 10px 4px; padding: 2px 0 6px 12px; border-left: 1px solid hsl(var(--border)); }
+.bb-daily-day-entries { contain: layout style; margin: 0 0 10px 4px; padding: 2px 0 6px 12px; border-left: 1px solid hsl(var(--border)); }
 .bb-daily-day-group > .bb-details-content > .bb-details-content-inner { padding-top: 0; }
 .bb-daily-transaction { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: start; padding: 6px 0; min-height: 44px; box-sizing: border-box; }
 .bb-daily-transaction + .bb-daily-transaction { border-top: 1px solid hsl(var(--border) / .55); }
@@ -655,15 +673,17 @@ button.bb-left-categories { cursor: pointer; }
 .bb-transaction-icon[data-token="bills"], .bb-transaction-icon[data-token="subs-needs"] { color: hsl(var(--category-subs-needs)); background: hsl(var(--category-subs-needs) / .12); }
 .bb-transaction-icon[data-token="subs-wants"] { color: hsl(var(--category-subs-wants)); background: hsl(var(--category-subs-wants) / .12); }
 @container (max-width: 380px) {
-  .bb-daily-amount-row[data-open="true"] { flex-wrap: wrap; }
-  .bb-daily-amount-row[data-open="true"] .bb-daily-morph-control { width: 100%; }
-  .bb-daily-active-filter { width: 100%; max-width: none; }
-  .bb-daily-active-filter .bb-category-mix-filter { flex: 1 1 auto; }
+  .bb-daily-amount-row { position: relative; min-height: 46px; box-sizing: content-box; padding-bottom: 0; transition: padding-bottom 280ms var(--bb-daily-ease); }
+  .bb-daily-amount-row > .bb-chart-total { flex: none; width: calc(100% - 144px); }
+  .bb-daily-amount-row .bb-daily-morph-control { position: absolute; right: 0; top: 0; transform: translateY(0); }
+  .bb-daily-amount-row[data-open="true"] { padding-bottom: 58px; }
+  .bb-daily-amount-row[data-open="true"] .bb-daily-morph-control { width: 100%; transform: translateY(58px); }
+  .bb-daily-active-filter { max-width: none; }
 }
 @media (min-width: 861px) { .bb-daily-section .bb-chart-layout { grid-template-columns: minmax(360px, 1fr) minmax(300px, .4fr); } }
 @media (max-width: 860px) { .bb-chart-side.bb-daily-summary { border-top: 1px solid hsl(var(--border)); padding-top: 18px; } }
 @media (max-width: 350px) { .bb-daily-heading .bb-card-title { font-size: 26px; } }
-@media (prefers-reduced-motion: reduce) { .bb-daily-day-header > svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .bb-daily-day-header > svg, .bb-daily-spending-content .bb-details-content, .bb-daily-morph-control, .bb-daily-amount-row, .bb-daily-filter-pane, .bb-daily-trigger-pane { transition: none; } }
 
 .bb-daily-spending-content .recharts-cartesian-grid-horizontal .bb-daily-spending-grid {
   stroke: hsl(var(--muted-foreground));

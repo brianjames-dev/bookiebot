@@ -1,5 +1,25 @@
 # Agent Decisions
 
+## 2026-11-01 - Preview Expenses And Retain Daily Disclosure Surfaces
+
+Replace the visible day entry count with at most three horizontal circles: up
+to two expense icons and +N for remaining entries. Match the filtered list’s
+category/source order and existing Current/Projected provenance; retain the full
+count in the accessible preview label. Rotate Calendar’s hard transparent mask
+onto the horizontal axis and use Category Mix-colored logo dots. Preview slots
+are 24px; full-row slots remain 28px. No new logos or financial scope changes.
+
+Keep Transactions and Type/close controls mounted in inert/accessibility-hidden
+panes and animate their width, crossfade, narrow-screen translation and reserved
+space in CSS. Use scoped 280ms disclosure easing without the old panel opacity
+fade. Retain rows after first opening, memoize the outer list, sorted data,
+previews and row bodies, and reuse one collator. Repeat toggles preserve DOM,
+decoded images and day expansion state; month keys reset day caches. Initial
+closed lists/days remain lazy. Keep the shared disclosure API and all other
+pages unchanged. No per-frame React state, height measurements, observers,
+animation dependency or persistence is introduced; native-device acceptance
+remains necessary for perceived smoothness.
+
 ## 2026-11-01 - Publish Quiet Indent Daily Transactions
 
 Implement the approved Daily Spending draft with independent expandable days,
