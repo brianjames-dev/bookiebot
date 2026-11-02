@@ -1,4 +1,4 @@
-import { memo, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ChevronDown, DollarSign, Droplets, Flame, Fuel, GraduationCap, House, Package, PiggyBank, ReceiptText, Repeat2, ShieldCheck, ShoppingBag, ShoppingBasket, Utensils, Wifi, Zap } from 'lucide-react'
 import { createDailyDayMotion, DAILY_PREVIEW_COUNT } from './daily-transactions-motion'
 import { transactionCategory, transactionMerchant, transactionText, type DailyTransaction } from './transaction-identity'
@@ -83,12 +83,20 @@ const TransactionBeads = memo(function TransactionBeads({ entries, total, aliase
 }) {
   return <span className="bb-daily-icon-layer" aria-hidden="true">
     {entries.map(({ entry, index }, position) => <span className="bb-daily-bead" data-entry={position} data-logo={Boolean(transactionMerchant(entry, aliases))} key={index} style={{ zIndex: total + 1 - position, '--bb-preview-category': categoryColors[entry.category] || 'hsl(var(--muted-foreground))' } as CSSProperties}>
+      <TransactionCutouts entries={entries} before={Math.min(position, DAILY_PREVIEW_COUNT)} aliases={aliases}>
       <span className="bb-daily-bead-paint"><span className="bb-daily-bead-body"><TransactionIcon entry={entry} aliases={aliases} eager={position < DAILY_PREVIEW_COUNT} /></span>{position < DAILY_PREVIEW_COUNT && <span className="bb-daily-preview-dot" />}</span>
-      <span className="bb-daily-mask-host" />
+      </TransactionCutouts>
     </span>)}
-    {total > DAILY_PREVIEW_COUNT && <span className="bb-daily-overflow"><span className="bb-daily-preview-more">+{total - DAILY_PREVIEW_COUNT}</span><span className="bb-daily-mask-host" /></span>}
+    {total > DAILY_PREVIEW_COUNT && <span className="bb-daily-overflow"><TransactionCutouts entries={entries} before={DAILY_PREVIEW_COUNT} aliases={aliases}><span className="bb-daily-preview-more">+{total - DAILY_PREVIEW_COUNT}</span></TransactionCutouts></span>}
   </span>
 })
+
+// Separate clips intersect, so overlapping circle/badge holes stay transparent.
+// Their paths animate on the painted HTML owners, without referenced SVG masks.
+function TransactionCutouts({ entries, before, aliases, children }: { entries: SortedTransaction[]; before: number; aliases?: Record<string, string>; children: ReactNode }) {
+  const cutouts = entries.slice(0, before).flatMap(({ entry }, index) => transactionMerchant(entry, aliases) ? [`${index}-circle`, `${index}-badge`] : [`${index}-circle`])
+  return cutouts.reduceRight<ReactNode>((content, key) => <span className="bb-daily-clip" key={key}>{content}</span>, children)
+}
 
 const TransactionRows = memo(function TransactionRows({ entries, aliases, categoryColors }: {
   entries: SortedTransaction[]; aliases?: Record<string, string>; categoryColors: Record<string, string>

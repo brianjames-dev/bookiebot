@@ -23,8 +23,11 @@ fading in after circles depart and fading out before their return.
 Each expense has one persistent painted circle. Opening uncoils the circles
 along staggered curved paths into their exact itemized-row positions; closing
 collects them along the reverse path. Earlier expenses stack above later ones,
-keeping category dots visible. Real SVG alpha cutouts subtract preceding circles
-and their badges, leaving hard transparent gaps. Category dots shrink on departure
+keeping category dots visible. Nested CSS path clips subtract preceding circles
+and their badges, leaving hard transparent gaps. Each constant-topology path
+animates directly on its HTML paint owner; referenced SVG mask descendants are
+not used, avoiding frozen cutouts during native icon motion. Separate clip layers
+intersect so overlapping circle/badge holes cannot refill each other. Category dots shrink on departure
 and return on collection; logos remain opaque without crossfading duplicate skins
 or swapping image elements at landing. Unknown/failed logos use category fallbacks.
 
@@ -58,9 +61,13 @@ sheet/bank writes, remote requests or extra settings are introduced.
 Verification includes focused React/identity tests, pinned asset/hash checks,
 `daily_date_column_browser_test.cjs` for six/+N, Today, positions, opacity and
 reversal continuity, image identity, keyboard/resize/reduced-motion/cleanup, and
-`daily_transactions_motion_browser_test.cjs` for a 120-entry day. The shipped-bundle
+`daily_transactions_motion_browser_test.cjs` for a 120-entry day.
+`daily_icon_edges_browser_test.cjs` samples moving fallback/logo edge pixels on
+high-density mobile surfaces, compares the last collapse frame with rest, and
+emulates frozen SVG geometry. The old SVG implementation fails that emulated
+case; native iOS behavior still requires the phone acceptance steps. The shipped-bundle
 `daily_spending_controls_browser_test.cjs` covers scopes, controls, transparent-gap
 pixels, category order, status alignment, themes, cents and responsive layout.
 `section_spacing_browser_test.cjs` checks overall bottom spacing. Browser checks
 use synthetic data and blocked external requests. Native acceptance is checklist
-234 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.
+235 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.
