@@ -1,5 +1,24 @@
 # Agent Decisions
 
+## 2026-11-01 - Publish Date Column With Persistent Expense Motion
+
+Implement the approved six-circle Date column at 28px, 8px overlap and 2px true
+transparent gaps, followed by exact +N overflow. Earlier expenses stack above
+later ones, including their category badges. One persistent rendered logo per
+expense travels into its category-sorted row and back; do not crossfade duplicate
+skins or exchange images at landing. Reveal the old singular/plural entry count
+by opacity as the preview vacates the header. The actual current Pacific day uses
+a soft mint circle and Today label, never a fixed sample date or day-number match.
+
+Use a scoped browser-keyframe controller, retaining lazy row mount/session state,
+accessible counts, inert closed panels and reduced-motion behavior. Sample once
+on reversal, cap long-day staggering at 216ms, and settle offscreen overflow rows
+directly. Initial/reduced layout writes final geometry without constructing
+animations. Resize only responds to width changes and defers writes beyond
+ResizeObserver delivery. Disable secondary CSS transitions on owned surfaces.
+No new persistence, dependencies, financial calculations or Finance Ops scope.
+
+
 ## 2026-11-01 - Preview Expenses And Retain Daily Disclosure Surfaces
 
 Replace the visible day entry count with at most three horizontal circles: up
