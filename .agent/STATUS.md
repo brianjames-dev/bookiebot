@@ -2,6 +2,8 @@
 
 Last updated: 2026-11-02
 
+Logo Studio first refinement (2026-11-02): imported the user's ten ready flags and all nine supplied image references. Prepared native-artwork circle candidates for PG&E, Peacock, Spotify, State Farm, USPS, Walmart, Trader Joe's, Whole Foods, Safeway and Panda Express; no AI recreation was necessary. The user's follow-up removes Whole Foods' white outer rim with a full-bleed green circle and white lettering; retain its first candidate in history. Source/candidate hashes and reproducible framing live in `docs/logo-review/batches/2026-11-02-first-refinement`. App catalogs/assets remain unchanged pending exact candidate approvals. Candidate handoffs now carry the saved batch reference, preserve history, discard stale restored approvals and clear pending autosaves on explicit submission. Verification: **36 focused / 2,843 full tests passed**, **557 optional PostgreSQL skipped**, clean Pyright, valid skill metadata and **14 Chromium/WebKit gallery cases** at 320/390/736px in both themes. Inspected the actual Whole Foods Current/Candidate phone comparison with no horizontal overflow.
+
 Logo Studio process (2026-11-02): the user chose process setup before additions. Added a versioned reusable skill and offline inventory/intake/candidate/approval/publication-plan tooling, plus one mobile gallery of all 247 existing logos with actual framing, notes, HTTPS references, new-merchant requests and explicit follow-up submission. Flags await chat intake by default; readiness permits refinement. Candidate/source/raw AI output hashes and full prompts persist; exact latest approval and unchanged active artwork are required for a read-only publication plan. No runtime logos, matching, categories or financial data changed. Verification: **31 focused / 2,838 full tests passed**, **557 optional PostgreSQL skipped**, clean Pyright, valid skill metadata and **14 Chromium/WebKit gallery cases** at 320/390/736px in both themes. The final wrapped mobile gallery was visually inspected. The user accepted native circle-gap checklist 237.
 
 Category Mix All/Spent congruence (2026-10-29; savings inclusion superseded by 191): All now uses the same shared display calculation as the Spent card and info modal: canonical expense outflows plus the active mode's combined Saved amount once. This retains sheet adjustments that may not appear among category slices. Show recorded cash savings in All even without ESPP enrollment; keep cash/ESPP sectors distinct and Needs/Wants/Savings filters scoped, including donor coverage. Include the headline in chart memo invalidation so expense-only refreshes cannot leave stale totals. **4 focused / 2,758 full tests passed**, **557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build. **48 Chromium/WebKit mode cases passed** at 320/390px in both themes, with no API traffic; native acceptance is checklist 181.
@@ -354,7 +356,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: user review of the new Logo Studio gallery. Choose additions/refinements there; collect optional replacement images/notes in chat before refining unready items. Compare and approve exact candidates before applying a publication plan. Manual steps are in `docs/logo-review/README.md`. No additions are queued automatically. Native circle-gap checklist 237 is accepted by the user.
+First: user review of the ten first-refinement Logo Studio candidates, including the revised full-bleed Whole Foods circle. Tap to compare Current/Candidate, select Approve candidate for desired versions and Send review decisions; carry the saved batchRef into the next turn. No runtime logo changes until exact approval. Manual steps are in `docs/logo-review/README.md`. Native circle-gap checklist 237 is accepted by the user.
 
 First: native acceptance of the single Raised cents switch following PR #106’s automatic merge/rollout (checklist 230). Default on; off restores full-size cents. Preserve owner/device persistence, exact strings, fitting and the existing compact graph geometry. Existing native acceptance follows below.
 
@@ -509,6 +511,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
 
 ## Completed 2026-11-02
+
+- First logo refinement batch: ten reviewed native-artwork candidates, nine retained supplied sources and one existing Panda Express vector. Preserve the initial Whole Foods white-rim version and its replacement without that rim. Added immutable source/candidate/history and full-bleed edge regressions; fixed candidate handoff to continue the existing batch, stale approval restoration and pending autosave flushing. Runtime catalogs/assets and Finance Ops backlog unchanged; user candidate review remains on deck.
 
 - Logo Studio process: versioned reusable skill, full 247-entry offline gallery, intake/readiness gating, source and AI lineage, immutable candidates and exact-hash approvals with stale/tamper guards. Publication is an agent-applied read-only plan; setup preserves all runtime catalogs/assets. Added lifecycle tests and mobile Chromium/WebKit review contracts; Status, Decisions and logo guide updated. Finance Ops backlog unchanged.
 

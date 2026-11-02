@@ -16,7 +16,8 @@ const fragment=template.replace('__STUDIO_DATA__',JSON.stringify(payload).replac
     const page=await browser.newPage({viewport:{width,height:800},colorScheme})
     const errors=[];page.on('pageerror',error=>errors.push(error.message))
     await page.route('**/*',route=>route.abort())
-    await page.setContent(fragment)
+    const batchFragment=width===320?fragment:fragment.replace('"snapshotId":"fixture"','"snapshotId":"fixture","batchRef":"docs/logo-review/batches/example/batch.json"')
+    await page.setContent(batchFragment)
     await page.evaluate(()=>{window.saved=[];window.sent=[];window.openai={setWidgetState:async state=>window.saved.push(state),sendFollowUpMessage:async value=>window.sent.push(value)}})
     const q=selector=>{const found=page.locator('#bookiebot-logo-studio '+selector);return selector==='[data-send]'?found.first():found}
     assert.equal(await q('[data-editor]').isVisible(),false)
@@ -35,6 +36,12 @@ const fragment=template.replace('__STUDIO_DATA__',JSON.stringify(payload).replac
     let feedback=JSON.parse(sent.prompt.split('\n\n').at(-1))
     assert.equal(feedback.items[0].ready,false)
     assert.equal(feedback.items[0].notes,'Center it; keep native colors')
+    // Candidate handoffs must continue the same batch rather than erasing history.
+    if(width!==320){
+     assert.equal(feedback.batchRef,'docs/logo-review/batches/example/batch.json')
+     assert.match(sent.prompt,/Continue the existing batch/)
+     assert.match(sent.prompt,/approval decisions.*do not need a new intake/)
+    }else assert.equal(feedback.batchRef,undefined)
     await q('[data-ready]').check()
     await q('[data-new]').fill('New Store\nNew Store\nAnother Store')
     await q('[data-approve]').click()
@@ -57,6 +64,12 @@ const fragment=template.replace('__STUDIO_DATA__',JSON.stringify(payload).replac
     assert.equal(await q('[data-comparison] [role="img"]').count(),4)
     assert.equal(await q('[data-notes]').inputValue(),'Another refinement')
     assert.equal(await page.evaluate(()=>window.saved.length),count+1,'restoring state must not save again')
+    const stale={...snapshot,modelContent:{...snapshot.modelContent,items:[{key:'merchant:one',notes:'Keep these notes',referenceUrls:[],ready:false,decision:'approve',candidateSha256:'old-candidate'}]}}
+    await page.evaluate(state=>window.dispatchEvent(new CustomEvent('openai:set_globals',{detail:{globals:{widgetState:state}}})),stale)
+    await q('[data-send]').click()
+    feedback=JSON.parse((await page.evaluate(()=>window.sent.at(-1).prompt)).split('\n\n').at(-1))
+    assert.equal(feedback.items[0].decision,undefined,'new artwork must invalidate restored approval')
+    assert.equal(feedback.items[0].notes,'Keep these notes')
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true)
     assert.deepEqual(errors,[])
     await page.close();cases++
@@ -65,9 +78,9 @@ const fragment=template.replace('__STUDIO_DATA__',JSON.stringify(payload).replac
     const page=await browser.newPage({viewport:{width:390,height:844}})
     const fragment=fs.readFileSync(process.argv[2],'utf8')
     await page.setContent(fragment)
-    assert.equal(await page.locator('[data-key]').count(),247)
-    const atlas=await page.evaluate(async()=>{const d=JSON.parse(document.getElementById('bookiebot-logo-studio-data').textContent);const image=new Image();image.src=d.atlas.url;await image.decode();return{width:image.width,height:image.height}})
-    assert.equal(atlas.width,1008);assert.ok(atlas.height>1000)
+    const atlas=await page.evaluate(async()=>{const d=JSON.parse(document.getElementById('bookiebot-logo-studio-data').textContent);const image=new Image();image.src=d.atlas.url;await image.decode();return{width:image.width,height:image.height,expectedHeight:d.atlas.height,count:d.items.length}})
+    assert.equal(await page.locator('[data-key]').count(),atlas.count)
+    assert.equal(atlas.width,1008);assert.equal(atlas.height,atlas.expectedHeight)
     await page.locator('[data-key]').last().click()
     assert.equal(await page.locator('[data-editor]').isVisible(),true)
     await page.close();cases++

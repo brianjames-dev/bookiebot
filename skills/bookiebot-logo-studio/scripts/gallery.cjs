@@ -40,7 +40,7 @@ const data=asset=>{
    'import io,sys; from PIL import Image; im=Image.open(io.BytesIO(sys.stdin.buffer.read())); im.save(sys.stdout.buffer,format="WEBP",lossless=True,exact=True,method=6)'],
    {input:Buffer.from(atlas.url.split(',')[1],'base64'),maxBuffer:8000000})
   atlas.url='data:image/webp;base64,'+compressed.toString('base64')
-  const payload={version:1,snapshotId:job.snapshot.snapshotId,items:job.snapshot.items.map(({key,kind,id,name,group,currentIndex,candidateIndex,candidate,notes,referenceUrls,status})=>({key,kind,id,name,group,currentIndex,candidateIndex,candidateSha256:candidate?.sha256,notes,referenceUrls,status})),atlas}
+  const payload={version:1,snapshotId:job.snapshot.snapshotId,batchRef:job.snapshot.batchRef,items:job.snapshot.items.map(({key,kind,id,name,group,currentIndex,candidateIndex,candidate,notes,referenceUrls,status})=>({key,kind,id,name,group,currentIndex,candidateIndex,candidateSha256:candidate?.sha256,notes,referenceUrls,status})),atlas}
   const json=JSON.stringify(payload).replace(/</g,'\\u003c')
   const fragment=fs.readFileSync(job.template,'utf8').replace('__STUDIO_DATA__',json)
   if(Buffer.byteLength(fragment)>1000000)throw Error('Review exceeds the inline size budget; review a selected batch instead')

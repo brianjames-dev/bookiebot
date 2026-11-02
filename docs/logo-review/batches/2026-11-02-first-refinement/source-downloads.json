@@ -1,0 +1,117 @@
+[
+  {
+    "key": "company:pge",
+    "requestedUrl": "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png",
+    "resolvedUrl": "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png",
+    "file": "sources/company-pge-82f3338868653b14.png",
+    "sha256": "82f3338868653b1472fc26b8d0f57f966b3ad6ebe15e00d0de96b84518a83895",
+    "size": [
+      480,
+      480
+    ],
+    "bytes": 11657
+  },
+  {
+    "key": "company:peacock",
+    "requestedUrl": "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png",
+    "resolvedUrl": "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png",
+    "file": "sources/company-peacock-c4fbe6ea59351fe4.png",
+    "sha256": "c4fbe6ea59351fe4a7e1da5ebda08a462cbf3bb2cb6cb8305a577341da103347",
+    "size": [
+      3840,
+      2160
+    ],
+    "bytes": 30837
+  },
+  {
+    "key": "company:spotify",
+    "requestedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+    "resolvedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+    "file": "sources/company-spotify-f803bde3cca6ceaf.png",
+    "sha256": "f803bde3cca6ceaf280d45bc470377994adc983cb4e411ec0e602a8ac821ca3f",
+    "size": [
+      1280,
+      1322
+    ],
+    "bytes": 66394
+  },
+  {
+    "key": "company:state-farm",
+    "requestedUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10",
+    "resolvedUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10",
+    "file": "sources/company-state-farm-14ae7b02e47e865f.png",
+    "sha256": "14ae7b02e47e865fe4a451fdf2038faf8b4ecc701b3ad2bcec4ba5ec0e05f977",
+    "size": [
+      448,
+      446
+    ],
+    "bytes": 10205
+  },
+  {
+    "key": "merchant:usps",
+    "requestedUrl": "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg",
+    "resolvedUrl": "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg",
+    "file": "sources/merchant-usps-6ee5fd5b64ea6e37.jpg",
+    "sha256": "6ee5fd5b64ea6e374bb2810dc6df18cdc72ad86215c27082af13642b939c17c2",
+    "size": [
+      2400,
+      1500
+    ],
+    "bytes": 60657
+  },
+  {
+    "key": "merchant:walmart",
+    "requestedUrl": "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg",
+    "resolvedUrl": "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg",
+    "file": "sources/merchant-walmart-3f556fb6c344a9e4.jpg",
+    "sha256": "3f556fb6c344a9e49eb04ce63bddb14dd91ecb826beffbaf8f5de64ca60cd259",
+    "size": [
+      1500,
+      1125
+    ],
+    "bytes": 22813
+  },
+  {
+    "key": "merchant:trader-joes",
+    "requestedUrl": "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg",
+    "resolvedUrl": "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg",
+    "file": "sources/merchant-trader-joes-b949368110f17c47.jpg",
+    "sha256": "b949368110f17c47341515144b04ca9882bf9b9004c03dbd5f0644ad169b2af3",
+    "size": [
+      900,
+      900
+    ],
+    "bytes": 57146
+  },
+  {
+    "key": "merchant:whole-foods",
+    "requestedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+    "resolvedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+    "file": "sources/merchant-whole-foods-65d2ef50b33cf9c7.png",
+    "sha256": "65d2ef50b33cf9c7e92bb252054170486acf6e6555de3af0d8f3eac490e2763e",
+    "size": [
+      3840,
+      3840
+    ],
+    "bytes": 338923
+  },
+  {
+    "key": "merchant:safeway",
+    "requestedUrl": "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png",
+    "resolvedUrl": "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png",
+    "file": "sources/merchant-safeway-93776f049fa7c37e.png",
+    "sha256": "93776f049fa7c37eb8a6aeb310afdeebf21278592cb8e26c7a429e718867c586",
+    "size": [
+      3840,
+      2160
+    ],
+    "bytes": 17691
+  },
+  {
+    "key": "merchant:panda-express",
+    "localOriginal": true,
+    "file": "sources/merchant-panda-express-dd57da67b81d91e1.svg",
+    "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+    "sourceUrl": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg"
+  }
+]

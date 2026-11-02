@@ -1,0 +1,483 @@
+{
+  "kind": "bookiebot-logo-batch",
+  "version": 1,
+  "snapshotId": "11f6086157be9a7a418f55f4906e488b206402a6c940f16d1d905b1dae7464c7",
+  "createdAt": "2026-11-02T19:40:39.409795+00:00",
+  "items": [
+    {
+      "key": "company:pge",
+      "kind": "company",
+      "id": "pge",
+      "name": "PG&E",
+      "expectedRevision": "bb5f5071152fe373e44fada1c3d977ce0d19956131efc4058b3f6d6922f4a29e",
+      "current": {
+        "key": "company:pge",
+        "kind": "company",
+        "id": "pge",
+        "name": "PG&E",
+        "group": "Bills & subscriptions",
+        "aliases": [
+          "PG&E",
+          "PGE",
+          "Pacific Gas and Electric"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-pge-50f203cf0ab8750d.png",
+        "sha256": "50f203cf0ab8750d19607b9fdc73508eb360538ff2e66580735619256af19767",
+        "revision": "bb5f5071152fe373e44fada1c3d977ce0d19956131efc4058b3f6d6922f4a29e",
+        "background": "transparent",
+        "inset": 0,
+        "sourceUrl": "https://www.pge.com/content/experience-fragments/pge/en/site/header/master/_jcr_content/root/header/image.coreimg.jpeg/1759521030312/pge-logo-95x100.jpeg"
+      },
+      "notes": "The right of the E shouldn't have a white vertical line",
+      "referenceUrls": [
+        "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "0964da2c337441ca47f522fa9b61c9549cb93513c31eb8d75747c4d57920b6ff",
+          "asset": "candidates/company-pge-0964da2c337441ca.png",
+          "source": {
+            "path": "references/company-pge-82f3338868653b14.png",
+            "sha256": "82f3338868653b1472fc26b8d0f57f966b3ad6ebe15e00d0de96b84518a83895"
+          },
+          "sourceUrl": "https://static.toss.im/png-icons/securities/icn-sec-fill-PCG.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:07.890856+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "company:peacock",
+      "kind": "company",
+      "id": "peacock",
+      "name": "Peacock",
+      "expectedRevision": "4edcd32b878543b073d47ab56dbf9355af1913247dea9073113714f4c7413f7f",
+      "current": {
+        "key": "company:peacock",
+        "kind": "company",
+        "id": "peacock",
+        "name": "Peacock",
+        "group": "Bills & subscriptions",
+        "aliases": [
+          "Peacock",
+          "Peacock Premium"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-peacock-b970a86f2be4c2ba.png",
+        "sha256": "b970a86f2be4c2baa39ca07efedf3c8fa3c41c26d1a864ffd767dd661bf0428a",
+        "revision": "4edcd32b878543b073d47ab56dbf9355af1913247dea9073113714f4c7413f7f",
+        "background": "transparent",
+        "inset": 0,
+        "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/peacock.svg"
+      },
+      "notes": "Try using this logo, it might be higher fidelity",
+      "referenceUrls": [
+        "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "703eb524d597f9cd7cb8258a767e4746e6889207d364b66af8371766b35befe4",
+          "asset": "candidates/company-peacock-703eb524d597f9cd.png",
+          "source": {
+            "path": "references/company-peacock-c4fbe6ea59351fe4.png",
+            "sha256": "c4fbe6ea59351fe4a7e1da5ebda08a462cbf3bb2cb6cb8305a577341da103347"
+          },
+          "sourceUrl": "https://1000logos.net/wp-content/uploads/2023/09/Peacock-Emblem.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:07.959157+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "company:spotify",
+      "kind": "company",
+      "id": "spotify",
+      "name": "Spotify",
+      "expectedRevision": "8a484e5744b6b3b7ff57ed73e4d5e0da9746e214fce0fbb31a707bafb2f17a85",
+      "current": {
+        "key": "company:spotify",
+        "kind": "company",
+        "id": "spotify",
+        "name": "Spotify",
+        "group": "Bills & subscriptions",
+        "aliases": [
+          "Spotify",
+          "Spotify Premium"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-spotify-68f0c1767ea2fb76.png",
+        "sha256": "68f0c1767ea2fb765befee52568268cd9807e46ee61db72212b2027d86740a1e",
+        "revision": "8a484e5744b6b3b7ff57ed73e4d5e0da9746e214fce0fbb31a707bafb2f17a85",
+        "background": "transparent",
+        "inset": 0,
+        "sourceUrl": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@83f32e08257b66fbd971ac8d7645f5b38d52e85d/svg/spotify.svg"
+      },
+      "notes": "Logo should take up the whole circle",
+      "referenceUrls": [
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "689c29a8409b5ba07c0411e19429f658dce7143486d32fdc048b3ddf21ff0993",
+          "asset": "candidates/company-spotify-689c29a8409b5ba0.png",
+          "source": {
+            "path": "references/company-spotify-f803bde3cca6ceaf.png",
+            "sha256": "f803bde3cca6ceaf280d45bc470377994adc983cb4e411ec0e602a8ac821ca3f"
+          },
+          "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Spotify_icon.svg/1280px-Spotify_icon.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.021144+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "company:state-farm",
+      "kind": "company",
+      "id": "state-farm",
+      "name": "State Farm",
+      "expectedRevision": "6ed1ca59d64d747d0fc3dbc2fbd533ace513d826c55f16daf0f9122d2b790823",
+      "current": {
+        "key": "company:state-farm",
+        "kind": "company",
+        "id": "state-farm",
+        "name": "State Farm",
+        "group": "Bills & subscriptions",
+        "aliases": [
+          "State Farm"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-state-farm-b590f921898f9821.png",
+        "sha256": "b590f921898f9821080d53e3b84ab374a453ac6fd5ef42de97b282ca41a75b81",
+        "revision": "6ed1ca59d64d747d0fc3dbc2fbd533ace513d826c55f16daf0f9122d2b790823",
+        "background": "transparent",
+        "inset": 0,
+        "sourceUrl": "https://www.statefarm.com/favicon.ico"
+      },
+      "notes": "This image is higher fidelity",
+      "referenceUrls": [
+        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "4d4c3fa7e7bc0b13211f860cc595dbe4f5fb2ad03eea9a000e7ee2d0dbcd946f",
+          "asset": "candidates/company-state-farm-4d4c3fa7e7bc0b13.png",
+          "source": {
+            "path": "references/company-state-farm-14ae7b02e47e865f.png",
+            "sha256": "14ae7b02e47e865fe4a451fdf2038faf8b4ecc701b3ad2bcec4ba5ec0e05f977"
+          },
+          "sourceUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSumjr2DErC83lMEUaXE4wx9gEgg42gB8ITtLJhripGBQ&s=10",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.081428+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "merchant:usps",
+      "kind": "merchant",
+      "id": "usps",
+      "name": "USPS",
+      "expectedRevision": "63112a41cfd93d1548e67f3ff5b953a0de159e0232c8b1321297b4235c8bfd14",
+      "current": {
+        "key": "merchant:usps",
+        "kind": "merchant",
+        "id": "usps",
+        "name": "USPS",
+        "group": "Shipping",
+        "aliases": [
+          "USPS"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-usps-a38dc7d740123c28.svg",
+        "sha256": "a38dc7d740123c280461552c5f661e9abea2ba49077c7e43c43bb021d688993e",
+        "revision": "63112a41cfd93d1548e67f3ff5b953a0de159e0232c8b1321297b4235c8bfd14",
+        "background": "#ffffff",
+        "inset": 7,
+        "sourceUrl": "https://www.usps.com"
+      },
+      "notes": "Higher fidelity image",
+      "referenceUrls": [
+        "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "565b2978786c54422b1779d109d6ab5c04117555b7d7879553511fe5c49ff9dd",
+          "asset": "candidates/merchant-usps-565b2978786c5442.png",
+          "source": {
+            "path": "references/merchant-usps-6ee5fd5b64ea6e37.jpg",
+            "sha256": "6ee5fd5b64ea6e374bb2810dc6df18cdc72ad86215c27082af13642b939c17c2"
+          },
+          "sourceUrl": "https://1000logos.net/wp-content/uploads/2020/09/USPS-Logo.jpg",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.142179+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "merchant:walmart",
+      "kind": "merchant",
+      "id": "walmart",
+      "name": "Walmart",
+      "expectedRevision": "a0f693ed5244c52cb340e2940251457f994fb5846601278e115015381c712411",
+      "current": {
+        "key": "merchant:walmart",
+        "kind": "merchant",
+        "id": "walmart",
+        "name": "Walmart",
+        "group": "General stores",
+        "aliases": [
+          "Walmart",
+          "Wal-Mart",
+          "Walmart Supercenter",
+          "Walmart gas"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-walmart-c1e12ba4f8a11a41.svg",
+        "sha256": "c1e12ba4f8a11a419e957fee26a9e41901019658a54c2507687ce46c8d92f432",
+        "revision": "a0f693ed5244c52cb340e2940251457f994fb5846601278e115015381c712411",
+        "background": "#ffffff",
+        "inset": 3,
+        "sourceUrl": "https://github.com/simple-icons/simple-icons/tree/11.15.0/icons/walmart.svg"
+      },
+      "notes": "",
+      "referenceUrls": [
+        "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "0f2f06cef4ab7d3c62cfd5b383989aa89325b109c04fe3e6a33f2147b1b7ae82",
+          "asset": "candidates/merchant-walmart-0f2f06cef4ab7d3c.png",
+          "source": {
+            "path": "references/merchant-walmart-3f556fb6c344a9e4.jpg",
+            "sha256": "3f556fb6c344a9e49eb04ce63bddb14dd91ecb826beffbaf8f5de64ca60cd259"
+          },
+          "sourceUrl": "https://www.allrecipes.com/thmb/V0uJ5-OXuEY2ozGrx16E-QOw53I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/ar-new-walmart-logo-spark-blue-4x3-05716be5a80a49858b751defdd5c3705.jpg",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.202829+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "merchant:trader-joes",
+      "kind": "merchant",
+      "id": "trader-joes",
+      "name": "Trader Joe’s",
+      "expectedRevision": "243a6be756547102d93a55b2b0a6069db482af471378e5120240eedb2dcb39a7",
+      "current": {
+        "key": "merchant:trader-joes",
+        "kind": "merchant",
+        "id": "trader-joes",
+        "name": "Trader Joe’s",
+        "group": "Groceries",
+        "aliases": [
+          "Trader Joe’s",
+          "Trader Joe's",
+          "Trader Joes"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-trader-joes-503e83d3207938d2.svg",
+        "sha256": "503e83d3207938d283c565f96f2bdfa09fac55a8184b5624d72d735d205edb6a",
+        "revision": "243a6be756547102d93a55b2b0a6069db482af471378e5120240eedb2dcb39a7",
+        "background": "#fffaf0",
+        "inset": 3,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Trader_Joes_Logo.svg"
+      },
+      "notes": "make sure new logo fills up entire logo circle",
+      "referenceUrls": [
+        "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "f97e72dd46e5d30efec6f8fa4debf699cda8693042aef3561e80c3944fbfc2e7",
+          "asset": "candidates/merchant-trader-joes-f97e72dd46e5d30e.png",
+          "source": {
+            "path": "references/merchant-trader-joes-b949368110f17c47.jpg",
+            "sha256": "b949368110f17c47341515144b04ca9882bf9b9004c03dbd5f0644ad169b2af3"
+          },
+          "sourceUrl": "https://1792exchange.com/wp-content/uploads/2026/03/company-trader-joes-logo.jpg",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.262754+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "merchant:whole-foods",
+      "kind": "merchant",
+      "id": "whole-foods",
+      "name": "Whole Foods",
+      "expectedRevision": "ad86fb8c6c34adffaa0c9c9075394015c528c9ada0135ef51e8fc34a1db481ce",
+      "current": {
+        "key": "merchant:whole-foods",
+        "kind": "merchant",
+        "id": "whole-foods",
+        "name": "Whole Foods",
+        "group": "Groceries",
+        "aliases": [
+          "Whole Foods",
+          "Whole Foods Market"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-whole-foods-d548ef550b066f1c.svg",
+        "sha256": "d548ef550b066f1caea51efc632d626aed0bf0ea2506f8d295ea33a01d5b034e",
+        "revision": "ad86fb8c6c34adffaa0c9c9075394015c528c9ada0135ef51e8fc34a1db481ce",
+        "background": "#ffffff",
+        "inset": 0,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Whole_Foods_Market_201x_logo.svg"
+      },
+      "notes": "Higher quality photo, should have white background Follow-up: expand the green logo to fully fill the circular space; remove the outer white line, keeping white lettering.",
+      "referenceUrls": [
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "aa4f4a0476a209e01d785267c52ee791ee0c982badddcabd8bff892cb919b248",
+          "asset": "candidates/merchant-whole-foods-aa4f4a0476a209e0.png",
+          "source": {
+            "path": "references/merchant-whole-foods-65d2ef50b33cf9c7.png",
+            "sha256": "65d2ef50b33cf9c7e92bb252054170486acf6e6555de3af0d8f3eac490e2763e"
+          },
+          "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.322264+00:00"
+        },
+        {
+          "sha256": "000cf9fe7f128aeda25f92275c27568ad350e133434b8a9ccdc8b1dd233968fa",
+          "asset": "candidates/merchant-whole-foods-000cf9fe7f128aed.png",
+          "source": {
+            "path": "references/merchant-whole-foods-65d2ef50b33cf9c7.png",
+            "sha256": "65d2ef50b33cf9c7e92bb252054170486acf6e6555de3af0d8f3eac490e2763e"
+          },
+          "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Whole_Foods_Market_201x_logo.svg/3840px-Whole_Foods_Market_201x_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:45:03.388092+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "merchant:safeway",
+      "kind": "merchant",
+      "id": "safeway",
+      "name": "Safeway",
+      "expectedRevision": "37204b00e32c14e603894fae13ac443dec01b5cb8af81cba4c88951a5f78e6ee",
+      "current": {
+        "key": "merchant:safeway",
+        "kind": "merchant",
+        "id": "safeway",
+        "name": "Safeway",
+        "group": "Groceries",
+        "aliases": [
+          "Safeway",
+          "Safeway gas",
+          "Safeway Fuel",
+          "Safeway fuel station"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-safeway-85938b09a89cdbd4.svg",
+        "sha256": "85938b09a89cdbd4eb9e10752c7a9d3a9399cb08d4e9e891d45939633476575a",
+        "revision": "37204b00e32c14e603894fae13ac443dec01b5cb8af81cba4c88951a5f78e6ee",
+        "background": "#ffffff",
+        "inset": 4,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Safeway_Logo.svg"
+      },
+      "notes": "Needs a white background",
+      "referenceUrls": [
+        "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "b2dad9ba0601efd0acbd8b449f14cf84e55eb1c3089f89e62be3b6b6ef0acc6f",
+          "asset": "candidates/merchant-safeway-b2dad9ba0601efd0.png",
+          "source": {
+            "path": "references/merchant-safeway-93776f049fa7c37e.png",
+            "sha256": "93776f049fa7c37eb8a6aeb310afdeebf21278592cb8e26c7a429e718867c586"
+          },
+          "sourceUrl": "https://1000logos.net/wp-content/uploads/2025/01/Safeway-Emblem.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.381668+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    },
+    {
+      "key": "merchant:panda-express",
+      "kind": "merchant",
+      "id": "panda-express",
+      "name": "Panda Express",
+      "expectedRevision": "93c63e4a69611697385e848e5e77a74594542fb1824a58f7ab3a9e7153cc8187",
+      "current": {
+        "key": "merchant:panda-express",
+        "kind": "merchant",
+        "id": "panda-express",
+        "name": "Panda Express",
+        "group": "Fast food & coffee",
+        "aliases": [
+          "Panda Express"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-panda-express-dd57da67b81d91e1.svg",
+        "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+        "revision": "93c63e4a69611697385e848e5e77a74594542fb1824a58f7ab3a9e7153cc8187",
+        "background": "#ffffff",
+        "inset": 4,
+        "sourceUrl": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg"
+      },
+      "notes": "The logo should fully fill in the circle",
+      "referenceUrls": [],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "9be10ad32406fd7796bbf55c559b65d1dbafd681076092206a6ab7015848fcb4",
+          "asset": "candidates/merchant-panda-express-9be10ad32406fd77.png",
+          "source": {
+            "path": "references/merchant-panda-express-dd57da67b81d91e1.svg",
+            "sha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a"
+          },
+          "sourceUrl": "https://en.wikipedia.org/wiki/File:Panda_Express_logo.svg",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-02T19:43:08.442769+00:00"
+        }
+      ],
+      "status": "candidate-review"
+    }
+  ]
+}

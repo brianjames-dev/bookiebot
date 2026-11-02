@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "size": 256,
+  "items": [
+    {
+      "key": "company:pge",
+      "source": "sources/company-pge-82f3338868653b14.png",
+      "sourceSha256": "82f3338868653b1472fc26b8d0f57f966b3ad6ebe15e00d0de96b84518a83895",
+      "background": "#0089c4",
+      "fill": 0.72,
+      "trim": "pge",
+      "treatment": "Clean supplied mark; remove former right-edge stripe"
+    },
+    {
+      "key": "company:peacock",
+      "source": "sources/company-peacock-c4fbe6ea59351fe4.png",
+      "sourceSha256": "c4fbe6ea59351fe4a7e1da5ebda08a462cbf3bb2cb6cb8305a577341da103347",
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": "alpha",
+      "treatment": "Higher-resolution supplied P and six-dot emblem"
+    },
+    {
+      "key": "company:spotify",
+      "source": "sources/company-spotify-f803bde3cca6ceaf.png",
+      "sourceSha256": "f803bde3cca6ceaf280d45bc470377994adc983cb4e411ec0e602a8ac821ca3f",
+      "background": "#1ed760",
+      "fill": 1.012,
+      "trim": "alpha",
+      "treatment": "Native green circle fills the complete medallion"
+    },
+    {
+      "key": "company:state-farm",
+      "source": "sources/company-state-farm-14ae7b02e47e865f.png",
+      "sourceSha256": "14ae7b02e47e865fe4a451fdf2038faf8b4ecc701b3ad2bcec4ba5ec0e05f977",
+      "background": "#ffffff",
+      "fill": 0.84,
+      "trim": "red",
+      "treatment": "Crop to native red symbol; discard grey rounded-square frame"
+    },
+    {
+      "key": "merchant:usps",
+      "source": "sources/merchant-usps-6ee5fd5b64ea6e37.jpg",
+      "sourceSha256": "6ee5fd5b64ea6e374bb2810dc6df18cdc72ad86215c27082af13642b939c17c2",
+      "background": "#ffffff",
+      "fill": 0.82,
+      "trim": "blue",
+      "treatment": "Higher-resolution supplied eagle with balanced circle padding"
+    },
+    {
+      "key": "merchant:walmart",
+      "source": "sources/merchant-walmart-3f556fb6c344a9e4.jpg",
+      "sourceSha256": "3f556fb6c344a9e49eb04ce63bddb14dd91ecb826beffbaf8f5de64ca60cd259",
+      "background": "#0153e3",
+      "fill": 0.74,
+      "trim": "yellow",
+      "treatment": "Supplied yellow spark with full-bleed blue field"
+    },
+    {
+      "key": "merchant:trader-joes",
+      "source": "sources/merchant-trader-joes-b949368110f17c47.jpg",
+      "sourceSha256": "b949368110f17c47341515144b04ca9882bf9b9004c03dbd5f0644ad169b2af3",
+      "background": "#cd0e2d",
+      "fill": 1.012,
+      "trim": "full",
+      "treatment": "Supplied round red badge fills the complete medallion"
+    },
+    {
+      "key": "merchant:whole-foods",
+      "source": "sources/merchant-whole-foods-65d2ef50b33cf9c7.png",
+      "sourceSha256": "65d2ef50b33cf9c7e92bb252054170486acf6e6555de3af0d8f3eac490e2763e",
+      "background": "#ffffff",
+      "fill": 1.012,
+      "trim": "alpha",
+      "treatment": "Full-bleed green circle with white lettering; no outer white ring"
+    },
+    {
+      "key": "merchant:safeway",
+      "source": "sources/merchant-safeway-93776f049fa7c37e.png",
+      "sourceSha256": "93776f049fa7c37eb8a6aeb310afdeebf21278592cb8e26c7a429e718867c586",
+      "background": "#ffffff",
+      "fill": 0.9,
+      "trim": "alpha",
+      "treatment": "Supplied red S on an opaque white circle"
+    },
+    {
+      "key": "merchant:panda-express",
+      "source": "sources/merchant-panda-express-dd57da67b81d91e1.svg",
+      "sourceSha256": "dd57da67b81d91e16f96e70e04b37d876850f8077d655a74b5879898f798fe6a",
+      "background": "#ce0e2d",
+      "fill": 1.012,
+      "trim": "alpha",
+      "treatment": "Native vector circle fills the medallion without runtime inset"
+    }
+  ]
+}
