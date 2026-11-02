@@ -1,0 +1,4 @@
+interface:
+  display_name: "BookieBot Logo Studio"
+  short_description: "Review and refine BookieBot transaction icons"
+  default_prompt: "Use $bookiebot-logo-studio to review transaction icons, collect my references, and prepare refined candidates."

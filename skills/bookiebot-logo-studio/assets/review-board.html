@@ -1,0 +1,137 @@
+<div id="bookiebot-logo-studio">
+  <style>
+    #bookiebot-logo-studio [hidden] { display: none !important; }
+    #bookiebot-logo-studio .studio-heading { padding-right: 96px; }
+    #bookiebot-logo-studio .studio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin: 16px 0; }
+    #bookiebot-logo-studio .studio-images { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; }
+    #bookiebot-logo-studio .studio-mark { display: inline-block; flex: none; border-radius: 50%; background-image: var(--studio-atlas); background-repeat: no-repeat; }
+    #bookiebot-logo-studio .studio-name { overflow-wrap: anywhere; }
+    #bookiebot-logo-studio .studio-fields { display: grid; gap: 12px; }
+    #bookiebot-logo-studio .studio-tile-content { display: grid; gap: 6px; }
+    #bookiebot-logo-studio .studio-comparison { display: flex; justify-content: center; flex-wrap: wrap; gap: 24px; margin-bottom: 12px; }
+    #bookiebot-logo-studio .studio-comparison > div { display: grid; justify-items: center; gap: 6px; }
+    #bookiebot-logo-studio .studio-grid > [data-editor] { grid-column: 1 / -1; }
+  </style>
+  <div class="studio-heading"><h2>Transaction icons</h2><span class="text-small text-muted" data-count></span></div>
+  <div class="card studio-fields" data-editor hidden>
+    <strong data-name></strong>
+    <div class="studio-comparison" data-comparison></div>
+    <label class="form-label">What should change?<textarea class="form-control" rows="3" maxlength="1200" data-notes></textarea></label>
+    <label class="form-label">Better logo URL <span class="text-muted">(optional)</span><input class="form-control" type="url" placeholder="https://" data-url></label>
+    <label class="form-check"><input class="form-check-input" type="checkbox" data-ready><span class="form-check-label">Ready to refine with these instructions</span></label>
+    <div class="viz-row">
+      <button class="btn" type="button" data-clear>Keep as is</button>
+      <button class="btn" type="button" data-approve hidden>Approve candidate</button>
+    </div>
+    <div class="viz-row"><button class="btn btn-primary" type="button" data-send>Send for intake</button><span class="text-small" data-summary aria-live="polite"></span></div>
+  </div>
+  <div data-groups></div>
+  <label class="form-label">New merchants to add <span class="text-muted">(one per line)</span><textarea class="form-control" rows="3" data-new></textarea></label>
+  <div class="viz-row">
+    <button class="btn btn-primary" type="button" data-send>Send for intake</button>
+    <span class="text-small text-muted" data-summary aria-live="polite"></span>
+  </div>
+  <div class="text-destructive" role="alert" data-error hidden></div>
+  <script type="application/json" id="bookiebot-logo-studio-data">__STUDIO_DATA__</script>
+  <script>
+    (function(){
+      const root=document.getElementById('bookiebot-logo-studio'),data=JSON.parse(document.getElementById('bookiebot-logo-studio-data').textContent)
+      const q=selector=>root.querySelector(selector),items=new Map(data.items.map(item=>[item.key,item]))
+      let choices={},newRequests=[],selected=null,saveTimer=null
+      root.style.setProperty('--studio-atlas','url("'+data.atlas.url+'")')
+      function mark(index,size,name){
+        if(index===undefined)return null
+        const span=document.createElement('span'),ratio=size/data.atlas.size
+        span.className='studio-mark';span.setAttribute('role','img');span.setAttribute('aria-label',name)
+        Object.assign(span.style,{width:size+'px',height:size+'px',backgroundSize:data.atlas.width*ratio+'px '+data.atlas.height*ratio+'px',backgroundPosition:-(index%data.atlas.columns)*size+'px '+-Math.floor(index/data.atlas.columns)*size+'px'})
+        return span
+      }
+      function feedback(){return{kind:'bookiebot-logo-feedback',version:1,snapshotId:data.snapshotId,items:Object.entries(choices).map(([key,value])=>({key,...value})),newRequests}}
+      function error(message){q('[data-error]').textContent=message;q('[data-error]').hidden=!message}
+      function persist(){
+        const state=feedback()
+        if(new TextEncoder().encode(JSON.stringify(state)).length>14000){error('This batch is too large to save between visits. Send it now to keep all your notes.');update();return true}
+        error('')
+        if(window.openai&&window.openai.setWidgetState)window.openai.setWidgetState({modelContent:state,privateContent:{selectedKey:selected}}).catch(()=>{})
+        update();return true
+      }
+      function update(){
+        const count=Object.keys(choices).length,ready=Object.values(choices).filter(item=>item.ready).length,approved=Object.values(choices).filter(item=>item.decision==='approve').length
+        q('[data-count]').textContent=data.items.length+' icons · tap to flag'
+        for(const summary of root.querySelectorAll('[data-summary]'))summary.textContent=count+' flagged · '+ready+' ready'+(approved?' · '+approved+' approved':'')
+        for(const send of root.querySelectorAll('[data-send]')){send.textContent=approved?'Send review decisions':ready?'Refine ready icons':'Send for intake';send.disabled=!count&&!newRequests.length}
+        for(const button of root.querySelectorAll('[data-key]'))button.setAttribute('aria-pressed',String(Boolean(choices[button.dataset.key])))
+      }
+      function renderEditor(key){
+        selected=key
+        const item=items.get(key)
+        const tile=Array.from(root.querySelectorAll('[data-key]')).find(button=>button.dataset.key===key)
+        if(tile)tile.after(q('[data-editor]'))
+        const value=choices[key];q('[data-editor]').hidden=false;q('[data-name]').textContent=item.name
+        q('[data-notes]').value=value.notes;q('[data-url]').value=value.referenceUrls[0]||'';q('[data-ready]').checked=value.ready
+        const comparison=q('[data-comparison]');comparison.replaceChildren()
+        for(const [label,index] of [['Current',item.currentIndex],['Candidate',item.candidateIndex]]){
+          if(index===undefined)continue
+          const column=document.createElement('div'),text=document.createElement('span');text.className='text-small';text.textContent=label
+          const images=document.createElement('div');images.className='studio-images';images.append(mark(index,42,item.name),mark(index,28,item.name));column.append(images,text);comparison.append(column)
+        }
+        q('[data-approve]').hidden=!item.candidateSha256
+      }
+      function edit(key){
+        const item=items.get(key)
+        choices[key]=choices[key]||{notes:item.notes||'',referenceUrls:item.referenceUrls||[],ready:false}
+        renderEditor(key);persist()
+        q('[data-editor]').scrollIntoView({block:'nearest',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})
+      }
+      function saveEditor(){
+        if(!selected)return
+        const old=choices[selected],url=q('[data-url]').value.trim()
+        if(url){try{const parsed=new URL(url);if(parsed.protocol!=='https:'||parsed.username||parsed.password)throw Error()}catch(e){error('Use a public HTTPS logo URL, or leave the reference blank.');return false}}
+        choices[selected]={notes:q('[data-notes]').value,referenceUrls:url?[url]:[],ready:q('[data-ready]').checked}
+        if(old&&old.decision&&old.notes===choices[selected].notes&&JSON.stringify(old.referenceUrls)===JSON.stringify(choices[selected].referenceUrls)&&old.ready===choices[selected].ready){choices[selected].decision=old.decision;choices[selected].candidateSha256=old.candidateSha256}
+        return persist()
+      }
+      const groups=q('[data-groups]')
+      for(const kind of ['company','merchant']){
+        const rows=data.items.filter(item=>item.kind===kind);if(!rows.length)continue
+        const title=document.createElement('h3');title.textContent=kind==='company'?'Bills & subscriptions':'Merchants'
+        const grid=document.createElement('div');grid.className='studio-grid'
+        for(const item of rows){
+          const button=document.createElement('button');button.type='button';button.className='btn viz-tile';button.dataset.key=item.key;button.setAttribute('aria-pressed','false');button.setAttribute('aria-label','Flag '+item.name)
+          const content=document.createElement('span');content.className='studio-tile-content'
+          const images=document.createElement('span');images.className='studio-images'
+          const index=item.candidateIndex===undefined?item.currentIndex:item.candidateIndex
+          const large=mark(index,42,item.name),small=mark(index,28,item.name);if(large)images.append(large,small)
+          const name=document.createElement('span');name.className='studio-name text-small';name.textContent=item.name
+          content.append(images,name);button.append(content);button.onclick=()=>{if(selected&&saveEditor()===false)return;edit(item.key)};grid.append(button)
+        }
+        groups.append(title,grid)
+      }
+      for(const field of ['[data-notes]','[data-url]','[data-ready]'])q(field).addEventListener('input',()=>{clearTimeout(saveTimer);saveTimer=setTimeout(saveEditor,250)})
+      q('[data-clear]').onclick=()=>{clearTimeout(saveTimer);delete choices[selected];selected=null;q('[data-editor]').hidden=true;persist()}
+      q('[data-approve]').onclick=()=>{if(saveEditor()===false)return;const item=items.get(selected);choices[selected].decision='approve';choices[selected].candidateSha256=item.candidateSha256;persist()}
+      q('[data-new]').oninput=()=>{newRequests=[...new Set(q('[data-new]').value.split('\n').map(name=>name.trim()).filter(Boolean))];persist()}
+      for(const send of root.querySelectorAll('[data-send]'))send.onclick=async()=>{
+        if(saveEditor()===false||!persist())return
+        const prompt='Use $bookiebot-logo-studio for this review. Import the feedback into a versioned batch. Items with ready=false need an intake in chat for my optional replacement images or further notes before any refinement. Refine only ready items, show current/candidate comparisons, and publish only exact candidates I approve. New merchant requests also need intake first.\n\n'+JSON.stringify(feedback())
+        try{
+          if(!window.openai||!window.openai.sendFollowUpMessage)throw Error('Open this review in Codex to send it to the pipeline.')
+          await window.openai.sendFollowUpMessage({prompt,title:'Review flagged transaction icons'})
+        }catch(e){error(e.message||'Could not submit the review. Your selections remain here.')}
+      }
+      function restore(state,privateState){
+        if(!state||state.version!==1||state.snapshotId!==data.snapshotId)return
+        clearTimeout(saveTimer);selected=null;q('[data-editor]').hidden=true
+        choices={};for(const item of state.items||[])if(items.has(item.key)){const {key,...value}=item;choices[key]=value}
+        newRequests=state.newRequests||[];q('[data-new]').value=newRequests.join('\n')
+        update()
+        const key=privateState&&privateState.selectedKey
+        if(key&&choices[key])renderEditor(key)
+      }
+      const saved=window.openai&&window.openai.widgetState
+      restore(saved&&saved.modelContent||saved,saved&&saved.privateContent)
+      window.addEventListener('openai:set_globals',event=>{const state=event.detail&&event.detail.globals&&event.detail.globals.widgetState;restore(state&&state.modelContent||state,state&&state.privateContent)})
+      update()
+    })()
+  </script>
+</div>

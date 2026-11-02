@@ -8,6 +8,8 @@ gspread==6.2.1
 oauth2client==4.1.3
 python-dotenv==1.0.1
 openpyxl
+# Offline logo review validation and lossless preview compression.
+Pillow>=11.1,<13
 python-dateutil==2.9.0.post0
 # Kaleido 1.x requires a system Chrome install (breaks on bare Railway images).
 # 0.2.1 ships a self-contained headless browser for fig.to_image().
