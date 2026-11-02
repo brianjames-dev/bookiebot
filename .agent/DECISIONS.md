@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-02 - Review logos through explicit intake and exact candidate approval
+
+Keep Logo Studio as a reusable agent skill with offline tooling, separate from app runtime and financial data. Combine the existing company and merchant catalogs in one namespaced inventory; preserve actual framing and all matching/category behavior. Flags default to needing input so the user can supply notes or better artwork in chat. Only explicit readiness authorizes refinement. Prefer official high-fidelity assets and deterministic framing; use AI selectively, retaining original inputs, unmodified generated outputs, full prompts and all hashes.
+
+Candidates are content-addressed and do not replace approved art. Approvals name the exact latest candidate hash; staging another version clears approval. Active artwork changes, candidate/reference/output tampering and incomplete AI lineage block publication planning. The tool emits a read-only plan; the agent applies approved catalog/provenance changes through normal tests and merge. Widget state is best-effort presentation state; explicit follow-up JSON carries review decisions. Setup does not automatically expand the library. Version the skill with the repository and install an identical personal copy for reuse.
+
 ## 2026-11-02 - Move Rigid Circle Gaps With Their Upper Icons
 
 The user confirms PR #112 did not remove the expansion flash and identifies the

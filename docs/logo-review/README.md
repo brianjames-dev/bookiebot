@@ -1,5 +1,37 @@
 # Small-circle logo quality review
 
+## Ongoing merchant and company review
+
+Use the versioned [BookieBot Logo Studio skill](../../skills/bookiebot-logo-studio/SKILL.md)
+for new review batches. Its inventory combines the approved company catalog and
+merchant catalog, preserving each runtime background/inset in an offline gallery.
+Flag icons, add notes or an HTTPS reference, request new merchants, and send the
+review to chat. Leave **Ready to refine** off when supplying images or discussing
+changes first; marking an item ready explicitly completes its intake.
+
+The tooling stores source/candidate hashes and AI input, raw output and full prompt
+lineage. Candidates remain separate from the app until explicitly approved by
+their exact latest hash. The publication command produces a read-only plan;
+applying it is a normal scoped catalog/provenance change with verification and
+merge. Existing artwork changes invalidate an old batch. A new candidate clears
+its prior approval. Gallery state alone neither starts refinement nor publishes.
+
+Setup verification:
+
+```bash
+python -m pytest unit_tests/reports/test_logo_studio.py unit_tests/reports/test_logo_quality_review.py
+BOOKIEBOT_PLAYWRIGHT_MODULE=/path/to/playwright node unit_tests/reports/logo_studio_browser_test.cjs
+```
+
+Manual review: open the current gallery on a phone; flag an icon, confirm the
+editor appears beside it, enter notes and send with readiness off. The next chat
+intake should invite replacement images before refining. After intake, inspect
+Current/Candidate at large and 28px sizes; approve and send only the versions you
+want. Requesting another change must clear approval. Unselected logos and app
+assets must remain unchanged. The first setup batch creates no new logos.
+
+## Original approved company batch
+
 This is an offline authoring and review process for all 89 calendar logos. The
 user approved the complete revised set on 2026-10-31; the app now uses these exact
 circle exports. Authoring/export alone never changes the production catalog.
