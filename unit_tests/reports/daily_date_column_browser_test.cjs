@@ -29,11 +29,14 @@ for(const engine of [chromium,webkit].filter(e=>!process.env.ONLY_ENGINE||e.name
  assert.equal(await group.locator('.bb-daily-day-count').evaluate(n=>getComputedStyle(n).opacity),'0');assert.equal(await group.locator('.bb-daily-transaction').count(),0)
  await page.waitForFunction(()=>[...document.querySelectorAll('.bb-daily-icon-layer img')].every(img=>img.complete&&img.naturalWidth))
  await group.evaluate(el=>{globalThis.__beads=[...el.querySelectorAll('.bb-daily-bead')];globalThis.__images=[...el.querySelectorAll('.bb-daily-bead img')]})
- await button.click();await page.waitForTimeout(350)
  const continuity=await group.evaluate(async el=>{
+  el.querySelector('button').click();await Promise.resolve()
   const animations=el.getAnimations({subtree:true});for(const a of animations)a.pause();await Promise.all(animations.map(a=>a.ready.catch(()=>{})))
-  const count=el.querySelector('.bb-daily-day-count'),read=()=>[...el.querySelectorAll('.bb-daily-bead')].map(n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,opacity:getComputedStyle(n).opacity}}),before=read(),countBefore=Number(getComputedStyle(count).opacity)
-  el.querySelector('button').click();const after=read();return{distances:before.map((p,i)=>Math.hypot(p.x-after[i].x,p.y-after[i].y)),countBefore,countAfter:Number(getComputedStyle(count).opacity)}
+  const count=el.querySelector('.bb-daily-day-count'),timing=animations.find(a=>a.effect.target===count).effect.getTiming(),at=timing.delay+Number(timing.duration)/2
+  for(const a of animations)a.currentTime=Math.min(at,a.effect.getComputedTiming().endTime)
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))
+  const read=()=>[...el.querySelectorAll('.bb-daily-bead')].map(n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,opacity:getComputedStyle(n).opacity}}),before=read(),countBefore=Number(getComputedStyle(count).opacity)
+  el.querySelector('button').click();await Promise.resolve();const after=read();return{distances:before.map((p,i)=>Math.hypot(p.x-after[i].x,p.y-after[i].y)),countBefore,countAfter:Number(getComputedStyle(count).opacity)}
  })
  assert(continuity.distances.every(d=>d<1),JSON.stringify(continuity));assert(continuity.countBefore>0&&continuity.countBefore<1,JSON.stringify(continuity));assert(Math.abs(continuity.countBefore-continuity.countAfter)<.01)
  await settled(group);assert.equal(await group.locator('.bb-daily-day-count').evaluate(n=>getComputedStyle(n).opacity),'0')

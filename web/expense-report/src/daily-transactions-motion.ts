@@ -15,12 +15,11 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
   const reduced = matchMedia('(prefers-reduced-motion: reduce)')
   const controller: Controller = { section, panel: section.querySelector<HTMLElement>('.bb-daily-day-panel')!, button: section.querySelector<HTMLButtonElement>('.bb-daily-day-header')!, layer: section.querySelector<HTMLElement>('.bb-daily-icon-layer')!, entryCount: Number(section.dataset.entryCount), target: initialOpen, instant: false, sequence: 0, animations: new Set(), flights: new Map() }
   const hasLogo = (scene: Controller, index: number) => scene.section.querySelector<HTMLElement>(`.bb-daily-bead[data-entry="${index}"]`)?.dataset.logo === 'true'
-  // A constant path topology lets the browser interpolate every cutout directly
-  // on its painted layer. SVG mask descendants can remain at an old paint while
-  // their parent icon moves, leaving a bite until the animation is cancelled.
-  function cutout({ cx, cy, r }: Geometry, size: number) {
+  // Small badge holes interpolate directly on their paint owner. Large circle
+  // holes keep this shape fixed and move with transforms in trackCircleGap.
+  function cutout({ cx, cy, r }: Geometry, size: number, padding = 0) {
     const n = (value: number) => Number(value.toFixed(4))
-    return `path(evenodd, "M0 0H${size}V${size}H0Z M${n(cx - r)} ${n(cy)}A${n(r)} ${n(r)} 0 1 0 ${n(cx + r)} ${n(cy)}A${n(r)} ${n(r)} 0 1 0 ${n(cx - r)} ${n(cy)}Z")`
+    return `path(evenodd, "M${-padding} ${-padding}H${size + padding}V${size + padding}H${-padding}Z M${n(cx - r)} ${n(cy)}A${n(r)} ${n(r)} 0 1 0 ${n(cx + r)} ${n(cy)}A${n(r)} ${n(r)} 0 1 0 ${n(cx - r)} ${n(cy)}Z")`
   }
   const cssProperty = (property: string) => property.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)
   function cancel(controller: Controller, clear = false) {
@@ -80,6 +79,36 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
     controller.animations.add(animation);
     animation.finished.catch(() => {});
     return animation;
+  }
+  function trackCircleGap(clip: HTMLElement, geometry: Geometry[], times: number[], total: number, size: number, radius: number) {
+    const content = clip.querySelector<HTMLElement>(':scope > .bb-daily-clip-content')!
+    // Distant earlier circles never touch this icon. Do not create a pair of
+    // composited layers for an empty intersection, especially on large days.
+    if (!gapVisible(geometry, size)) {
+      clip.style.clipPath = 'none'
+      clip.style.transform = content.style.transform = 'none'
+      return
+    }
+    // Keep the large hole rigid: its position follows the upper circle using
+    // transforms, rather than morphing a shape on the lower circle's clock.
+    // The inverse child transform leaves the lower icon's paint in place.
+    clip.style.clipPath = cutout({ cx: size / 2, cy: size / 2, r: radius }, size, radius * 2)
+    const positions = geometry.map(({ cx, cy }) => ({
+      x: Math.max(-radius, Math.min(size + radius, cx)) - size / 2,
+      y: Math.max(-radius, Math.min(size + radius, cy)) - size / 2,
+    }))
+    const frames = (inverse: boolean) => positions.map(({ x, y }, frame) => ({ offset: times[frame] / total, transform: `translate3d(${inverse ? -x : x}px, ${inverse ? -y : y}px, 0)` }))
+    animate(controller, clip, frames(false), { duration: total, easing: 'linear' })
+    animate(controller, content, frames(true), { duration: total, easing: 'linear' })
+  }
+  function gapVisible(geometry: Geometry[], size: number) {
+    // Include the swept bounds between samples, so a fast crossing is not
+    // discarded just because both sampled centers lie outside the icon.
+    return geometry.some((shape, index) => {
+      const before = geometry[Math.max(0, index - 1)]
+      const radius = Math.max(shape.r, before.r)
+      return radius > 0 && Math.min(shape.cx, before.cx) - radius < size + .5 && Math.max(shape.cx, before.cx) + radius > -.5 && Math.min(shape.cy, before.cy) - radius < size + .5 && Math.max(shape.cy, before.cy) + radius > -.5
+    })
   }
   const clamp = (value: number) => Math.max(0, Math.min(1, value));
   const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -233,10 +262,10 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
         const holes = flight.neighborClips || [...flight.ghost.querySelectorAll<HTMLElement>('.bb-daily-clip')];
         flight.neighborClips = holes;
         neighbors.forEach(({ previous, badge }, hole) => {
-          animate(controller, holes[hole], times.map((time, frame) => {
-            const geometry = neighborHole(poses[frame][i], poses[frame][previous], badge);
-            return { offset: time / total, clipPath: cutout(geometry, base) };
-          }), { duration: total, easing: 'linear' });
+          const geometry = times.map((_, frame) => neighborHole(poses[frame][i], poses[frame][previous], badge))
+          if (badge && !gapVisible(geometry, base)) holes[hole].style.clipPath = 'none'
+          else if (badge) animate(controller, holes[hole], geometry.map((shape, frame) => ({ offset: times[frame] / total, clipPath: cutout(shape, base) })), { duration: total, easing: 'linear' });
+          else trackCircleGap(holes[hole], geometry, times, total, base, base / 2 + gap)
         });
       }
       snapshot.copy.forEach(({ element, opacity }) => {
@@ -262,10 +291,10 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
       const holes = controller.echoClips || [...echo.querySelectorAll<HTMLElement>('.bb-daily-clip')];
       controller.echoClips = holes;
       neighbors.forEach(({ previous, badge }, hole) => {
-        animate(controller, holes[hole], times.map((time, frame) => {
-          const geometry = neighborHole(echoPose, poses[frame][previous], badge);
-          return { offset: time / total, clipPath: cutout(geometry, base) };
-        }), { duration: total, easing: 'linear' });
+        const geometry = times.map((_, frame) => neighborHole(echoPose, poses[frame][previous], badge))
+        if (badge && !gapVisible(geometry, base)) holes[hole].style.clipPath = 'none'
+        else if (badge) animate(controller, holes[hole], geometry.map((shape, frame) => ({ offset: times[frame] / total, clipPath: cutout(shape, base) })), { duration: total, easing: 'linear' });
+        else trackCircleGap(holes[hole], geometry, times, total, base, base / 2 + gap)
       });
       animate(controller, echo, [{ opacity: overflowOpacity, transform: 'scale(1)' }, { opacity: open ? 0 : 1, transform: `scale(${open ? .8 : 1})` }], { duration: duration * .25, delay: open ? count * cascade : duration * .75, easing: 'ease-in-out' });
     }

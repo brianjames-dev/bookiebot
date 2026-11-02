@@ -23,10 +23,15 @@ fading in after circles depart and fading out before their return.
 Each expense has one persistent painted circle. Opening uncoils the circles
 along staggered curved paths into their exact itemized-row positions; closing
 collects them along the reverse path. Earlier expenses stack above later ones,
-keeping category dots visible. Nested CSS path clips subtract preceding circles
-and their badges, leaving hard transparent gaps. Each constant-topology path
-animates directly on its HTML paint owner; referenced SVG mask descendants are
-not used, avoiding frozen cutouts during native icon motion. Separate clip layers
+keeping category dots visible. Nested clips subtract preceding circles and
+their badges, leaving hard transparent gaps. Large circle gaps keep a rigid
+16px radius (14px icon + 2px gap): a clip window translates with the upper circle,
+while an inverse child translation keeps the lower icon's paint in place. The
+large shape never morphs on a separate animation clock. Wholly outside holes
+park tangent to the icon bounds, keeping the fixed clipping plane small.
+Only gaps whose swept bounds can touch an icon get moving layers; distant
+neighbors remain unclipped, including between keyframe samples on fast paths.
+Small badge holes still shrink directly with their badge. Separate clip layers
 intersect so overlapping circle/badge holes cannot refill each other. Category dots shrink on departure
 and return on collection; logos remain opaque without crossfading duplicate skins
 or swapping image elements at landing. Unknown/failed logos use category fallbacks.
@@ -37,7 +42,7 @@ the clipped icon surfaces, avoiding redundant compositing changes at startup.
 `web/expense-report/src/daily-transactions-motion.ts` keeps travel at 500ms with
 36ms staggering, a 34px curve and a subtle spring. The cascade is capped at 216ms
 on very long days. Offscreen overflow entries settle directly while all entries
-remain available. Browser keyframes interpolate transforms, cutout geometry,
+remain available. Browser keyframes interpolate transforms, small badge geometry,
 text opacity and panel height; there is no per-frame React or JS animation loop.
 Reversals sample the current presentation. Width changes settle on the next
 animation frame, outside ResizeObserver delivery; reduced motion snaps directly.
@@ -68,10 +73,13 @@ reversal continuity, image identity, keyboard/resize/reduced-motion/cleanup, and
 `daily_icon_edges_browser_test.cjs` samples moving fallback/logo edge pixels on
 high-density mobile surfaces from 0ms onward, verifies initial/repeat opening
 without redundant opacity effects or layer-hint changes, compares the last
-collapse frame with rest, and emulates frozen SVG geometry. The old SVG implementation fails that emulated
-case; native iOS behavior still requires the phone acceptance steps. The shipped-bundle
+collapse frame with rest, and emulates lagging cutout painting (frozen legacy SVG
+and a 32ms delay on large CSS shape animations). The previous implementations
+fail those emulated cases. Gap-center alignment with the upper circle and
+unchanged lower-icon paint positions are checked throughout motion; native iOS
+behavior still requires phone acceptance. The shipped-bundle
 `daily_spending_controls_browser_test.cjs` covers scopes, controls, transparent-gap
 pixels, category order, status alignment, themes, cents and responsive layout.
 `section_spacing_browser_test.cjs` checks overall bottom spacing. Browser checks
 use synthetic data and blocked external requests. Native acceptance is checklist
-236 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.
+237 in `.agent/STATUS.md`; physical-device smoothness still needs phone review.

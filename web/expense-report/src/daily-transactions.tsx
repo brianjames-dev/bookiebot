@@ -92,10 +92,10 @@ const TransactionBeads = memo(function TransactionBeads({ entries, total, aliase
 })
 
 // Separate clips intersect, so overlapping circle/badge holes stay transparent.
-// Their paths animate on the painted HTML owners, without referenced SVG masks.
+// Circle windows move with a counter-translated child, keeping their size fixed.
 function TransactionCutouts({ entries, before, aliases, children }: { entries: SortedTransaction[]; before: number; aliases?: Record<string, string>; children: ReactNode }) {
   const cutouts = entries.slice(0, before).flatMap(({ entry }, index) => transactionMerchant(entry, aliases) ? [`${index}-circle`, `${index}-badge`] : [`${index}-circle`])
-  return cutouts.reduceRight<ReactNode>((content, key) => <span className="bb-daily-clip" key={key}>{content}</span>, children)
+  return cutouts.reduceRight<ReactNode>((content, key) => <span className="bb-daily-clip" data-cutout={key} key={key}>{key.endsWith('-circle') ? <span className="bb-daily-clip-content">{content}</span> : content}</span>, children)
 }
 
 const TransactionRows = memo(function TransactionRows({ entries, aliases, categoryColors }: {

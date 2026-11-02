@@ -19,7 +19,12 @@ async function record(page,selector,action,delay=0){return page.evaluate(async({
  const page=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'no-preference'}),errors=[];page.on('pageerror',e=>errors.push(e.message))
  await page.route('**/*',route=>route.abort());await page.setContent(`<html data-theme="dark"><head><style>${css}</style><style>body{margin:0}#root{padding:16px}#following{height:900px}</style></head><body><div id="root"></div></body></html>`);await page.addScriptTag({content:bundle});await page.locator('#outer-toggle').waitFor()
  const first=await record(page,'#outer','#outer-toggle',30);const daySelector='.bb-daily-day-group:first-child > .bb-details-content',button='.bb-daily-day-header'
- const opening=await record(page,daySelector,button,30),closing=await record(page,daySelector,button,30),reopening=await record(page,daySelector,button,30)
+ // Separate recordings must start from rest, even if a loaded browser takes
+ // longer to mount a large day than the fixed frame-sampling window.
+ const settled=()=>page.waitForFunction(()=>document.querySelector('.bb-daily-day-group:first-child').dataset.moving==='false')
+ const opening=await record(page,daySelector,button,30);await settled()
+ const closing=await record(page,daySelector,button,30);await settled()
+ const reopening=await record(page,daySelector,button,30);await settled()
  const rapid=await page.evaluate(async()=>{
   const button=document.querySelector('.bb-daily-day-header'),target=document.querySelector('.bb-daily-day-group:first-child > .bb-details-content'),rows=[...target.querySelectorAll('.bb-daily-transaction')],samples=[]
   for(let i=0;i<4;i++){await new Promise(r=>setTimeout(r,60));const before=target.getBoundingClientRect().height;button.click();await new Promise(requestAnimationFrame);samples.push({before,after:target.getBoundingClientRect().height})}
