@@ -40,7 +40,7 @@ const compiled = ts.transpileModule(activityDay + "\n" + declarations.map(node =
 }).outputText
 const chartSurface = ({ children }) => React.createElement("div", null, children)
 const runtime = {
-  exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useId: React.useId,
+  exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useLayoutEffect: React.useLayoutEffect, useId: React.useId,
   useRef: React.useRef, DailyTransactionDays: require("./load_frontend_module.cjs")("daily-transactions.tsx").DailyTransactionDays, memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
   CollapsibleContent: motionRuntime.exports.CollapsibleContent,
   useMediaQuery: () => true, stableBarAnimation: undefined, stableBarShape: undefined,
@@ -67,7 +67,7 @@ let props = { entries, year: 2026, month: 10, filter: "all", data: [{ label: "1"
 let renderer
 const controlFocus=[]
 act(() => { renderer = create(React.createElement(Section, props), {createNodeMock: element => element.props.className === 'bb-daily-morph-control' ? {
- querySelector: selector => ({focus: options => controlFocus.push({selector,options})}),
+ querySelector: selector => ['.bb-daily-active-filter','.bb-daily-transactions-toggle'].includes(selector) ? {focus: options => controlFocus.push({selector,options})} : null,
 } : null}) })
 const toggle = () => renderer.root.findByProps({ className: "bb-details-toggle bb-daily-transactions-toggle" })
 const disclosure = () => renderer.root.findAllByProps({ className: "bb-details-content" })[0]

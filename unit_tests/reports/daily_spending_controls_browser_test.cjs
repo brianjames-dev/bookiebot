@@ -25,7 +25,7 @@ async function settle(section){await section.evaluate(async el=>{
 async function closedLayout(section){return section.evaluate(section=>{
  const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,center:r.top+r.height/2}}
  const dropdown=section.querySelector('select[aria-label="Daily spending filter"]'),title=section.querySelector('h2'),button=section.querySelector('.bb-daily-transactions-toggle'),row=section.querySelector('.bb-daily-amount-row'),amount=row.querySelector('.bb-fitted-amount-text'),integer=amount.querySelector('.bb-amount-integer')||amount,reference=document.querySelector('select[aria-label="Category mix filter"]')
- return {dropdown:rect(dropdown),title:rect(title),button:rect(button),row:rect(row),amount:rect(amount),integer:rect(integer),overflow:document.documentElement.scrollWidth>innerWidth,styles:[dropdown,reference].map(el=>{const s=getComputedStyle(el);return[s.borderRadius,s.padding,s.fontSize,s.backgroundColor]}),radius:getComputedStyle(button).borderRadius}
+ return {dropdown:rect(dropdown),title:rect(title),button:rect(button),row:rect(row),amount:rect(amount),integer:rect(integer),overflow:document.documentElement.scrollWidth>innerWidth,styles:[dropdown,reference].map(el=>{const s=getComputedStyle(el);return[s.borderRadius,s.padding,s.fontSize,s.backgroundColor]}),radius:getComputedStyle(button).borderRadius,background:getComputedStyle(button).backgroundColor}
 })}
 ;(async()=>{let cases=0
  for(const engine of [chromium,webkit].filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){const browser=await engine.launch({headless:true})
@@ -50,6 +50,7 @@ async function closedLayout(section){return section.evaluate(section=>{
    await settle(section)
    const m=await closedLayout(section)
    assert.equal(m.overflow,false,JSON.stringify(m));assert.deepEqual(m.styles[0],m.styles[1]);assert.equal(m.radius,'24px');assert.ok(m.dropdown.height>=44&&m.button.height>=44)
+   assert.equal(m.background,m.styles[0][3],'Collapsed Transactions uses the shared dropdown tint')
    assert.ok(m.title.right+7<=m.dropdown.left,JSON.stringify(m));assert.ok(Math.abs(m.title.center-m.dropdown.center)<1,JSON.stringify(m))
    assert.ok(m.amount.right+10<=m.button.left,JSON.stringify(m));assert.ok(Math.abs(m.integer.center-m.button.center)<2,JSON.stringify(m));assert.ok(Math.abs(m.row.right-m.button.right)<1,JSON.stringify(m));assert.ok(m.amount.width>20)
    const legend=section.getByRole('list',{name:'Daily spending legend'})
@@ -127,7 +128,17 @@ async function closedLayout(section){return section.evaluate(section=>{
   assert.ok(plainOpen.amount.right+10<=plainOpen.button.left&&Math.abs(plainOpen.integer.center-plainOpen.button.center)<2,'Full-size cents also fit beside the expanded capsule '+JSON.stringify(plainOpen))
   assert.ok(Math.abs(plainOpen.row.height-plain.row.height)<1&&!plainOpen.overflow)
   const longest=await type.locator('option').evaluateAll(options=>options.reduce((a,b)=>a.text.length>b.text.length?a:b).value)
-  await type.selectOption(longest);assert.equal(await type.inputValue(),longest,'Long categories retain their complete native option value')
+  const widths={}
+  for(const value of ['Food','Shopping',longest]){await type.selectOption(value);await settle(section);widths[value]=await section.locator('.bb-daily-active-filter').evaluate(n=>n.getBoundingClientRect().width)}
+  assert(widths.Shopping>widths.Food+5,'The filter grows and shrinks with its selected label '+JSON.stringify(widths))
+  assert.equal(await type.inputValue(),longest,'Long categories retain their complete native option value')
+  const truncation=await section.evaluate(el=>{const group=el.querySelector('.bb-daily-active-filter'),label=group.querySelector('.bb-category-filter-label'),close=group.querySelector('button'),style=getComputedStyle(label);return{background:getComputedStyle(group).backgroundColor,ellipsis:style.textOverflow,overflow:style.overflow,visible:style.visibility,width:group.getBoundingClientRect().width,max:Math.min(190,el.querySelector('.bb-daily-amount-row').clientWidth*.55),clipped:label.scrollWidth>label.clientWidth,close:close.getBoundingClientRect().width}})
+  assert.equal(truncation.background,plain.styles[0][3]);assert.equal(truncation.ellipsis,'ellipsis');assert.equal(truncation.overflow,'hidden');assert.equal(truncation.visible,'visible');assert.equal(truncation.close,44);assert(truncation.width<=truncation.max+1)
+  if(width===320){assert(truncation.clipped,'The long label is capped and actually truncates');await section.locator('.bb-daily-summary').screenshot({path:`/private/tmp/bookiebot-label-${engine.name()}-${dark?'dark':'light'}.png`})}
+  await type.selectOption('Food');await settle(section)
+  assert(Math.abs(await section.locator('.bb-daily-active-filter').evaluate(n=>n.getBoundingClientRect().width)-widths.Food)<1,'A clipped long label shrinks back to its original short width')
+  const hiddenResize=await section.evaluate(el=>{const carrier=el.querySelector('.bb-daily-morph-control'),before=carrier.style.getPropertyValue('--bb-daily-filter-width');el.style.display='none';window.dispatchEvent(new Event('resize'));el.style.removeProperty('display');return{before,after:carrier.style.getPropertyValue('--bb-daily-filter-width')}})
+  assert.equal(hiddenResize.after,hiddenResize.before,'Resizing a hidden app page must not replace its measured label width with zero geometry')
   const longLabel=await closedLayout(section);assert.ok(longLabel.amount.right+10<=longLabel.button.left&&!longLabel.overflow)
   assert.deepEqual(errors,[]);assert.deepEqual(traffic,[]);cases++;console.log(engine.name(),width,dark?'dark/reduced':'light','PASS');await page.close()
  }}finally{await browser.close()}}

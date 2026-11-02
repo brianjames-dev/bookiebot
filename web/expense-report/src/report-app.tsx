@@ -2194,6 +2194,36 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   const filteredEntries = useMemo(() => selectedCategory ? entries.filter(entry => entry.category === selectedCategory) : entries, [entries, selectedCategory])
   const toggleDetails = useCallback(() => { opened.current = true; restoreControlFocus.current = true; setOpen(current => !current) }, [])
 
+  useLayoutEffect(() => {
+    const controls = controlsRef.current
+    const label = controls?.querySelector<HTMLElement>('.bb-category-filter-label')
+    const close = controls?.querySelector<HTMLElement>('.bb-daily-transactions-close')
+    const group = controls?.querySelector<HTMLElement>('.bb-daily-active-filter')
+    if (!controls || !label || !close || !group) return
+    let disposed = false
+    const measure = () => {
+      if (disposed) return
+      // Measure the text, not the animated capsule, so changing its width cannot
+      // feed back into the target. CSS owns interpolation and the inline cap.
+      const range = document.createRange()
+      range.selectNodeContents(label)
+      const textWidth = range.getBoundingClientRect().width, closeWidth = close.getBoundingClientRect().width
+      if (textWidth <= 0 || closeWidth <= 0) return // Hidden app pages have no measurable geometry.
+      const style = getComputedStyle(label), border = getComputedStyle(group)
+      const width = Math.ceil(textWidth +
+        parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) +
+        parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth) +
+        closeWidth + parseFloat(border.borderLeftWidth) + parseFloat(border.borderRightWidth))
+      const value = `${width}px`
+      if (width > 0 && controls.style.getPropertyValue('--bb-daily-filter-width') !== value) controls.style.setProperty('--bb-daily-filter-width', value)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    document.fonts?.addEventListener('loadingdone', measure)
+    void document.fonts?.ready.then(measure)
+    return () => { disposed = true; window.removeEventListener('resize', measure); document.fonts?.removeEventListener('loadingdone', measure) }
+  }, [open, selectedCategory])
+
   useEffect(() => { setCategory("") }, [year, month, filter])
   useEffect(() => {
     if (!restoreControlFocus.current) return
