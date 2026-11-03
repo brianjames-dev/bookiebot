@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-02 - Remove Highlights From The Report
+
+The user supersedes the preceding Highlights restyling and requests removing the section entirely. Remove it from both Overview and standalone reports, including its exclusive renderers, tooltip helpers, imports, styles and tests. Daily Spending ends Overview with its existing footer spacing; standalone reports flow directly into their remaining sections. Daily Spending and Transactions remain the purchase-browsing surfaces. Keep canonical report payload fields and read-only bot analytics intact; this is a presentation removal with no persistence or financial lifecycle changes.
+
 ## 2026-11-02 - Select Expense Highlights With The Shared Native Dropdown
 
 Graph-style follow-up: implement the user-approved Clear labels draft with eight visible rows, 20px bars, an 8px edge gap, 92px name column and 200px thumbnails (16px corners / 12px padding). Keep exact end values and full names in thumbnails; reserve additional value space only for unusually large numbers. This supersedes the original ten-row display limit below. The source payload, rent exclusion, ordering, counts/totals, two retained charts and native selector stay unchanged. Use Recharts public coordinate/width hooks to fit thumbnails across the complete chart, retaining shared vertical placement, five-second expiry, dismissal and CSS motion. No new setting, dependency, persistence or financial workflow.

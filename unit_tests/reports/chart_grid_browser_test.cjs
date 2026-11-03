@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const root=path.resolve(__dirname,'../..'),frontend=path.join(root,'web/expense-report'),req=createRequire(path.join(frontend,'package.json'))
 const {chromium,webkit}=process.env.BOOKIEBOT_PLAYWRIGHT_MODULE?require(process.env.BOOKIEBOT_PLAYWRIGHT_MODULE):req('playwright')
 const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.css'),'utf8')
-const charts=['BurnRateChart','DailySpendingChart','TopExpensesChart','MerchantChart','BillsUtilitiesChart']
+const charts=['BurnRateChart','DailySpendingChart','BillsUtilitiesChart']
 // Export private chart components only in this fixture. The unrelated Category
 // Mix worker URL is resolved without starting a worker or making a request.
 const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx',contents:`
@@ -15,8 +15,6 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
   createRoot(document.getElementById('root')).render(<>
     <section data-test-chart="burn"><BurnRateChart burnRate={burn} categoryBalances={{raw:{needs:0,wants:1050,savings:0},remaining:{needs:0,wants:1050,savings:0},deficits:{needs:0,wants:0,savings:0},transfers:[],totalOverspend:0}} month={10}/></section>
     <section data-test-chart="daily" className="bb-daily-spending-content"><DailySpendingChart data={daily} total={450} filter="all" detailsOpen={false} detailsId="fixture" onToggleDetails={()=>{}} onInspectDay={()=>{}}/></section>
-    <section data-test-chart="expenses"><TopExpensesChart entries={[{item:'Groceries',amount:100},{item:'Lunch',amount:40}]}/></section>
-    <section data-test-chart="merchants"><MerchantChart data={[{label:'Market',count:4},{label:'Cafe',count:2}]}/></section>
     <section data-test-chart="bills"><BillsUtilitiesChart items={[{key:'power',label:'Power',history:[{month:8,label:'Aug',amount:70},{month:9,label:'Sep',amount:100}]}]} billEvents={[]} year={2026} month={9}/></section>
   </>);
 `},plugins:[{name:'chart-test-exports',setup(build){build.onResolve({filter:/\?worker&url$/},args=>({path:args.path,namespace:'unused-worker'}));build.onLoad({filter:/.*/,namespace:'unused-worker'},()=>({contents:'export default "/unused-category-worker.js"',loader:'js'}));build.onLoad({filter:/\/report-app\.tsx$/},args=>({contents:fs.readFileSync(args.path,'utf8')+'\nexport {'+charts.join(',')+'};',loader:'tsx',resolveDir:path.dirname(args.path)}))}}],bundle:true,format:'iife',outfile:'chart-grid-fixture.js',write:false,define:{'process.env.NODE_ENV':'"production"'}}).then(result=>result.outputFiles.find(file=>file.path.endsWith('.js')).text)
@@ -29,10 +27,10 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
   try{for(const width of [390,1024])for(const dark of [false,true]){
    const page=await browser.newPage({viewport:{width,height:900},reducedMotion:'reduce'})
    const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',route=>route.abort())
-   await page.setContent('<html data-theme="'+(dark?'dark':'light')+'"><head><style>'+css+'</style><style>section[data-test-chart]{height:420px}section[data-test-chart=burn]{height:600px}.bb-chart-box,.bb-insight-chart-box,.bb-bills-chart-box{height:260px!important}</style></head><body><div id="root"></div></body></html>')
+   await page.setContent('<html data-theme="'+(dark?'dark':'light')+'"><head><style>'+css+'</style><style>section[data-test-chart]{height:420px}section[data-test-chart=burn]{height:600px}.bb-chart-box,.bb-bills-chart-box{height:260px!important}</style></head><body><div id="root"></div></body></html>')
    await page.addScriptTag({content:bundle})
-   await page.waitForFunction(()=>document.querySelectorAll('[data-test-chart] .recharts-cartesian-grid').length===5,null,{timeout:10000}).catch(error=>{assert.deepEqual(errors,[]);throw error})
-   for(const name of ['burn','daily','expenses','merchants','bills']){
+   await page.waitForFunction(()=>document.querySelectorAll('[data-test-chart] .recharts-cartesian-grid').length===3,null,{timeout:10000}).catch(error=>{assert.deepEqual(errors,[]);throw error})
+   for(const name of ['burn','daily','bills']){
     const colors=await page.locator('[data-test-chart="'+name+'"]').evaluate(section=>{
      const probe=document.createElement('span');section.append(probe);probe.style.transition='none';probe.style.color='hsl(var(--muted-foreground))';const grey=getComputedStyle(probe).color;probe.style.color='hsl(var(--foreground))';const foreground=getComputedStyle(probe).color;probe.remove()
      const grids=[...section.querySelectorAll('.recharts-cartesian-grid line')].filter(n=>getComputedStyle(n).strokeDasharray!=='none').map(n=>getComputedStyle(n).stroke)

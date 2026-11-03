@@ -33,7 +33,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  LabelList,
   Line,
   LineChart,
   Pie,
@@ -43,8 +42,6 @@ import {
   Sector,
   XAxis,
   YAxis,
-  useChartWidth,
-  useActiveTooltipCoordinate,
 } from "recharts"
 
 import { Badge } from "./components/ui/badge"
@@ -77,7 +74,6 @@ import type {
   CategoryBalances,
   ExpenseEntry,
   ExpenseReportData,
-  OccurrenceRow,
   ReportModeView,
   SubscriptionItem,
   UtilityHistoryItem,
@@ -252,8 +248,6 @@ const WANTS_BAR_COLOR = "hsl(var(--chart-2))"
 const DAILY_SPENDING_BAR_RADIUS: [number, number, number, number] = [2, 2, 2, 2]
 const DAILY_SPENDING_GRID_COLOR = "hsl(var(--muted-foreground))"
 const DAILY_SPENDING_BOUNDARY_COLOR = "hsl(var(--foreground))"
-const TOP_EXPENSE_HEAT_COLORS = Array.from({ length: 10 }, (_, index) => `hsl(var(--chart-1) / ${1 - index * 0.055})`)
-const MERCHANT_BAR_COLOR = "hsl(var(--chart-5))"
 const CATEGORY_CHART_COLORS: Record<string, string> = {
   rent: "hsl(var(--category-rent))",
   bills_utilities: "hsl(var(--category-bills))",
@@ -670,8 +664,6 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
           sourceRequest={sourceRequest} />
         <DailySpendingCard report={report} calendarEvents={activeReport.calendarEvents}
           projected={projectionActive} categoryColors={categoryColors} onInspectDay={inspectDay} />
-
-        {navigation && <MemoizedExpenseInsightsCard topEntries={report.topEntries} merchantOccurrences={report.merchantOccurrences} />}
         </ReportScreen>
 
         {!navigation && (appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
@@ -681,11 +673,6 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
         } /> : <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
           receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
           monthLabel={report.monthLabel} year={report.year} month={report.month} />)}
-
-        {!navigation && <MemoizedExpenseInsightsCard
-          topEntries={report.topEntries}
-          merchantOccurrences={report.merchantOccurrences}
-        />}
 
         {!navigation && appSession && <SavingsGoals />}
         {!navigation && <Investments report={report} />}
@@ -712,7 +699,6 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
 const MemoizedBurnRateChart = memo(BurnRateChart)
 const MemoizedCalendarAnalyticsPanel = memo(CalendarAnalyticsPanel)
 const MemoizedBillsUtilitiesPanel = memo(BillsUtilitiesPanel)
-const MemoizedExpenseInsightsCard = memo(ExpenseInsightsCard)
 
 const OverviewCharts = memo(function OverviewCharts({ report, activeReport, chartBreakdown, projected: projectionActive,
   preferredChart, onChartChange, onInspectCategory: inspectCategory, collapseKey, sourceRequest }: {
@@ -2515,173 +2501,6 @@ function DailySpendingTooltipContent({
   )
 }
 
-const HIGHLIGHTS_LAYOUT = { rows: 8, weight: 20, rowGap: 8, labelWidth: 92, thumbnailWidth: 200 } as const
-
-type HighlightRow = { label: string; amount: number; count?: number; color?: string }
-
-let highlightLabelMeasure: CanvasRenderingContext2D | null | undefined
-function highlightTextWidth(value: string, weight: 400 | 500 = 400) {
-  highlightLabelMeasure ??= document.createElement('canvas').getContext('2d')
-  if (!highlightLabelMeasure) return value.length * 7
-  highlightLabelMeasure.font = `${weight} 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`
-  return highlightLabelMeasure.measureText(value).width
-}
-function fitHighlightLabel(value: string, width: number) {
-  if (highlightTextWidth(value) <= width) return value
-  let low = 0, high = value.length
-  while (low < high) {
-    const middle = Math.ceil((low + high) / 2)
-    if (highlightTextWidth(value.slice(0, middle) + '…') <= width) low = middle
-    else high = middle - 1
-  }
-  return value.slice(0, low) + '…'
-}
-function HighlightAxisLabel({x,y,payload,width}: {x?: number|string;y?: number|string;payload?: {value?: unknown};width: number}) {
-  const label = useMemo(() => fitHighlightLabel(String(payload?.value ?? ''), width), [payload?.value, width])
-  return <text x={x} y={y} dominantBaseline="middle" textAnchor="end" className="bb-highlight-label">{label}</text>
-}
-function HighlightValue({x=0,y=0,width=0,height=0,value,kind}: {x?: number|string;y?: number|string;width?: number|string;height?: number|string;value?: unknown;kind: string}) {
-  return <text x={Number(x)+Number(width)+9} y={Number(y)+Number(height)/2} dominantBaseline="middle" className="bb-highlight-value">
-    {kind === 'amount' ? formatMoney(Number(value)) : `${value}×`}
-  </text>
-}
-function HighlightThumbnail({active,payload,kind}: {active?: boolean;payload?: Array<{payload?: HighlightRow}>;kind:'amount'|'count'}) {
-  const settings = HIGHLIGHTS_LAYOUT
-  const row = payload?.find(item => item.payload)?.payload
-  if (!active || !row) return null
-  const style = {
-    '--bb-highlight-thumb-width':`${settings.thumbnailWidth}px`,
-  } as CSSProperties
-  return <div className="bb-chart-tooltip bb-touch-tooltip-content bb-highlight-thumbnail" style={style} role="tooltip">
-    <div className="bb-highlight-thumb-header">
-      <span className="bb-highlight-thumb-swatch" aria-hidden="true" style={{background:kind === 'amount' ? row.color : MERCHANT_BAR_COLOR}} />
-      <div className="bb-chart-tooltip-title">{row.label}</div>
-    </div>
-    <div className="bb-highlight-thumb-primary">
-      <span className="bb-highlight-thumb-metric">{kind === 'amount' ? formatMoney(row.amount) : row.count ?? 0}</span>
-      {kind === 'count' && <span className="bb-highlight-thumb-caption">{row.count === 1 ? 'occurrence' : 'occurrences'}</span>}
-    </div>
-    {kind === 'amount' ? <div className="bb-highlight-thumb-caption bb-highlight-thumb-description">Expense amount</div> :
-      <div className="bb-highlight-thumb-footer"><span>Total spent</span><span className="bb-highlight-thumb-total">{formatMoney(row.amount)}</span></div>}
-  </div>
-}
-function HighlightFloatingThumbnail({kind}: {kind:'amount'|'count'}) {
-  const settings = HIGHLIGHTS_LAYOUT
-  const chartWidth = useChartWidth() ?? 0
-  const coordinate = useActiveTooltipCoordinate()
-  const lastX = useRef(8)
-  // Recharts normally bounds a tooltip to the plotting area. On phones that
-  // excludes the name column, leaving too little width for a readable card.
-  // Use its public coordinate/width hooks to fit across the whole chart while
-  // retaining native vertical placement, cursor, dismissal and CSS motion.
-  if (coordinate && Number.isFinite(coordinate.x) && chartWidth > 0) {
-    const width = Math.min(settings.thumbnailWidth, chartWidth-16)
-    const positive = coordinate.x+12, negative = coordinate.x-width-12
-    const preferred = positive+width>chartWidth-8 && negative>=8 ? negative : positive
-    lastX.current = Math.max(8,Math.min(preferred,chartWidth-width-8))
-  }
-  return <ChartTooltip position={{x:lastX.current}} content={<HighlightThumbnail kind={kind} />} cursor={{fill:'hsl(var(--foreground) / .06)'}} />
-}
-function HighlightsPlot({rows,kind}: {rows: HighlightRow[];kind: 'amount'|'count'}) {
-  const settings = HIGHLIGHTS_LAYOUT
-  const data = rows.slice(0, settings.rows)
-  // Preserve the approved 68px value gutter for normal amounts, and reserve
-  // enough room for larger exact values instead of clipping their digits.
-  const valueGutter = Math.max(68, ...data.map(row => Math.ceil(highlightTextWidth((kind === 'amount' ? formatMoney(row.amount) : `${row.count ?? 0}×`).replace(/\d/g, '0'), 500)) + 13))
-  // Each categorical band is exactly bar thickness + the requested edge gap.
-  // Explicit axis height and plot margins keep that geometry independent of
-  // entry count, viewport width and which of the two native graphs is active.
-  const plotHeight = data.length * (settings.weight + settings.rowGap) + 4 + 30
-  return <div className="bb-highlight-plot" style={{'--bb-highlight-plot-height':`${plotHeight}px`} as CSSProperties}>
-    <ChartContainer config={{[kind]: {label: kind === 'amount' ? 'Amount' : 'Occurrences', color: kind === 'amount' ? 'hsl(var(--chart-1))' : MERCHANT_BAR_COLOR}}}
-    className="bb-insight-chart-box">
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} layout="vertical" margin={{top:4,right:valueGutter,left:0,bottom:0}} barCategoryGap={0}>
-        <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-        <XAxis type="number" height={30} tickCount={3} tickFormatter={value => kind === 'amount' ? `$${value}` : String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
-        <YAxis dataKey="label" type="category" width={settings.labelWidth} padding={{top:0,bottom:0}}
-          tick={(props) => <HighlightAxisLabel {...props} width={settings.labelWidth-12} />}
-          tickLine={false} axisLine={false} interval={0} />
-        <HighlightFloatingThumbnail kind={kind} />
-        <Bar dataKey={kind} name={kind === 'amount' ? 'Expense amount' : 'Occurrences'} fill={kind === 'amount' ? 'hsl(var(--chart-1))' : MERCHANT_BAR_COLOR}
-          radius={[0,settings.weight/2,settings.weight/2,0]} barSize={settings.weight} isAnimationActive={false}>
-          {data.map((row,index) => <Cell key={`${row.label}-${index}`} fill={kind === 'amount' ? row.color : MERCHANT_BAR_COLOR} />)}
-          <LabelList dataKey={kind} content={(props) => <HighlightValue {...props} kind={kind} />} />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-    </ChartContainer>
-  </div>
-}
-function TopExpensesChart({entries}: {entries: ExpenseEntry[]}) {
-  const visibleEntries = entries.slice(0,10)
-  const rows = visibleEntries.map((entry,index) => ({label:expenseEntryItemLabel(entry),amount:entry.amount,color:topExpenseHeatColor(index,visibleEntries.length)}))
-  return <HighlightsPlot rows={rows} kind="amount" />
-}
-function MerchantChart({data}: {data: OccurrenceRow[]}) {
-  return <HighlightsPlot rows={data.slice(0,10)} kind="count" />
-}
-
-function topExpenseHeatColor(index: number, total: number) {
-  if (total <= 1) {
-    return TOP_EXPENSE_HEAT_COLORS[0]
-  }
-  const paletteIndex = Math.round((index / (total - 1)) * (TOP_EXPENSE_HEAT_COLORS.length - 1))
-  return TOP_EXPENSE_HEAT_COLORS[Math.min(Math.max(paletteIndex, 0), TOP_EXPENSE_HEAT_COLORS.length - 1)]
-}
-
-type ExpenseInsightsView = "largest" | "merchants"
-
-function ExpenseInsightsCard({
-  topEntries,
-  merchantOccurrences,
-}: {
-  topEntries: ExpenseEntry[]
-  merchantOccurrences: OccurrenceRow[]
-}) {
-  const [view, setView] = useState<ExpenseInsightsView>("largest")
-  const dismissChartTooltips = useChartTooltipDismiss()
-  const largestEntries = useMemo(() => topEntries
-    .filter((entry) => entry.category.trim().toLowerCase() !== "rent" && expenseEntryItemLabel(entry).trim().toLowerCase() !== "rent")
-    .sort((left, right) => (
-      right.amount - left.amount
-      || right.date.localeCompare(left.date)
-      || expenseEntryItemLabel(left).localeCompare(expenseEntryItemLabel(right))
-    )), [topEntries])
-  const switchView = (nextView: ExpenseInsightsView) => {
-    if (nextView === view) {
-      return
-    }
-    dismissChartTooltips()
-    setView(nextView)
-  }
-
-  return (
-    <Card className="bb-report-section bb-highlights-section">
-      <CardHeader>
-        <div className="bb-card-title-row bb-highlights-heading">
-          <CardTitle>Highlights</CardTitle>
-          <CategoryFilterControl<ExpenseInsightsView>
-            filter={view} onFilterChange={switchView}
-            filters={[{ value: "largest", label: "Largest" }, { value: "merchants", label: "Most Frequent" }]}
-            label="Highlights view" dismissTrigger="expense-highlights"
-          />
-        </div>
-      </CardHeader>
-      <CardContent className="bb-expense-insights-content">
-        <div className="bb-insight-view" role="region" aria-label="Largest expenses"
-          data-state={view === "largest" ? "active" : "inactive"} inert={view !== "largest"} aria-hidden={view !== "largest"}>
-          <TopExpensesChart entries={largestEntries} />
-        </div>
-        <div className="bb-insight-view" role="region" aria-label="Most frequent merchants"
-          data-state={view === "merchants" ? "active" : "inactive"} inert={view !== "merchants"} aria-hidden={view !== "merchants"}>
-          <MerchantChart data={merchantOccurrences} />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function StatList({ rows }: { rows: [string, string][] }) {
   return (
     <div className="bb-stat-list">
@@ -2954,10 +2773,6 @@ function AmountRowsTable({ columns, rows, hideHeader = false }: { columns: [stri
       </table>
     </div>
   )
-}
-
-function expenseEntryItemLabel(entry: ExpenseEntry) {
-  return entry.item || entry.location || "Transaction"
 }
 
 function DailyEntriesTable({ entries, categoryColors, aliases, year, month }: {

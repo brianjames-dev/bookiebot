@@ -26,7 +26,7 @@ const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-r
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
 async function gap(page,section,button) {return page.evaluate(({section,button})=>{const edge=document.querySelector(section),control=document.querySelector(button);if(!edge||!control)throw new Error(`Missing spacing target: ${!edge?section:button}`);return edge.getBoundingClientRect().bottom-control.getBoundingClientRect().bottom},{section,button})}
-const dailyButton='.bb-daily-section button.bb-details-toggle',insightChart='.bb-highlights-section .bb-insight-view[data-state="active"] .bb-insight-chart-box'
+const dailyButton='.bb-daily-section button.bb-details-toggle'
 const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-reference)<.6,`${message}: ${actual}px versus Categories ${reference}px`)
 ;(async()=>{
   let cases=0
@@ -57,65 +57,19 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           await route.fulfill({json:value})
         })
         await page.goto('https://bookie.test/app/expenses')
-        await page.locator('.bb-highlights-section').waitFor()
+        await page.locator('.bb-daily-section').waitFor()
         await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click()
         await page.waitForTimeout(350)
         const reference=await gap(page,'.bb-daily-section',dailyButton)
         assert.ok(await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')>=23,'Burn Rate retains compact bottom breathing room')
-        const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightChart)}
+        const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton)}
         if(!measureOnly) {
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
           closeEnough(measured.daily,reference,'Daily Transactions footer')
-          closeEnough(measured.largest,reference,'Largest chart footer has no leftover list space')
-          const highlights=page.locator('.bb-highlights-section'),chooser=page.getByRole('combobox',{name:'Highlights view',exact:true})
-          assert.equal(await highlights.getByRole('heading',{name:'Highlights',exact:true}).count(),1)
-          const assertInlineHeading=async()=>{
-            const layout=await highlights.locator('.bb-highlights-heading').evaluate(el=>{
-              const title=el.querySelector('.bb-card-title').getBoundingClientRect(),select=el.querySelector('select').getBoundingClientRect()
-              return {titleRight:title.right,selectLeft:select.left,titleY:title.y+title.height/2,selectY:select.y+select.height/2,selectRight:select.right}
-            })
-            assert.ok(Math.abs(layout.titleY-layout.selectY)<.6,'Highlights and its selector stay centered on the same row')
-            assert.ok(layout.titleRight+11.5<=layout.selectLeft&&layout.selectRight<=width,'Both labels fit inline without overlap or overflow')
-          }
-          await assertInlineHeading()
-          assert.equal(await chooser.inputValue(),'largest')
-          assert.equal(await chooser.locator('..').getAttribute('data-bb-tooltip-dismiss-trigger'),'expense-highlights')
-          assert.deepEqual(await chooser.locator('option').allTextContents(),['Largest','Most Frequent'])
-          assert.equal(await highlights.getByRole('button',{name:/View all|Collapse/}).count(),0,'Remove both full-list buttons')
-          assert.equal(await highlights.locator('table,.bb-hidden-list-panel,[role="tablist"],[role="tabpanel"]').count(),0,'No obsolete disclosure or tab semantics')
-          assert.equal(await highlights.getByRole('region').count(),1,'Only the selected chart is accessible')
-          assert.equal(await highlights.getByRole('region',{name:'Largest expenses',exact:true}).count(),1)
-          const style=await chooser.evaluate(el=>{const r=el.getBoundingClientRect(),c=getComputedStyle(el),ref=getComputedStyle(document.querySelector('.bb-daily-heading select'));return {height:r.height,left:r.left,right:r.right,background:c.backgroundColor,border:c.borderColor,radius:c.borderRadius,referenceBackground:ref.backgroundColor,referenceBorder:ref.borderColor,referenceRadius:ref.borderRadius}})
-          assert.ok(style.height>=44&&style.left>=0&&style.right<=width,'Native selector keeps its touch target and fits the page')
-          assert.equal(style.background,style.referenceBackground,'Dropdown shares the Daily Spending tint')
-          assert.equal(style.border,style.referenceBorder,'Dropdown shares the Daily Spending border')
-          assert.equal(style.radius,style.referenceRadius,'Dropdown shares the Daily Spending capsule shape')
-          const beforeHeight=await highlights.evaluate(el=>el.getBoundingClientRect().height)
-          const chartIdentity=await highlights.locator('.bb-insight-view').evaluateAll(panels=>{panels.forEach((p,i)=>p.dataset.fixtureIdentity=String(i));return panels.map(p=>p.dataset.fixtureIdentity)})
-          await chooser.focus()
-          await chooser.press('Escape')
-          assert.equal(await chooser.evaluate(el=>el===document.activeElement),true,'Native chooser accepts keyboard focus')
-          assert.equal(await chooser.locator('..').getAttribute('data-pointer-focus'),null,'Keyboard input restores the shared focus treatment')
-          await chooser.selectOption('merchants')
-          await page.waitForTimeout(350)
-          assert.equal(await chooser.inputValue(),'merchants','Native selection changes the chart')
-          await assertInlineHeading()
-          assert.equal(await highlights.getByRole('region',{name:'Most frequent merchants',exact:true}).count(),1)
-          closeEnough(await gap(page,'.bb-highlights-section',insightChart),reference,'Most Frequent chart footer')
-          closeEnough(await highlights.evaluate(el=>el.getBoundingClientRect().height),beforeHeight,'Switching charts keeps the section height stable')
-          await page.locator('.bb-insight-view[data-state="active"] .recharts-bar-rectangle').first().tap()
-          await highlights.locator('.bb-insight-view[data-state="active"] .bb-chart-tooltip-title').filter({hasText:'Fixture merchant 1'}).waitFor()
-          await chooser.selectOption('largest')
-          await page.waitForTimeout(350)
-          assert.equal(await highlights.getByRole('region',{name:'Largest expenses',exact:true}).count(),1)
-          assert.equal(await highlights.locator('.bb-insight-view[data-state="active"] .recharts-bar-rectangle').count(),8,'Largest uses the approved eight-row graph')
-          for(const value of ['merchants','largest','merchants','largest']) {await chooser.selectOption(value);await page.waitForTimeout(35)}
-          await page.waitForTimeout(350)
-          assert.deepEqual(await highlights.locator('.bb-insight-view').evaluateAll(panels=>panels.map(p=>p.dataset.fixtureIdentity)),chartIdentity,'Switching preserves chart DOM')
-          assert.equal(await highlights.getByRole('region').count(),1)
-          await assertInlineHeading()
-          closeEnough(await gap(page,'.bb-highlights-section',insightChart),reference,'Rapid reversals retain compact footer spacing')
-          if(width===390){await highlights.screenshot({path:`/tmp/bookiebot-highlights-${engine.name()}-${dark?'dark':'light'}.png`})}
+          assert.equal(await page.locator('.bb-highlights-section,.bb-insight-view,.bb-highlight-plot').count(),0,'Remove the entire Highlights section, including hidden charts')
+          assert.equal(await page.getByRole('heading',{name:/^(Expense )?Highlights$/}).count(),0)
+          assert.equal(await page.getByRole('combobox',{name:'Highlights view',exact:true}).count(),0)
+          assert.deepEqual(await page.getByRole('region',{name:'Overview',exact:true}).locator(':scope > .bb-report-section').evaluateAll(sections=>sections.map(el=>el.classList.contains('bb-daily-section'))),[true],'Daily Spending is the final Overview section, without an empty card')
           await page.locator(dailyButton).click();await page.waitForTimeout(350)
           assert.equal(await page.locator('.bb-daily-transactions .bb-daily-day-group').count(),12,'Transactions still reveals the full list')
           closeEnough(await gap(page,'.bb-daily-section','.bb-daily-transactions'),reference,'Expanded daily content bottom')
