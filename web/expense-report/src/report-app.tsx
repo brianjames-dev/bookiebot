@@ -61,7 +61,6 @@ import type { DailyTransaction } from "./transaction-identity"
 import type { MetricExplanation } from "./types"
 import { useReportViewPreferences, type PreferredChart } from "./report-view-preferences"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartTooltipDismissProvider, useChartTooltipDismiss } from "./components/ui/chart"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs"
 import { CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import type {
   AmountRow,
@@ -2658,46 +2657,36 @@ function ExpenseInsightsCard({
       || right.date.localeCompare(left.date)
       || expenseEntryItemLabel(left).localeCompare(expenseEntryItemLabel(right))
     )), [topEntries])
-  const switchView = (nextView: string) => {
-    const resolvedView = nextView as ExpenseInsightsView
-    if (resolvedView === view) {
+  const switchView = (nextView: ExpenseInsightsView) => {
+    if (nextView === view) {
       return
     }
     dismissChartTooltips()
-    setView(resolvedView)
+    setView(nextView)
   }
 
   return (
     <Card className="bb-report-section bb-highlights-section">
-      <Tabs value={view} onValueChange={switchView} className="bb-card-tabs">
-        <CardHeader>
-          <div className="bb-card-title-row bb-inline-toggle-row">
-            <CardTitle>Expense Highlights</CardTitle>
-            <TabsList activeValue={view} data-bb-tooltip-dismiss-trigger="expense-highlights">
-              <TabsTrigger value="largest">Largest</TabsTrigger>
-              <TabsTrigger value="merchants">Most Frequent</TabsTrigger>
-            </TabsList>
-          </div>
-        </CardHeader>
-        <CardContent className="bb-expense-insights-content">
-          <TabsContent value="largest" forceMount inert={view !== "largest"} aria-hidden={view !== "largest"}>
-            <div className="bb-insight-panel">
-              <TopExpensesChart entries={largestEntries} />
-              <HiddenListPanel total={largestEntries.length} collapseKey={view}>
-                <TopExpensesTable entries={largestEntries} />
-              </HiddenListPanel>
-            </div>
-          </TabsContent>
-          <TabsContent value="merchants" forceMount inert={view !== "merchants"} aria-hidden={view !== "merchants"}>
-            <div className="bb-insight-panel">
-              <MerchantChart data={merchantOccurrences} />
-              <HiddenListPanel total={merchantOccurrences.length} collapseKey={view}>
-                <MerchantOccurrencesTable rows={merchantOccurrences} />
-              </HiddenListPanel>
-            </div>
-          </TabsContent>
-        </CardContent>
-      </Tabs>
+      <CardHeader>
+        <div className="bb-card-title-row bb-highlights-heading">
+          <CardTitle>Expense Highlights</CardTitle>
+          <CategoryFilterControl<ExpenseInsightsView>
+            filter={view} onFilterChange={switchView}
+            filters={[{ value: "largest", label: "Largest" }, { value: "merchants", label: "Most Frequent" }]}
+            label="Expense highlights view" dismissTrigger="expense-highlights"
+          />
+        </div>
+      </CardHeader>
+      <CardContent className="bb-expense-insights-content">
+        <div className="bb-insight-view" role="region" aria-label="Largest expenses"
+          data-state={view === "largest" ? "active" : "inactive"} inert={view !== "largest"} aria-hidden={view !== "largest"}>
+          <TopExpensesChart entries={largestEntries} />
+        </div>
+        <div className="bb-insight-view" role="region" aria-label="Most frequent merchants"
+          data-state={view === "merchants" ? "active" : "inactive"} inert={view !== "merchants"} aria-hidden={view !== "merchants"}>
+          <MerchantChart data={merchantOccurrences} />
+        </div>
+      </CardContent>
     </Card>
   )
 }
@@ -2934,17 +2923,6 @@ function ExpandRowsButton({
   )
 }
 
-function HiddenListPanel({ children, total, collapseKey }: { children: ReactNode; total: number; collapseKey?: string }) {
-  const [expanded, setExpanded] = useState(false)
-  useEffect(() => setExpanded(false), [collapseKey])
-  return (
-    <div className="bb-hidden-list-panel">
-      <CollapsibleContent open={expanded} lazy>{children}</CollapsibleContent>
-      <ExpandRowsButton expanded={expanded} total={total} onToggle={() => setExpanded((current) => !current)} />
-    </div>
-  )
-}
-
 function AmountTable({ columns, rows, limit }: { columns: [string, string]; rows: AmountRow[]; limit?: number }) {
   const [expanded, setExpanded] = useState(false)
   if (!rows.length) {
@@ -2989,70 +2967,6 @@ function AmountRowsTable({ columns, rows, hideHeader = false }: { columns: [stri
 
 function expenseEntryItemLabel(entry: ExpenseEntry) {
   return entry.item || entry.location || "Transaction"
-}
-
-function TopExpensesTable({ entries }: { entries: ExpenseEntry[] }) {
-  if (!entries.length) {
-    return <div className="bb-empty">No shared expense entries found.</div>
-  }
-
-  return <TopExpensesRowsTable entries={entries} />
-}
-
-function TopExpensesRowsTable({ entries, hideHeader = false }: { entries: ExpenseEntry[]; hideHeader?: boolean }) {
-  return (
-    <div className="bb-table-wrap">
-      <table>
-        {hideHeader ? null : (
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Category</th>
-              <th>Amount</th>
-            </tr>
-          </thead>
-        )}
-        <tbody>
-          {entries.map((entry, index) => (
-            <tr key={`${entry.date}-${entry.category}-${entry.amount}-${index}`}>
-              <td>{expenseEntryItemLabel(entry)}</td>
-              <td>{entry.category}</td>
-              <td className="bb-amount">{formatMoney(entry.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function MerchantOccurrencesTable({ rows }: { rows: OccurrenceRow[] }) {
-  if (!rows.length) {
-    return <div className="bb-empty">No merchant activity found.</div>
-  }
-
-  return (
-    <div className="bb-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Location</th>
-            <th>Count</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label}>
-              <td>{row.label}</td>
-              <td>{row.count}</td>
-              <td className="bb-amount">{formatMoney(row.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
 }
 
 function DailyEntriesTable({ entries, categoryColors, aliases, year, month }: {

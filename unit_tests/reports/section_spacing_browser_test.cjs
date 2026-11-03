@@ -26,14 +26,14 @@ const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-r
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
 async function gap(page,section,button) {return page.evaluate(({section,button})=>{const edge=document.querySelector(section),control=document.querySelector(button);if(!edge||!control)throw new Error(`Missing spacing target: ${!edge?section:button}`);return edge.getBoundingClientRect().bottom-control.getBoundingClientRect().bottom},{section,button})}
-const dailyButton='.bb-daily-section button.bb-details-toggle',insightButton='.bb-highlights-section .bb-tabs-content[data-state="active"] .bb-expand-toggle'
+const dailyButton='.bb-daily-section button.bb-details-toggle',insightChart='.bb-highlights-section .bb-insight-view[data-state="active"] .bb-insight-chart-box'
 const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-reference)<.6,`${message}: ${actual}px versus Categories ${reference}px`)
 ;(async()=>{
   let cases=0
   for(const engine of [chromium,webkit]) {
     const browser=await engine.launch({headless:true})
     try {
-      for(const width of (measureOnly?[390]:[320,390,768,1280])) for(const dark of [false,true]) {
+      for(const width of (process.env.ONLY_WIDTH?[Number(process.env.ONLY_WIDTH)]:measureOnly?[390]:[320,390,768,1280])) for(const dark of [false,true]) {
         const page=await browser.newPage({viewport:{width,height:900},hasTouch:true,isMobile:width<768,reducedMotion:dark?'reduce':'no-preference'})
         const errors=[],writes=[]
         page.on('pageerror',e=>errors.push(e.message))
@@ -62,20 +62,48 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
         await page.waitForTimeout(350)
         const reference=await gap(page,'.bb-daily-section',dailyButton)
         assert.ok(await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')>=23,'Burn Rate retains compact bottom breathing room')
-        const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightButton)}
+        const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton),largest:await gap(page,'.bb-highlights-section',insightChart)}
         if(!measureOnly) {
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
           closeEnough(measured.daily,reference,'Daily Transactions footer')
-          closeEnough(measured.largest,reference,'Largest View all footer, including the final section')
-          await page.locator(insightButton).click();await page.waitForTimeout(350)
-          closeEnough(await gap(page,'.bb-highlights-section',insightButton),reference,'Expanded largest footer')
-          await page.locator(insightButton).click();await page.waitForTimeout(350)
-          closeEnough(await gap(page,'.bb-highlights-section',insightButton),reference,'Recollapsed largest footer')
-          await page.getByRole('tab',{name:'Most Frequent',exact:true}).click()
+          closeEnough(measured.largest,reference,'Largest chart footer has no leftover list space')
+          const highlights=page.locator('.bb-highlights-section'),chooser=page.getByRole('combobox',{name:'Expense highlights view',exact:true})
+          assert.equal(await chooser.inputValue(),'largest')
+          assert.equal(await chooser.locator('..').getAttribute('data-bb-tooltip-dismiss-trigger'),'expense-highlights')
+          assert.deepEqual(await chooser.locator('option').allTextContents(),['Largest','Most Frequent'])
+          assert.equal(await highlights.getByRole('button',{name:/View all|Collapse/}).count(),0,'Remove both full-list buttons')
+          assert.equal(await highlights.locator('table,.bb-hidden-list-panel,[role="tablist"],[role="tabpanel"]').count(),0,'No obsolete disclosure or tab semantics')
+          assert.equal(await highlights.getByRole('region').count(),1,'Only the selected chart is accessible')
+          assert.equal(await highlights.getByRole('region',{name:'Largest expenses',exact:true}).count(),1)
+          const style=await chooser.evaluate(el=>{const r=el.getBoundingClientRect(),c=getComputedStyle(el),ref=getComputedStyle(document.querySelector('.bb-daily-heading select'));return {height:r.height,left:r.left,right:r.right,background:c.backgroundColor,border:c.borderColor,radius:c.borderRadius,referenceBackground:ref.backgroundColor,referenceBorder:ref.borderColor,referenceRadius:ref.borderRadius}})
+          assert.ok(style.height>=44&&style.left>=0&&style.right<=width,'Native selector keeps its touch target and fits the page')
+          assert.equal(style.background,style.referenceBackground,'Dropdown shares the Daily Spending tint')
+          assert.equal(style.border,style.referenceBorder,'Dropdown shares the Daily Spending border')
+          assert.equal(style.radius,style.referenceRadius,'Dropdown shares the Daily Spending capsule shape')
+          const beforeHeight=await highlights.evaluate(el=>el.getBoundingClientRect().height)
+          const chartIdentity=await highlights.locator('.bb-insight-view').evaluateAll(panels=>{panels.forEach((p,i)=>p.dataset.fixtureIdentity=String(i));return panels.map(p=>p.dataset.fixtureIdentity)})
+          await chooser.focus()
+          await chooser.press('Escape')
+          assert.equal(await chooser.evaluate(el=>el===document.activeElement),true,'Native chooser accepts keyboard focus')
+          assert.equal(await chooser.locator('..').getAttribute('data-pointer-focus'),null,'Keyboard input restores the shared focus treatment')
+          await chooser.selectOption('merchants')
           await page.waitForTimeout(350)
-          closeEnough(await gap(page,'.bb-highlights-section',insightButton),reference,'Most Frequent View all footer')
-          await page.locator(insightButton).click();await page.waitForTimeout(350)
-          closeEnough(await gap(page,'.bb-highlights-section',insightButton),reference,'Expanded Most Frequent footer')
+          assert.equal(await chooser.inputValue(),'merchants','Native selection changes the chart')
+          assert.equal(await highlights.getByRole('region',{name:'Most frequent merchants',exact:true}).count(),1)
+          closeEnough(await gap(page,'.bb-highlights-section',insightChart),reference,'Most Frequent chart footer')
+          closeEnough(await highlights.evaluate(el=>el.getBoundingClientRect().height),beforeHeight,'Switching charts keeps the section height stable')
+          await page.locator('.bb-insight-view[data-state="active"] .recharts-bar-rectangle').first().tap()
+          await highlights.locator('.bb-insight-view[data-state="active"] .bb-chart-tooltip-title').filter({hasText:'Fixture merchant 1'}).waitFor()
+          await chooser.selectOption('largest')
+          await page.waitForTimeout(350)
+          assert.equal(await highlights.getByRole('region',{name:'Largest expenses',exact:true}).count(),1)
+          assert.equal(await highlights.locator('.bb-insight-view[data-state="active"] .recharts-bar-rectangle').count(),10,'Largest retains its top-ten graph')
+          for(const value of ['merchants','largest','merchants','largest']) {await chooser.selectOption(value);await page.waitForTimeout(35)}
+          await page.waitForTimeout(350)
+          assert.deepEqual(await highlights.locator('.bb-insight-view').evaluateAll(panels=>panels.map(p=>p.dataset.fixtureIdentity)),chartIdentity,'Switching preserves chart DOM')
+          assert.equal(await highlights.getByRole('region').count(),1)
+          closeEnough(await gap(page,'.bb-highlights-section',insightChart),reference,'Rapid reversals retain compact footer spacing')
+          if(width===390){await highlights.screenshot({path:`/tmp/bookiebot-highlights-${engine.name()}-${dark?'dark':'light'}.png`})}
           await page.locator(dailyButton).click();await page.waitForTimeout(350)
           assert.equal(await page.locator('.bb-daily-transactions .bb-daily-day-group').count(),12,'Transactions still reveals the full list')
           closeEnough(await gap(page,'.bb-daily-section','.bb-daily-transactions'),reference,'Expanded daily content bottom')
