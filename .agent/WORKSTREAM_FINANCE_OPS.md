@@ -4,6 +4,10 @@ Last updated: 2026-11-03
 
 ## Goal
 
+### Transaction tap/line refinements and inline-editor exploration — 2026-11-03
+
+Completed the two requested production refinements: pointer/touch taps no longer reveal a row's actions, while directional swipe and keyboard/assistive access remain; remove the duplicate swipe-wrapper border so flat singles and expanded rows retain only native separators. **12 Chromium/WebKit cases** cover touch/mouse taps, micro-drags, vertical gestures, singleton/expanded separators, actual swipes, review/cancel and prior financial UI contracts. **55 targeted / 2,851 full local tests passed / 563 optional PostgreSQL skipped**, clean Python/frontend types/build. Existing writers, forms, confirmation/recovery and Finance Ops lifecycle backlog are unchanged. Three source-backed inline-editor directions are a separate preview-only exploration; implementation remains pending the user's design selection. STATUS checklist 247 records acceptance.
+
 ### Joined reveal Transactions workspace — 2026-11-03
 
 Completed the user-directed consolidation of Daily Spending into Transactions, retaining the native graph/day/logo motion. One scope/search drives full-result exact-cent chart/day metadata before 40-row pagination; stale snapshots cannot append shifted rows. All is recorded expenses/bill payments; Income/Savings remain explicit scopes and scheduled estimates remain outside this workspace. Canonical shared purchases use full gross values, distinct from net/projected Overview budget metrics. Single-entry days are flat; capability-bound joined Update/Split/Delete rails use fixed icon clipping and symmetric 420ms CSS motion with no visible focus chrome.
