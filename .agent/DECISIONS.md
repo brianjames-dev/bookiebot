@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-02 - Select Expense Highlights With The Shared Native Dropdown
+
+Replace the Largest/Most Frequent tab strip with the existing category selector, retaining its tint, border, chevron, touch target, pointer/keyboard focus handling and tooltip dismissal. Keep both chart instances mounted in overlapping CSS regions so switching retains the crossfade and stable plot height; only the active region is accessible. On phones, keep the selector below the title for both labels to avoid reflow when selecting Most Frequent.
+
+Remove both View all disclosures and their dedicated transaction tables/helpers. Daily Spending and the Transactions screen remain the places to browse purchases. Keep the chart data, top-ten limit, rent exclusion, ordering, counts, amounts and tooltips unchanged. No new state storage, dependency or financial workflow is introduced.
+
 ## 2026-11-02 - Fit Transaction Filter Labels Within The Inline Capsule
 
 Use the category dropdown primary/8% tint for both Transactions states, including hover. Measure the selected label’s text plus its real padding/borders and fixed 44px X after category changes, font readiness or window resize; write a CSS width target only when it changes. CSS animates that target within the existing 190px/55% row cap. Do not observe the animated capsule or add per-frame React/measurement work.

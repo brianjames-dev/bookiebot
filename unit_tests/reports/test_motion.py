@@ -21,13 +21,10 @@ def test_disclosure_and_modal_motion_lifecycle(script):
     )
 
 
-def test_live_details_and_expanded_lists_use_the_shared_disclosure_content():
+def test_live_details_use_the_shared_disclosure_content():
     source = (FRONTEND / "report-app.tsx").read_text()
     details = source.split("function DetailsPanel", 1)[1].split("function useModalPageScrollLock", 1)[0]
-    hidden_list = source.split("function HiddenListPanel", 1)[1].split("function AmountTable", 1)[0]
-
     assert "<CollapsibleContent open={open}" in details
-    assert "<CollapsibleContent open={expanded}" in hidden_list
 
 
 def test_modal_exit_keeps_native_dialog_and_scroll_lock_until_motion_finishes():

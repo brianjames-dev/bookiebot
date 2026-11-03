@@ -315,11 +315,12 @@ summary {
   gap: 6px;
 }
 
-.bb-inline-toggle-row {
+.bb-highlights-heading {
   flex-wrap: wrap;
 }
 
-.bb-inline-toggle-row .bb-tabs-list {
+.bb-highlights-heading .bb-category-mix-filter {
+  flex: 0 0 auto;
   margin-left: auto;
 }
 
@@ -710,10 +711,8 @@ button.bb-left-categories { cursor: pointer; }
   stroke-dasharray: none;
 }
 
-.bb-expense-insights-content,
-.bb-insight-panel {
+.bb-expense-insights-content {
   display: grid;
-  gap: 18px;
 }
 
 .bb-insight-chart-box {
@@ -1165,10 +1164,6 @@ button.bb-left-categories { cursor: pointer; }
   }
 }
 
-.bb-card-tabs {
-  display: contents;
-}
-
 .bb-chart-carousel {
   display: flex;
   flex-direction: column;
@@ -1455,7 +1450,7 @@ button.bb-left-categories { cursor: pointer; }
 }
 
 
-.bb-expense-insights-content > .bb-tabs-content {
+.bb-insight-view {
   grid-area: 1 / 1;
   min-width: 0;
   opacity: 0;
@@ -1464,15 +1459,15 @@ button.bb-left-categories { cursor: pointer; }
   transition: opacity var(--bb-motion-duration) var(--bb-motion-ease), transform var(--bb-motion-duration) var(--bb-motion-ease), visibility 0s linear var(--bb-motion-duration);
 }
 
-.bb-expense-insights-content > .bb-tabs-content:first-child {
+.bb-insight-view:first-child {
   transform: translateX(-14px);
 }
 
-.bb-expense-insights-content > .bb-tabs-content:last-child {
+.bb-insight-view:last-child {
   transform: translateX(14px);
 }
 
-.bb-expense-insights-content > .bb-tabs-content[data-state="active"] {
+.bb-insight-view[data-state="active"] {
   opacity: 1;
   transform: translateX(0);
   visibility: visible;
@@ -2393,12 +2388,6 @@ button.bb-left-categories { cursor: pointer; }
   overscroll-behavior: contain;
 }
 
-.bb-hidden-list-panel {
-  display: grid;
-  width: 100%;
-  gap: 10px;
-}
-
 .bb-expand-toggle {
   appearance: none;
   flex: 0 0 auto;
@@ -3000,10 +2989,6 @@ button:focus-visible, summary:focus-visible {
     justify-self: stretch;
   }
 
-  .bb-inline-toggle-row .bb-tabs-list {
-    margin-left: 0;
-  }
-
   .bb-analytics-header-controls {
     justify-content: flex-end;
   }
@@ -3109,6 +3094,7 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .bb-highlights-heading .bb-card-title { flex-basis: 100%; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
   .bb-metrics-grid > .bb-metric-card:nth-child(-n+2) { padding-bottom: 30px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; }

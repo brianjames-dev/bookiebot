@@ -554,7 +554,7 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Income After Expenses" not in html
     assert "Budget remaining" not in html
     assert "Wants Left" not in html
-    assert "View all" in html
+    assert "Expense highlights view" in html
     assert "Expense Highlights" in html
     assert "Largest" in html
     assert "Most Frequent" in html
@@ -605,11 +605,11 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "data-bb-tooltip-motion-ready" in html
     assert "data-bb-tooltip-dismiss-revision" in html
     assert "data-bb-chart-interaction-revision" in html
-    for trigger in ("projection", "calendar", "expense-highlights"):
+    for trigger in ("projection", "calendar"):
         assert f'data-bb-tooltip-dismiss-trigger":"{trigger}"' in html
     # Shared category selectors pass their scope to the same native control;
-    # runtime layout checks verify the resulting DOM attribute for both uses.
-    for trigger in ("category-mix", "daily-spending"):
+    # runtime layout checks verify the resulting DOM attribute for each use.
+    for trigger in ("category-mix", "daily-spending", "expense-highlights"):
         assert f'dismissTrigger:"{trigger}"' in html
     assert "bb-chart-tooltip-frame-dismissing" in html
     assert "bb-theme-toggle-moon" in html
@@ -1120,7 +1120,8 @@ def test_report_payload_tracks_merchant_occurrences_by_location_count():
     assert payload["merchantOccurrences"][0] == {"label": "Starbucks", "count": 2, "amount": 11.0}
     assert payload["merchantOccurrences"][1] == {"label": "Costco", "count": 1, "amount": 100.0}
     assert "Occurrences" in html
-    assert "bb-hidden-list-panel" in html
+    assert "bb-hidden-list-panel" not in html
+    assert "Expense highlights view" in html
     assert "bb-chart-carousel-indicators" in html
     assert "bb-chart-carousel-track" in html
     assert "data-dragging" in html
