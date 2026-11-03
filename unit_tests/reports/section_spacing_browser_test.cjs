@@ -67,7 +67,17 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
           closeEnough(measured.daily,reference,'Daily Transactions footer')
           closeEnough(measured.largest,reference,'Largest chart footer has no leftover list space')
-          const highlights=page.locator('.bb-highlights-section'),chooser=page.getByRole('combobox',{name:'Expense highlights view',exact:true})
+          const highlights=page.locator('.bb-highlights-section'),chooser=page.getByRole('combobox',{name:'Highlights view',exact:true})
+          assert.equal(await highlights.getByRole('heading',{name:'Highlights',exact:true}).count(),1)
+          const assertInlineHeading=async()=>{
+            const layout=await highlights.locator('.bb-highlights-heading').evaluate(el=>{
+              const title=el.querySelector('.bb-card-title').getBoundingClientRect(),select=el.querySelector('select').getBoundingClientRect()
+              return {titleRight:title.right,selectLeft:select.left,titleY:title.y+title.height/2,selectY:select.y+select.height/2,selectRight:select.right}
+            })
+            assert.ok(Math.abs(layout.titleY-layout.selectY)<.6,'Highlights and its selector stay centered on the same row')
+            assert.ok(layout.titleRight+11.5<=layout.selectLeft&&layout.selectRight<=width,'Both labels fit inline without overlap or overflow')
+          }
+          await assertInlineHeading()
           assert.equal(await chooser.inputValue(),'largest')
           assert.equal(await chooser.locator('..').getAttribute('data-bb-tooltip-dismiss-trigger'),'expense-highlights')
           assert.deepEqual(await chooser.locator('option').allTextContents(),['Largest','Most Frequent'])
@@ -89,6 +99,7 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           await chooser.selectOption('merchants')
           await page.waitForTimeout(350)
           assert.equal(await chooser.inputValue(),'merchants','Native selection changes the chart')
+          await assertInlineHeading()
           assert.equal(await highlights.getByRole('region',{name:'Most frequent merchants',exact:true}).count(),1)
           closeEnough(await gap(page,'.bb-highlights-section',insightChart),reference,'Most Frequent chart footer')
           closeEnough(await highlights.evaluate(el=>el.getBoundingClientRect().height),beforeHeight,'Switching charts keeps the section height stable')
@@ -102,6 +113,7 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           await page.waitForTimeout(350)
           assert.deepEqual(await highlights.locator('.bb-insight-view').evaluateAll(panels=>panels.map(p=>p.dataset.fixtureIdentity)),chartIdentity,'Switching preserves chart DOM')
           assert.equal(await highlights.getByRole('region').count(),1)
+          await assertInlineHeading()
           closeEnough(await gap(page,'.bb-highlights-section',insightChart),reference,'Rapid reversals retain compact footer spacing')
           if(width===390){await highlights.screenshot({path:`/tmp/bookiebot-highlights-${engine.name()}-${dark?'dark':'light'}.png`})}
           await page.locator(dailyButton).click();await page.waitForTimeout(350)

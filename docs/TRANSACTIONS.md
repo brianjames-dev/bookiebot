@@ -1,6 +1,6 @@
 # Recorded transactions in the app
 
-Overview now ends with the former Spending content: Daily Spending, its day/transaction details, and Expense Highlights (Largest / Most Frequent). Ask's activity source opens Overview. The former Spending navigation position is Transactions.
+Overview now ends with the former Spending content: Daily Spending, its day/transaction details, and Highlights (Largest / Most Frequent). Ask's activity source opens Overview. The former Spending navigation position is Transactions.
 
 Transactions lists recorded expenses, income, payments and cash savings for the selected month, with an explicit All months choice across configured existing annual workbooks. It is separate from the Plaid review inbox and excludes scheduled estimates and derived ESPP totals. Search covers descriptions, locations, people/cards, dates and amounts; filters cover type, category, person/card and split status. Results are newest first, in pages of 40. Failed reads are errors, not an empty history. Two batched worksheet reads per annual workbook load existing monthly sources and action logs; owner/month browsing snapshots last 30 seconds. Search and filtering reuse them. Explicit Refresh and financial-change events request fresh source data and replace the browsing cache. Opening the tab is lazy and does not add sheet reads to initial Overview loading.
 

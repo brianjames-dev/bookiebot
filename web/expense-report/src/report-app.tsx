@@ -2669,11 +2669,11 @@ function ExpenseInsightsCard({
     <Card className="bb-report-section bb-highlights-section">
       <CardHeader>
         <div className="bb-card-title-row bb-highlights-heading">
-          <CardTitle>Expense Highlights</CardTitle>
+          <CardTitle>Highlights</CardTitle>
           <CategoryFilterControl<ExpenseInsightsView>
             filter={view} onFilterChange={switchView}
             filters={[{ value: "largest", label: "Largest" }, { value: "merchants", label: "Most Frequent" }]}
-            label="Expense highlights view" dismissTrigger="expense-highlights"
+            label="Highlights view" dismissTrigger="expense-highlights"
           />
         </div>
       </CardHeader>

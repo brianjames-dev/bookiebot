@@ -554,8 +554,8 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
     assert "Income After Expenses" not in html
     assert "Budget remaining" not in html
     assert "Wants Left" not in html
-    assert "Expense highlights view" in html
-    assert "Expense Highlights" in html
+    assert "Highlights view" in html
+    assert "Expense Highlights" not in html
     assert "Largest" in html
     assert "Most Frequent" in html
     assert "Largest Expenses" not in html
@@ -1121,7 +1121,7 @@ def test_report_payload_tracks_merchant_occurrences_by_location_count():
     assert payload["merchantOccurrences"][1] == {"label": "Costco", "count": 1, "amount": 100.0}
     assert "Occurrences" in html
     assert "bb-hidden-list-panel" not in html
-    assert "Expense highlights view" in html
+    assert "Highlights view" in html
     assert "bb-chart-carousel-indicators" in html
     assert "bb-chart-carousel-track" in html
     assert "data-dragging" in html
