@@ -10,11 +10,11 @@ const h = React.createElement
 global.IS_REACT_ACT_ENVIRONMENT = true
 const source = fs.readFileSync(process.argv[2] || 'web/expense-report/src/report-app.tsx', 'utf8')
 const file = ts.createSourceFile('report-app.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-const names = new Set(['reportSpentTotal', 'ExpenseReportApp', 'ExpenseReportBody', 'OverviewCharts', 'DailySpendingCard', 'ExpenseInsightsCard', 'CategoryFilterControl',
-  'MemoizedBurnRateChart', 'MemoizedCalendarAnalyticsPanel', 'MemoizedBillsUtilitiesPanel', 'MemoizedExpenseInsightsCard'])
+const names = new Set(['reportSpentTotal', 'ExpenseReportApp', 'ExpenseReportBody', 'OverviewCharts', 'DailySpendingCard', 'CategoryFilterControl',
+  'MemoizedBurnRateChart', 'MemoizedCalendarAnalyticsPanel', 'MemoizedBillsUtilitiesPanel'])
 const declarations = file.statements.filter(node => ts.isFunctionDeclaration(node) ? names.has(node.name?.text)
   : ts.isVariableStatement(node) && node.declarationList.declarations.some(item => names.has(item.name.getText(file))))
-const compiled = ts.transpileModule(declarations.map(node => node.getText(file)).join('\n') + '\nexports.Highlights = ExpenseInsightsCard', {
+const compiled = ts.transpileModule(declarations.map(node => node.getText(file)).join('\n') + '\nexports.DailyCard = DailySpendingCard', {
   compilerOptions: {target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX},
 }).outputText
 const counts = {}, timers = new Map(); let serial = 0
@@ -30,10 +30,9 @@ const document = {querySelector:selector=>({focus(){},scrollIntoView(){sourceTar
 const passthrough = ({children}) => h(React.Fragment,null,children)
 const leaf = name => {const fn = props => { count(name);return h(TooltipProbe,{name}) };return fn}
 const CategoryMixChartLeaf = leaf('category'), CategoryMixChart = React.memo(CategoryMixChartLeaf), CalendarAnalyticsPanel = leaf('calendar'), BurnRateChart = leaf('burn'), BillsUtilitiesPanel = leaf('bills')
-const DailySpendingSection = leaf('daily'), TopExpensesChart = leaf('highlights'), MerchantChart = leaf('merchants')
+const DailySpendingSection = leaf('daily')
 const ChartCarouselNavigation = props => h('nav',null)
 const DailySpendingFilterControl = props => h('daily-filter',null)
-const Tabs = props => passthrough(props)
 const ReportViews = {exports:{},require:req}
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/report-view-preferences.ts','utf8'),{
   compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS},
@@ -62,14 +61,14 @@ const runtime = { exports:{}, require:req, window, document,
   amountRowsTotal:rows=>rows.reduce((sum,e)=>sum+e.amount,0),activitySummary:entries=>({total:entries.reduce((sum,e)=>sum+e.amount,0)}),
   roundCurrency:value=>Math.round(value*100)/100,
   activityMatchesCategory:(entry,item)=>entry.category===item.label,monthOnlyLabel:label=>label.split(' ')[0],
-  expenseEntryItemLabel:entry=>{count('highlightLabels');return entry.item||entry.location||'Transaction'},
   CATEGORY_CHART_COLORS:{food:'red',grocery:'green'},CHART_CAROUSEL_GAP:16,clamp:(value,min,max)=>Math.max(min,Math.min(max,value)),
   isInteractiveTouchTarget:()=>false,
   CategoryMixChart,CalendarAnalyticsPanel,BurnRateChart,BillsUtilitiesPanel,DailySpendingSection,DailySpendingFilterControl,ChartCarouselNavigation,
-  TopExpensesChart,MerchantChart,Tabs,ChartTooltipDismissProvider,useChartTooltipDismiss,
+  ChartTooltipDismissProvider,useChartTooltipDismiss,
 }
 for(const name of ['Card','CardHeader','CardTitle','CardContent','ReportScreen','ReportMenu','TabsList','TabsTrigger','TabsContent','ChevronDown'])runtime[name]=passthrough
 for(const name of ['MetricCard','RemainingCategoryBars','SavingsMetricCard','ReportBrand','ReportHeader','ThemeToggle','SharedReimbursementsCard','ReimbursementLedger','Investments','SavingsGoals','ReportQuestions','PhoneNotifications','ActivityDetails','MetricExplanationDetails'])runtime[name]=leaf(name)
+runtime.ReportScreen=({children})=>h(React.Fragment,null,children)
 runtime.ModalDetails=passthrough
 runtime.FittedAmount=passthrough
 runtime.AmountAppearanceBoundary=passthrough
@@ -82,7 +81,7 @@ const App=runtime.exports.ExpenseReportApp
 const activity=[{day:1,date:'10/1/2026',category:'Food',item:'Lunch',amount:12},{day:1,date:'10/1/2026',category:'Shopping',item:'Shirt',amount:30},{day:1,date:'10/1/2026',category:'Grocery',item:'Groceries',amount:20}]
 const breakdown=[{key:'food',label:'Food',amount:42},{key:'grocery',label:'Grocery',amount:20}]
 const view={metrics:{monthlyIncome:5000,totalExpenses:72,incomeAfterExpenses:4428,amountSaved:500,savingsMinimum:500,savingsIdeal:1000},breakdown,categoryBalances:{},categoryBudgets:{},calendarEvents:[],utilityHistory:[],burnRate:{}}
-let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',generatedAt:'2026-10-25',elapsedDays:25,dailyEntries:activity,activity,topEntries:activity,merchantOccurrences:[],currentView:view,projectedView:{...view,metrics:{...view.metrics,monthlyIncome:6000,totalExpenses:172,amountSaved:600}},burnRate:{},metricExplanations:{current:{spent:{value:72}},projected:{spent:{value:172}}}}
+let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',generatedAt:'2026-10-25',elapsedDays:25,dailyEntries:activity,activity,topEntries:activity,merchantOccurrences:[{label:'Fixture merchant',amount:12,count:1}],currentView:view,projectedView:{...view,metrics:{...view.metrics,monthlyIncome:6000,totalExpenses:172,amountSaved:600}},burnRate:{},metricExplanations:{current:{spent:{value:72}},projected:{spent:{value:172}}}}
 const appSession = {signOut:()=>{},signingOut:false}
 const swipeListeners={}
 const nativeViewport={clientWidth:390,scrollLeft:0,dataset:{},
@@ -90,6 +89,12 @@ const nativeViewport={clientWidth:390,scrollLeft:0,dataset:{},
  scrollTo({left,behavior}){if(behavior==='instant')this.scrollLeft=left}}
 let renderer
 act(()=>{renderer=Renderer.create(h(App,{report,appSession}),{createNodeMock:el=>el.props.className==='bb-chart-carousel'?nativeViewport:null})})
+function assertNoHighlights() {
+  const overviewChildren=React.Children.toArray(renderer.root.findByType(runtime.ReportScreen).props.children)
+  assert.equal(overviewChildren.at(-1).type,runtime.exports.DailyCard,'Daily Spending ends Overview with no Highlights placeholder')
+  assert.doesNotMatch(JSON.stringify(renderer.toJSON()),/Highlights|Largest expenses|Most frequent merchants|bb-insight-view/,'Neither report layout renders Highlights')
+}
+assertNoHighlights()
 assert.deepEqual(renderer.root.findAllByType('h2').map(title=>title.findByType(runtime.FittedAmount).props.children),['Category Mix','Burn Rate','Calendar','Bills & Utilities'],'Every sliding page owns its own heading')
 const spentCard=()=>renderer.root.findAllByType(runtime.MetricCard).find(card=>card.props.label==='Spent')
 assert.equal(spentCard().props.value,72,'Spent uses authoritative expenses without cash or ESPP savings')
@@ -102,28 +107,16 @@ const unchanged=(before,keys)=>keys.forEach(key=>assert.equal(counts[key],before
 let before=snapshot()
 act(()=>renderer.root.findByType(CategoryMixChartLeaf).props.onFilterChange('wants'))
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants')
-assert.equal(revisions.category,1);assert.equal(revisions.daily,1);assert.equal(revisions.highlights,1)
-unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','daily','highlights','highlightLabels','calendar','burn','bills'])
+assert.equal(revisions.category,1);assert.equal(revisions.daily,1)
+unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','daily','calendar','burn','bills'])
 before=snapshot()
 assert.equal(renderer.root.findByType(CalendarAnalyticsPanel).props.onFilterChange,undefined,'Calendar has no All/Subs filter')
-unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','daily','highlights','highlightLabels','category','burn','bills'])
+unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','daily','category','burn','bills'])
 before=snapshot()
 act(()=>renderer.root.findByType(DailySpendingFilterControl).props.onFilterChange('wants'))
 assert.equal(renderer.root.findByType(DailySpendingSection).props.entries.length,2)
-assert.equal(revisions.daily,2);assert.equal(revisions.category,2);assert.equal(revisions.highlights,2)
-unchanged(before,['viewCalculation','activityCalculation','highlights','highlightLabels','category','calendar','burn','bills'])
-before=snapshot()
-const highlightsFilter=()=>renderer.root.findByProps({'aria-label':'Highlights view'})
-assert.deepEqual(highlightsFilter().findAllByType('option').map(option=>option.children[0]),['Largest','Most Frequent'])
-assert.equal(highlightsFilter().props.value,'largest')
-assert.equal(renderer.root.findAllByProps({className:'bb-hidden-list-panel'}).length,0,'Highlights removes its full-list disclosure')
-assert.equal(renderer.root.findAllByProps({className:'bb-expand-toggle'}).length,0,'Highlights has no View all control')
-const activeHighlights=()=>renderer.root.findAllByProps({className:'bb-insight-view'}).map(panel=>[panel.props['data-state'],panel.props.inert,panel.props['aria-hidden']])
-assert.deepEqual(activeHighlights(),[['active',false,false],['inactive',true,true]],'Only Largest is accessible initially')
-act(()=>highlightsFilter().props.onChange({target:{value:'merchants'}}))
-assert.deepEqual(activeHighlights(),[['inactive',true,true],['active',false,false]],'Dropdown switches the visible and accessible chart together')
-assert.equal(revisions.highlights,3);assert.equal(revisions.daily,3);assert.equal(revisions.category,3)
-unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','daily','highlightLabels','category','calendar','burn','bills'])
+assert.equal(revisions.daily,2);assert.equal(revisions.category,2)
+unchanged(before,['viewCalculation','activityCalculation','category','calendar','burn','bills'])
 // Actual page-level changes must still recompute fresh values and inspections.
 act(()=>renderer.root.findByType(runtime.ReportHeader).props.onToggle())
 assert.equal(renderer.root.findAllByType(runtime.MetricCard)[0].props.value,6000)
@@ -131,7 +124,7 @@ assert.equal(spentCard().props.value,172,'Projected Spent uses its own expenses 
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.allSpentTotal,172,'Category Mix receives the same Projected headline')
 act(()=>spentCard().props.onExplain())
 assert.equal(renderer.root.findByType(runtime.MetricExplanationDetails).props.detail.value,172)
-assert.equal(revisions.highlights,4);assert.equal(revisions.daily,4);assert.equal(revisions.category,4)
+assert.equal(revisions.daily,3);assert.equal(revisions.category,3)
 assert.equal(counts.viewCalculation,before.viewCalculation+1)
 assert.equal(counts.activityCalculation,before.activityCalculation+1)
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants','Mode changes retain the chart filter')
@@ -141,7 +134,7 @@ act(()=>renderer.root.findByType(DailySpendingSection).props.onInspectDay('1','S
 const detail=renderer.root.findByType(runtime.ActivityDetails).props
 assert.deepEqual(detail.entries.map(e=>e.item),['Shirt'])
 assert.equal(detail.total,30)
-unchanged(before,['viewCalculation','activityCalculation','dailyCalculation','highlightLabels'])
+unchanged(before,['viewCalculation','activityCalculation','dailyCalculation'])
 const extra={day:1,date:'10/1/2026',category:'Shopping',item:'New item',amount:10}
 report={...report,activity:[...activity,extra],dailyEntries:[...activity,extra]}
 act(()=>renderer.update(h(App,{report,appSession})))
@@ -166,7 +159,7 @@ act(()=>swipeListeners.touchmove(swipeEvent(40)))
 nativeViewport.scrollLeft=210
 act(()=>swipeListeners.scroll(swipeEvent(40)))
 assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex,1,'The indicator previews the majority-visible graph before release')
-unchanged(before,['category','burn','calendar','bills','daily','highlights'])
+unchanged(before,['category','burn','calendar','bills','daily'])
 assert.equal(renderer.root.findByProps({id:'bb-chart-burn-rate'}).props['aria-hidden'],true,'Preview does not commit the graph selection during native dragging')
 act(()=>swipeListeners.touchend(swipeEvent(40,false)))
 assert.equal(renderer.root.findByProps({id:'bb-chart-burn-rate'}).props['aria-hidden'],true,'Release leaves inertia and snap to the native browser')
@@ -176,28 +169,9 @@ assert.equal(renderer.root.findByType(ChartCarouselNavigation).props.activeIndex
 assert.equal(renderer.root.findByType(CategoryMixChartLeaf).props.filter,'wants')
 act(()=>renderer.unmount())
 assert.equal(timers.size,0,'Unmount releases carousel cooldown timers')
-// Sorting/filtering remains presentation-only, and refreshing data does not
-// reset the selected chart or mutate the canonical report arrays.
-const highlightEntries=Object.freeze([
- Object.freeze({date:'10/2/2026',category:'Food',item:'Small',amount:12}),
- Object.freeze({date:'10/1/2026',category:'Rent',item:'Housing',amount:2000}),
- Object.freeze({date:'10/3/2026',category:'Shopping',item:'Large',amount:80}),
- Object.freeze({date:'10/1/2026',category:'Other needs',item:'Rent',amount:1500}),
-])
-const occurrences=Object.freeze([{label:'Fixture merchant',amount:24,count:2}])
-act(()=>{renderer=Renderer.create(h(ChartTooltipDismissProvider,null,h(runtime.exports.Highlights,{topEntries:highlightEntries,merchantOccurrences:occurrences})))})
-const largest=()=>renderer.root.findByType(TopExpensesChart)
-const merchants=()=>renderer.root.findByType(MerchantChart)
-assert.deepEqual(largest().props.entries.map(e=>e.item),['Large','Small'],'Largest still excludes rent and sorts by amount')
-assert.equal(merchants().props.data,occurrences,'Frequency uses the original count/amount payload')
-const originalChart=largest(),originalMerchants=merchants()
-for(const value of ['merchants','largest','merchants'])act(()=>highlightsFilter().props.onChange({target:{value}}))
-assert.equal(largest(),originalChart,'Switching retains the same Largest chart instance')
-assert.equal(merchants(),originalMerchants,'Switching retains the same frequency chart instance')
-act(()=>renderer.update(h(ChartTooltipDismissProvider,null,h(runtime.exports.Highlights,{topEntries:[],merchantOccurrences:[]}))))
-assert.equal(highlightsFilter().props.value,'merchants','Refresh preserves the selected view')
-assert.equal(largest().props.entries.length,0,'Empty refresh has no stale largest rows')
-assert.equal(merchants().props.data.length,0,'Empty refresh has no stale merchant rows')
-assert.deepEqual(activeHighlights(),[['inactive',true,true],['active',false,false]])
+// The removed section must stay absent in both the app and standalone report,
+// even while the canonical report still contains largest/frequency data.
+act(()=>{renderer=Renderer.create(h(Navigation.Provider,{value:{screen:'overview',preferences:{mode:'current',chartId:'category',setChartId(){}}}},h(App,{report,appSession})),{createNodeMock:el=>el.props.className==='bb-chart-carousel'?nativeViewport:null})})
+assertNoHighlights()
 act(()=>renderer.unmount())
-console.log('Overview render isolation: independent filters, native Highlights selector, retained accessible charts, no full-list disclosure, fresh modes/report and scoped day inspection passed')
+console.log('Overview render isolation: no Highlights in app or standalone, Daily Spending is final, independent filters, fresh modes/report and scoped day inspection passed')
