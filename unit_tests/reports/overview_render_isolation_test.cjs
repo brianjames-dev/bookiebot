@@ -113,7 +113,7 @@ assert.equal(renderer.root.findByType(DailySpendingSection).props.entries.length
 assert.equal(revisions.daily,2);assert.equal(revisions.category,2);assert.equal(revisions.highlights,2)
 unchanged(before,['viewCalculation','activityCalculation','highlights','highlightLabels','category','calendar','burn','bills'])
 before=snapshot()
-const highlightsFilter=()=>renderer.root.findByProps({'aria-label':'Expense highlights view'})
+const highlightsFilter=()=>renderer.root.findByProps({'aria-label':'Highlights view'})
 assert.deepEqual(highlightsFilter().findAllByType('option').map(option=>option.children[0]),['Largest','Most Frequent'])
 assert.equal(highlightsFilter().props.value,'largest')
 assert.equal(renderer.root.findAllByProps({className:'bb-hidden-list-panel'}).length,0,'Highlights removes its full-list disclosure')

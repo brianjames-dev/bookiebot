@@ -2,6 +2,8 @@
 
 ## 2026-11-02 - Select Expense Highlights With The Shared Native Dropdown
 
+Follow-up: the user shortened the title to **Highlights** so both native selector labels fit beside it. Remove the forced two-row phone rule; actual 320px geometry verifies both options inline. This supersedes the phone-heading layout below, retaining its chart and disclosure decisions.
+
 Replace the Largest/Most Frequent tab strip with the existing category selector, retaining its tint, border, chevron, touch target, pointer/keyboard focus handling and tooltip dismissal. Keep both chart instances mounted in overlapping CSS regions so switching retains the crossfade and stable plot height; only the active region is accessible. On phones, keep the selector below the title for both labels to avoid reflow when selecting Most Frequent.
 
 Remove both View all disclosures and their dedicated transaction tables/helpers. Daily Spending and the Transactions screen remain the places to browse purchases. Keep the chart data, top-ten limit, rent exclusion, ordering, counts, amounts and tooltips unchanged. No new state storage, dependency or financial workflow is introduced.

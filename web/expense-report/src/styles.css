@@ -315,10 +315,6 @@ summary {
   gap: 6px;
 }
 
-.bb-highlights-heading {
-  flex-wrap: wrap;
-}
-
 .bb-highlights-heading .bb-category-mix-filter {
   flex: 0 0 auto;
   margin-left: auto;
@@ -3094,7 +3090,6 @@ button:focus-visible, summary:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .bb-highlights-heading .bb-card-title { flex-basis: 100%; }
   .bb-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; margin-bottom: 20px; }
   .bb-metrics-grid > .bb-metric-card:nth-child(-n+2) { padding-bottom: 30px; }
   .bb-metric-card:nth-child(odd) { border-left: 0; }
