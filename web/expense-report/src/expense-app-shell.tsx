@@ -219,7 +219,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
-        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />}
+        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}

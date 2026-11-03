@@ -297,13 +297,30 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
     except ValueError as exc:
         raise TransactionValidation("Choose a valid transactions page.") from exc
     selected = [row for row in rows if (not kind or row["kind"] == kind) and (not category or row["category"] == category)
+        and (query.get("scope") != "spending" or row["kind"] in {"expense", "payment"})
+        and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping"} else "needs") == query["bucket"])
         and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
         and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
                 or word == f"{row['amountCents'] / 100:.2f}" for word in search)]
-    return {"items": [public_row(row) for row in selected[offset:offset + 40]], "total": len(selected),
+    result = {"items": [public_row(row) for row in selected[offset:offset + 40]], "total": len(selected),
             "nextOffset": offset + 40 if len(selected) > offset + 40 else None,
             "categories": sorted({row["category"] for row in rows if row["category"]}),
             "persons": sorted({row["person"] for row in rows}), "month": month}
+    if query.get("view") == "daily":
+        # Aggregate the complete selected snapshot, not the visible 40-row page.
+        # These are recorded sources only; no estimates acquire edit capabilities.
+        days: dict[str, dict[str, Any]] = {}
+        for row in selected:
+            key = row["date"] or row["month"] + ":undated"
+            day = days.setdefault(key, {"date": row["date"], "month": row["month"], "count": 0,
+                                       "totalCents": 0, "needsCents": 0, "wantsCents": 0})
+            day["count"] += 1
+            day["totalCents"] += row["amountCents"]
+            day["wantsCents" if row["category"] in {"food", "shopping"} else "needsCents"] += row["amountCents"]
+        result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected])
+        result["days"] = list(days.values())
+        result["totalAmountCents"] = sum(row["amountCents"] for row in selected)
+    return result
 
 
 def _normalized(body: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
@@ -429,7 +446,7 @@ def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
         "reviewVersion": digest([row["version"], normalized])}
     if row.get("_restoration"):
         payload["restoration"] = row["_restoration"]
-    if normalized["operation"] == "split" or (row["split"] and normalized["operation"] == "update" and "amount" in normalized.get("updates", {})):
+    if normalized["operation"] == "split" or (row["split"] and normalized["operation"] in {"update", "move"} and "amount" in normalized.get("updates", {})):
         from bookiebot.sheets.collaboration import split_amounts
         method = normalized.get("split_method") or row["split"]
         basis = normalized.get("custom_payer_basis_points")

@@ -662,8 +662,8 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
           projected={projectionActive} preferredChart={viewPreferences.chartId} onChartChange={selectChart}
           onInspectCategory={inspectCategory} collapseKey={chartCollapseKey}
           sourceRequest={sourceRequest} />
-        <DailySpendingCard report={report} calendarEvents={activeReport.calendarEvents}
-          projected={projectionActive} categoryColors={categoryColors} onInspectDay={inspectDay} />
+        {!navigation && <DailySpendingCard report={report} calendarEvents={activeReport.calendarEvents}
+          projected={projectionActive} categoryColors={categoryColors} onInspectDay={inspectDay} />}
         </ReportScreen>
 
         {!navigation && (appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
@@ -1040,7 +1040,7 @@ function ChartCarouselNavigation({
   )
 }
 
-function CategoryFilterControl<Filter extends string>({
+export function CategoryFilterControl<Filter extends string>({
   filter, onFilterChange, filters, label, dismissTrigger,
 }: {
   filter: Filter
@@ -2245,7 +2245,7 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   </>
 }
 
-function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl }: {
+export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total: number
@@ -2254,11 +2254,13 @@ function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onTog
   detailsId: string
   onToggleDetails: () => void
   transactionControl?: ReactNode
+  metricLabel?: string
+  legendLabel?: string
 }) {
   return <div className="bb-chart-layout">
-    <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} />
+    <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} legendLabel={legendLabel} />
     <div className="bb-chart-side bb-daily-summary">
-      <div className="bb-chart-kicker">Total Spent</div>
+      <div className="bb-chart-kicker">{metricLabel}</div>
       <div className="bb-daily-amount-row" data-open={detailsOpen}>
         <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
         {transactionControl ?? <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}><span>Transactions</span><ChevronDown aria-hidden="true" /></button>}
@@ -2267,11 +2269,11 @@ function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onTog
   </div>
 }
 
-function DailySpendingPlot({ data, filter, onInspectDay }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void }) {
+function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void; legendLabel?: string }) {
   const axis = dailySpendingAxis(data)
   const chartData = dailySpendingChartRows(data, axis)
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
-  const showStackedBars = filter === "all"
+  const showStackedBars = filter === "all" && !legendLabel
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return <div className="bb-daily-plot">
       <ChartContainer
@@ -2297,6 +2299,7 @@ function DailySpendingPlot({ data, filter, onInspectDay }: { data: DailySpending
               />
               <XAxis
                 dataKey="label"
+                tickFormatter={(value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? new Date(String(value) + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : String(value)}
                 tick={{ className: "bb-daily-spending-x-axis-label", fill: DAILY_SPENDING_BOUNDARY_COLOR }}
                 tickLine={false}
                 axisLine={false}
@@ -2312,7 +2315,7 @@ function DailySpendingPlot({ data, filter, onInspectDay }: { data: DailySpending
                 axisLine={false}
                 width={58}
               />
-              <ChartTooltip content={<DailySpendingTooltipContent filter={filter} />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
+              <ChartTooltip content={<DailySpendingTooltipContent filter={filter} legendLabel={legendLabel} />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
               {showStackedBars ? (
                 <>
                   <Bar isAnimationActive={!reducedMotion} animationInterpolateFn={stableBarAnimation} shape={stableBarShape} dataKey="chartNeedsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
@@ -2326,8 +2329,8 @@ function DailySpendingPlot({ data, filter, onInspectDay }: { data: DailySpending
         </div>
       </ChartContainer>
     <ul className="bb-daily-legend" aria-label="Daily spending legend">
-      {filter !== "wants" && <li><span style={{ background: NEEDS_BAR_COLOR }} aria-hidden="true" />Needs</li>}
-      {filter !== "needs" && <li><span style={{ background: WANTS_BAR_COLOR }} aria-hidden="true" />Wants</li>}
+      {legendLabel?<li><span style={{background:NEEDS_BAR_COLOR}} aria-hidden="true"/>{legendLabel}</li>:filter !== "wants" && <li><span style={{ background: NEEDS_BAR_COLOR }} aria-hidden="true" />Needs</li>}
+      {!legendLabel&&filter !== "needs" && <li><span style={{ background: WANTS_BAR_COLOR }} aria-hidden="true" />Wants</li>}
     </ul>
   </div>
 }
@@ -2459,17 +2462,19 @@ function DailySpendingTooltipContent({
   active,
   payload,
   filter,
+  legendLabel,
 }: {
   active?: boolean
   payload?: DailySpendingTooltipPayload[]
   filter: DailySpendingFilter
+  legendLabel?:string
 }) {
   const point = (payload ?? []).find((item) => item.payload)?.payload
   if (!active || !point) {
     return null
   }
 
-  const rows = filter === "all"
+  const rows = legendLabel ? [{label:legendLabel,amount:point.amount,color:NEEDS_BAR_COLOR}] : filter === "all"
     ? [
         { label: "Needs", amount: point.needsAmount, color: NEEDS_BAR_COLOR },
         { label: "Wants", amount: point.wantsAmount, color: WANTS_BAR_COLOR },

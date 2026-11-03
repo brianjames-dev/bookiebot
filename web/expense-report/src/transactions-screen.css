@@ -1,34 +1,12 @@
 .bb-shell-transactions { padding-top: 14px; }
 .bb-transactions { min-width: 0; }
-.bb-transactions-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 24px; }
-.bb-transactions h1 { font:400 clamp(32px,5vw,44px)/1.15 var(--bb-display-font); margin:0 0 8px; }
+.bb-transactions-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0; }
+.bb-transactions h1 { font:400 clamp(26px,7vw,30px)/1.15 var(--bb-display-font); margin:0 0 8px; }
 .bb-transactions-heading p,.bb-transaction-list-heading { color:hsl(var(--muted-foreground)); font-size:13px; margin:0; }
-.bb-transactions button { cursor:pointer; font:inherit; font-size:14px; color:hsl(var(--primary)); background:transparent; border:1px solid hsl(var(--border)); border-radius:10px; min-height:44px; padding:10px 12px; -webkit-tap-highlight-color:transparent; }
+ .bb-transactions :is(.bb-transaction-editor,.bb-transaction-completion,.bb-transaction-notice) button,.bb-transactions-heading button,.bb-transaction-load,.bb-transaction-empty button,.bb-recorded-undo,.bb-transaction-period button { cursor:pointer; font:inherit; font-size:14px; color:hsl(var(--primary)); background:transparent; border:1px solid hsl(var(--border)); border-radius:10px; min-height:44px; padding:10px 12px; -webkit-tap-highlight-color:transparent; }
 .bb-transactions button:disabled { opacity:.5; cursor:default; }
-.bb-transactions button:focus-visible,.bb-transactions input:focus-visible,.bb-transactions select:focus-visible { outline:2px solid hsl(var(--primary)); outline-offset:3px; }
-.bb-transactions label { display:grid; gap:6px; font-size:13px; color:hsl(var(--muted-foreground)); min-width:0; }
-.bb-transactions input,.bb-transactions select { min-width:0; width:100%; box-sizing:border-box; min-height:44px; background:hsl(var(--background)); color:hsl(var(--foreground)); border:1px solid hsl(var(--border)); border-radius:10px; padding:10px; font:inherit; font-size:16px; }
-.bb-transactions-toolbar { display:flex; gap:8px; }
-.bb-transactions-toolbar>button { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-.bb-transaction-search { display:flex!important; flex:1; align-items:center; position:relative; }
-.bb-transaction-search svg { position:absolute; left:12px; }
-.bb-transaction-search input { padding-left:38px; }
-.bb-transaction-period { display:flex; gap:10px; align-items:end; margin:14px 0 16px; }
-.bb-transaction-period>* { flex:1; }
-.bb-transaction-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:0 0 18px; }
-.bb-transaction-list-heading { display:flex; justify-content:space-between; margin:12px 0; font-size:12px; }
-.bb-transaction-list { display:grid; gap:9px; }
-.bb-transaction-row { border-radius:15px; background:hsl(var(--card)); min-width:0; }
-.bb-transactions .bb-transaction-row-toggle { display:grid; grid-template-columns:18px minmax(0,1fr) auto 16px; gap:10px; align-items:center; width:100%; text-align:left; padding:16px 12px; border:0; color:hsl(var(--foreground)); }
-.bb-transaction-row-toggle>svg { color:hsl(var(--primary)); }
-.bb-transaction-row-toggle>span { min-width:0; }
-.bb-transaction-row-toggle strong { font-size:14px; font-weight:600; }
-.bb-transaction-row-toggle>span strong { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bb-transaction-row-toggle small { display:block; font-size:11px; color:hsl(var(--muted-foreground)); margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.bb-transaction-amount { white-space:nowrap; font-variant-numeric:tabular-nums; }
-.bb-transaction-row[data-open=true] .bb-transaction-row-toggle>span strong { white-space:normal; overflow-wrap:anywhere; }
-.bb-transaction-row-actions { display:flex; flex-wrap:wrap; gap:8px; padding:0 12px 14px; }
-.bb-transaction-row-actions>p { font-size:13px; line-height:1.5; margin:0; width:100%; color:hsl(var(--muted-foreground)); }
+.bb-transactions :is(.bb-transaction-editor,.bb-transaction-period) label { display:grid; gap:6px; font-size:13px; color:hsl(var(--muted-foreground)); min-width:0; }
+.bb-transactions :is(.bb-transaction-editor,.bb-transaction-period) :is(input,select) { min-width:0; width:100%; box-sizing:border-box; min-height:44px; background:hsl(var(--background)); color:hsl(var(--foreground)); border:1px solid hsl(var(--border)); border-radius:10px; padding:10px; font:inherit; font-size:16px; }
 .bb-transaction-editor { padding:18px; margin:20px 0; border:1px solid hsl(var(--border)); background:hsl(var(--card)); border-radius:15px; }
 .bb-transaction-editor h2 { font-size:18px; line-height:1.4; overflow-wrap:anywhere; margin:0 0 14px; }
 .bb-transaction-editor p { font-size:13px; line-height:1.6; }
@@ -82,4 +60,45 @@
 .bb-change-footer { margin-top:18px; padding-top:16px; border-top:1px solid hsl(var(--border)); }
 .bb-transactions .bb-change-undo { display:flex; justify-content:center; align-items:center; gap:8px; width:100%; background:color-mix(in srgb,hsl(var(--primary)) 7%,transparent); border-color:color-mix(in srgb,hsl(var(--primary)) 35%,hsl(var(--border))); font-weight:500; }
 .bb-change-legacy { margin:0; font-size:13px; color:hsl(var(--muted-foreground)); }
-@media(max-width:350px) { .bb-transactions .bb-transaction-row-toggle { grid-template-columns:minmax(0,1fr) auto 14px; gap:7px; }.bb-transaction-row-toggle>svg:first-child { display:none; }.bb-transaction-toolbar button span { display:none; } }
+
+.bb-recorded-swipe { border-top:1px solid hsl(var(--border) / .55); }
+.bb-recorded-swipe { position:relative; min-width:0; overflow:hidden; touch-action:pan-y; }
+.bb-recorded-swipe-icon-viewport { position:absolute; inset:0; pointer-events:none; }
+.bb-recorded-swipe-actions { position:absolute; inset-block:0; width:var(--bb-recorded-action-width); max-width:calc(100% - 12px); display:grid; grid-template-columns:repeat(var(--bb-recorded-action-count,3),minmax(0,1fr)); align-items:stretch; gap:0; z-index:0; visibility:hidden; pointer-events:none; }
+.bb-recorded-actions-left { right:0; }
+.bb-recorded-actions-right { left:0; }
+.bb-recorded-swipe[data-side="left"] .bb-recorded-actions-left,.bb-recorded-swipe[data-side="right"] .bb-recorded-actions-right { visibility:visible; pointer-events:auto; }
+.bb-recorded-action { min-width:0; width:100%; height:100%; margin:0; min-height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:5px 2px; border:0; color:hsl(var(--primary)); background:hsl(var(--primary) / .17); font:inherit; font-size:11px; font-weight:500; }
+.bb-recorded-action svg { width:17px; height:17px; }
+.bb-recorded-action-delete { color:hsl(0 0% 100%); background:light-dark(hsl(0 67% 45%),hsl(0 62% 46%)); }
+.bb-recorded-action-move { background:hsl(var(--primary) / .09); }
+.bb-recorded-row-access { position:absolute; z-index:4; inset:0; width:100%; height:100%; padding:0; border:0; border-radius:0; background:transparent; color:inherit; touch-action:pan-y; }
+.bb-recorded-row-access:focus-visible { outline-offset:-2px; }
+.bb-transactions .bb-recorded-swipe-actions { border-radius:var(--bb-recorded-roundness); overflow:hidden; }
+.bb-transactions .bb-recorded-action + .bb-recorded-action { box-shadow:inset 1px 0 0 hsl(var(--background) / .2); }
+
+.bb-transactions { --bb-recorded-roundness:8px; }
+.bb-transactions .bb-daily-transaction { position:relative; z-index:1; background:hsl(var(--background)); padding-block:6px; }
+.bb-recorded-search { display:flex; align-items:center; gap:9px; height:44px; padding:0 12px; margin:20px 0 0; background:hsl(var(--foreground) / .035); border:1px solid hsl(var(--border) / .75); border-radius:13px; color:hsl(var(--muted-foreground)); }
+.bb-recorded-search>svg { flex:0 0 17px; width:17px; height:17px; }
+.bb-recorded-search input { min-width:0; width:100%; border:0; background:transparent; color:hsl(var(--foreground)); font:inherit; font-size:16px; height:100%; padding:0; }
+.bb-recorded-search button { flex:0 0 30px; width:30px; min-height:40px; padding:6px; border:0; background:transparent; color:inherit; }
+.bb-recorded-search button svg { width:17px; height:17px; }
+.bb-transactions .bb-daily-transactions { padding-top:12px; }
+.bb-transactions .bb-chart-layout { margin-bottom:0; }
+.bb-transactions .bb-daily-summary { margin-bottom:0; }
+.bb-transactions .bb-daily-summary .bb-category-mix-filter { flex:none; min-width:64px; max-width:min(190px,50%); grid-template-columns:minmax(0,1fr); }
+.bb-transactions .bb-category-filter-label { min-width:0; max-width:100%; overflow:hidden; }
+.bb-transactions .bb-category-mix-filter select { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bb-transaction-period { position:relative; margin:0 0 18px; font-size:13px; color:hsl(var(--muted-foreground)); }
+.bb-transaction-period summary { width:max-content; min-height:32px; display:flex; align-items:center; list-style:none; cursor:pointer; }
+.bb-transaction-period summary>svg { width:14px; height:14px; margin-left:7px; }
+.bb-transaction-period summary::-webkit-details-marker { display:none; }
+.bb-transaction-period>div { position:absolute; z-index:10; top:100%; left:0; width:240px; max-width:100%; padding:14px; border:1px solid hsl(var(--border)); border-radius:14px; background:hsl(var(--card)); box-shadow:0 8px 24px hsl(var(--foreground) / .08); }
+.bb-transaction-period>div button { width:100%; margin-top:10px; }
+.bb-recorded-day-chip { display:flex; align-items:center; gap:8px; padding:8px 12px; margin-top:12px; color:hsl(var(--primary)); background:hsl(var(--primary) / .08); border:1px solid hsl(var(--border)); border-radius:24px; }
+.bb-recorded-day-chip svg { width:14px; height:14px; }
+.bb-recorded-loading,.bb-daily-page-note { color:hsl(var(--muted-foreground)); font-size:12px; padding:12px 0; }
+@media(prefers-reduced-motion:reduce) { .bb-recorded-swipe * { transition:none!important; } }
+/* The approved workspace has no visible focus chrome; controls retain native focus and keyboard behavior. */
+.bb-transactions :focus,.bb-transactions :focus-visible,.bb-transactions .bb-category-mix-filter:focus-within { outline:none!important; box-shadow:none!important; }

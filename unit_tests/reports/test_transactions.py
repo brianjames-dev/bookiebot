@@ -312,8 +312,9 @@ def test_split_creation_uses_the_explicit_historical_workbook(canonical):
     assert not canonical.store.snapshot("brian")["events"]
 
 
+@pytest.mark.parametrize("operation",["update","move"])
 @pytest.mark.parametrize("settlement",["pending","received"])
-def test_app_updates_reuse_canonical_repayment_guards_without_recording_receipts(canonical,saved,monkeypatch,settlement):
+def test_app_updates_reuse_canonical_repayment_guards_without_recording_receipts(canonical,saved,monkeypatch,settlement,operation):
     from unit_tests.reimbursements.test_store import payment
     from bookiebot.reimbursements import service
     # The two fixtures deliberately use different local grids. Canonical writes
@@ -329,7 +330,7 @@ def test_app_updates_reuse_canonical_repayment_guards_without_recording_receipts
     monkeypatch.setattr(undo,"select_recent_action",lambda *args,**kwargs:current)
     monkeypatch.setattr(undo,"_read_log",lambda:[])
     before=canonical.store.snapshot("brian")
-    command={"id":public["id"],"month":"2026-01","version":public["version"],"operation":"update","updates":{"amount":50000}}
+    command={"id":public["id"],"month":"2026-01","version":public["version"],"operation":operation,"updates":{"amount":50000},**({"destination":"food"} if operation=="move" else {})}
     result=confirm(saved,command)
     assert not result["success"] and result["state"]=="done"
     assert canonical.store.snapshot("brian")==before
@@ -370,7 +371,8 @@ def test_legacy_failure_message_is_not_permission_to_repeat_a_possible_writer(sa
     writer.assert_called_once()
 
 
-def test_transactions_amount_review_and_update_preserve_custom_reimbursement_percentage(canonical, saved, monkeypatch):
+@pytest.mark.parametrize("operation",["update","move"])
+def test_transactions_amount_review_and_update_preserve_custom_reimbursement_percentage(canonical, saved, monkeypatch,operation):
     from bookiebot.reimbursements import service
     from unit_tests.reimbursements.test_store import command as ledger_command
     monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED", "true")
@@ -386,7 +388,7 @@ def test_transactions_amount_review_and_update_preserve_custom_reimbursement_per
     monkeypatch.setattr(undo, "select_recent_action", lambda *args, **kwargs: current)
     monkeypatch.setattr(undo, "_read_log_data", lambda **kwargs: SimpleNamespace(records=[]))
     change = {"id": public["id"], "month": "2026-01", "version": public["version"],
-              "operation": "update", "updates": {"amount": 12345}}
+              "operation": operation, "updates": {"amount": 12345}, **({"destination":"food"} if operation=="move" else {})}
     preview = tx.review(B, change)["review"]
     assert preview["share"] == {"method": "custom", "payerCents": 4115, "partnerCents": 8230,
                                "payerBasisPoints": 3333, "payerName": "Brian", "partnerName": "Hannah"}
@@ -523,3 +525,54 @@ def test_custom_dollar_review_rejects_invalid_cents_without_writes(canonical,sav
     with pytest.raises(tx.TransactionValidation):
         tx.review(B,{"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerShareCents":share})
     assert canonical.store.snapshot("brian")==before
+
+
+def test_daily_totals_and_counts_cover_the_full_filtered_result_before_pagination(saved, monkeypatch):
+    original = row(saved)
+    samples = [{**original, "id": f"fixture-{i}", "date": saved.month+"-20", "amountCents": 101,
+                "category": "food" if i % 2 else "grocery", "split": "equal" if i % 3 == 0 else ""} for i in range(85)]
+    samples.append({**original, "id": "fixture-income", "kind": "income", "amountCents": 900000})
+    monkeypatch.setattr(tx, "load_transactions", lambda *a, **k: samples)
+    result = tx.listing(B, {"month":saved.month, "view":"daily", "scope":"spending"})
+    assert len(result["items"]) == 40 and result["total"] == 85 and result["nextOffset"] == 40
+    assert result["totalAmountCents"] == 8585
+    assert result["days"] == [{"date":saved.month+"-20", "month":saved.month, "count":85,
+                              "totalCents":8585, "needsCents":4343, "wantsCents":4242}]
+    later = tx.listing(B, {"month":saved.month, "view":"daily", "scope":"spending", "offset":"80"})
+    assert len(later["items"]) == 5 and later["nextOffset"] is None
+    assert later["days"] == result["days"] and later["totalAmountCents"] == result["totalAmountCents"]
+    for bucket, count in [("needs",43),("wants",42)]:
+        filtered = tx.listing(B, {"month":saved.month, "view":"daily", "scope":"spending", "bucket":bucket})
+        assert filtered["total"] == count and filtered["totalAmountCents"] == count * 101
+    shared = tx.listing(B, {"month":saved.month, "view":"daily", "scope":"spending", "split":"shared"})
+    assert shared["total"] == 29 and shared["totalAmountCents"] == 2929
+    assert tx.listing(B, {"month":saved.month,"view":"daily","kind":"income"})["totalAmountCents"] == 900000
+    empty = tx.listing(B, {"month":saved.month,"view":"daily","search":"no matching purchase"})
+    assert empty["days"] == [] and empty["totalAmountCents"] == 0
+
+
+def test_combined_category_and_field_update_uses_one_move_and_one_undo(saved, monkeypatch):
+    repo = saved.repos[saved.previous]
+    original = deepcopy(repo.expense._rows)
+    change = body(saved, "move", saved.previous, destination="food", updates={"amount":1599,"item":"Updated purchase","location":"Updated merchant"})
+    before_log = deepcopy(repo.action_log._rows)
+    prepared = tx.review(B, change)["review"]
+    assert prepared["destination"] == "food" and prepared["after"]["amount"] == "15.99"
+    assert repo.expense._rows == original and repo.action_log._rows == before_log
+    update = Mock(wraps=undo.update_recent_action)
+    move = Mock(wraps=undo.move_recent_action)
+    monkeypatch.setattr(undo, "update_recent_action", update)
+    monkeypatch.setattr(undo, "move_recent_action", move)
+    result = confirm(saved, change)
+    assert result["success"], result
+    assert move.call_count == 1 and update.call_count == 0
+    assert result["summary"]["after"]["amount"] == "15.99"
+    assert result["summary"]["after"]["item"] == "Updated purchase"
+    assert result["undo"]
+    assert saved.commands.command(B, {**change,"version":prepared["item"]["version"],"reviewVersion":prepared["reviewVersion"],"requestId":"isolated-request-0000001"}) == result and move.call_count == 1
+    undone = confirm(saved, {**result["undo"],"operation":"undo"}, "isolated-combined-undo-01")
+    assert undone["success"], undone
+    for category in ("shopping", "food"):
+        columns=list(undo._category_columns(category).values())
+        for index in range(1,max(len(original),len(repo.expense._rows))+1):
+            assert [tx.cell(repo.expense._rows,index,c) for c in columns] == [tx.cell(original,index,c) for c in columns]

@@ -21,15 +21,18 @@ export function TransactionIcon({ entry, aliases, eager = false }: { entry: Dail
   </span>
 }
 
-export type DailyTransactionGroup = { day: string; entries: DailyTransaction[]; today: boolean }
-export function DailyTransactionDays({ groups, categoryColors, year, month, aliases }: {
-  groups: DailyTransactionGroup[]; categoryColors: Record<string, string>; year: number; month: number; aliases?: Record<string, string>
+export type DailyTransactionGroup = { day: string; entries: DailyTransaction[]; today: boolean; count?: number; total?: number; key?:string; year?:number; month?:number; caption?:string }
+type RowWrapper = (entry:DailyTransaction,position:number,children:ReactNode,standalone?:boolean)=>ReactNode
+export function DailyTransactionDays({ groups, categoryColors, year, month, aliases, flatSingles=false, wrapRow }: {
+  groups: DailyTransactionGroup[]; categoryColors: Record<string, string>; year: number; month: number; aliases?: Record<string, string>; flatSingles?:boolean; wrapRow?:RowWrapper
 }) {
-  return <div className="bb-daily-days">{groups.map(group => <DailyTransactionDay key={`${year}-${month}-${group.day}`} {...group} categoryColors={categoryColors} year={year} month={month} aliases={aliases} />)}</div>
+  return <div className="bb-daily-days">{groups.map(group => flatSingles && (group.count??group.entries.length)===1
+    ? <SingleTransactionDay key={group.key??`${year}-${month}-${group.day}`} {...group} categoryColors={categoryColors} year={group.year??year} month={group.month??month} aliases={aliases} wrapRow={wrapRow}/>
+    : <DailyTransactionDay key={group.key??`${year}-${month}-${group.day}`} {...group} categoryColors={categoryColors} year={group.year??year} month={group.month??month} aliases={aliases} wrapRow={wrapRow}/>)}</div>
 }
 
-function DailyTransactionDay({ day, entries, today, categoryColors, year, month, aliases }: DailyTransactionGroup & {
-  categoryColors: Record<string, string>; year: number; month: number; aliases?: Record<string, string>
+function DailyTransactionDay({ day, entries, today, categoryColors, year, month, aliases, count, total: groupTotal, wrapRow, caption }: DailyTransactionGroup & {
+  categoryColors: Record<string, string>; year: number; month: number; aliases?: Record<string, string>; wrapRow?:RowWrapper
 }) {
   const [open, setOpen] = useState(false)
   const opened = useRef(false)
@@ -41,7 +44,7 @@ function DailyTransactionDay({ day, entries, today, categoryColors, year, month,
   // Sort once per data change; toggling a day doesn't rebuild its transaction rows.
   const sorted = useMemo(() => entries.map((entry, index) => ({ entry, index, category: transactionCategory(entry).label }))
     .sort((a, b) => categoryOrder.compare(a.category, b.category) || a.index - b.index), [entries])
-  const total = useMemo(() => money.format(entries.reduce((sum, entry) => sum + entry.amount, 0)), [entries])
+  const total = useMemo(() => money.format(groupTotal??entries.reduce((sum, entry) => sum + entry.amount, 0)), [entries,groupTotal])
   useLayoutEffect(() => {
     if (!section.current) return
     const scene = createDailyDayMotion(section.current, open)
@@ -50,29 +53,29 @@ function DailyTransactionDay({ day, entries, today, categoryColors, year, month,
   }, [sorted, aliases])
   useLayoutEffect(() => { motion.current?.setOpen(open) }, [open, sorted, aliases])
   return <section className="bb-daily-day-group" ref={section} data-entry-count={sorted.length}>
-    <button type="button" className="bb-daily-day-header" data-undated={!dated} aria-expanded={open} aria-controls={id} aria-current={today ? 'date' : undefined} aria-label={`${today ? 'Today, ' : ''}${weekday} ${day}, ${total}, ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`} onClick={() => { opened.current = true; setOpen(value => !value) }}>
-      <span className="bb-daily-day-date" data-today={today}><span className="bb-daily-day">{day}</span>{weekday && <span className="bb-daily-date-weekday">{today ? 'Today' : weekday}</span>}</span>
+    <button type="button" className="bb-daily-day-header" data-undated={!dated} aria-expanded={open} aria-controls={id} aria-current={today ? 'date' : undefined} aria-label={`${today ? 'Today, ' : ''}${weekday} ${day}, ${total}, ${count??entries.length} ${(count??entries.length) === 1 ? 'entry' : 'entries'}`} onClick={() => { opened.current = true; setOpen(value => !value) }}>
+      <span className="bb-daily-day-date" data-today={today}><span className="bb-daily-day">{day}</span>{weekday && <span className="bb-daily-date-weekday">{today ? 'Today' : caption??weekday}</span>}</span>
       <span className="bb-daily-date-copy">
-        <TransactionPreview entries={sorted} aliases={aliases} />
-        <span className="bb-daily-day-count" aria-hidden="true">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</span>
+        <TransactionPreview entries={sorted} aliases={aliases} total={count??sorted.length} />
+        <span className="bb-daily-day-count" aria-hidden="true">{count??entries.length} {(count??entries.length) === 1 ? 'entry' : 'entries'}</span>
       </span>
       <span className="bb-daily-day-total">{total}</span><ChevronDown aria-hidden="true" />
     </button>
     <div className="bb-details-content bb-daily-day-panel" id={id} role="region" aria-label={`${weekday} ${day} transactions`} aria-hidden={!open} inert={!open}>
-      <div className="bb-details-content-inner">{opened.current && <TransactionRows entries={sorted} aliases={aliases} categoryColors={categoryColors} />}</div>
+      <div className="bb-details-content-inner">{opened.current && <TransactionRows entries={sorted} aliases={aliases} categoryColors={categoryColors} wrapRow={wrapRow} />}{(count??entries.length)>entries.length&&<p className="bb-daily-page-note">{entries.length} of {count} entries loaded. Load more below to see the rest.</p>}</div>
     </div>
-    <TransactionBeads entries={opened.current ? sorted : sorted.slice(0, DAILY_PREVIEW_COUNT)} total={sorted.length} aliases={aliases} categoryColors={categoryColors} />
+    <TransactionBeads entries={opened.current ? sorted : sorted.slice(0, DAILY_PREVIEW_COUNT)} total={count??sorted.length} aliases={aliases} categoryColors={categoryColors} />
   </section>
 }
 
 type SortedTransaction = { entry: DailyTransaction; index: number; category: string }
-const TransactionPreview = memo(function TransactionPreview({ entries, aliases }: {
-  entries: SortedTransaction[]; aliases?: Record<string, string>
+const TransactionPreview = memo(function TransactionPreview({ entries, aliases, total }: {
+  entries: SortedTransaction[]; aliases?: Record<string, string>; total:number
 }) {
   const shown = entries.slice(0, DAILY_PREVIEW_COUNT)
-  const remaining = entries.length - shown.length
+  const remaining = total - shown.length
   const names = shown.map(({ entry }) => transactionText(entry, transactionMerchant(entry, aliases)).primary)
-  return <span className="bb-daily-preview" role="img" aria-label={`${entries.length} ${entries.length === 1 ? 'transaction' : 'transactions'}: ${names.join(', ')}${remaining ? `, ${remaining} more` : ''}`}>
+  return <span className="bb-daily-preview" role="img" aria-label={`${total} ${total === 1 ? 'transaction' : 'transactions'}: ${names.join(', ')}${remaining ? `, ${remaining} more` : ''}`}>
     {shown.map(({ index }) => <span className="bb-daily-preview-item" key={index} aria-hidden="true" />)}
     {remaining > 0 && <span className="bb-daily-preview-item" aria-hidden="true" />}
   </span>
@@ -82,12 +85,12 @@ const TransactionBeads = memo(function TransactionBeads({ entries, total, aliase
   entries: SortedTransaction[]; total: number; aliases?: Record<string, string>; categoryColors: Record<string, string>
 }) {
   return <span className="bb-daily-icon-layer" aria-hidden="true">
-    {entries.map(({ entry, index }, position) => <span className="bb-daily-bead" data-entry={position} data-logo={Boolean(transactionMerchant(entry, aliases))} key={index} style={{ zIndex: total + 1 - position, '--bb-preview-category': categoryColors[entry.category] || 'hsl(var(--muted-foreground))' } as CSSProperties}>
+    {entries.map(({ entry, index }, position) => <span className="bb-recorded-swipe-icon-viewport" key={index} style={{ zIndex: total + 1 - position }}><span className="bb-daily-bead" data-entry={position} data-logo={Boolean(transactionMerchant(entry, aliases))} key={index} style={{ zIndex: total + 1 - position, '--bb-preview-category': categoryColors[entry.category] || 'hsl(var(--muted-foreground))' } as CSSProperties}>
       <TransactionCutouts entries={entries} before={Math.min(position, DAILY_PREVIEW_COUNT)} aliases={aliases}>
       <span className="bb-daily-bead-paint"><span className="bb-daily-bead-body"><TransactionIcon entry={entry} aliases={aliases} eager={position < DAILY_PREVIEW_COUNT} /></span>{position < DAILY_PREVIEW_COUNT && <span className="bb-daily-preview-dot" />}</span>
       </TransactionCutouts>
-    </span>)}
-    {total > DAILY_PREVIEW_COUNT && <span className="bb-daily-overflow"><TransactionCutouts entries={entries} before={DAILY_PREVIEW_COUNT} aliases={aliases}><span className="bb-daily-preview-more">+{total - DAILY_PREVIEW_COUNT}</span></TransactionCutouts></span>}
+    </span></span>)}
+    {total > Math.min(entries.length,DAILY_PREVIEW_COUNT) && <span className="bb-daily-overflow"><TransactionCutouts entries={entries} before={DAILY_PREVIEW_COUNT} aliases={aliases}><span className="bb-daily-preview-more">+{total - Math.min(entries.length,DAILY_PREVIEW_COUNT)}</span></TransactionCutouts></span>}
   </span>
 })
 
@@ -98,18 +101,35 @@ function TransactionCutouts({ entries, before, aliases, children }: { entries: S
   return cutouts.reduceRight<ReactNode>((content, key) => <span className="bb-daily-clip" data-cutout={key} key={key}>{key.endsWith('-circle') ? <span className="bb-daily-clip-content">{content}</span> : content}</span>, children)
 }
 
-const TransactionRows = memo(function TransactionRows({ entries, aliases, categoryColors }: {
-  entries: SortedTransaction[]; aliases?: Record<string, string>; categoryColors: Record<string, string>
+const TransactionRows = memo(function TransactionRows({ entries, aliases, categoryColors, wrapRow }: {
+  entries: SortedTransaction[]; aliases?: Record<string, string>; categoryColors: Record<string, string>; wrapRow?:RowWrapper
 }) {
   return <div className="bb-daily-day-entries">
-    {entries.map(({ entry, index }) => {
+    {entries.map(({ entry, index }, position) => {
       const text = transactionText(entry, transactionMerchant(entry, aliases))
-      return <div className="bb-daily-transaction" key={index} data-category={entry.category} data-scheduled={entry.status === 'scheduled'}>
+      const row = <div className="bb-daily-transaction" key={index} data-category={entry.category} data-scheduled={entry.status === 'scheduled'}>
         <span className="bb-daily-row-icon-anchor" aria-hidden="true" />
         <span className="bb-daily-transaction-name">{text.primary}</span><span className="bb-daily-transaction-money">{money.format(entry.amount)}</span>
         <span className="bb-daily-transaction-meta"><span className="bb-daily-transaction-category" style={{ color: categoryColors[entry.category] }}>{text.category}</span>{text.item && <><span aria-hidden="true">·</span><span className="bb-daily-transaction-item">{text.item}</span></>}</span>
         {entry.status === 'scheduled' && <small className="bb-daily-transaction-status">Scheduled</small>}
       </div>
+      return <span className="bb-daily-row-shell" key={index}>{wrapRow?wrapRow(entry,position,row):row}</span>
     })}
   </div>
 })
+
+function SingleTransactionDay({day,entries,today,year,month,categoryColors,aliases,wrapRow,caption}:DailyTransactionGroup & {year:number;month:number;categoryColors:Record<string,string>;aliases?:Record<string,string>;wrapRow?:RowWrapper}){
+ const entry=entries[0],text=transactionText(entry,transactionMerchant(entry,aliases))
+ const dated=Number.isFinite(Number(day))
+ const weekday=dated?new Intl.DateTimeFormat('en-US',{weekday:'short'}).format(new Date(year,month-1,Number(day),12)):'Undated'
+ const row = <div className="bb-daily-transaction" data-category={entry.category} data-scheduled={entry.status==='scheduled'}>
+    <span className="bb-daily-row-icon-anchor" aria-hidden="true" style={{'--bb-preview-category':categoryColors[entry.category]} as React.CSSProperties}><span className="bb-daily-bead-paint"><span className="bb-daily-bead-body" style={{clipPath:'path(evenodd, "M0 0H28V28H0Z M21 25A4 4 0 1 0 29 25A4 4 0 1 0 21 25Z")'}}><TransactionIcon entry={entry} aliases={aliases} eager/></span><span className="bb-daily-preview-dot"/></span></span>
+    <span className="bb-daily-transaction-name">{text.primary}</span><span className="bb-daily-day-total">{money.format(entry.amount)}</span>
+    <span className="bb-daily-transaction-meta"><span className="bb-daily-transaction-category" style={{color:categoryColors[entry.category]}}>{text.category}</span>{text.item&&<><span aria-hidden="true">·</span><span className="bb-daily-transaction-item">{text.item}</span></>}</span>
+    {entry.status==='scheduled'&&<small className="bb-daily-transaction-status">Scheduled</small>}
+   </div>
+ return <section className="bb-daily-day-group bb-daily-single-day" aria-label={`${today?'Today':weekday} ${day}, one transaction`} data-single-entry="true">
+  <div className="bb-daily-day-date bb-daily-single-date" data-today={today} aria-current={today?'date':undefined}><span className="bb-daily-day">{dated?day:'—'}</span><span className="bb-daily-date-weekday">{today?'Today':caption??weekday}</span></div>
+  {wrapRow?wrapRow(entry,0,row,true):row}
+ </section>
+}

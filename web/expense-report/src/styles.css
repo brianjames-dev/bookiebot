@@ -3321,3 +3321,13 @@ button:focus-visible, summary:focus-visible {
 @media (prefers-reduced-motion: reduce) { .bb-contour-callouts, .bb-category-pie-center, .bb-category-pie-host .bb-category-used { transition: none; } }
 
 @media (min-width: 700px) { .bb-category-mix-page .bb-category-chart-layout { width: min(100%, 620px); margin-inline: auto; } }
+
+.bb-recorded-swipe-icon-viewport { position:absolute; inset:0; pointer-events:none; }
+.bb-daily-row-shell { display:block; }
+.bb-daily-row-shell + .bb-daily-row-shell { border-top:1px solid hsl(var(--border) / .55); }
+.bb-daily-single-day { display:grid; grid-template-columns:34px minmax(0,1fr); gap:8px; align-items:center; min-height:72px; padding:14px 0; }
+.bb-daily-single-date { align-self:center; min-width:0; }
+.bb-daily-single-day .bb-recorded-swipe { margin-right:24px; }
+.bb-daily-single-day .bb-daily-transaction { min-height:44px; }
+.bb-daily-single-day .bb-daily-day-total { grid-row:1 / span 2; align-self:center; justify-self:end; }
+.bb-daily-single-day .bb-daily-row-icon-anchor { position:relative; display:block; visibility:visible; }

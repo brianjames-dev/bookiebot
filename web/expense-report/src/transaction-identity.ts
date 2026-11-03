@@ -2,7 +2,7 @@ import catalog from './merchant-logos.json'
 import { companyIdentity, companyLogo } from './company-logo'
 import type { ExpenseEntry } from './types'
 
-export type DailyTransaction = ExpenseEntry & { status?: 'recorded' | 'scheduled'; kind?: 'bill' | 'subscription' | 'income' }
+export type DailyTransaction = ExpenseEntry & { id?: string; status?: 'recorded' | 'scheduled'; kind?: 'bill' | 'subscription' | 'income' | 'expense' | 'payment' | 'savings' }
 const byAlias = new Map(catalog.flatMap(merchant => merchant.aliases.map(alias => [companyIdentity(alias), merchant] as const)))
 
 export function transactionMerchant(entry: DailyTransaction, aliases: Record<string, string> = {}) {

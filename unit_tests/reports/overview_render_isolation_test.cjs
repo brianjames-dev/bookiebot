@@ -14,7 +14,7 @@ const names = new Set(['reportSpentTotal', 'ExpenseReportApp', 'ExpenseReportBod
   'MemoizedBurnRateChart', 'MemoizedCalendarAnalyticsPanel', 'MemoizedBillsUtilitiesPanel'])
 const declarations = file.statements.filter(node => ts.isFunctionDeclaration(node) ? names.has(node.name?.text)
   : ts.isVariableStatement(node) && node.declarationList.declarations.some(item => names.has(item.name.getText(file))))
-const compiled = ts.transpileModule(declarations.map(node => node.getText(file)).join('\n') + '\nexports.DailyCard = DailySpendingCard', {
+const compiled = ts.transpileModule(declarations.map(node => node.getText(file)).join('\n') + '\nexports.DailyCard = DailySpendingCard; exports.OverviewCharts = OverviewCharts', {
   compilerOptions: {target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX},
 }).outputText
 const counts = {}, timers = new Map(); let serial = 0
@@ -89,9 +89,9 @@ const nativeViewport={clientWidth:390,scrollLeft:0,dataset:{},
  scrollTo({left,behavior}){if(behavior==='instant')this.scrollLeft=left}}
 let renderer
 act(()=>{renderer=Renderer.create(h(App,{report,appSession}),{createNodeMock:el=>el.props.className==='bb-chart-carousel'?nativeViewport:null})})
-function assertNoHighlights() {
+function assertNoHighlights(inApp=false) {
   const overviewChildren=React.Children.toArray(renderer.root.findByType(runtime.ReportScreen).props.children)
-  assert.equal(overviewChildren.at(-1).type,runtime.exports.DailyCard,'Daily Spending ends Overview with no Highlights placeholder')
+  assert.equal(overviewChildren.at(-1).type,inApp?runtime.exports.OverviewCharts:runtime.exports.DailyCard,'The app ends at the carousel; standalone keeps Daily Spending without Highlights')
   assert.doesNotMatch(JSON.stringify(renderer.toJSON()),/Highlights|Largest expenses|Most frequent merchants|bb-insight-view/,'Neither report layout renders Highlights')
 }
 assertNoHighlights()
@@ -172,6 +172,6 @@ assert.equal(timers.size,0,'Unmount releases carousel cooldown timers')
 // The removed section must stay absent in both the app and standalone report,
 // even while the canonical report still contains largest/frequency data.
 act(()=>{renderer=Renderer.create(h(Navigation.Provider,{value:{screen:'overview',preferences:{mode:'current',chartId:'category',setChartId(){}}}},h(App,{report,appSession})),{createNodeMock:el=>el.props.className==='bb-chart-carousel'?nativeViewport:null})})
-assertNoHighlights()
+assertNoHighlights(true)
 act(()=>renderer.unmount())
 console.log('Overview render isolation: no Highlights in app or standalone, Daily Spending is final, independent filters, fresh modes/report and scoped day inspection passed')

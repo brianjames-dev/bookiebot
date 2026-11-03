@@ -32,7 +32,7 @@ state=nextScrollNavigation(state,1000,1000)
 assert.equal(state.compact,true,'Bottom rubber-band bounce is not upward navigation')
 assert.equal(nextScrollNavigation(state,-20,1000).compact,false)
 assert.equal(nextScrollNavigation(state,100,0).compact,false,'A short screen has no compact scroll state')
-assert.equal(screenForReportSource('activity'),'overview')
+assert.equal(screenForReportSource('activity'),'transactions')
 assert.equal(screenForReportSource('reimbursements'),'shared')
 for(const source of ['overview','categories','cash_flow','commitments','burn_rate']) assert.equal(screenForReportSource(source),'overview')
 

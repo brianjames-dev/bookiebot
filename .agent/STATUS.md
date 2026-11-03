@@ -1,6 +1,6 @@
 # Agent Status
 
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 Highlights removal (2026-11-02): removed the entire section from Overview and standalone reports, including exclusive chart renderers, thumbnails, helpers/imports/styles and obsolete tests. Daily Spending ends Overview with normal footer spacing; canonical report payloads and read-only bot analytics remain. **63 focused / 2,845 full tests passed / 557 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build; **16 actual-bundle section-spacing + 24 remaining-chart Chromium/WebKit cases** pass across phone/desktop, both themes and normal/reduced motion. App/standalone runtime regressions retain populated legacy data while asserting no Highlights or placeholder. Phone screenshot inspected; README/phone/Decisions updated. Native checklist 245 supersedes 242–244. Finance Ops backlog unchanged; no live financial APIs/writes.
 
@@ -374,11 +374,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: native acceptance of the Highlights removal (checklist 245), following required CI/merge and automatic rollout. Overview ends at Daily Spending with its normal footer; standalone reports flow directly to their remaining sections. Verify transaction expansion/filtering and all four carousel graphs. Local checks pass; release evidence follows in the completion response.
-
-First: native acceptance of matching Transactions tint and content-sized category labels (checklist 241). The first tap still only reveals the hybrid controls; test Food/Shopping/a long label, its width cap and ellipsis, then close/reopen in both themes.
-
-First: native acceptance of deliberate Transactions picker and inline morph (checklist 240). First tap reveals All types/X without opening the picker; controls expand beside Total Spent even on narrow phones. Verify the separate picker tap, X, reversals, both cents appearances and themes.
+First: native acceptance of the merged Transactions workspace (checklist 246), after required CI/merge and automatic rollout. Overview ends after its four-chart carousel; Transactions owns the recorded Daily Spending graph, unified All chooser/search, Date column and joined swipe actions. Verify flat singles, long-day pagination, smooth icon clipping/reversal and no visible focus borders; review/cancel only on production. This supersedes app Daily Spending/Highlights placement and hybrid-control checklists 240–245. Release evidence follows in the completion response.
 
 First: native acceptance of published logo refinements and Starbucks long-name matching (checklist 239). Update the app and inspect the affected purchase plus revised circles in Daily Spending/Calendar; no financial edits are needed.
 
@@ -537,6 +533,12 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-11-03
+
+- Implemented the approved Joined reveal Transactions workspace using the production native chart, DailyTransactionDays, merchant/fallback circles and snake motion. Overview ends after its carousel; standalone reports retain read-only Daily Spending. One All chooser scopes graph/list, with Needs/Wants/Shared/categories plus Income/Savings; search sits below the total. Single-entry days are flat with identical amount alignment and 28px circle/category badge. Capability-bound left swipes reveal equal joined Update/Split/Delete controls, 8px corners, 12px gap and symmetric 420ms CSS motion. Fixed icon viewports prevent fading/leaking at the row edge; no visible focus borders/outlines/shadows, with keyboard controls retained.
+- Category edits use one existing Move command containing all edited fields behind Update's single review/confirmation. Existing IDs, source/version checks, frozen durable confirmations, split/repayment/canonical guards, uncertainty recovery and Undo remain intact. Recalculate split shares for combined amount/category reviews and show all changed fields/category in review/receipt/Undo. Full filtered snapshot metadata supplies chart/day totals before 40-row pagination; changed snapshots refuse append. Pending filters retain matching graph/label data. Recorded full purchase scope remains separate from projected/scheduled/net budget metrics.
+- Verification: **2,851 full tests passed / 563 optional PostgreSQL skipped**, **62 targeted passed / 58 skipped**, Python and frontend types clean, production build clean. **12 Chromium/WebKit workspace cases** cover 320/390/1280px, both themes, actual native graph/day components, pagination, singles, scope/search, combined review/cancel, keyboard focus and symmetric swipe frame samples; **16 shipped layout cases** and both engines' 120-entry native motion checks pass. Controller regressions cover stale pages and label consistency during loading. No live financial test writes. README, Transactions/Daily Spending/phone guides, Finance Ops, Decisions and manual checklist 246 updated. Required CI/merge and deployment verification follow.
 
 ## Completed 2026-11-02
 
@@ -1502,6 +1504,8 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
   - undoing update/delete/move
 
 ## Manual Test Checklist
+
+246. Update and open Transactions on iPhone, both themes/orientations and Reduce Motion. Overview should end after its four-chart carousel, while signed reports retain read-only Daily Spending. Check the graph, matching Needs/Wants legend, Total Spent with All beside it, and search below with one X. Exercise Needs/Wants/Shared/category/Income/Savings, month/All months and bar day selection; recorded purchases differ from scheduled/projected/net budget metrics by design. Single-entry dates must not expand or duplicate totals and must match header amount position/font and 28px icon/category badge. Expand a long multi-entry day, load another 40-row page and verify full day/graph totals/counts stay fixed; a changed snapshot must ask for Refresh. Verify Today and snake/logo motion. Swipe left for equal Update/Split/Delete controls as capabilities allow: icons clip immediately at the row edge without fading, entry/exit use the same speed/easing, only one row opens, and full swipes never execute. Use keyboard Left/Right/Escape and Tab: no visible focus borders/outlines/shadows. Open Update, edit category and amount, review all changed fields/shares, then Cancel; Split contains Remove split. Preserve source restrictions and uncertainty/Undo controls. Do not confirm a production financial change for testing. This supersedes app placement/control expectations in 240–245; historical standalone behavior remains.
 
 245. Update the app and scroll to the bottom of Overview in both themes, phone orientations and Reduce Motion. Daily Spending should be the final section, with no Highlights title, selector, charts or empty band below it. Open Transactions, filter and expand/collapse days, then close: preserve normal footer spacing and access above the floating nav. Check all four carousel graphs and standalone report sections; financial totals remain unchanged. This supersedes Highlights checklists 242–244. No live financial test writes.
 

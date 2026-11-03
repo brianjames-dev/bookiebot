@@ -29,7 +29,7 @@ export const screenTitles: Record<AppScreen, string> = {
   overview: "Overview", transactions: "Transactions", shared: "Shared", savings: "Savings", reconcile: "Reconcile", settings: "Settings",
 }
 export function screenForReportSource(source: string): MainScreen {
-  return source === "reimbursements" ? "shared" : "overview"
+  return source === "reimbursements" ? "shared" : source === "activity" ? "transactions" : "overview"
 }
 export interface AppNavigation {
   screen: AppScreen
