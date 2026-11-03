@@ -108,7 +108,7 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           await chooser.selectOption('largest')
           await page.waitForTimeout(350)
           assert.equal(await highlights.getByRole('region',{name:'Largest expenses',exact:true}).count(),1)
-          assert.equal(await highlights.locator('.bb-insight-view[data-state="active"] .recharts-bar-rectangle').count(),10,'Largest retains its top-ten graph')
+          assert.equal(await highlights.locator('.bb-insight-view[data-state="active"] .recharts-bar-rectangle').count(),8,'Largest uses the approved eight-row graph')
           for(const value of ['merchants','largest','merchants','largest']) {await chooser.selectOption(value);await page.waitForTimeout(35)}
           await page.waitForTimeout(350)
           assert.deepEqual(await highlights.locator('.bb-insight-view').evaluateAll(panels=>panels.map(p=>p.dataset.fixtureIdentity)),chartIdentity,'Switching preserves chart DOM')

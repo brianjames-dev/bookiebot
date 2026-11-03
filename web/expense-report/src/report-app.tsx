@@ -33,6 +33,7 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
+  LabelList,
   Line,
   LineChart,
   Pie,
@@ -42,6 +43,8 @@ import {
   Sector,
   XAxis,
   YAxis,
+  useChartWidth,
+  useActiveTooltipCoordinate,
 } from "recharts"
 
 import { Badge } from "./components/ui/badge"
@@ -2512,69 +2515,111 @@ function DailySpendingTooltipContent({
   )
 }
 
-function TopExpensesChart({ entries }: { entries: ExpenseEntry[] }) {
-  const showYAxisLabels = !useMediaQuery("(max-width: 640px)")
-  const visibleEntries = entries.slice(0, 10)
-  const rows = visibleEntries.map((entry, index) => ({
-    label: expenseEntryItemLabel(entry),
-    amount: entry.amount,
-    color: topExpenseHeatColor(index, visibleEntries.length),
-  }))
+const HIGHLIGHTS_LAYOUT = { rows: 8, weight: 20, rowGap: 8, labelWidth: 92, thumbnailWidth: 200 } as const
 
-  return (
-    <ChartContainer config={{ amount: { label: "Amount", color: "hsl(var(--chart-2))" } }} className="bb-insight-chart-box">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: showYAxisLabels ? 20 : 0, bottom: 12 }}>
-          <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis type="number" tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} />
-          <YAxis
-            dataKey="label"
-            type="category"
-            width={showYAxisLabels ? 148 : 0}
-            tick={showYAxisLabels}
-            tickFormatter={(value) => truncateChartLabel(value, 22)}
-            tickLine={false}
-            axisLine={false}
-          />
-          <ChartTooltip content={<TopExpensesTooltipContent />} cursor={{ fill: "hsl(var(--foreground) / 0.08)" }} />
-          <Bar dataKey="amount" name="Expense amount" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]}>
-            {rows.map((row, index) => (
-              <Cell key={`${row.label}-${index}`} fill={row.color} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartContainer>
-  )
+type HighlightRow = { label: string; amount: number; count?: number; color?: string }
+
+let highlightLabelMeasure: CanvasRenderingContext2D | null | undefined
+function highlightTextWidth(value: string, weight: 400 | 500 = 400) {
+  highlightLabelMeasure ??= document.createElement('canvas').getContext('2d')
+  if (!highlightLabelMeasure) return value.length * 7
+  highlightLabelMeasure.font = `${weight} 12px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif`
+  return highlightLabelMeasure.measureText(value).width
 }
-
-type TopExpensesChartRow = {
-  label: string
-  amount: number
-  color: string
-}
-
-function TopExpensesTooltipContent({
-  active,
-  payload,
-}: {
-  active?: boolean
-  payload?: Array<{ payload?: TopExpensesChartRow }>
-}) {
-  const row = payload?.find((item) => item.payload)?.payload
-  if (!active || !row) {
-    return null
+function fitHighlightLabel(value: string, width: number) {
+  if (highlightTextWidth(value) <= width) return value
+  let low = 0, high = value.length
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    if (highlightTextWidth(value.slice(0, middle) + '…') <= width) low = middle
+    else high = middle - 1
   }
-  return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content">
+  return value.slice(0, low) + '…'
+}
+function HighlightAxisLabel({x,y,payload,width}: {x?: number|string;y?: number|string;payload?: {value?: unknown};width: number}) {
+  const label = useMemo(() => fitHighlightLabel(String(payload?.value ?? ''), width), [payload?.value, width])
+  return <text x={x} y={y} dominantBaseline="middle" textAnchor="end" className="bb-highlight-label">{label}</text>
+}
+function HighlightValue({x=0,y=0,width=0,height=0,value,kind}: {x?: number|string;y?: number|string;width?: number|string;height?: number|string;value?: unknown;kind: string}) {
+  return <text x={Number(x)+Number(width)+9} y={Number(y)+Number(height)/2} dominantBaseline="middle" className="bb-highlight-value">
+    {kind === 'amount' ? formatMoney(Number(value)) : `${value}×`}
+  </text>
+}
+function HighlightThumbnail({active,payload,kind}: {active?: boolean;payload?: Array<{payload?: HighlightRow}>;kind:'amount'|'count'}) {
+  const settings = HIGHLIGHTS_LAYOUT
+  const row = payload?.find(item => item.payload)?.payload
+  if (!active || !row) return null
+  const style = {
+    '--bb-highlight-thumb-width':`${settings.thumbnailWidth}px`,
+  } as CSSProperties
+  return <div className="bb-chart-tooltip bb-touch-tooltip-content bb-highlight-thumbnail" style={style} role="tooltip">
+    <div className="bb-highlight-thumb-header">
+      <span className="bb-highlight-thumb-swatch" aria-hidden="true" style={{background:kind === 'amount' ? row.color : MERCHANT_BAR_COLOR}} />
       <div className="bb-chart-tooltip-title">{row.label}</div>
-      <div className="bb-chart-tooltip-row">
-        <span className="bb-chart-tooltip-dot" style={{ background: row.color }} />
-        <span>Expense amount</span>
-        <strong>{formatMoney(row.amount)}</strong>
-      </div>
     </div>
-  )
+    <div className="bb-highlight-thumb-primary">
+      <span className="bb-highlight-thumb-metric">{kind === 'amount' ? formatMoney(row.amount) : row.count ?? 0}</span>
+      {kind === 'count' && <span className="bb-highlight-thumb-caption">{row.count === 1 ? 'occurrence' : 'occurrences'}</span>}
+    </div>
+    {kind === 'amount' ? <div className="bb-highlight-thumb-caption bb-highlight-thumb-description">Expense amount</div> :
+      <div className="bb-highlight-thumb-footer"><span>Total spent</span><span className="bb-highlight-thumb-total">{formatMoney(row.amount)}</span></div>}
+  </div>
+}
+function HighlightFloatingThumbnail({kind}: {kind:'amount'|'count'}) {
+  const settings = HIGHLIGHTS_LAYOUT
+  const chartWidth = useChartWidth() ?? 0
+  const coordinate = useActiveTooltipCoordinate()
+  const lastX = useRef(8)
+  // Recharts normally bounds a tooltip to the plotting area. On phones that
+  // excludes the name column, leaving too little width for a readable card.
+  // Use its public coordinate/width hooks to fit across the whole chart while
+  // retaining native vertical placement, cursor, dismissal and CSS motion.
+  if (coordinate && Number.isFinite(coordinate.x) && chartWidth > 0) {
+    const width = Math.min(settings.thumbnailWidth, chartWidth-16)
+    const positive = coordinate.x+12, negative = coordinate.x-width-12
+    const preferred = positive+width>chartWidth-8 && negative>=8 ? negative : positive
+    lastX.current = Math.max(8,Math.min(preferred,chartWidth-width-8))
+  }
+  return <ChartTooltip position={{x:lastX.current}} content={<HighlightThumbnail kind={kind} />} cursor={{fill:'hsl(var(--foreground) / .06)'}} />
+}
+function HighlightsPlot({rows,kind}: {rows: HighlightRow[];kind: 'amount'|'count'}) {
+  const settings = HIGHLIGHTS_LAYOUT
+  const data = rows.slice(0, settings.rows)
+  // Preserve the approved 68px value gutter for normal amounts, and reserve
+  // enough room for larger exact values instead of clipping their digits.
+  const valueGutter = Math.max(68, ...data.map(row => Math.ceil(highlightTextWidth((kind === 'amount' ? formatMoney(row.amount) : `${row.count ?? 0}×`).replace(/\d/g, '0'), 500)) + 13))
+  // Each categorical band is exactly bar thickness + the requested edge gap.
+  // Explicit axis height and plot margins keep that geometry independent of
+  // entry count, viewport width and which of the two native graphs is active.
+  const plotHeight = data.length * (settings.weight + settings.rowGap) + 4 + 30
+  return <div className="bb-highlight-plot" style={{'--bb-highlight-plot-height':`${plotHeight}px`} as CSSProperties}>
+    <ChartContainer config={{[kind]: {label: kind === 'amount' ? 'Amount' : 'Occurrences', color: kind === 'amount' ? 'hsl(var(--chart-1))' : MERCHANT_BAR_COLOR}}}
+    className="bb-insight-chart-box">
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} layout="vertical" margin={{top:4,right:valueGutter,left:0,bottom:0}} barCategoryGap={0}>
+        <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+        <XAxis type="number" height={30} tickCount={3} tickFormatter={value => kind === 'amount' ? `$${value}` : String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
+        <YAxis dataKey="label" type="category" width={settings.labelWidth} padding={{top:0,bottom:0}}
+          tick={(props) => <HighlightAxisLabel {...props} width={settings.labelWidth-12} />}
+          tickLine={false} axisLine={false} interval={0} />
+        <HighlightFloatingThumbnail kind={kind} />
+        <Bar dataKey={kind} name={kind === 'amount' ? 'Expense amount' : 'Occurrences'} fill={kind === 'amount' ? 'hsl(var(--chart-1))' : MERCHANT_BAR_COLOR}
+          radius={[0,settings.weight/2,settings.weight/2,0]} barSize={settings.weight} isAnimationActive={false}>
+          {data.map((row,index) => <Cell key={`${row.label}-${index}`} fill={kind === 'amount' ? row.color : MERCHANT_BAR_COLOR} />)}
+          <LabelList dataKey={kind} content={(props) => <HighlightValue {...props} kind={kind} />} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+    </ChartContainer>
+  </div>
+}
+function TopExpensesChart({entries}: {entries: ExpenseEntry[]}) {
+  const visibleEntries = entries.slice(0,10)
+  const rows = visibleEntries.map((entry,index) => ({label:expenseEntryItemLabel(entry),amount:entry.amount,color:topExpenseHeatColor(index,visibleEntries.length)}))
+  return <HighlightsPlot rows={rows} kind="amount" />
+}
+function MerchantChart({data}: {data: OccurrenceRow[]}) {
+  return <HighlightsPlot rows={data.slice(0,10)} kind="count" />
 }
 
 function topExpenseHeatColor(index: number, total: number) {
@@ -2583,60 +2628,6 @@ function topExpenseHeatColor(index: number, total: number) {
   }
   const paletteIndex = Math.round((index / (total - 1)) * (TOP_EXPENSE_HEAT_COLORS.length - 1))
   return TOP_EXPENSE_HEAT_COLORS[Math.min(Math.max(paletteIndex, 0), TOP_EXPENSE_HEAT_COLORS.length - 1)]
-}
-
-function truncateChartLabel(value: unknown, maxLength: number) {
-  const text = String(value ?? "")
-  if (text.length <= maxLength) {
-    return text
-  }
-  return `${text.slice(0, Math.max(maxLength - 3, 0))}...`
-}
-
-function MerchantChart({ data }: { data: OccurrenceRow[] }) {
-  const showYAxisLabels = !useMediaQuery("(max-width: 640px)")
-  const rows = data.slice(0, 10)
-  return (
-    <ChartContainer config={{ count: { label: "Occurrences", color: MERCHANT_BAR_COLOR } }} className="bb-insight-chart-box">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} layout="vertical" margin={{ top: 12, right: 22, left: showYAxisLabels ? 20 : 0, bottom: 12 }}>
-          <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis type="number" tickFormatter={(value) => String(value)} tickLine={false} axisLine={false} allowDecimals={false} />
-          <YAxis dataKey="label" type="category" width={showYAxisLabels ? 148 : 0} tick={showYAxisLabels} tickLine={false} axisLine={false} />
-          <ChartTooltip content={<MerchantTooltipContent />} cursor={{ fill: "rgb(8 145 178 / 0.14)" }} />
-          <Bar dataKey="count" name="Occurrences" fill={MERCHANT_BAR_COLOR} radius={[0, 6, 6, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartContainer>
-  )
-}
-
-function MerchantTooltipContent({
-  active,
-  payload,
-}: {
-  active?: boolean
-  payload?: Array<{ payload?: OccurrenceRow }>
-}) {
-  const row = payload?.find((item) => item.payload)?.payload
-  if (!active || !row) {
-    return null
-  }
-  return (
-    <div className="bb-chart-tooltip bb-touch-tooltip-content">
-      <div className="bb-chart-tooltip-title">{row.label}</div>
-      <div className="bb-chart-tooltip-row">
-        <span className="bb-chart-tooltip-dot" style={{ background: MERCHANT_BAR_COLOR }} />
-        <span>Occurrences</span>
-        <strong>{row.count}</strong>
-      </div>
-      <div className="bb-chart-tooltip-row">
-        <span />
-        <span>Total</span>
-        <strong>{formatMoney(row.amount)}</strong>
-      </div>
-    </div>
-  )
 }
 
 type ExpenseInsightsView = "largest" | "merchants"
