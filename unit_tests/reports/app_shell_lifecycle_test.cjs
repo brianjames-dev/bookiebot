@@ -222,7 +222,7 @@ async function main() {
   await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '37.25'); assert.equal(input(tree, 'Note').props.value, 'Payment draft')
   await tap(tree, 'Ask BookieBot'); assert.equal(ask.open, true); assert.equal(ask.month, '2026-08')
   await run(() => nav.preferences.setMode('projected')); assert.equal(ask.mode, 'projected')
-  for (const [source, expected] of [['activity', 'overview'], ['reimbursements', 'shared'], ['burn-rate', 'overview']]) {
+  for (const [source, expected] of [['activity', 'transactions'], ['reimbursements', 'shared'], ['burn-rate', 'overview']]) {
     await run(() => ask.onShowSource(source)); assert.equal(screen(tree), expected); assert.equal(ask.open, false); assert.equal(nav.sourceRequest.section, source)
     if (source === 'reimbursements') {
       await run(() => { for (const [id, timer] of [...timers]) if (timer.delay === 280) { timers.delete(id); timer.cb() } })

@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import { ArrowDownLeft, ArrowUpRight, ChevronDown, RefreshCw, Search, SlidersHorizontal } from "lucide-react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ChevronDown, RefreshCw, Search, X } from "lucide-react"
 import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
-import { CollapsibleContent } from "./components/ui/motion"
+import {DailySpendingChart, CategoryFilterControl} from './report-app'
+import {useAppNavigation} from './app-navigation'
+import {DailyTransactionDays} from './daily-transactions'
+import {TransactionSwipeContext,wrapTransactionRow} from './transaction-swipe'
+import {recordedDays,recordedChart,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
 import { TransactionChangeDetails, TransactionCompletion, type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
 import { CustomSplitControl } from "./custom-split"
 import "./transactions-screen.css"
@@ -14,16 +18,14 @@ export interface RecordedTransaction {
   fields: Record<string, string>; editableFields: string[]; capabilities: Record<Operation, boolean>; reasons: Record<string, string>
   splitOptions?: {custom: boolean; payerName: string; partnerName: string; payerBasisPoints: number; payerCents?: number}
 }
-interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
+interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; snapshotVersion?:string; days?:RecordedDay[]; totalAmountCents?:number; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
 interface Change { id: string; month: string; version?: string; operation: Operation; updates?: Record<string, string | number>; destination?: string; method?: string; payerShareCents?: number }
 interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: TransactionChangeSummary["share"]; restoration?: TransactionChangeSummary["restoration"] }
 interface Result { state: "running" | "done" | "uncertain"; success?: boolean; detail?: string; undo?: {month: string; id: string}; summary?: TransactionChangeSummary }
-const labels: Record<Operation, string> = {update: "Update", move: "Move", delete: "Delete", split: "Split", cancel_split: "Cancel split", undo: "Undo"}
-const reviewTitles: Record<Operation, string> = {update:"Update transaction",move:"Move transaction",delete:"Delete transaction",split:"Split transaction",cancel_split:"Remove split",undo:"Undo change"}
-const categories: Record<string, string> = {grocery: "Grocery", gas: "Gas", food: "Food", shopping: "Shopping", need_expenses: "Needs"}
+const labels: Record<Operation, string> = {update: "Update", move: "Update", delete: "Delete", split: "Split", cancel_split: "Cancel split", undo: "Undo"}
+const reviewTitles: Record<Operation, string> = {update:"Update transaction",move:"Update transaction",delete:"Delete transaction",split:"Split transaction",cancel_split:"Remove split",undo:"Undo change"}
+const categories: Record<string, string> = {grocery: "Grocery", gas: "Gas", food: "Food", shopping: "Shopping", need_expenses: "Other needs"}
 const money = (cents: number) => new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(cents / 100)
-const dateLabel = (value: string) => value ? new Date(value + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"}) : "Undated"
-const methodLabel = (value: string) => ({income: "By income", equal: "50/50", fronted: "Fronted", custom: "Custom split"}[value] ?? value)
 class RequestError extends Error { constructor(message: string, readonly status: number) { super(message) } }
 async function request(path: string, body?: unknown, signal?: AbortSignal): Promise<any> {
   const controller = new AbortController()
@@ -42,6 +44,8 @@ async function request(path: string, body?: unknown, signal?: AbortSignal): Prom
 }
 function checkedListing(value: any): Listing {
   if (!value || !Array.isArray(value.items) || value.items.length > 40 || !Number.isSafeInteger(value.total) || !Array.isArray(value.categories) || !Array.isArray(value.persons)
+    || value.days && (!Array.isArray(value.days)||!Number.isSafeInteger(value.totalAmountCents)||value.days.some((day:any)=>!Number.isSafeInteger(day.count)||day.count<1||!Number.isSafeInteger(day.totalCents)||!Number.isSafeInteger(day.needsCents)||!Number.isSafeInteger(day.wantsCents)))
+    || value.nextOffset!==null&&!value.days
     || value.items.some((row: any) => !row || typeof row.id !== "string" || typeof row.version !== "string" || !Number.isSafeInteger(row.amountCents) || !row.capabilities || !Array.isArray(row.editableFields)
       || row.splitOptions && (typeof row.splitOptions.custom !== "boolean" || !row.splitOptions.payerName || !row.splitOptions.partnerName
         || !Number.isSafeInteger(row.splitOptions.payerBasisPoints) || row.splitOptions.payerBasisPoints < 0 || row.splitOptions.payerBasisPoints > 10_000
@@ -49,12 +53,16 @@ function checkedListing(value: any): Listing {
   return value
 }
 
-export function TransactionsScreen({active, ownerName, initialMonth}: {active: boolean; ownerName: string; initialMonth: string}) {
+export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {active: boolean; ownerName: string; initialMonth: string;aliases?:Record<string,string>}) {
+  const navigation=useAppNavigation()
   const [month, setMonth] = useState(initialMonth)
   const [search, setSearch] = useState("")
-  const [filters, setFilters] = useState(false)
-  const [kind, setKind] = useState(""), [category, setCategory] = useState(""), [person, setPerson] = useState(""), [split, setSplit] = useState("")
+  useEffect(()=>{const request=navigation?.sourceRequest;if(active&&request?.section==='activity')navigation?.consumeSource?.(request.id)},[active,navigation?.sourceRequest?.id])
+  const [filter,setFilter]=useState("all"),[day,setDay]=useState("")
+  const {kind,category,split,scope,bucket}=transactionFilter(filter)
+  const manager=useRef<{close?:(instant?:boolean)=>void}>({})
   const [listing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
+  const [displayScope, setDisplayScope] = useState({filter:"all",month:initialMonth})
   const [selected, setSelected] = useState<RecordedTransaction | null>(null)
   const [operation, setOperation] = useState<Operation | null>(null), [draft, setDraft] = useState<Record<string, string>>({})
   const [destination, setDestination] = useState(""), [method, setMethod] = useState("income")
@@ -66,6 +74,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const editor = useRef<HTMLElement>(null)
   const facets = useRef<{categories:string[];persons:string[]}>({categories:[],persons:[]})
   const freshNext = useRef(false)
+  const listingRef=useRef(listing);listingRef.current=listing
   const loadAbort = useRef<AbortController | null>(null)
   const storageKey = `bookiebot:transaction-request:${ownerName}`
   const uncertain = Boolean(pending && result?.state !== "done")
@@ -84,7 +93,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const load = useCallback(async (offset = 0, append = false, fresh = false) => {
     const token = ++generation.current
     loadAbort.current?.abort(); const controller = new AbortController(); loadAbort.current = controller
-    const query = new URLSearchParams({month, search, kind, category, person, split, offset: String(offset),fresh:fresh ? "1" : ""})
+    const query = new URLSearchParams({month, search, kind, category, split, scope, bucket, view:"daily", offset: String(offset),fresh:fresh ? "1" : ""})
     setLoading(true); setError("")
     try {
       const next = checkedListing(await request(`/app/transactions?${query}`, undefined, controller.signal))
@@ -94,15 +103,18 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
         setPending(next.pendingCommand); setResult({state:"running",detail:"A saved change still needs verification."})
         try { sessionStorage.setItem(storageKey,JSON.stringify(next.pendingCommand)) } catch {}
       }
+      if(append&&listingRef.current?.snapshotVersion&&next.snapshotVersion!==listingRef.current.snapshotVersion)throw new Error("Recorded activity changed. Refresh Transactions before loading more.")
+      manager.current.close?.(true)
       setListing(previous => append && previous ? {...next, items: [...previous.items, ...next.items]} : next)
+      setDisplayScope({filter,month})
       return true
     } catch (failure) { if (mounted.current && token === generation.current && !controller.signal.aborted) handleError(failure) }
     finally { if (mounted.current && token === generation.current) setLoading(false) }
     return false
-  }, [month, search, kind, category, person, split])
+  }, [month, search, kind, category, split, scope, bucket, filter])
   useEffect(() => {
     if (!active) return
-    setListing(null); setLoading(true)
+    setLoading(true)
     const timer = window.setTimeout(() => { const fresh=freshNext.current; freshNext.current=false; void load(0,false,fresh) }, search ? 250 : 0)
     return () => { window.clearTimeout(timer); ++generation.current; loadAbort.current?.abort() }
   }, [active, load, revision])
@@ -114,7 +126,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const changed = () => { window.dispatchEvent(new Event("bookiebot:transactions-changed")); window.dispatchEvent(new Event("bookiebot:reimbursements-changed")); setRevision(value => value + 1) }
   const begin = (row: RecordedTransaction, op: Operation) => {
     setSelected(row); setOperation(op); setDraft({...row.fields, amount: (row.amountCents / 100).toFixed(2)})
-    setDestination(""); setMethod(row.split || "income"); setReview(null); setReviewBody(null); setError(""); setResult(null)
+    setDestination(row.category); setMethod(row.split || "income"); setReview(null); setReviewBody(null); setError(""); setResult(null)
     setCustomValid(true); setPayerShareCents(row.splitOptions?.payerCents ?? Math.floor((row.amountCents * (row.splitOptions?.payerBasisPoints ?? 5000) + 5000) / 10_000))
   }
   const preview = async (undo?: {id: string; month: string}) => {
@@ -124,9 +136,9 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
     let body: Change
     if (undo) body = {...undo, operation: "undo"}
     else {
-      body = {id: row!.id, month: row!.month, version: row!.version, operation: operation!}
+      body = {id: row!.id, month: row!.month, version: row!.version, operation: operation === "update" && destination !== row!.category ? "move" : operation!}
       if (operation === "update" || operation === "move") {
-        const fields = operation === "move" ? ["item"] : row!.editableFields
+        const fields = [...row!.editableFields, ...(["food","shopping","need_expenses"].includes(destination) && !row!.editableFields.includes("item") ? ["item"] : [])]
         body.updates = {}
         for (const field of fields) {
           const value = draft[field]
@@ -136,7 +148,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
             if (Math.round(Number(value) * 100) !== row!.amountCents) body.updates.amount = Math.round(Number(value) * 100)
           } else body.updates[field] = value
         }
-        if (operation === "move") body.destination = destination
+        if (body.operation === "move") body.destination = destination
       }
       if (operation === "split") {
         body.method = method
@@ -153,7 +165,7 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
       if (!mounted.current) return
       if (!data?.review?.reviewVersion || !data.review.item?.version) throw new Error("Couldn't read the change review.")
       setReview(data.review); setReviewBody({...body, version: data.review.item.version})
-      setOperation(body.operation)
+      setOperation(body.operation === "move" ? "update" : body.operation)
     } catch (failure) { if (mounted.current) handleError(failure) }
     finally { inFlight.current = false; if (mounted.current) setBusy(false) }
   }
@@ -188,20 +200,26 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
   const categoryOptions = {...categories, ...Object.fromEntries((listing?.categories ?? facets.current.categories).filter(value=>!(value in categories)).map(value=>[value,value]))}
   const locked = busy || uncertain
   const pageRefresh = usePageRefresh("transactions", { refresh: () => load(0, false, true), disabled: locked || loading })
-  const filterCount = [kind,category,person,split].filter(Boolean).length
-  return <section className="bb-transactions" aria-label="Recorded transactions">
-    <header className="bb-transactions-heading"><div><h1>Transactions</h1><p>Everything you’ve recorded, in one place.</p></div>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={locked || loading} onClick={() => void load(0,false,true)}><RefreshCw size={18} /></button>}</header>
-    <div className="bb-transactions-toolbar"><label className="bb-transaction-search"><Search size={18} aria-hidden="true"/><input type="search" aria-label="Search transactions" placeholder="Search transactions" value={search} onChange={event=>setSearch(event.target.value)} /></label><button type="button" aria-expanded={filters} aria-controls="bb-transaction-filters" onClick={()=>setFilters(value=>!value)}><SlidersHorizontal size={18}/><span>Filters{filterCount ? ` · ${filterCount}` : ""}</span></button></div>
-    <div className="bb-transaction-period"><label>Period<select aria-label="Transaction period" value={month === "all" ? "all" : "selected"} onChange={event=>setMonth(event.target.value === "all" ? "all" : initialMonth)}><option value="selected">One month</option><option value="all">All months</option></select></label>{month !== "all" && <input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month} onChange={event=>{if(event.target.value)setMonth(event.target.value)}}/>}</div>
-    <CollapsibleContent open={filters} id="bb-transaction-filters"><div className="bb-transaction-filters">
-      <label>Type<select aria-label="Transaction type" value={kind} onChange={e=>setKind(e.target.value)}><option value="">All types</option>{["expense","income","payment","savings"].map(value=><option key={value} value={value}>{value[0].toUpperCase()+value.slice(1)}</option>)}</select></label>
-      <label>Category<select aria-label="Transaction category" value={category} onChange={e=>setCategory(e.target.value)}><option value="">All categories</option>{Object.entries(categoryOptions).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
-      <label>Person / card<select aria-label="Transaction person or card" value={person} onChange={e=>setPerson(e.target.value)}><option value="">All people / cards</option>{(listing?.persons ?? facets.current.persons).map(value=><option key={value}>{value}</option>)}</select></label>
-      <label>Split<select aria-label="Transaction split status" value={split} onChange={e=>setSplit(e.target.value)}><option value="">All transactions</option><option value="shared">Shared</option><option value="personal">Not split</option></select></label>
-      {filterCount > 0 && <button type="button" onClick={()=>{setKind("");setCategory("");setPerson("");setSplit("")}}>Clear filters</button>}
-    </div></CollapsibleContent>
-    {error && <p role="alert" className="bb-transaction-notice">{error}</p>}
-    {result?.state === "done" && result.success ? <TransactionCompletion summary={result.summary} canUndo={Boolean(result.undo)} disabled={locked}
+  const filterCount = Number(filter!=="all")
+  const days=useMemo(()=>listing?.days??[],[listing])
+  const groups=useMemo(()=>recordedDays(listing?.items??[],days,displayScope.month).filter(group=>!day||group.day===day||group.key===day||day==='Undated'&&!Number.isFinite(Number(group.day))),[listing,days,displayScope.month,day])
+  const chart=useMemo(()=>recordedChart(days,displayScope.month),[days,displayScope.month])
+  const rows=useMemo(()=>new Map(listing?.items.map(row=>[row.id,row])??[]),[listing])
+  const filtersList=[{value:'all',label:'All'},{value:'needs',label:'Needs'},{value:'wants',label:'Wants'},{value:'shared',label:'Shared'},...Object.entries(categoryOptions).map(([value,label])=>({value:'category:'+value,label:spendingCategories[value]??label})),{value:'income',label:'Income'},{value:'savings',label:'Savings'}]
+  const changeFilter=(value:string)=>{manager.current.close?.();setDay('');setFilter(value)}
+  const displayedFilter=displayScope.filter
+  const metricLabel=displayedFilter==='income'?'Total Income':displayedFilter==='savings'?'Total Saved':'Total Spent'
+  const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+row.amountCents,0)??0
+  useEffect(()=>{manager.current.close?.(true);setDay('')},[month,search,active])
+  return <TransactionSwipeContext.Provider value={{manager:manager.current,rows,locked:locked||loading||Boolean(operation),onAction:begin}}><section className="bb-transactions bb-daily-spending-content" aria-label="Recorded transactions" aria-busy={loading} onPointerDownCapture={event=>{if(!(event.target as Element).closest('.bb-recorded-swipe'))manager.current.close?.()}}>
+    <header className="bb-transactions-heading"><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={locked || loading} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
+    <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>
+    {listing && <DailySpendingChart data={chart} total={total/100} filter={displayedFilter==='needs'||displayedFilter==='wants'?displayedFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={value=>{if(!loading)setDay(previous=>previous===value?'':value)}} metricLabel={metricLabel} legendLabel={displayedFilter==='income'?'Income':displayedFilter==='savings'?'Savings':undefined}
+      transactionControl={<CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/>}/>}
+    <label className="bb-recorded-search"><Search aria-hidden="true"/><input type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder="Search transactions" maxLength={200} value={search} onChange={event=>setSearch(event.target.value)}/>{search&&<button type="button" aria-label="Clear search" onClick={()=>setSearch('')}><X aria-hidden="true"/></button>}</label>
+    {day&&<button type="button" className="bb-recorded-day-chip" onClick={()=>setDay('')}>Day {day}<X aria-hidden="true"/></button>}
+    {error && <div role="alert" className="bb-transaction-notice"><p>{error}</p>{listing&&<button type="button" disabled={locked||loading} onClick={()=>void load(0,false,true)}>Refresh transactions</button>}</div>}
+    {result?.state === "done" && result.success ? <TransactionCompletion moveAsUpdate summary={result.summary} canUndo={Boolean(result.undo)} disabled={locked}
       onUndo={()=>{if(result.undo)void preview(result.undo)}} onDismiss={()=>setResult(null)}/>
       : result && <div role="status" className="bb-transaction-notice"><p>{result.detail || (result.state === "running" ? "Checking the saved change…" : "This change needs inspection in saved history. It will not be submitted again.")}</p>{uncertain && <><button type="button" disabled={busy} onClick={()=>void checkStatus()}>Check saved status</button><button type="button" disabled={busy} onClick={()=>void checkStatus(true)}>Retry same confirmation</button></>}</div>}
     {operation && <section ref={editor} className="bb-transaction-editor" aria-label="Edit transaction" aria-busy={busy}>
@@ -213,26 +231,22 @@ export function TransactionsScreen({active, ownerName, initialMonth}: {active: b
         <div className="bb-transaction-form-actions"><button type="button" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}>Back</button><button className="bb-transaction-primary" type="button" disabled={locked} onClick={()=>void confirm()}>{busy ? "Saving…" : `Confirm ${labels[review.operation].toLowerCase()}`}</button></div></>
       : <form onSubmit={event=>{event.preventDefault();void preview()}}>
         {operation === "update" && selected?.editableFields.map(field=><label key={field}>{field === "amount" && selected.split ? "Full purchase amount" : field === "person" ? "Person / card" : field[0].toUpperCase()+field.slice(1)}{field === "person" ? <select value={draft[field] ?? ""} onChange={e=>setDraft(value=>({...value,[field]:e.target.value}))}>{["Hannah","Brian (BofA)","Brian (AL)"].map(value=><option key={value}>{value}</option>)}</select> : <input required maxLength={200} inputMode={field === "amount" ? "decimal" : "text"} value={draft[field] ?? ""} onChange={e=>setDraft(value=>({...value,[field]:e.target.value}))}/>}</label>)}
-        {operation === "move" && <><label>Move to<select required value={destination} onChange={e=>setDestination(e.target.value)}><option value="">Choose category</option>{Object.entries(categories).filter(([key])=>key!==selected?.category).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>{["food","shopping","need_expenses"].includes(destination) && <label>Item name<input required value={draft.item ?? ""} onChange={e=>setDraft(value=>({...value,item:e.target.value}))}/></label>}</>}
+        {operation === "update" && selected?.capabilities.move && <><label>Category<select aria-label="Update category" value={destination} onChange={e=>setDestination(e.target.value)}>{Object.entries(categories).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select></label>{["food","shopping","need_expenses"].includes(destination)&&!selected.editableFields.includes('item')&&<label>Item name<input required maxLength={200} value={draft.item??''} onChange={e=>setDraft(value=>({...value,item:e.target.value}))}/></label>}</>}
         {operation === "split" && <><label>Split method<select value={method} onChange={e=>{setMethod(e.target.value);setCustomValid(true)}}><option value="income">By income</option><option value="equal">50/50</option>{selected?.kind === "expense" && <option value="fronted">Fronted</option>}{(selected?.splitOptions?.custom || method === "custom") && <option value="custom" disabled={!selected?.splitOptions?.custom}>Custom</option>}</select></label>
           {method === "custom" && selected?.splitOptions?.custom && <CustomSplitControl grossCents={selected.amountCents} payerName={selected.splitOptions.payerName}
             partnerName={selected.splitOptions.partnerName} payerCents={payerShareCents} disabled={locked} onChange={setPayerShareCents} onValidityChange={setCustomValid}/>}</>}
         {operation === "delete" && <p>Review this deletion before removing the recorded transaction.</p>}{operation === "cancel_split" && <p>Remove the split and keep the full purchase recorded. No repayment will be marked received.</p>}
+        {operation==='split'&&selected?.capabilities.cancel_split&&<button type="button" disabled={locked} onClick={()=>begin(selected,'cancel_split')}>Remove split</button>}
         <button className="bb-transaction-primary" type="submit" disabled={locked || operation === "split" && method === "custom" && !customValid}>{busy ? "Preparing review…" : "Review change"}</button>
       </form>}
       <button type="button" disabled={locked} onClick={discard}>Cancel</button>
     </section>}
-    {listing?.undo && !operation && !result?.undo && <button type="button" disabled={locked} onClick={()=>void preview(listing.undo)}>Undo last change</button>}
-    <div className="bb-transaction-list-heading"><span>{listing ? `${listing.total} ${listing.total === 1 ? "transaction" : "transactions"}` : "Recorded activity"}</span><span>Newest first</span></div>
-    {loading && !listing && <p role="status" className="bb-transaction-empty">Loading recorded transactions…</p>}
+    {listing?.undo && !operation && !result?.undo && <button type="button" className="bb-recorded-undo" disabled={locked} onClick={()=>void preview(listing.undo)}>Undo last change</button>}
+    {loading && <p role="status" className="bb-recorded-loading">Loading recorded transactions…</p>}
     {!loading && !listing && !error && <p className="bb-transaction-empty">Open Transactions to load your recorded activity.</p>}
-    {listing?.items.length === 0 && <div className="bb-transaction-empty"><p>{search || filterCount ? "No transactions match these filters." : "No recorded transactions in this period."}</p>{(search || filterCount > 0) && <button type="button" onClick={()=>{setSearch("");setKind("");setCategory("");setPerson("");setSplit("")}}>Clear search and filters</button>}</div>}
-    <div className="bb-transaction-list">{listing?.items.map(row=><article key={row.id} className="bb-transaction-row" data-open={selected?.id === row.id}>
-      <button className="bb-transaction-row-toggle" type="button" aria-expanded={selected?.id === row.id} disabled={locked || Boolean(operation)} onClick={()=>setSelected(value=>value?.id === row.id ? null : row)}>
-        {row.kind === "income" ? <ArrowDownLeft aria-hidden="true" size={18}/> : <ArrowUpRight aria-hidden="true" size={18}/>}<span><strong>{row.title}</strong><small>{dateLabel(row.date)} · {row.categoryLabel}{month === "all" ? ` · ${row.month}` : ""}</small><small>{row.location ? row.location+" · " : ""}{row.person}{row.split ? ` · ${methodLabel(row.split)}` : ""}</small></span><strong className="bb-transaction-amount">{row.kind === "income" ? "+" : ""}{money(row.amountCents)}</strong><ChevronDown size={16}/></button>
-      <CollapsibleContent open={selected?.id === row.id}><div className="bb-transaction-row-actions">{row.notice && <p>{row.notice}</p>}{(["update","move","split","delete"] as Operation[]).filter(op=>row.capabilities[op]).map(op=><button key={op} type="button" disabled={locked || Boolean(operation)} onClick={()=>begin(row,op)}>{op === "split" && row.split ? "Edit split" : labels[op]}</button>)}{row.capabilities.cancel_split && <button type="button" disabled={locked || Boolean(operation)} onClick={()=>begin(row,"cancel_split")}>Cancel split</button>}</div></CollapsibleContent>
-    </article>)}</div>
+    {listing?.items.length===0&&<div className="bb-transaction-empty"><p>{search||filterCount?'No transactions match these filters.':'No recorded transactions in this period.'}</p>{(search||filterCount>0)&&<button type="button" onClick={()=>{setSearch('');setFilter('all')}}>Clear search and filters</button>}</div>}
+    <div className="bb-transaction-list bb-daily-transactions" id="bb-recorded-days"><DailyTransactionDays groups={groups} year={Number(initialMonth.slice(0,4))} month={Number(initialMonth.slice(5))} flatSingles wrapRow={wrapTransactionRow} aliases={aliases} categoryColors={recordedCategoryColors}/></div>
     {listing?.nextOffset !== null && listing?.nextOffset !== undefined && <button className="bb-transaction-load" type="button" disabled={loading} onClick={()=>void load(listing.nextOffset!,true)}>{loading ? "Loading…" : "Load more transactions"}</button>}
     {error && !listing && <button type="button" disabled={loading} onClick={()=>void load(0,false,true)}>Try again</button>}
-  </section>
+  </section></TransactionSwipeContext.Provider>
 }

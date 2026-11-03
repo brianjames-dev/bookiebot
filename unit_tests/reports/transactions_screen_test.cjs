@@ -3,6 +3,14 @@ const {createRequire}=require('node:module'),req=createRequire(path.resolve('web
 const React=req('react'),Renderer=req('react-test-renderer'),ts=req('typescript'),{act}=Renderer
 const requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map()
 let serial=0,tree,work
+const SwipeContext=React.createContext(null)
+function ActionFixture({entry}){const ctx=React.useContext(SwipeContext),row=ctx.rows.get(entry.id);return React.createElement('div',null,entry.item,['update','split','delete'].filter(op=>row.capabilities[op]).map(op=>React.createElement('button',{key:op,disabled:ctx.locked,onClick:()=>ctx.onAction(row,op)},op==='split'&&row.split?'Edit split':op[0].toUpperCase()+op.slice(1))))}
+const presentation={
+ './app-navigation':{useAppNavigation:()=>null},
+ './transaction-swipe':{TransactionSwipeContext:SwipeContext,wrapTransactionRow:(entry)=>React.createElement(ActionFixture,{entry})},
+ './daily-transactions':{DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,null)))))},
+ './report-app':{DailySpendingChart:props=>React.createElement('div',null,props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
+}
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
 const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(){},removeEventListener(){},dispatchEvent(e){events.push(e.type)},matchMedia(){return {matches:true}}}
 global.IS_REACT_ACT_ENVIRONMENT=true
@@ -10,7 +18,7 @@ function load(file){
  if(cache.has(file))return cache.get(file)
  const exports={};cache.set(file,exports)
  const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText
- vm.runInNewContext(code,{exports,AbortController,URLSearchParams,Intl,Date,Error,Event:class{constructor(type){this.type=type}},window:win,crypto:{randomUUID:()=>`isolated-request-${++serial}-command`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>name.endsWith('.css')?{}:name==='./app-work-guard'?{useAppWorkStatus(value){const id=React.useId();statuses.set(id,value);update();React.useEffect(()=>()=>{statuses.delete(id);update()},[id]);return React.useCallback(next=>{statuses.set(id,next);update()},[id])}}:name.startsWith('.')?load(['.tsx','.ts'].map(ext=>path.resolve(path.dirname(file),name)+ext).find(fs.existsSync)):req(name)})
+ vm.runInNewContext(code,{exports,AbortController,URLSearchParams,Intl,Date,Error,Event:class{constructor(type){this.type=type}},window:win,crypto:{randomUUID:()=>`isolated-request-${++serial}-command`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>presentation[name]??(name.endsWith('.css')?{}:name==='./app-work-guard'?{useAppWorkStatus(value){const id=React.useId();statuses.set(id,value);update();React.useEffect(()=>()=>{statuses.delete(id);update()},[id]);return React.useCallback(next=>{statuses.set(id,next);update()},[id])}}:name.startsWith('.')?load(['.tsx','.ts'].map(ext=>path.resolve(path.dirname(file),name)+ext).find(fs.existsSync)):req(name))})
  return exports
 }
 const {TransactionsScreen}=load(path.resolve('web/expense-report/src/transactions-screen.tsx'))
@@ -28,9 +36,9 @@ const reject=async(target=latest())=>run(()=>target.reject(Error('Lost connectio
 const body=()=>JSON.parse(latest().options.body)
 const row={id:'2026-10:source-1',actionId:'source-1',month:'2026-10',version:'version-1',date:'2026-10-20',title:'Fixture cable',location:'Fixture shop',person:'Brian (BofA)',kind:'expense',category:'shopping',categoryLabel:'Shopping',amountCents:1234,split:'',fields:{date:'2026-10-20',item:'Fixture cable',amount:'12.34',location:'Fixture shop',person:'Brian (BofA)'},editableFields:['item','amount','location','person'],capabilities:{update:true,move:true,delete:true,split:true,cancel_split:false,undo:true},reasons:{}}
 row.splitOptions={custom:true,payerName:'Brian',partnerName:'Hannah',payerBasisPoints:5000}
-const listing=(items=[row],extra={})=>({items,total:items.length,nextOffset:null,categories:['shopping'],persons:['Brian (BofA)'],month:'2026-10',...extra})
+const listing=(items=[row],extra={})=>({items,total:items.length,nextOffset:null,days:items.length?[{date:row.date,month:row.month,count:items.length,totalCents:items.reduce((sum,r)=>sum+r.amountCents,0),needsCents:0,wantsCents:items.reduce((sum,r)=>sum+r.amountCents,0)}]:[],totalAmountCents:items.reduce((sum,r)=>sum+r.amountCents,0),categories:['shopping'],persons:['Brian (BofA)'],month:'2026-10',...extra})
 const review=(change,item=row)=>({review:{item,after:{...item.fields,amount:change.updates?.amount?String(change.updates.amount/100):item.fields.amount},operation:change.operation,destination:change.destination,reviewVersion:'review-'+change.operation,share:change.operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}})
-const expand=async()=>run(()=>tree.root.findAllByType('button').find(n=>n.props.className==='bb-transaction-row-toggle').props.onClick())
+const expand=async()=>run(()=>{})
 const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}))
 ;(async()=>{
  await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0,'Hidden Transactions does not add startup reads')
@@ -40,12 +48,13 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  await run(()=>tree.root.findAllByType('input').find(n=>n.props.value==='12.34').props.onChange({target:{value:'15.99'}}))
  assert.equal(requests.filter(r=>r.options.body).length,0,'Editing does not write')
  await submit();assert.equal(body().updates.amount,1599);assert.equal(latest().url,'/app/transactions/review');const updateBody=body();await respond(review(updateBody))
+ assert.equal(body().operation,'update','Unchanged category uses the existing Update writer');
  assert.ok(button('Confirm update'));assert.equal(requests.filter(r=>r.url==='/app/transactions').length,0,'Review is not confirmation')
  await click('Cancel');assert.equal(work.dirty,false)
- for(const [label,op] of [['Move','move'],['Delete','delete'],['Split','split']]){
+ for(const [label,op] of [['Update','move'],['Delete','delete'],['Split','split']]){
   await expand();await click(label)
-  if(op==='move')await run(()=>tree.root.findByType('form').findByType('select').props.onChange({target:{value:'food'}}))
-  await submit();const change=body();assert.equal(change.operation,op);await respond(review(change))
+  if(op==='move'){await run(()=>tree.root.findByProps({'aria-label':'Update category'}).props.onChange({target:{value:'food'}}));await run(()=>tree.root.findAllByType('input').find(n=>n.props.value==='12.34').props.onChange({target:{value:'19.99'}}))}
+  await submit();const change=body();assert.equal(change.operation,op);if(op==='move'){assert.equal(change.updates.amount,1999);assert.equal(change.destination,'food')}await respond(review(change))
   if(op==='split')assert.match(text(tree.toJSON()),/No repayment will be marked received/)
   await click('Cancel')
  }
@@ -70,13 +79,20 @@ const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preve
  await tick();await respond(listing())
  await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'cable'}}));await tick();assert.match(latest().url,/search=cable/)
  const old=latest();await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'payroll'}}));await tick();const current=latest()
- await respond(listing([{...row,title:'Payroll fixture',id:'payroll'}]),200,current);await respond(listing(),200,old)
- const resultList=()=>text(tree.root.findByProps({className:'bb-transaction-list'}))
+ await respond(listing([{...row,title:'Payroll fixture',fields:{...row.fields,item:'Payroll fixture'},id:'payroll'}]),200,current);await respond(listing(),200,old)
+ const resultList=()=>text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'}))
  assert.match(resultList(),/Payroll fixture/);assert.ok(!resultList().includes('Fixture cable'),'Stale search responses cannot replace the latest results')
  assert.match(text(tree.root.findByProps({'aria-label':'Saved transaction change'})),/Fixture cable/,'The saved receipt retains its confirmed transaction through unrelated searches')
- await click('Filters');await run(()=>tree.root.findByProps({'aria-label':'Transaction type'}).props.onChange({target:{value:'income'}}));await tick();assert.match(latest().url,/kind=income/);await respond(listing([]))
+ await run(()=>tree.root.findByProps({'aria-label':'Filter transactions'}).props.onChange({target:{value:'income'}}));await tick();assert.match(latest().url,/kind=income/)
+ assert.equal(tree.root.findByType(presentation['./report-app'].DailySpendingChart).props.metricLabel,'Total Spent','Pending filters keep the previous chart data and its matching label together')
+ await respond(listing([]));assert.equal(tree.root.findByType(presentation['./report-app'].DailySpendingChart).props.metricLabel,'Total Income')
  assert.match(text(tree.toJSON()),/No transactions match/)
  await click('Clear search and filters');await tick();await respond(listing())
+ await click('Refresh transactions');await respond(listing([row],{snapshotVersion:'one',nextOffset:40,total:2}))
+ await click('Load more transactions');await respond(listing([{...row,id:'shifted'}],{snapshotVersion:'two'}))
+ assert.match(text(tree.toJSON()),/Recorded activity changed/)
+ assert.equal(tree.root.findByType(presentation['./daily-transactions'].DailyTransactionDays).props.groups[0].entries.length,1,'Changed source snapshots cannot append duplicate or shifted page rows')
+ await click('Refresh transactions');await respond(listing())
  await expand();await click('Delete');await submit();await respond(review(body()));await click('Confirm delete');const deletion=body();await reject()
  await run(()=>tree.unmount());assert.ok(storage.size,'Uncertain confirmation survives a page reload in this owner session')
  const before=requests.filter(r=>r.options.body).length

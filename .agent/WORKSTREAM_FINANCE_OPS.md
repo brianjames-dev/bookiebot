@@ -1,8 +1,14 @@
 # Finance Operations Workstream
 
-Last updated: 2026-10-29
+Last updated: 2026-11-03
 
 ## Goal
+
+### Joined reveal Transactions workspace — 2026-11-03
+
+Completed the user-directed consolidation of Daily Spending into Transactions, retaining the native graph/day/logo motion. One scope/search drives full-result exact-cent chart/day metadata before 40-row pagination; stale snapshots cannot append shifted rows. All is recorded expenses/bill payments; Income/Savings remain explicit scopes and scheduled estimates remain outside this workspace. Canonical shared purchases use full gross values, distinct from net/projected Overview budget metrics. Single-entry days are flat; capability-bound joined Update/Split/Delete rails use fixed icon clipping and symmetric 420ms CSS motion with no visible focus chrome.
+
+Category changes are part of Update's one review/confirmation and dispatch exactly one existing Move command with all edited fields. No new writer, schema, reconciliation event or repayment lifecycle. Combined amount/category reviews recalculate split shares and display all field/category changes; existing source/version, canonical/repayment guards, frozen request replay, uncertainty recovery and supported Undo remain authoritative. Isolated combined-edit/replay/Undo and canonical guard regressions pass. **2,851 local full passed / 563 optional PostgreSQL skipped**, clean Python/frontend types/build, **12 workspace / 16 shipped-layout browser cases** and both engines' 120-entry native day-motion checks pass. README, workflow/phone/presentation guides, Decisions and STATUS checklist 246 updated. This closes the requested presentation/action consolidation; deferred general recent-action persistence/search and scheduled/recorded semantics backlog remains unchanged. No production financial test writes.
 
 ### Category Mix All matches Spent — 2026-10-29
 

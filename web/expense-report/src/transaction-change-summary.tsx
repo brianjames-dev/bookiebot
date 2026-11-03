@@ -32,7 +32,7 @@ export function TransactionChangeDetails({summary, saved = false}: {summary: Tra
   const date = summary.date ? new Date(summary.date + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"}) : "Undated"
   const restoration = summary.operation === "undo" ? summary.restoration : undefined
   const before = restoration?.current ?? summary.before
-  const changes = summary.operation === "update" || restoration?.operation === "update" ? Object.entries(summary.after).filter(([field, value]) => field !== "date" &&
+  const changes = (summary.operation === "update" || summary.operation === "move" || Boolean(restoration)) ? Object.entries(summary.after).filter(([field, value]) => field !== "date" &&
     (field === "amount" ? amount(value) !== amount(before[field] ?? "") : value !== before[field])) : []
   const category = restoration?.restoredCategory ?? (summary.operation === "move" ? categories[summary.destination ?? ""] || summary.category : summary.category)
   return <div className="bb-change-details">
@@ -60,11 +60,11 @@ export function TransactionChangeDetails({summary, saved = false}: {summary: Tra
   </div>
 }
 
-export function TransactionCompletion({summary, canUndo, disabled, onUndo, onDismiss}: {
-  summary?: TransactionChangeSummary; canUndo: boolean; disabled: boolean; onUndo: () => void; onDismiss: () => void
+export function TransactionCompletion({summary, canUndo, disabled, onUndo, onDismiss, moveAsUpdate = false}: {
+  moveAsUpdate?:boolean; summary?: TransactionChangeSummary; canUndo: boolean; disabled: boolean; onUndo: () => void; onDismiss: () => void
 }) {
   return <section role="status" className="bb-transaction-completion" aria-label="Saved transaction change">
-    <div className="bb-change-status"><span className="bb-change-check"><Check size={18} aria-hidden="true"/></span><h2>{summary ? completed[summary.operation] || "Change saved" : "Change saved"}</h2>
+    <div className="bb-change-status"><span className="bb-change-check"><Check size={18} aria-hidden="true"/></span><h2>{summary ? moveAsUpdate&&summary.operation==="move"?"Transaction updated":completed[summary.operation] || "Change saved" : "Change saved"}</h2>
       <button type="button" className="bb-change-dismiss" aria-label="Dismiss transaction result" disabled={disabled} onClick={onDismiss}><X size={17} aria-hidden="true"/></button></div>
     {summary ? <TransactionChangeDetails summary={summary} saved/> : <p className="bb-change-legacy">Your transaction change was saved.</p>}
     {canUndo && <div className="bb-change-footer"><button type="button" className="bb-change-undo" disabled={disabled} onClick={onUndo}><Undo2 size={17} aria-hidden="true"/>Undo this change</button></div>}

@@ -1,5 +1,29 @@
 # Daily Spending presentation
 
+## Authenticated Transactions workspace (2026-11-03)
+
+The app now reuses the native chart and row/motion components on **Transactions**;
+Overview ends after its four-chart carousel. One All chooser beside Total Spent
+filters the recorded chart and list together (Needs/Wants/Shared/categories,
+plus Income/Savings); search follows below. Single-entry days are flat and keep
+the same total alignment, 28px logo and category badge. Multi-entry days retain
+the Date column, quiet indent, Today and persistent-circle snake motion.
+Joined right-side Update/Split/Delete actions slide out on a left swipe, with
+8px corners, a 12px gap and matching 420ms entry/exit easing. A fixed viewport
+clips the painted circle at the row edge without opacity changes. Controls have
+no visible focus borders, outlines or focus shadows while retaining keyboard use.
+Totals/counts cover the complete recorded snapshot, not just a 40-row page.
+Category changes are part of one reviewed Update, delegated to the existing Move
+writer. Full canonical purchase amounts can differ from projected/net budget
+metrics; scheduled entries remain outside this recorded workspace. See
+[Transactions](TRANSACTIONS.md) for scope, safety, pagination and manual checks.
+
+## Standalone signed report
+
+The remaining description of the Transactions morph, type-only filtering and
+Current/Projected totals applies to the **standalone report**, not the app tab.
+Both surfaces continue using the same native graph, icons and day motion below.
+
 Daily Spending keeps the approved Quiet indent rows and Date column preview.
 The chart, axes, Current/Projected, All/Needs/Wants scopes and financial totals
 retain their existing definitions. The Needs/Wants legend shares the bar colors.

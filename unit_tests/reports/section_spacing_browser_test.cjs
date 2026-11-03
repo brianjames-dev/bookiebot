@@ -57,24 +57,16 @@ const closeEnough=(actual,reference,message)=>assert.ok(Math.abs(actual-referenc
           await route.fulfill({json:value})
         })
         await page.goto('https://bookie.test/app/expenses')
-        await page.locator('.bb-daily-section').waitFor()
+        await page.locator('.bb-chart-carousel-band').waitFor()
         await page.getByRole('button',{name:'Show Burn Rate',exact:true}).click()
         await page.waitForTimeout(350)
-        const reference=await gap(page,'.bb-daily-section',dailyButton)
+        const reference=Math.min(32,Math.max(16,width*.03))+2
         assert.ok(await gap(page,'.bb-chart-carousel-band','#bb-chart-burn-rate .bb-burn-month-panel')>=23,'Burn Rate retains compact bottom breathing room')
-        const measured={engine:engine.name(),width,dark,balance:reference,daily:await gap(page,'.bb-daily-section',dailyButton)}
+        const measured={engine:engine.name(),width,dark,balance:reference}
         if(!measureOnly) {
           closeEnough(reference,Math.min(32,Math.max(16,width*.03))+2,'Keep the approved Categories spacing')
-          closeEnough(measured.daily,reference,'Daily Transactions footer')
-          assert.equal(await page.locator('.bb-highlights-section,.bb-insight-view,.bb-highlight-plot').count(),0,'Remove the entire Highlights section, including hidden charts')
-          assert.equal(await page.getByRole('heading',{name:/^(Expense )?Highlights$/}).count(),0)
-          assert.equal(await page.getByRole('combobox',{name:'Highlights view',exact:true}).count(),0)
-          assert.deepEqual(await page.getByRole('region',{name:'Overview',exact:true}).locator(':scope > .bb-report-section').evaluateAll(sections=>sections.map(el=>el.classList.contains('bb-daily-section'))),[true],'Daily Spending is the final Overview section, without an empty card')
-          await page.locator(dailyButton).click();await page.waitForTimeout(350)
-          assert.equal(await page.locator('.bb-daily-transactions .bb-daily-day-group').count(),12,'Transactions still reveals the full list')
-          closeEnough(await gap(page,'.bb-daily-section','.bb-daily-transactions'),reference,'Expanded daily content bottom')
-          await page.getByRole('button',{name:'Close transactions',exact:true}).click();await page.waitForTimeout(350)
-          closeEnough(await gap(page,'.bb-daily-section',dailyButton),reference,'Recollapsed Transactions footer')
+          assert.equal(await page.locator('.bb-daily-section,.bb-highlights-section,.bb-insight-view,.bb-highlight-plot').count(),0,'Overview ends with the carousel; purchases live in Transactions')
+          assert.deepEqual(await page.getByRole('region',{name:'Overview',exact:true}).locator(':scope > .bb-report-section').evaluateAll(sections=>sections.map(el=>el.className)),[],'No placeholder below the final carousel')
           for(const title of ['Category Mix','Burn Rate','Calendar','Bills & Utilities']) {
             await page.getByRole('button',{name:`Show ${title}`,exact:true}).click();await page.waitForTimeout(350)
             const pageRegion=page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .bb-chart-page')

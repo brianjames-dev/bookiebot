@@ -1,5 +1,15 @@
 # Agent Decisions
 
+## 2026-11-03 - Consolidate Recorded Daily Spending Into Transactions
+
+Move the app's native Daily Spending chart, Date column/Quiet indent list and persistent-circle animation into Transactions; Overview ends after its four-chart carousel. Standalone signed reports retain read-only Daily Spending. A single All chooser beside the total scopes both graph and list by Needs/Wants/Shared/category, with Income/Savings also available, and search follows below. Single-entry days are flat. Keep recorded source identity and full purchase amounts authoritative: All excludes income/savings, scheduled estimates and derived ESPP. Canonical gross purchases may differ from projected/net budget metrics; this does not change repayment accounting or scheduled/recorded lifecycle semantics.
+
+Add optional full-result daily/count/cent metadata and a selected-source version digest to the existing listing response before 40-row pagination, without new sheet reads or persistence. Refuse an append whose snapshot changed; retain the previous graph and its corresponding labels while another query loads. Reuse the existing native graph, category control, day engine and artwork instead of duplicating draft components.
+
+Expose capability-bound joined Update/Split/Delete controls on right-side rails; no full-swipe financial execution. Fold category selection into Update. Only category changes dispatch one existing Move command containing every edited field, never chained Update and Move writes. Retain the original operation in frozen review/confirmation/recovery/Undo, while the UI calls it Update. Show category and all changed fields in review/receipts/restoration, and recalculate split shares for combined amount/category reviews. Existing canonical, source/version, claim, repayment and reconciliation safeguards remain authoritative; Split owns reviewed removal. No database migration, new financial writer, event protocol or dependency.
+
+Use equal 54px action columns, 8px corners, a 12px amount gap and matching 420ms entry/exit CSS easing. Clip persistent circles through a stationary row viewport while their paint translates, keeping logos opaque and the rail painted through closing. Retain keyboard access, one-open-row state, vertical scrolling and reduced motion. The user's explicit follow-up removes visible focus borders, outlines and focus shadows throughout this workspace; structural borders remain.
+
 ## 2026-11-02 - Remove Highlights From The Report
 
 The user supersedes the preceding Highlights restyling and requests removing the section entirely. Remove it from both Overview and standalone reports, including its exclusive renderers, tooltip helpers, imports, styles and tests. Daily Spending ends Overview with its existing footer spacing; standalone reports flow directly into their remaining sections. Daily Spending and Transactions remain the purchase-browsing surfaces. Keep canonical report payload fields and read-only bot analytics intact; this is a presentation removal with no persistence or financial lifecycle changes.
