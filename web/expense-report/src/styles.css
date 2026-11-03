@@ -714,8 +714,99 @@ button.bb-left-categories { cursor: pointer; }
 .bb-insight-chart-box {
   width: 100%;
   min-width: 0;
-  height: clamp(320px, 42vh, 500px);
-  min-height: 320px;
+  height: var(--bb-highlight-plot-height, 258px);
+  min-height: 0;
+}
+
+
+.bb-highlight-label,
+.bb-highlight-value {
+  fill: hsl(var(--foreground));
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+}
+.bb-highlight-value {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.bb-highlight-thumbnail.bb-chart-tooltip {
+  box-sizing: border-box;
+  display: block;
+  width: var(--bb-highlight-thumb-width, 200px);
+  min-width: 0;
+  max-width: calc(100vw - 32px);
+  padding: var(--bb-highlight-thumb-padding, 12px);
+  border-radius: var(--bb-highlight-thumb-radius, 16px);
+  border: 1px solid hsl(var(--border) / .85);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: 0 8px 24px hsl(var(--foreground) / .10);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.bb-highlight-thumb-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.bb-highlight-thumbnail .bb-chart-tooltip-title {
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.bb-highlight-thumb-swatch {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.bb-highlight-thumb-primary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.bb-highlight-thumb-metric {
+  color: hsl(var(--foreground));
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.025em;
+}
+.bb-highlight-thumb-caption {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 400;
+}
+.bb-highlight-thumb-description { margin-top: 4px; }
+.bb-highlight-thumb-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid hsl(var(--border) / .8);
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.35;
+}
+.bb-highlight-thumb-total {
+  margin-left: auto;
+  color: hsl(var(--foreground));
+  font-size: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .bb-subscription-analytics,
@@ -3083,10 +3174,6 @@ button:focus-visible, summary:focus-visible {
     min-height: 0;
   }
 
-  .bb-insight-chart-box {
-    height: 300px;
-    min-height: 300px;
-  }
 }
 
 @media (max-width: 640px) {
