@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-03 - Require A Pointer Swipe To Reveal Transaction Actions
+
+Ordinary pointer/touch clicks must not reveal or toggle a transaction rail. Keep the existing directional drag threshold, vertical-scroll arbitration and one-open-row state; retain keyboard/assistive activation without pointer movement. Let native day boundaries and adjacent row shells own separators, removing the redundant border on every swipe wrapper (including flat singles). User-requested editors that expand inside their selected row are a design exploration only in this pass; existing production financial forms/reviews/confirmations remain unchanged until a draft is selected.
+
 ## 2026-11-03 - Consolidate Recorded Daily Spending Into Transactions
 
 Move the app's native Daily Spending chart, Date column/Quiet indent list and persistent-circle animation into Transactions; Overview ends after its four-chart carousel. Standalone signed reports retain read-only Daily Spending. A single All chooser beside the total scopes both graph and list by Needs/Wants/Shared/category, with Income/Savings also available, and search follows below. Single-entry days are flat. Keep recorded source identity and full purchase amounts authoritative: All excludes income/savings, scheduled estimates and derived ESPP. Canonical gross purchases may differ from projected/net budget metrics; this does not change repayment accounting or scheduled/recorded lifecycle semantics.

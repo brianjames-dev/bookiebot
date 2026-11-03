@@ -90,6 +90,7 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
    {available.map(([op,label,Icon])=><button type="button" className={`bb-recorded-action bb-recorded-action-${op}`} key={op} disabled={readonly} onClick={()=>activate(op)} aria-label={`${label} ${entry.location||entry.item}`}><Icon aria-hidden="true"/><span>{label}</span></button>)}
   </div>}
   {children}
-  {!readonly&&<button type="button" className="bb-recorded-row-access" aria-label={`Show actions for ${entry.location||entry.item}`} aria-expanded={side!==0} style={{transform:`translateX(${target.current*revealWidth()}px)`}} onClick={()=>{if(!suppressed.current)reveal(target.current?0:-1)}} onKeyDown={event=>{if(event.key==='ArrowLeft'){event.preventDefault();reveal(-1)}if(event.key==='ArrowRight'){event.preventDefault();reveal(0)}if(event.key==='Escape'){event.preventDefault();reveal(0)}}}/>}
+  {/* Zero-detail activation preserves keyboard/assistive access; pointer taps do not reveal actions. */}
+  {!readonly&&<button type="button" className="bb-recorded-row-access" aria-label={`Show actions for ${entry.location||entry.item}`} aria-expanded={side!==0} style={{transform:`translateX(${target.current*revealWidth()}px)`}} onClick={event=>{if(event.detail===0&&!suppressed.current)reveal(target.current?0:-1)}} onKeyDown={event=>{if(event.key==='ArrowLeft'){event.preventDefault();reveal(-1)}if(event.key==='ArrowRight'){event.preventDefault();reveal(0)}if(event.key==='Escape'){event.preventDefault();reveal(0)}}}/>}
  </div>
 }

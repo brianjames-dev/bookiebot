@@ -61,7 +61,6 @@
 .bb-transactions .bb-change-undo { display:flex; justify-content:center; align-items:center; gap:8px; width:100%; background:color-mix(in srgb,hsl(var(--primary)) 7%,transparent); border-color:color-mix(in srgb,hsl(var(--primary)) 35%,hsl(var(--border))); font-weight:500; }
 .bb-change-legacy { margin:0; font-size:13px; color:hsl(var(--muted-foreground)); }
 
-.bb-recorded-swipe { border-top:1px solid hsl(var(--border) / .55); }
 .bb-recorded-swipe { position:relative; min-width:0; overflow:hidden; touch-action:pan-y; }
 .bb-recorded-swipe-icon-viewport { position:absolute; inset:0; pointer-events:none; }
 .bb-recorded-swipe-actions { position:absolute; inset-block:0; width:var(--bb-recorded-action-width); max-width:calc(100% - 12px); display:grid; grid-template-columns:repeat(var(--bb-recorded-action-count,3),minmax(0,1fr)); align-items:stretch; gap:0; z-index:0; visibility:hidden; pointer-events:none; }
