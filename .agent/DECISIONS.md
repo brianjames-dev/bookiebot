@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-04 - Include Elapsed Subscription Charges In Transactions
+
+The user approves closing the $76.49 November Current/Transactions gap by including Xfinity ($61.50, November 2) and Slate Digital ($14.99, November 4), and the same rule for all recurring subscriptions. Reuse Current's active subscription parser, amount, Needs/Wants bucket and monthly/yearly day calculation. Show each occurrence on/after its withdrawal date in Pacific time; future charges stay in planning. Missing/invalid dates, inactive and nonpositive amounts create no rows. Clamp short months and include annual charges only in their charge month.
+
+Derive these read-only occurrences from `Subscriptions` in the existing personal-workbook batch, with owner/month-scoped identities independent of price/date corrections and versions sensitive to the displayed source. Keep duplicate saved lines distinct to match Current; do not guess matches to separately logged purchases. There is no new financial row, action-log identity, midnight writer, bank state or schema. Existing bank schedule matching and financial confirmation/repayment guards remain authoritative. Purchase actions are disabled server-side and absent from the row; changes belong to the saved subscription schedule. Include occurrences in complete-result totals, pagination, search and Needs/Wants/category filters; use existing merchant logos and category-colored repeat fallbacks. Other card-scope/net-purchase policies are unchanged, so this fixes the subscription gap rather than redefining every report's scope.
+
 ## 2026-11-04 - Display Shared Bills At Confirmed Cash Exposure
 
 The user wants dynamic bills in Transactions to reflect how much the payer is currently carrying. Display canonical `cash_v1` bill payments as gross minus confirmed `settledCents`, rather than the original charge or allocated payer share. Pending sent reports and cleared debt are not receipts; reversals restore exposure. This supersedes the full-gross Transactions display policy for shared bills only. Other purchases and historical net-accounting sources retain their existing policy.

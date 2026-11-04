@@ -286,7 +286,8 @@ def test_one_batched_read_per_workbook_is_reused_for_search_and_filter(saved,mon
     tx.listing(B,{"month":saved.month})
     tx.listing(B,{"month":saved.month,"search":"cable","person":"Brian (AL)"})
     assert reader.call_count==2
-    assert all("Subscriptions" not in call.args[2] for call in reader.call_args_list)
+    assert "Subscriptions" in reader.call_args_list[0].args[2]
+    assert "Subscriptions" not in reader.call_args_list[1].args[2]
     saved.repos[saved.month].expense.update_cell(3,undo._category_columns("shopping")["amount"],"$9.00")
     fresh=tx.listing(B,{"month":saved.month,"fresh":"1","search":"cable 3"})
     assert fresh["items"][0]["amountCents"]==900 and reader.call_count==4

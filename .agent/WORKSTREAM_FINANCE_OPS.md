@@ -4,6 +4,10 @@ Last updated: 2026-11-04
 
 ## Goal
 
+### Elapsed subscription charges in Transactions — 2026-11-04
+
+Implemented the approved subscription slice of scheduled/recorded parity: Transactions derives monthly/yearly occurrences on their saved withdrawal days using Current's existing parser, amounts and category buckets. Future/inactive/zero/unresolved charges remain excluded; short/leap months and historical annual charge months retain the same rules. Owner/month identities survive price/date corrections and repeated refreshes; complete-result daily/headline/chart totals, pagination and Needs/Wants/category/search agree. Existing logos and colored repeat fallbacks render on schedule-controlled rows with no purchase actions or audit-log identity. The same personal workbook batch reads Subscriptions, and the existing Pacific-date cache handles rollover. No new financial writer, sheet/DB schema, bank event or repayment change; other report/card/net-purchase policies remain. Verification/release and native acceptance are tracked in STATUS checklist 256; this completes the missing elapsed-subscription presentation slice without changing the broader lifecycle backlog.
+
 ### Shared bill cash exposure in Transactions — 2026-11-04
 
 Implemented the requested display correction: canonical shared bills use gross minus confirmed receipts in rows, daily totals, Total Spent and the optional graph. Pending reports/reset clearing do not count as received, reversals restore exposure, partner bill cells are not discounted twice and zero-exposure managed bills retain their identity. Gross remains the edit/split/bank authority; queued timing, other purchase/legacy amount contracts, source/audit IDs and existing lifecycle guards are unchanged. No schema or live financial test writes. Isolated lifecycle and actual iPhone component regression coverage plus release evidence are tracked in STATUS checklist 255. This completes this bill-presentation slice; the broader Finance Ops backlog stays unchanged.

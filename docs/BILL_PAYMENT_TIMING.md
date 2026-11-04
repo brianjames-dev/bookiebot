@@ -30,9 +30,16 @@ derived placements; no historical amount or saved action is rewritten.
 Expected amounts without an entered monthly amount stay estimates even after
 their scheduled date passes. They never acquire recorded transaction actions.
 Known queued amounts replace their own expectation rather than adding to it.
-Subscription schedule behavior is unchanged.
+Recurring subscription amounts already count in Current on their saved pull
+dates. Transactions now shows those same elapsed occurrences, including annual
+charges only in their charge month. Future subscriptions stay in planning;
+inactive, zero-amount and unresolved-date subscriptions do not create rows.
+This uses the existing subscription schedule as the amount/date authority,
+whereas a dynamic bill still needs its monthly amount entered. Subscription
+occurrences remain controlled by their schedule and have no purchase edit,
+split, delete or Undo actions. No monthly sheet row is created on withdrawal.
 
-Transactions reads fetch the bill schedule in the existing personal-workbook
+Transactions reads fetch the bill and subscription schedules in the existing personal-workbook
 batch. Their cache includes the Pacific date, so yesterday's cached list cannot
 hide a newly paid bill. Normal app opening/foreground refresh or pull-to-refresh
 recalculates views; a saved static report is still a snapshot.

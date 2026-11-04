@@ -4,7 +4,7 @@ from __future__ import annotations
 import calendar
 from contextlib import contextmanager
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import lru_cache
 import hashlib
 import json
@@ -215,6 +215,42 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
                         new_values=[cell(personal,row,col+3)], metadata={"type":"savings", "category":"monthly savings"}, description="Cash savings"))
 
 
+def _subscription_rows(actor: str, month: str, rows: list[list[str]], *, as_of: date) -> list[dict[str, Any]]:
+    """Read scheduled charge occurrences without creating editable sheet sources."""
+    from bookiebot.reports.expense_breakdown import (
+        BudgetMonth, _subscription_items, _subscription_day_in_month, _subscription_bucket,
+    )
+    period = parse_phone_report_month(month)
+    selected = BudgetMonth(period.year, period.month)
+    result, occurrences = [], {}
+    reason = "Manage the saved subscription schedule to change this recurring charge."
+    for item in _subscription_items(rows):
+        day = _subscription_day_in_month(item, selected)
+        if day is None:
+            continue
+        withdrawal = date(period.year, period.month, day)
+        if withdrawal > as_of:
+            continue
+        # Stable across price/date corrections and refreshes; duplicate saved
+        # lines remain distinct just as they do in Current's subscription total.
+        identity = digest([actor, item.name.casefold(), item.cadence, item.kind.casefold()])
+        ordinal = occurrences.get(identity, 0)
+        occurrences[identity] = ordinal + 1
+        category = _subscription_bucket(item)
+        amount = cents(f"{item.amount:.2f}")
+        result.append({"id": f"{month}:subscription-{identity}-{ordinal}", "actionId": "", "month": month,
+            "version": digest([actor, asdict(item), withdrawal.isoformat(), ordinal]),
+            "date": withdrawal.isoformat(), "title": item.name, "location": "", "person": get_user_config(actor).name,
+            "kind": "subscription", "category": category,
+            "categoryLabel": "Subs (Wants)" if category == "subscriptions_wants" else "Subs (Needs)",
+            "amountCents": amount, "fields": {"date": withdrawal.isoformat(), "item": item.name, "amount": f"{item.amount:.2f}"},
+            "split": "", "editableFields": [],
+            "capabilities": {operation: False for operation in ("update", "move", "delete", "split", "cancel_split", "undo")},
+            "reasons": {operation: reason for operation in ("update", "move", "delete", "split", "cancel_split", "undo")},
+            "notice": reason})
+    return result
+
+
 def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[dict[str, Any]]:
     from bookiebot.sheets.bills import bill_payment_state, list_bill_schedules
     as_of = now_pacific().date()
@@ -235,7 +271,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
             logs = [f"_BookieBot Action Log - {year:04d}-{number:02d}" for number in numbers]
-            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule"])
+            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule", "Subscriptions"])
             schedules = list_bill_schedules(personal.get("_BookieBot Bill Schedule", []))
             shared_rows = read_workbook_tabs(client, get_shared_expenses_spreadsheet_id(year), [*titles, *logs])
             for number, title, log in zip(numbers, titles, logs):
@@ -297,7 +333,8 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                         row["version"] = digest([row["version"], row["date"]])
                     if row["amountCents"] > 0:
                         result.append(row)
-        result.sort(key=lambda row: (row["month"], row["date"], row["_logged"].created_at, row["id"]), reverse=True)
+                result.extend(_subscription_rows(actor, period, personal.get("Subscriptions", []), as_of=as_of))
+        result.sort(key=lambda row: (row["month"], row["date"], getattr(row.get("_logged"), "created_at", ""), row["id"]), reverse=True)
         with _CACHE_LOCK:
             if len(_CACHE) >= 32:
                 _CACHE.pop(next(iter(_CACHE)))
@@ -323,8 +360,8 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
     except ValueError as exc:
         raise TransactionValidation("Choose a valid transactions page.") from exc
     selected = [row for row in rows if (not kind or row["kind"] == kind) and (not category or row["category"] == category)
-        and (query.get("scope") != "spending" or row["kind"] in {"expense", "payment"})
-        and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping"} else "needs") == query["bucket"])
+        and (query.get("scope") != "spending" or row["kind"] in {"expense", "payment", "subscription"})
+        and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needs") == query["bucket"])
         and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
         and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
                 or word in {f"{row['amountCents'] / 100:.2f}", f"{row.get('displayAmountCents', row['amountCents']) / 100:.2f}"} for word in search)]
@@ -343,7 +380,7 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
                                        "totalCents": 0, "needsCents": 0, "wantsCents": 0})
             day["count"] += 1
             day["totalCents"] += amount
-            day["wantsCents" if row["category"] in {"food", "shopping"} else "needsCents"] += amount
+            day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
         result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected])
         result["days"] = list(days.values())
         result["totalAmountCents"] = sum(row.get("displayAmountCents", row["amountCents"]) for row in selected)

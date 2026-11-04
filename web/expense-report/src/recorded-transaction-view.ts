@@ -4,15 +4,15 @@ import type {DailyTransactionGroup} from './daily-transactions'
 
 export interface RecordedDay {date:string;month:string;count:number;totalCents:number;needsCents:number;wantsCents:number}
 export const displayedAmount=(row:RecordedTransaction)=>row.displayAmountCents??row.amountCents
-export const spendingCategories:Record<string,string>={grocery:'Groceries',gas:'Gas',food:'Food',shopping:'Shopping',need_expenses:'Other needs',rent:'Rent',pge:'PG&E',water:'Water',recology:'Recology'}
+export const spendingCategories:Record<string,string>={grocery:'Groceries',gas:'Gas',food:'Food',shopping:'Shopping',need_expenses:'Other needs',rent:'Rent',pge:'PG&E',water:'Water',recology:'Recology',static_bills_subscriptions_needs:'Subs (Needs)',subscriptions_wants:'Subs (Wants)'}
 export function transactionFilter(value:string){
  return {scope:['income','savings'].includes(value)?'':'spending',kind:['income','savings'].includes(value)?value:'',bucket:['needs','wants'].includes(value)?value:'',category:value.startsWith('category:')?value.slice(9):'',split:value==='shared'?'shared':''}
 }
 export function recordedEntry(row:RecordedTransaction):DailyTransaction{
- const category=row.kind==='income'?'Income':row.kind==='savings'?'Savings':({grocery:'Grocery',gas:'Gas',food:'Food',shopping:'Shopping',need_expenses:'Other needs',rent:'Rent'}[row.category]??(row.kind==='payment'?'Bills & Utilities':row.categoryLabel))
+ const category=row.kind==='income'?'Income':row.kind==='savings'?'Savings':({grocery:'Grocery',gas:'Gas',food:'Food',shopping:'Shopping',need_expenses:'Other needs',rent:'Rent'}[row.category]??(row.kind==='subscription'?spendingCategories[row.category]:row.kind==='payment'?'Bills & Utilities':row.categoryLabel))
  return {id:row.id,date:row.date,item:row.fields.item||row.title,location:row.location,person:row.person,category,amount:displayedAmount(row)/100,status:'recorded',kind:row.kind as DailyTransaction['kind']}
 }
-export const recordedCategoryColors:Record<string,string>=Object.fromEntries(Object.entries({Grocery:'category-grocery',Gas:'category-gas',Food:'category-food',Shopping:'category-shopping','Other needs':'category-need',Rent:'category-rent','Bills & Utilities':'category-bills',Income:'success',Savings:'chart-3'}).map(([name,token])=>[name,`hsl(var(--${token}))`]))
+export const recordedCategoryColors:Record<string,string>=Object.fromEntries(Object.entries({Grocery:'category-grocery',Gas:'category-gas',Food:'category-food',Shopping:'category-shopping','Other needs':'category-need',Rent:'category-rent','Bills & Utilities':'category-bills','Subs (Needs)':'category-subs-needs','Subs (Wants)':'category-subs-wants',Income:'success',Savings:'chart-3'}).map(([name,token])=>[name,`hsl(var(--${token}))`]))
 export function recordedDays(rows:RecordedTransaction[],days:RecordedDay[],month:string):DailyTransactionGroup[]{
  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).map(part=>[part.type,part.value]))
  const today=`${parts.year}-${parts.month}-${parts.day}`
