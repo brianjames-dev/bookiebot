@@ -16,6 +16,11 @@ applying it is a normal scoped catalog/provenance change with verification and
 merge. Existing artwork changes invalidate an old batch. A new candidate clears
 its prior approval. Gallery state alone neither starts refinement nor publishes.
 
+Gallery autosave acknowledgements leave active inputs in place. Refinement notes
+retain their caret and native undo history; Enter and Shift+Enter create lines
+in both textareas. Raw new-merchant drafts retain blank lines across restoration,
+while submitted merchant names remain trimmed and deduplicated.
+
 Setup verification:
 
 ```bash

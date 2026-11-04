@@ -37,6 +37,7 @@
     (function(){
       const root=document.getElementById('bookiebot-logo-studio'),data=JSON.parse(document.getElementById('bookiebot-logo-studio-data').textContent)
       const q=selector=>root.querySelector(selector),items=new Map(data.items.map(item=>[item.key,item]))
+      const origin='logo-studio-'+Math.random().toString(36).slice(2)
       let choices={},newRequests=[],selected=null,saveTimer=null
       root.style.setProperty('--studio-atlas','url("'+data.atlas.url+'")')
       function mark(index,size,name){
@@ -50,9 +51,10 @@
       function error(message){q('[data-error]').textContent=message;q('[data-error]').hidden=!message}
       function persist(){
         const state=feedback()
-        if(new TextEncoder().encode(JSON.stringify(state)).length>14000){error('This batch is too large to save between visits. Send it now to keep all your notes.');update();return true}
+        const saved={modelContent:state,privateContent:{selectedKey:selected,newRequestsText:q('[data-new]').value,origin}}
+        if(new TextEncoder().encode(JSON.stringify(saved)).length>14000){error('This batch is too large to save between visits. Send it now to keep all your notes.');update();return true}
         error('')
-        if(window.openai&&window.openai.setWidgetState)window.openai.setWidgetState({modelContent:state,privateContent:{selectedKey:selected}}).catch(()=>{})
+        if(window.openai&&window.openai.setWidgetState)window.openai.setWidgetState(saved).catch(()=>{})
         update();return true
       }
       function update(){
@@ -111,7 +113,11 @@
       for(const field of ['[data-notes]','[data-url]','[data-ready]'])q(field).addEventListener('input',()=>{clearTimeout(saveTimer);saveTimer=setTimeout(saveEditor,250)})
       q('[data-clear]').onclick=()=>{clearTimeout(saveTimer);delete choices[selected];selected=null;q('[data-editor]').hidden=true;persist()}
       q('[data-approve]').onclick=()=>{if(saveEditor()===false)return;const item=items.get(selected);choices[selected].decision='approve';choices[selected].candidateSha256=item.candidateSha256;persist()}
-      q('[data-new]').oninput=()=>{newRequests=[...new Set(q('[data-new]').value.split('\n').map(name=>name.trim()).filter(Boolean))];persist()}
+      const requestNames=text=>[...new Set(text.split('\n').map(name=>name.trim()).filter(Boolean))]
+      q('[data-new]').oninput=()=>{newRequests=requestNames(q('[data-new]').value);persist()}
+      for(const field of root.querySelectorAll('textarea'))field.addEventListener('keydown',event=>{
+        if(event.key==='Enter')event.stopPropagation()
+      })
       for(const send of root.querySelectorAll('[data-send]'))send.onclick=async()=>{
         if(saveEditor()===false||!persist())return
         const context=data.batchRef?'Continue the existing batch named by batchRef; do not re-import intake or erase candidate history. Explicit approval decisions name exact candidate hashes and do not need a new intake. ':'Import the feedback into a versioned batch. '
@@ -123,9 +129,15 @@
       }
       function restore(state,privateState){
         if(!state||state.version!==1||state.snapshotId!==data.snapshotId||state.batchRef!==data.batchRef)return
+        // Host acknowledgements (including delayed ones) are not new drafts.
+        // Legacy model-only echoes must not replace a field being edited either.
+        if(privateState&&privateState.origin===origin)return
+        if(root.contains(document.activeElement)&&document.activeElement.matches('textarea,input:not([type="checkbox"]),select'))return
         clearTimeout(saveTimer);selected=null;q('[data-editor]').hidden=true
         choices={};for(const item of state.items||[])if(items.has(item.key)){const {key,...value}=item;if(value.decision==='approve'&&value.candidateSha256!==items.get(key).candidateSha256){delete value.decision;delete value.candidateSha256}choices[key]=value}
-        newRequests=state.newRequests||[];q('[data-new]').value=newRequests.join('\n')
+        newRequests=state.newRequests||[]
+        const draft=privateState&&privateState.newRequestsText
+        q('[data-new]').value=typeof draft==='string'&&JSON.stringify(requestNames(draft))===JSON.stringify(newRequests)?draft:newRequests.join('\n')
         update()
         const key=privateState&&privateState.selectedKey
         if(key&&choices[key])renderEditor(key)
