@@ -28,7 +28,7 @@ def _date(value: str, year: int, month: int) -> str | None:
 
 
 def comparison_data(report: ExpenseBreakdownReport, payload: dict[str, Any]) -> dict[str, Any]:
-    """Never use a scheduled bill date or synthetic undated-income day as fact."""
+    """Entered autopay bills use their withdrawal date; estimates stay scheduled."""
     from bookiebot.reports.expense_breakdown import CATEGORY_LABELS
 
     def entry(label: str, amount: float, category: str, raw_date: str) -> dict[str, Any]:
@@ -48,8 +48,10 @@ def comparison_data(report: ExpenseBreakdownReport, payload: dict[str, Any]) -> 
     projected_scheduled = [
         entry(item.label, item.amount, item.group, f"{report.month.year}-{report.month.month:02d}-{item.day:02d}")
         for item in report.calendar_events
-        if item.kind == "subscription" or (item.kind == "bill" and item.amount_estimated)
+        if item.kind == "subscription" or (item.kind == "bill" and item.projected_only)
     ]
+    projected_scheduled.extend(entry(item.label, item.amount, item.group, "")
+                               for item in report.queued_bills if not item.date)
     return {
         "recordedExpenses": recorded,
         "scheduledExpenses": scheduled,
@@ -116,6 +118,11 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                     for payment in report.payments if payment.group == item["key"]
                 ]
                 if mode == "projected":
+                    fixed.extend(
+                        {"label": f"{payment.label} · queued", "amount": _money(payment.amount),
+                         "source": "scheduled", "date": _date(payment.date, report.month.year, report.month.month)}
+                        for payment in report.queued_bills if payment.group == item["key"]
+                    )
                     fixed.extend(
                         {"label": f"{event.label} · expected", "amount": _money(event.amount),
                          "source": "scheduled", "date": None}
@@ -188,6 +195,8 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
             "spent": detail("Spent", spent_total, "Expense outflows", spent, [
                 "Cash savings and payroll ESPP are shown in Saved and excluded from Spent.",
                 "Subscription amounts are based on their schedule, not confirmation from your bank.",
+                "Entered bills count as paid on their saved withdrawal/autopay date; bank confirmation is not required.",
+                "Entered bills without a unique withdrawal date stay queued in Projected.",
                 "Projected includes full scheduled commitments for the month." if mode == "projected" else "Current includes recorded costs and subscription schedules elapsed so far.",
             ]),
             "left": detail("Left", metrics["incomeAfterExpenses"], "Needs remaining + Wants remaining + Savings remaining", left, left_notes),
@@ -353,9 +362,9 @@ def _period(payload: dict[str, Any], through_day: int, *, mode: str | None = Non
     if mode:
         # Start with the authoritative Spent value, preserving signed sheet
         # adjustments. Remove only costs known to fall outside the window.
-        # A bill's due date is never treated as its actual payment date.
+        # Entered autopay bills are timed by the approved withdrawal schedule.
         excluded = _total(item["amount"] for item in expenses if item.get("date") and not included(item))
-        excluded_scheduled = _total(item["amount"] for item in timed["scheduledExpenses"] if not included(item))
+        excluded_scheduled = _total(item["amount"] for item in timed["scheduledExpenses"] if item.get("date") and not included(item))
         result["spending"] = _money(payload["modeViews"][mode]["metrics"]["totalExpenses"] - excluded - excluded_scheduled)
         result["complete"] = not any((undated_count, adjustment))
     return result

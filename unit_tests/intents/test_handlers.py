@@ -434,7 +434,7 @@ async def test_payment_logging_retries_transient_sheets_read_quota(monkeypatch, 
 
     assert attempts == 2
     sleep.assert_awaited_once_with(1.0)
-    assert any("Logged water as paid" in (content or "") for content, _kwargs in message.channel.sent)
+    assert any("Saved water bill amount" in (content or "") for content, _kwargs in message.channel.sent)
 
 
 @pytest.mark.asyncio

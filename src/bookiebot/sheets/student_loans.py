@@ -87,6 +87,8 @@ def _amount(value: Any, *, allow_empty: bool = False) -> Decimal:
 
 
 def student_loan_status() -> dict[str, Any]:
+    from bookiebot.sheets.bills import bill_payment_state
+    from bookiebot.sheets.routing import now_pacific
     loan = configured_student_loan()
     if loan is None:
         return {"configured": False, "note": SUBSCRIPTION_ONLY_MESSAGE}
@@ -97,9 +99,12 @@ def student_loan_status() -> dict[str, Any]:
                 "note": "Automatic monthly Need expense; no monthly payment log is required."}
     _row, value = _loan_row(get_sheets_repo().income_sheet(), loan)
     actual = _amount(value, allow_empty=True)
+    today = now_pacific().date()
+    timing = bill_payment_state(loan.source_label, today.year, today.month, [loan], as_of=today)
     return {"configured": True, "label": loan.display_name, "amount": float(actual),
-            "paid": actual > 0, "expectedAmount": loan.expected_amount, "pullDay": loan.pull_day,
-            "note": "Recorded current-month payment; a schedule alone does not confirm a payment."}
+            "paid": actual > 0 and timing.paid, "queued": actual > 0 and not timing.paid,
+            "expectedAmount": loan.expected_amount, "pullDay": loan.pull_day,
+            "note": "Entered amount counts as paid on its withdrawal date; an unentered estimate remains projected."}
 
 
 def log_standalone_student_loan(amount: Any, *, return_action_id: bool = False):

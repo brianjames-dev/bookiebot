@@ -197,32 +197,23 @@ async def calculate_burn_rate() -> tuple[str | None, str | None]:
 
 
 async def check_rent_paid():
-    ws = _income_ws()
-    if ws is None:
-        return False, 0.0
-    try:
-        cell = ws.find("Rent")
-        amount_cell = ws.cell(cell.row, cell.col + 1).value
-        if amount_cell:
-            cleaned = clean_money(amount_cell)
-            if cleaned > 0:
-                return True, cleaned
-    except Exception as e:
-        print(f"[ERROR] Failed to check rent paid: {e}")
-    return False, 0.0
+    return await check_payment_paid("Rent")
 
 
 async def check_payment_paid(category_label: str):
+    from bookiebot.sheets.bills import bill_payment_state, bill_source_amount, list_bill_schedules
+    from bookiebot.sheets.routing import now_pacific
     ws = _income_ws()
     if ws is None:
         return False, 0.0
     try:
-        cell = ws.find(category_label)
-        amount_cell = ws.cell(cell.row, cell.col + 1).value
-        if amount_cell:
-            cleaned = clean_money(amount_cell)
-            if cleaned > 0:
-                return True, cleaned
+        amount = bill_source_amount(ws.get_all_values(), category_label) or 0.0
+        if amount > 0:
+            schedule = get_sheets_repo().find_bill_schedule_sheet()
+            plans = list_bill_schedules(schedule.get_all_values() if schedule is not None else [])
+            today = now_pacific().date()
+            state = bill_payment_state(category_label, today.year, today.month, plans, as_of=today)
+            return state.paid, amount
     except Exception as e:
         print(f"[ERROR] Failed to check {category_label} paid: {e}")
     return False, 0.0

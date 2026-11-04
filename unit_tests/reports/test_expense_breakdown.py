@@ -414,6 +414,10 @@ def test_build_expense_breakdown_report_aggregates_shared_and_personal_data():
             shared_expenses=InMemoryWorksheet(shared_rows),
             personal_budget=InMemoryWorksheet(personal_rows),
             subscriptions=InMemoryWorksheet(subscriptions_rows),
+            bill_schedule=InMemoryWorksheet([BILL_SCHEDULE_HEADERS, *[
+                [label.lower(), label, "monthly", "1", "", label, "", "", ""]
+                for label in ("Rent", "PG&E", "Water")
+            ]]),
             budget_history=(
                 BudgetHistoryRows(
                     BudgetMonth(2026, 4),
@@ -1203,8 +1207,9 @@ def test_current_month_calendar_events_include_projected_income_subscriptions_an
         "wants": 1770.0,
         "savings": 1200.0,
     }
-    assert payload["breakdown"][2]["label"] == "Static Bills & Subscriptions"
-    assert payload["breakdown"][2]["amount"] == 15.0
+    static = next(item for item in payload["breakdown"] if item["key"] == "static_bills_subscriptions_needs")
+    assert static["label"] == "Static Bills & Subscriptions"
+    assert static["amount"] == 15.0
     assert events[("income", "Paycheck")] == {
         "kind": "income",
         "label": "Paycheck",
@@ -1306,6 +1311,10 @@ def test_report_recalculates_totals_from_selected_month_subscription_activity(mo
             shared_expenses=InMemoryWorksheet([["hdr"] * 28, ["hdr"] * 28]),
             personal_budget=InMemoryWorksheet(personal_rows),
             subscriptions=InMemoryWorksheet(subscriptions_rows),
+            bill_schedule=InMemoryWorksheet([BILL_SCHEDULE_HEADERS, *[
+                [label.lower(), label, "monthly", "1", "", label, "", "", ""]
+                for label in ("Rent", "PG&E", "Water")
+            ]]),
         ),
     )
 
@@ -2289,10 +2298,11 @@ def test_unpaid_utility_point_waits_until_billing_month_closes(monkeypatch, now_
     assert by_label["PG&E"]["history"][1]["amount"] == 0.0
 
 
-def test_actual_current_off_cycle_utility_payment_is_visible(monkeypatch):
+def test_off_cycle_entered_utility_is_not_shown_as_paid_without_a_withdrawal_date(monkeypatch):
     monkeypatch.setattr(expense_breakdown, "now_pacific", lambda: datetime(2026, 9, 5, tzinfo=routing.PACIFIC_TZ))
     schedule = [BILL_SCHEDULE_HEADERS, ["recology", "Recology", "quarterly", "20", "2,5,8,11", "Recology", "", "", ""]]
     items = expense_breakdown._utility_history_items(
         (BudgetHistoryRows(BudgetMonth(2026, 9), [["Recology", "$123"]]),), schedule, BudgetMonth(2026, 9)
     )
-    assert items[0].history == [("Sep", 9, 123.0)]
+    assert items[0].history == []
+    assert items[0].current_amount == 0

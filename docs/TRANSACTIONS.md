@@ -1,5 +1,11 @@
 # Recorded transactions in the app
 
+Entered bills now follow their saved withdrawal/autopay date. Future or
+unresolved dates keep the amount queued in Calendar/Projected and outside this
+recorded workspace. On the withdrawal date the existing source appears once,
+dated to that withdrawal, with the same edit/split/Undo identity. Unentered
+estimates never become transaction rows. See [Bill payment timing](BILL_PAYMENT_TIMING.md).
+
 Transactions opens with the Date column/Quiet indent list and existing recorded-transaction actions. The circular graph button beside All smoothly reveals or hides the native Daily Spending chart below Total Spent/filter and above search; it starts hidden, retains its chart instance through reversals and makes no data requests. Overview ends after its four-chart carousel; standalone signed reports retain read-only Daily Spending. Ask's activity source opens Transactions.
 
 The single **All** chooser beside Total Spent filters both chart and list by Needs, Wants, Shared or category. Income and cash Savings remain accessible in that chooser, with Total Income / Total Saved labels. All means recorded spending (expenses and bill payments), not income or savings. Search sits below the total and matches descriptions, locations, people/cards, dates and amounts; there are no separate people/card/status filters. The period control offers the selected month or All months across configured existing annual workbooks. This remains separate from Plaid review and excludes scheduled estimates and derived ESPP totals. Shared purchases use the canonical full purchase amount, matching their edit/review rows; this recorded-activity total can differ from Overview's Current/Projected budget total and net amounts after repayments. Scheduled status semantics are not changed by this merger.

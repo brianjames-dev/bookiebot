@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-04 - Count Entered Bills On Their Withdrawal Date
+
+The user explicitly approves queuing known bill amounts before autopay rather than waiting for a bank match or a second payment confirmation. The saved withdrawal/pull day is the payment assumption, not a separate invoice due date or the logging timestamp. Require exactly one valid matching monthly/quarterly schedule; clamp to month-end and leave missing, overlapping or off-cycle timing queued. Estimates without an entered monthly amount never become recorded payments merely because their day passes.
+
+Derive paid/queued state on reads from existing monthly cells and the owner/year's schedule. Preserve amounts, source IDs, canonical gross/net splits, repayments, edits, Undo and audit history; no new table/column, midnight financial writer or duplicate transaction. Existing undated bills inherit their schedule placement. Corrections to that date authority also correct derived placements. Current/Transactions exclude queued amounts; Calendar/Projected retain them, including unresolved amounts in `queuedBills`. Report breakdowns, balance fallbacks, comparison/explanation provenance, bill history and assistant queries agree. Capture report payment timing once and include the Pacific date in the Transactions cache.
+
+Read schedules in the existing personal-workbook batch. A later bank charge may match an early-entered bill's existing action using its unique recorded monthly schedule occurrence; retain the original action and reserve both physical and occurrence references so a duplicate cannot consume it twice. Existing explicit financial confirmation, amount-mismatch, owner/version and separate repayment guards remain. Logging feedback saves a bill amount without claiming an early payment. See `docs/BILL_PAYMENT_TIMING.md`; this supersedes earlier policies counting entered undated bills immediately or keeping future fixed-bill drilldowns Recorded.
+
 ## 2026-11-03 - Optional Gas Location and coordinated column migration
 
 Add optional Location at J between Gas Amount and Person; physically insert a column rather than overwrite the occupied Gas summaries. Resolve legacy/new worksheet coordinates from fresh headers, rejecting unknown identifiable layouts, and stamp new/migrated expense actions with `gas_location_v1`. Preserve untagged legacy meanings. All categories to the right, compaction/Move/Delete/Undo snapshots, canonical source/receipt maps and bank reservations must follow the same schema.

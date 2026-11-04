@@ -31,18 +31,14 @@ export function activityMatchesCategory(entry: ReportActivity, category: Pick<Br
 }
 export function calendarActivityStatus(event: CalendarEvent): ActivityStatus {
   // A subscription’s scheduled pull passing does not prove it posted at a bank.
-  // A bill's future due date is separate from its amount's provenance. Only an
-  // explicit estimate is scheduled; a recorded amount stays recorded on any day.
-  return event.amountEstimated || event.kind === 'subscription' || (event.kind === 'income' && event.projectedOnly) ? 'scheduled' : 'recorded'
+  // Entered bills become recorded on their withdrawal date. Expectations and
+  // future queued amounts remain scheduled, including in Projected drilldowns.
+  return event.amountEstimated || event.kind === 'subscription' || event.projectedOnly ? 'scheduled' : 'recorded'
 }
 export function reportActivity(report: ExpenseReportData, events: CalendarEvent[], projected: boolean): ReportActivity[] {
   return [
     ...report.dailyEntries.map((entry, index) => ({...entry, id:`expense-${index}`, day:activityDay(entry.date, report.year, report.month), status:'recorded' as const, dateSource:'recorded' as const})),
-    ...events.filter(event => event.kind !== 'income' && (
-      projected || !event.projectedOnly || (
-        event.kind === 'bill' && event.group === 'static_bills_subscriptions_needs' && !event.amountEstimated
-      )
-    )).map((event, index) => ({
+    ...events.filter(event => event.kind !== 'income' && (projected || !event.projectedOnly)).map((event, index) => ({
       id:`calendar-${index}`, date:`${report.month}/${event.day}/${report.year}`, day:event.day,
       category:calendarActivityCategory(event), amount:event.amount, person:report.ownerName,
       item:event.label, location:'', status:calendarActivityStatus(event), dateSource:'scheduled' as const,

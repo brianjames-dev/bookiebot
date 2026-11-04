@@ -371,6 +371,7 @@ def _financial_report_section(
         return {
             "fixedCommitments": _fixed_commitments_from_breakdown(view["breakdown"]),
             "bills": bill_events,
+            "queuedBills": payload.get("queuedBills", []) if mode == "projected" else [],
             "subscriptionEvents": subscription_events,
             "subscriptionsNeeds": payload["subscriptionsNeeds"],
             "subscriptionsWants": payload["subscriptionsWants"],

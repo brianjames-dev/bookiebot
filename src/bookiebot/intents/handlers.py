@@ -1498,6 +1498,8 @@ async def query_rent_paid_handler(message):
     paid, amount = await su.check_rent_paid()
     if paid:
         await message.channel.send(f"✅ You paid ${amount:.2f} for rent this month.")
+    elif amount > 0:
+        await message.channel.send(f"🗓️ Rent amount saved: ${amount:.2f}. Queued until its withdrawal date; a missing date must be set first.")
     else:
         await message.channel.send("❌ You have NOT paid rent yet this month.")
 
@@ -1506,6 +1508,8 @@ async def query_pge_paid_handler(message):
     paid, amount = await su.check_pge_paid()
     if paid:
         await message.channel.send(f"✅ You paid ${amount:.2f} for PG&E this month.")
+    elif amount > 0:
+        await message.channel.send(f"🗓️ PG&E amount saved: ${amount:.2f}. Queued until its withdrawal date; a missing date must be set first.")
     else:
         await message.channel.send("❌ You have NOT paid PG&E yet this month.")
 
@@ -1514,6 +1518,8 @@ async def query_recology_paid_handler(message):
     paid, amount = await su.check_recology_paid()
     if paid:
         await message.channel.send(f"✅ You paid ${amount:.2f} for Recology this month.")
+    elif amount > 0:
+        await message.channel.send(f"🗓️ Recology amount saved: ${amount:.2f}. Queued until its withdrawal date; a missing date must be set first.")
     else:
         await message.channel.send("❌ You have NOT paid Recology yet this month.")
 
@@ -1522,6 +1528,8 @@ async def query_water_paid_handler(message):
     paid, amount = await su.check_water_paid()
     if paid:
         await message.channel.send(f"✅ You paid ${amount:.2f} for water this month.")
+    elif amount > 0:
+        await message.channel.send(f"🗓️ Water amount saved: ${amount:.2f}. Queued until its withdrawal date; a missing date must be set first.")
     else:
         await message.channel.send("❌ You have NOT paid water yet this month.")
 
@@ -2000,6 +2008,8 @@ async def standalone_student_loan_handler(entities, message, *, logging_payment:
                 f"Student Loan is an automatic monthly Need expense: ${status['amount']:.2f}, "
                 f"scheduled on day {status['pullDay']}. No monthly payment log is required."
             )
+        elif status.get("queued"):
+            await message.channel.send(f"🗓️ Student-loan amount saved: ${status['amount']:.2f}. Queued until withdrawal on day {status['pullDay']}.")
         elif status["paid"]:
             await message.channel.send(f"✅ Student loan recorded this month: ${status['amount']:.2f}.")
         else:
@@ -2021,7 +2031,7 @@ async def log_rent_paid_handler(entities, message):
 
     success, action_id = await _log_payment_with_retry(su.log_rent_paid, amount)
     if success:
-        await message.channel.send(f"✅ Logged rent as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await message.channel.send(f"✅ Saved rent bill amount for {_budget_profile_name(message)}: ${amount:.2f}. It counts as paid on its saved withdrawal date.")
         await continue_split_after_log(
             data=entities,
             message=message,
@@ -2041,7 +2051,7 @@ async def log_pge_paid_handler(entities, message):
 
     success, action_id = await _log_payment_with_retry(su.log_pge_paid, amount)
     if success:
-        await message.channel.send(f"✅ Logged PG&E as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await message.channel.send(f"✅ Saved PG&E bill amount for {_budget_profile_name(message)}: ${amount:.2f}. It counts as paid on its saved withdrawal date.")
         await continue_split_after_log(
             data=entities,
             message=message,
@@ -2061,7 +2071,7 @@ async def log_recology_paid_handler(entities, message):
 
     success, action_id = await _log_payment_with_retry(su.log_recology_paid, amount)
     if success:
-        await message.channel.send(f"✅ Logged Recology as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await message.channel.send(f"✅ Saved Recology bill amount for {_budget_profile_name(message)}: ${amount:.2f}. It counts as paid on its saved withdrawal date.")
         await continue_split_after_log(
             data=entities,
             message=message,
@@ -2081,7 +2091,7 @@ async def log_water_paid_handler(entities, message):
 
     success, action_id = await _log_payment_with_retry(su.log_water_paid, amount)
     if success:
-        await message.channel.send(f"✅ Logged water as paid for {_budget_profile_name(message)}: ${amount:.2f}")
+        await message.channel.send(f"✅ Saved water bill amount for {_budget_profile_name(message)}: ${amount:.2f}. It counts as paid on its saved withdrawal date.")
         await continue_split_after_log(
             data=entities,
             message=message,
