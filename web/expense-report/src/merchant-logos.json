@@ -1729,5 +1729,17 @@
     "asset": "company-logo-merchant-valero-57190617f3f23016.png",
     "background": "#ffffff",
     "inset": 0
+  },
+  {
+    "id": "aws",
+    "name": "AWS",
+    "aliases": [
+      "AWS",
+      "Amazon Web Services",
+      "Amazon AWS"
+    ],
+    "asset": "company-logo-merchant-aws-f604b52ec9f1ba0a.png",
+    "background": "#ffffff",
+    "inset": 0
   }
 ]

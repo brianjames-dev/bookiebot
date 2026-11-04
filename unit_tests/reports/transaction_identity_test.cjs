@@ -28,6 +28,16 @@ for(const location of ['Valero','VALERO GAS','Valero fuel','Valero gas station s
 }
 assert.equal(transactionMerchant(input({location:'Valero gift card reseller'})),null)
 assert.equal(transactionMerchant(input({location:'Unknown station',item:'Valero',category:'Gas'})),null)
+for(const location of ['AWS','Amazon Web Services','Amazon AWS','  AMAZON WEB SERVICES  ','amazon-web-services','Amazon Web Services store #123']){
+ const merchant=transactionMerchant(input({category:'Other needs',location,item:'Cloud hosting'}))
+ assert.equal(merchant?.id,'aws',location)
+ assert.equal(merchant.inset,0)
+ assert.equal(transactionText(input({location,item:'Cloud hosting'}),merchant).primary,'AWS')
+}
+assert.equal(transactionMerchant(input({location:'',item:'Amazon Web Services'}))?.id,'aws')
+for(const location of ['AWS gift card reseller','Amazon Web Services training','Amazon Web Services Marketplace','Unknown provider']){
+ assert.equal(transactionMerchant(input({location,item:'AWS'})),null,location)
+}
 assert.equal(transactionMerchant(input({item:'Amazon'})).id,'amazon')
 assert.equal(transactionMerchant(input({item:'Amazon Prime'})).id,'amazon-prime')
 assert.equal(transactionMerchant(input({item:'Water'}),{water:'santa-rosa-water'}).id,'santa-rosa-water')
@@ -58,4 +68,4 @@ assert.equal(renderer.root.findAllByType('img').length,1)
 act(()=>renderer.update(React.createElement(TransactionIcon,{entry:input({item:'Unknown',category:'Income'})})))
 assert.equal(slot().props['data-merchant'],'fallback');assert.equal(renderer.root.findAllByType('img').length,0)
 act(()=>renderer.unmount())
-console.log('159 merchant names/store aliases, category families, exact matching, descriptions and reused logo states passed')
+console.log(`${merchants.length} merchant names/store aliases, category families, exact matching, descriptions and reused logo states passed`)

@@ -1,6 +1,6 @@
 {
   "status": "approved",
-  "reviewDate": "2026-11-03",
+  "reviewDate": "2026-11-04",
   "license": "Respective company trademarks; sources and upstream packages recorded per mark. No affiliation implied.",
   "logos": [
     {
@@ -3269,6 +3269,35 @@
         "sourceUrl": "https://brandlogos.net/wp-content/uploads/2012/11/valero-logo-vector.png",
         "method": "reframe",
         "rendering": "docs/logo-review/batches/2026-11-03-gas-refinement/rendering.json"
+      }
+    },
+    {
+      "id": "aws",
+      "name": "AWS",
+      "aliases": [
+        "AWS",
+        "Amazon Web Services",
+        "Amazon AWS"
+      ],
+      "asset": "company-logo-merchant-aws-f604b52ec9f1ba0a.png",
+      "background": "#ffffff",
+      "inset": 0,
+      "group": "Technology & services",
+      "previousVersions": [],
+      "addedIn": "aws-logo-2026-11-04",
+      "source": "https://aws.amazon.com/",
+      "upstream": "https://aws.amazon.com/",
+      "sha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+      "review": "approved-2026-11-04",
+      "package": "Logo Studio · native artwork",
+      "studioReview": {
+        "batch": "docs/logo-review/batches/2026-11-04-aws/batch.json",
+        "candidateSha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+        "source": "docs/logo-review/batches/2026-11-04-aws/references/merchant-aws-5fffc69099f60c99.svg",
+        "sourceSha256": "5fffc69099f60c99a39b2464521eda8a2bb5e156475ae598c8ac56294bdf5bff",
+        "sourceUrl": "https://aws.amazon.com/",
+        "method": "reframe",
+        "rendering": "docs/logo-review/batches/2026-11-04-aws/rendering.json"
       }
     }
   ]

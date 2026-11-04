@@ -58,6 +58,17 @@ Sam's Club vector and its unmodified original, deterministic framing, hashes
 and approvals. Current merchant entries retain their previous versions; all
 prepared circles use zero inset. Valero adds only explicit name aliases.
 
+The user approved the AWS circle in chat on 2026-11-04. Its exact candidate hash,
+original public AWS navigation vector, normalized render source, circle framing,
+pre-publication inventory and chat approval are retained in
+`batches/2026-11-04-aws` and `publications/2026-11-04-aws-logo.json`.
+The native paths are unchanged; inherited paint is resolved to AWS navy on a
+full white circle with transparent corners and zero runtime inset. No AI was used.
+Reproduce with `BOOKIEBOT_PLAYWRIGHT_MODULE=/path/to/playwright node docs/logo-review/batches/2026-11-04-aws/prepare.cjs /tmp/aws-circle.png`.
+AWS, Amazon Web Services and Amazon AWS match explicitly in transaction locations
+(or item names when location is blank), including existing normalization/store
+suffix rules. Amazon retail/Prime and every prior catalog entry remain independent.
+
 Manual review: open the current gallery on a phone; flag an icon, confirm the
 editor appears beside it, enter notes and send with readiness off. The next chat
 intake should invite replacement images before refining. After intake, inspect

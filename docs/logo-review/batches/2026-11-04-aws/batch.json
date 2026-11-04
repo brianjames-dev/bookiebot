@@ -1,0 +1,51 @@
+{
+  "kind": "bookiebot-logo-batch",
+  "version": 1,
+  "snapshotId": "5c56c30bbe26377e55273cb2e668a9a5644213f2b79bcb69fc2fbd60c2e79bcf",
+  "createdAt": "2026-11-04T22:14:18.672860+00:00",
+  "intakeOrigin": "Direct chat request; agent-prepared proposal, not user-approved artwork. Exact request retained in request.json.",
+  "items": [
+    {
+      "key": "merchant:aws",
+      "kind": "merchant",
+      "id": "aws",
+      "name": "AWS",
+      "expectedRevision": null,
+      "current": null,
+      "notes": "Add an AWS logo for locations named Amazon Web Services or AWS. Keep separate from Amazon retail and Amazon Prime. Proposal uses the current official AWS navigation artwork.",
+      "referenceUrls": [
+        "https://aws.amazon.com/"
+      ],
+      "references": [
+        {
+          "path": "references/merchant-aws-295af927451286f9.svg",
+          "sha256": "295af927451286f981d2ca5099f6981dcb7f4b82661bc8a20812c4afa2391db0"
+        }
+      ],
+      "candidates": [
+        {
+          "sha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+          "asset": "candidates/merchant-aws-f604b52ec9f1ba0a.png",
+          "source": {
+            "path": "references/merchant-aws-5fffc69099f60c99.svg",
+            "sha256": "5fffc69099f60c99a39b2464521eda8a2bb5e156475ae598c8ac56294bdf5bff"
+          },
+          "sourceUrl": "https://aws.amazon.com/",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T22:14:19.034455+00:00"
+        }
+      ],
+      "status": "approved",
+      "proposedAliases": [
+        "AWS",
+        "Amazon Web Services",
+        "Amazon AWS"
+      ],
+      "approvedSha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+      "approvedAt": "2026-11-04T22:24:23.082853+00:00"
+    }
+  ]
+}

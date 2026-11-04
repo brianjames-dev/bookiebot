@@ -43,7 +43,7 @@ def test_approved_merchant_art_is_local_content_addressed_and_inert():
     provenance = json.loads((root / "docs/merchant-logos/catalog.json").read_text())["logos"]
     assert catalog == [{key: item[key] for key in catalog[0]} for item in provenance]
     catalog = provenance
-    assert len(catalog) == len({item['id'] for item in catalog}) == 159
+    assert len(catalog) == len({item['id'] for item in catalog}) == 160
     aliases = {}
     for item in catalog:
         assert re.fullmatch(r'company-logo-merchant-[a-z0-9-]+-[a-f0-9]{16}\.(svg|png)', item['asset'])
@@ -66,7 +66,7 @@ def test_approved_merchant_art_is_local_content_addressed_and_inert():
                     assert not re.search(r'@import|url\(\s*[\"\']?(?!#)', node.text or '', re.I)
         reviewed = {'amazon', 'usps', 'walmart', 'trader-joes', 'whole-foods', 'safeway', 'panda-express'}
         gas_reviewed = {'bp', 'chevron', 'circle-k', 'sheetz', 'sam-s-club', 'valero'}
-        expected_review = 'approved-2026-11-03' if item['id'] in gas_reviewed else 'approved-2026-11-02' if item['id'] in reviewed else 'approved-2026-11-01'
+        expected_review = 'approved-2026-11-04' if item['id'] == 'aws' else 'approved-2026-11-03' if item['id'] in gas_reviewed else 'approved-2026-11-02' if item['id'] in reviewed else 'approved-2026-11-01'
         assert item['source'] and item['review'] == expected_review
         assert re.fullmatch(r'#[a-fA-F0-9]{6}', item['background'])
         assert 0 <= item['inset'] <= 10

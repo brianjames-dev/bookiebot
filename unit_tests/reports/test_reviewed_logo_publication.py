@@ -17,6 +17,7 @@ def read(path):
                 'merchant:whole-foods', 'merchant:safeway', 'merchant:panda-express', 'merchant:amazon'}),
     ('2026-11-03-gas-logos.json', {'merchant:bp', 'merchant:chevron', 'merchant:circle-k',
                                 'merchant:sheetz', 'merchant:sam-s-club', 'merchant:valero'}),
+    ('2026-11-04-aws-logo.json', {'merchant:aws'}),
 ])
 def test_latest_reviewed_logos_are_the_exact_published_assets(file, expected):
     publication = read('docs/logo-review/publications/' + file)
@@ -40,7 +41,7 @@ def test_latest_reviewed_logos_are_the_exact_published_assets(file, expected):
             assert runtime['asset'] != change['previous']['asset']
             assert (ROOT / 'src/bookiebot/reports/assets' / change['previous']['asset']).is_file()
         else:
-            assert change['key'] == 'merchant:valero'
+            assert change['key'] in {'merchant:valero', 'merchant:aws'}
         if kind == 'merchant':
             assert runtime['inset'] == 0
             assert runtime['background'] == change['background']
@@ -55,8 +56,8 @@ def test_publication_preserves_other_catalog_art_and_only_adds_named_starbucks_a
     catalogs = {kind: {item['id']: item for item in read(f'web/expense-report/src/{kind}-logos.json')}
                 for kind in ['company', 'merchant']}
     assert len(snapshot['items']) == 247
-    assert sum(map(len, catalogs.values())) == 248
-    assert {kind + ':' + id for kind, entries in catalogs.items() for id in entries} - {item['key'] for item in snapshot['items']} == {'merchant:valero'}
+    assert sum(map(len, catalogs.values())) == 249
+    assert {kind + ':' + id for kind, entries in catalogs.items() for id in entries} - {item['key'] for item in snapshot['items']} == {'merchant:valero', 'merchant:aws'}
     for item in snapshot['items']:
         active = catalogs[item['kind']][item['id']]
         aliases = [*item['aliases'], 'Starbucks Coffee Company'] if item['key'] == 'merchant:starbucks' else item['aliases']
@@ -84,3 +85,44 @@ def test_gas_publication_preserves_every_unselected_active_catalog_entry():
             assert hashlib.sha256((ROOT / item['asset']).read_bytes()).hexdigest() == item['sha256']
             if item['kind'] == 'merchant':
                 assert active['inset'] == item['inset'] and active['background'] == item['background']
+
+
+def test_aws_addition_preserves_the_catalog_and_approved_vector_circle():
+    from PIL import Image
+    from xml.etree import ElementTree as ET
+
+    folder = 'docs/logo-review/batches/2026-11-04-aws'
+    snapshot = read(f'{folder}/inventory.json')
+    catalogs = {kind: {item['id']: item for item in read(f'web/expense-report/src/{kind}-logos.json')}
+                for kind in ['company', 'merchant']}
+    assert len(snapshot['items']) == 248
+    assert {kind + ':' + id for kind, entries in catalogs.items() for id in entries} - {item['key'] for item in snapshot['items']} == {'merchant:aws'}
+    for item in snapshot['items']:
+        active = catalogs[item['kind']][item['id']]
+        assert active['name'] == item['name'] and active['aliases'] == item['aliases']
+        assert active['asset'] == Path(item['asset']).name
+        assert hashlib.sha256((ROOT / item['asset']).read_bytes()).hexdigest() == item['sha256']
+        if item['kind'] == 'merchant':
+            assert active['inset'] == item['inset'] and active['background'] == item['background']
+
+    aws = catalogs['merchant']['aws']
+    assert aws['aliases'] == ['AWS', 'Amazon Web Services', 'Amazon AWS']
+    assert aws['inset'] == 0 and aws['background'] == '#ffffff'
+    provenance = next(item for item in read('docs/merchant-logos/catalog.json')['logos'] if item['id'] == 'aws')
+    studio = provenance['studioReview']
+    metadata = read(f'{folder}/request.json')
+    assert studio['sourceUrl'] == 'https://aws.amazon.com/'
+    assert studio['candidateSha256'] == provenance['sha256']
+    assert metadata['approval']['message'] == 'yes please use it'
+    for file, key in [('aws-navigation-original.svg', 'sourceSha256'), ('aws-navigation.svg', 'renderSourceSha256')]:
+        assert hashlib.sha256((ROOT / folder / file).read_bytes()).hexdigest() == metadata[key]
+    original = ET.parse(ROOT / folder / 'aws-navigation-original.svg').getroot()
+    framed = ET.parse(ROOT / folder / 'aws-navigation.svg').getroot()
+    paths = lambda tree: [node.attrib['d'] for node in tree.iter() if node.tag.endswith('path')]
+    assert len(paths(original)) == 6 and paths(original) == paths(framed)
+    with Image.open(ROOT / 'src/bookiebot/reports/assets' / aws['asset']) as image:
+        assert image.format == 'PNG' and image.size == (256, 256)
+        rgba = image.convert('RGBA')
+        assert rgba.getpixel((0, 0))[3] == 0
+        assert rgba.getpixel((128, 8)) == (255, 255, 255, 255)
+        assert rgba.getpixel((128, 248)) == (255, 255, 255, 255)

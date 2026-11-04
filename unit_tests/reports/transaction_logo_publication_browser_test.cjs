@@ -3,13 +3,14 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const root=path.resolve(__dirname,'../..'),frontend=path.join(root,'web/expense-report'),req=createRequire(path.join(frontend,'package.json'))
 const {chromium,webkit}=require(process.env.BOOKIEBOT_PLAYWRIGHT_MODULE||req.resolve('playwright'))
 const read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8'))
-const publication={changes:[...read('docs/logo-review/publications/2026-11-02-reviewed-logos.json').changes,...read('docs/logo-review/publications/2026-11-03-gas-logos.json').changes]},catalogs={company:read('web/expense-report/src/company-logos.json'),merchant:read('web/expense-report/src/merchant-logos.json')}
+const publication={changes:[...read('docs/logo-review/publications/2026-11-02-reviewed-logos.json').changes,...read('docs/logo-review/publications/2026-11-03-gas-logos.json').changes,...read('docs/logo-review/publications/2026-11-04-aws-logo.json').changes]},catalogs={company:read('web/expense-report/src/company-logos.json'),merchant:read('web/expense-report/src/merchant-logos.json')}
 const cases=publication.changes.map(change=>{const[kind,id]=change.key.split(':'),item=catalogs[kind].find(i=>i.id===id);return{key:change.key,kind,id,name:item.name,label:item.aliases[0],asset:item.asset,sha256:change.sha256}})
 cases.push({key:'merchant:starbucks',kind:'merchant',id:'starbucks',name:'Starbucks',label:'Starbucks Coffee Company',asset:catalogs.merchant.find(i=>i.id==='starbucks').asset})
+cases.find(c=>c.id==='aws').label='Amazon Web Services'
 const bundle=req('esbuild').buildSync({stdin:{resolveDir:frontend,loader:'tsx',contents:`
  import React from 'react';import{createRoot}from'react-dom/client';import{TransactionIcon,DailyTransactionDays}from'./src/daily-transactions';import{CompanyMedallion}from'./src/cashflow-calendar';
- const gasIds=new Set(['bp','chevron','circle-k','sheetz','sam-s-club','valero']),cases=${JSON.stringify(cases)},entry=c=>({date:'11/5/2026',category:c.kind==='company'?'Static Bills & Subscriptions':gasIds.has(c.id)?'Gas':c.id==='starbucks'?'Food':'Shopping',amount:12,person:'Fixture',item:'Purchase',location:c.label});
- createRoot(document.getElementById('root')).render(<><div className="fixture-grid">{cases.map(c=><div key={c.key} data-case={c.key}><TransactionIcon entry={entry(c)} eager/><span>{c.name}</span>{c.kind==='company'&&<CompanyMedallion event={{label:c.label,kind:'subscription',amount:12,day:5,group:'subscriptions_wants',projectedOnly:false}}/>}</div>)}</div><div className="bb-daily-spending-content"><DailyTransactionDays groups={[{day:'5',today:false,entries:cases.map(entry)}]} year={2026} month={11} categoryColors={{Shopping:'hsl(var(--category-shopping))',Food:'hsl(var(--category-food))','Static Bills & Subscriptions':'hsl(var(--category-subs-needs))'}}/></div></>);
+ const gasIds=new Set(['bp','chevron','circle-k','sheetz','sam-s-club','valero']),cases=${JSON.stringify(cases)},entry=c=>({date:'11/5/2026',category:c.kind==='company'?'Static Bills & Subscriptions':gasIds.has(c.id)?'Gas':c.id==='starbucks'?'Food':c.id==='aws'?'Other needs':'Shopping',amount:12,person:'Fixture',item:'Purchase',location:c.label});
+ createRoot(document.getElementById('root')).render(<><div className="fixture-grid">{cases.map(c=><div key={c.key} data-case={c.key}><TransactionIcon entry={entry(c)} eager/><span>{c.name}</span>{c.kind==='company'&&<CompanyMedallion event={{label:c.label,kind:'subscription',amount:12,day:5,group:'subscriptions_wants',projectedOnly:false}}/>}</div>)}</div><div className="bb-daily-spending-content"><DailyTransactionDays groups={[{day:'5',today:false,entries:cases.map(entry)}]} year={2026} month={11} categoryColors={{Shopping:'hsl(var(--category-shopping))',Food:'hsl(var(--category-food))','Other needs':'hsl(var(--category-need))','Static Bills & Subscriptions':'hsl(var(--category-subs-needs))'}}/></div></>);
  `},bundle:true,write:false,format:'iife',define:{'process.env.NODE_ENV':'"production"'}}).outputFiles[0].text
 const assets=path.join(root,'src/bookiebot/reports/assets'),css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8')
 ;(async()=>{let count=0
@@ -42,5 +43,5 @@ for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
   await page.close();count++
  }
 }finally{await browser.close()}}
-console.log(JSON.stringify({cases:count,publishedLogos:publication.changes.length,matchedAliases:['Starbucks Coffee Company','Valero'],status:'passed'}))
+console.log(JSON.stringify({cases:count,publishedLogos:publication.changes.length,matchedAliases:['Starbucks Coffee Company','Valero','Amazon Web Services'],status:'passed'}))
 })().catch(e=>{console.error(e);process.exitCode=1})

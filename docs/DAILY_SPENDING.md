@@ -113,7 +113,7 @@ canonical scheduled entries. Category and Scheduled share the secondary line.
 The row's 28px anchor is the landing position for its single persistent logo.
 Bars retain the existing exact-day inspection dialog.
 
-Merchant identity reuses approved service/provider aliases, then the 159 reviewed
+Merchant identity reuses approved service/provider aliases, then the 160 reviewed
 merchant marks. Matching uses explicit normalized names and optional trailing
 store/location numbers. Normalize Unicode, case, punctuation and spacing; no
 fuzzy, substring or typo matching is used. Locations take precedence, with item
@@ -130,6 +130,13 @@ All six use zero inset and retain source, framing, approval and previous artwork
 in `docs/logo-review/batches/2026-11-03-gas-refinement`. Runtime images are local content-addressed assets;
 Calendar artwork/catalogs/import workflows are unchanged. No recategorization,
 sheet/bank writes, remote requests or extra settings are introduced.
+
+AWS uses the exact approved 256px circle from the native AWS vector, with no
+extra inset. `AWS`, `Amazon Web Services` and `Amazon AWS` are explicit aliases;
+existing case/punctuation/space normalization and store-number suffix handling
+apply. Amazon retail and Amazon Prime keep their existing marks. Additional words
+such as training or gift-card reseller do not match AWS. The review batch and
+source/approval hashes are retained in `docs/logo-review/batches/2026-11-04-aws`.
 
 Verification includes focused React/identity tests, pinned asset/hash checks,
 `daily_date_column_browser_test.cjs` for six/+N, Today, positions, opacity and
@@ -149,8 +156,9 @@ pixels, category order, status alignment, themes, cents and responsive layout.
 `transaction_fallback_colors_browser_test.cjs` compares computed glyph/disc
 colors directly with the production Category Mix palette, including aliases,
 both themes, live theme switching, failed images and moving persistent circles.
-`transaction_logo_publication_browser_test.cjs` checks all eleven published marks
+`transaction_logo_publication_browser_test.cjs` checks all eighteen published marks
 in actual Daily Spending/Calendar components, the Starbucks alias/display name,
-zero extra padding and persistent image identity during expansion/collapse.
+Valero and Amazon Web Services aliases, zero extra padding and persistent image
+identity during expansion/collapse. AWS phone acceptance is checklist 257.
 All browser checks use synthetic data and blocked external requests. Native acceptance is checklist
 241 in `.agent/STATUS.md`; physical-device appearance still needs phone review.
