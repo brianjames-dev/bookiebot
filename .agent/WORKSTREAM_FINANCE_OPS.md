@@ -4,6 +4,10 @@ Last updated: 2026-11-04
 
 ## Goal
 
+### Shared bill cash exposure in Transactions — 2026-11-04
+
+Implemented the requested display correction: canonical shared bills use gross minus confirmed receipts in rows, daily totals, Total Spent and the optional graph. Pending reports/reset clearing do not count as received, reversals restore exposure, partner bill cells are not discounted twice and zero-exposure managed bills retain their identity. Gross remains the edit/split/bank authority; queued timing, other purchase/legacy amount contracts, source/audit IDs and existing lifecycle guards are unchanged. No schema or live financial test writes. Isolated lifecycle and actual iPhone component regression coverage plus release evidence are tracked in STATUS checklist 255. This completes this bill-presentation slice; the broader Finance Ops backlog stays unchanged.
+
 ### Queued bills and withdrawal-date payment visibility — 2026-11-04
 
 Implemented the user-approved bill slice of scheduled/recorded semantics: entered amounts stay in Calendar/Projected until their saved withdrawal date, then become paid in Current/Transactions once, under the same source identity. Missing/ambiguous/off-cycle dates stay queued; unentered estimates remain projected after their day passes. Report totals, subtotal fallbacks, comparisons, explanations, bill history, drilldowns and bot status/logging feedback agree. The schedule joins the existing Transactions batch and the cache includes the Pacific date. Bank matching can use the recorded monthly occurrence for an action logged weeks early while preserving both reservations and duplicate guards. No schema/midnight writer, sheet or production financial test mutations. Verification/release is tracked in STATUS checklist 254; the broader recent-action/inbox backlog remains unchanged. This completes the entered-bill timing slice previously deferred by the Transactions consolidation.

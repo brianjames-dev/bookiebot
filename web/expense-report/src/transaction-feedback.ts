@@ -8,8 +8,8 @@ const money=(cents:number)=>new Intl.NumberFormat('en-US',{style:'currency',curr
 export function confirmedRows(items:RecordedTransaction[],id:string,summary:TransactionChangeSummary){
  return summary.operation==='delete'?items.filter(row=>row.id!==id):items.map(row=>{
   if(row.id!==id)return row
-  const after=summary.after,category=summary.destination??row.category
-  return {...row,fields:{...row.fields,...after},category,categoryLabel:category===row.category?row.categoryLabel:category,title:after.item||after.source||row.title,location:after.location??row.location,person:after.person??row.person,amountCents:after.amount?Math.round(Number(after.amount.replace(/[$,]/g,''))*100):row.amountCents}
+  const after=summary.after,category=summary.destination??row.category,amountCents=after.amount?Math.round(Number(after.amount.replace(/[$,]/g,''))*100):row.amountCents
+  return {...row,fields:{...row.fields,...after},category,categoryLabel:category===row.category?row.categoryLabel:category,title:after.item||after.source||row.title,location:after.location??row.location,person:after.person??row.person,amountCents,...(row.displayAmountCents===undefined?{}:{displayAmountCents:row.displayAmountCents+amountCents-row.amountCents})}
  })
 }
 export function motionValues(items:RecordedTransaction[],days:RecordedDay[],aliases?:Record<string,string>){

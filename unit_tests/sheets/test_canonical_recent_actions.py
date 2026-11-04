@@ -19,7 +19,7 @@ def canonical(monkeypatch):
         "payerPerson": "Brian (BofA)", "version": 3, "accounting": "cash_v1",
         "sourceActionId": "source", "splitActionId": "split", "sourceWorksheet": "expense",
         "sourceRow": 3, "category": "grocery", "method": "income", "lifecycle": "active",
-        "grossCents": 9234, "payerShareCents": 5977, "partnerShareCents": 3257,
+        "grossCents": 9234, "payerShareCents": 5977, "partnerShareCents": 3257, "settledCents": 0,
         "item": "Grocery", "location": "Costco Wholesale",
         "sourceColumnMap": {"date": 1, "amount": 2, "location": 3, "person": 4},
         "sourceValues": {"date": "9/16/2026", "amount": "92.34", "location": "Costco Wholesale", "person": "Brian (BofA)"},

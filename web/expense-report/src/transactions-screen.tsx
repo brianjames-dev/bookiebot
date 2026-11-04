@@ -6,7 +6,7 @@ import {DailySpendingChart, CategoryFilterControl} from './report-app'
 import {useAppNavigation} from './app-navigation'
 import {DailyTransactionDays} from './daily-transactions'
 import {TransactionSwipeContext,wrapTransactionRow} from './transaction-swipe'
-import {recordedDays,recordedChart,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
+import {displayedAmount,recordedDays,recordedChart,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
 import { type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
 import {InlineTransactionEditor,transactionMotion,type InlineSnapshot} from './transaction-inline-editor'
 import {ChangeMotionContext,type ChangePlan} from './transaction-value-motion'
@@ -19,7 +19,7 @@ import "./transactions-screen.css"
 type Operation = TransactionOperation
 export interface RecordedTransaction {
   id: string; actionId: string; month: string; version: string; date: string; title: string; location: string
-  person: string; kind: string; category: string; categoryLabel: string; amountCents: number; split: string; notice?: string
+  person: string; kind: string; category: string; categoryLabel: string; amountCents: number; displayAmountCents?: number; split: string; notice?: string
   fields: Record<string, string>; editableFields: string[]; capabilities: Record<Operation, boolean>; reasons: Record<string, string>
   splitOptions?: {custom: boolean; payerName: string; partnerName: string; payerBasisPoints: number; payerCents?: number; incomePayerCents?:number}
 }
@@ -49,6 +49,7 @@ function checkedListing(value: any): Listing {
     || value.days && (!Array.isArray(value.days)||!Number.isSafeInteger(value.totalAmountCents)||value.days.some((day:any)=>!Number.isSafeInteger(day.count)||day.count<1||!Number.isSafeInteger(day.totalCents)||!Number.isSafeInteger(day.needsCents)||!Number.isSafeInteger(day.wantsCents)))
     || value.nextOffset!==null&&!value.days
     || value.items.some((row: any) => !row || typeof row.id !== "string" || typeof row.version !== "string" || !Number.isSafeInteger(row.amountCents) || !row.capabilities || !Array.isArray(row.editableFields)
+      || row.displayAmountCents !== undefined && (!Number.isSafeInteger(row.displayAmountCents) || row.displayAmountCents < 0 || row.displayAmountCents > row.amountCents)
       || row.splitOptions && (typeof row.splitOptions.custom !== "boolean" || !row.splitOptions.payerName || !row.splitOptions.partnerName
         || !Number.isSafeInteger(row.splitOptions.payerBasisPoints) || row.splitOptions.payerBasisPoints < 0 || row.splitOptions.payerBasisPoints > 10_000
         || row.splitOptions.payerCents !== undefined && (!Number.isSafeInteger(row.splitOptions.payerCents) || row.splitOptions.payerCents < 0 || row.splitOptions.payerCents > row.amountCents)
@@ -192,7 +193,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
         manager.current.close?.();discard()
         if(before&&id&&before.items.some(row=>row.id===id)&&next.summary&&next.summary.operation!=='undo'){
           const afterItems=confirmedRows(before.items,id,next.summary)
-          const old=before.items.find(row=>row.id===id)!,after=afterItems.find(row=>row.id===id),delta=(after?.amountCents??0)-old.amountCents
+          const old=before.items.find(row=>row.id===id)!,after=afterItems.find(row=>row.id===id),delta=(after?displayedAmount(after):0)-displayedAmount(old)
           const afterDays=before.days?.flatMap(day=>day.date===old.date&&day.month===old.month?day.count===1&&!after?[]:[{...day,count:day.count-(after?0:1),totalCents:day.totalCents+delta}]:[day])
           // Keep identities inert during feedback; only the subsequent fresh
           // listing can make new versions/rows available for another command.
@@ -265,7 +266,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
   const changeFilter=(value:string)=>{if(locked||operation||notice)return;manager.current.close?.();setDay('');setFilter(value)}
   const displayedFilter=displayScope.filter
   const metricLabel=displayedFilter==='income'?'Total Income':displayedFilter==='savings'?'Total Saved':'Total Spent'
-  const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+row.amountCents,0)??0
+  const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+displayedAmount(row),0)??0
   useEffect(()=>{manager.current.close?.(true);setDay('')},[month,search,active])
   const amountValue=Number(draft.amount),validAmount=/^\d+(?:\.\d{1,2})?$/.test(draft.amount??'')&&amountValue>0&&Number.isSafeInteger(Math.round(amountValue*100))
   const validFields=selected?.editableFields.every(field=>field==='amount'||draft[field]===selected.fields[field]||Boolean(draft[field]?.trim())&&draft[field].length<=200)

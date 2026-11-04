@@ -977,6 +977,7 @@ def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_recon
     source_type = "expense" if value["sourceWorksheet"] == "expense" else "payment"
     metadata.update(category=value["category"], person=value["payerPerson"], source_type=source_type,
                     split_method=value["method"], gross_amount=values["amount"],
+                    canonical_settled_cents=str(value["settledCents"]),
                     payer_share=f"{value['payerShareCents'] / 100:.2f}",
                     partner_share=f"{value['partnerShareCents'] / 100:.2f}")
     for stored, key in (("customPayerBasisPoints", "custom_payer_basis_points"), ("customPayerRatio", "custom_payer_ratio")):
