@@ -100,6 +100,18 @@ def test_recovery_requires_saved_exact_link_and_independent_purchase_identity():
     assert recover_gas_locations(**fixture)[0]["location"]=="Chevron"
 
 
+def test_location_logged_during_compatible_deployment_is_not_dropped_at_cutover():
+    fixture=recovery_fixture()
+    saved=action();saved["metadata"]["supplied_location"]="Shell"
+    fixture["logs"]["November"][1][5]=json.dumps(saved)
+    fixture["transactions"]=[];fixture["reconciliations"]=[]
+    result=recover_gas_locations(**fixture)
+    assert result==[{"title":"November","row":3,"actionId":"exact-action","location":"Shell","source":"saved_action_input"}]
+    payload={"sourceWorksheet":"expense","sourceSpreadsheetId":"shared","sourceSheetTitle":"November", "sourceActionId":"exact-action", "category":"gas","location":"", "sourceColumnMap":{"date":8,"amount":9,"person":10},"sourceValues":{"date":"11/3/2026","amount":"42.25","person":"Brian (BofA)"}}
+    updated=migrate_allocation(payload,shared_id="shared",titles={"November"},locations={"exact-action":"Shell"})
+    assert updated["location"]==updated["sourceValues"]["location"]=="Shell"
+
+
 @pytest.mark.parametrize("problem",["pending","removed","amount","date","account_owner","source_owner","source_amount","source_date","deleted","unlinked","duplicate_row","conflicting_merchant"])
 def test_recovery_never_guesses_or_recreates_missing_sources(problem):
     f=recovery_fixture();bank=f["transactions"][0]

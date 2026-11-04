@@ -75,6 +75,10 @@ def recover_gas_locations(sheets: dict[str, list[list[str]]], logs: dict[str, li
             if sum(identity(values(other)) == key for other in current[2:]) != 1:
                 continue
             owner = get_user_config(row[2]).budget_owner_key
+            supplied = str(action["metadata"].get("supplied_location") or "").strip()
+            if supplied and len(supplied) <= 200 and not any(ord(c) < 32 for c in supplied):
+                results.append({"title": title, "row": row_number, "actionId": row[0], "location": supplied, "source": "saved_action_input"})
+                continue
             candidates = []
             for link in reconciliations:
                 if link.get("matched_action_log_id") != row[0] or link.get("status") not in {"confirmed", "matched"} or link.get("classification") != "expense" or link.get("owner_key") != owner:
@@ -147,7 +151,7 @@ def migrate_action(payload: dict[str, Any], *, location: str = "") -> dict[str, 
     return result
 
 
-def migrate_allocation(payload: dict[str, Any], *, shared_id: str, titles: set[str]) -> dict[str, Any]:
+def migrate_allocation(payload: dict[str, Any], *, shared_id: str, titles: set[str], locations: dict[str, str] | None = None) -> dict[str, Any]:
     """Translate current projection coordinates, retaining immutable audit rows."""
     result = deepcopy(payload)
     if (result.get("sourceWorksheet") == "expense" and result.get("sourceSpreadsheetId") == shared_id
@@ -158,7 +162,10 @@ def migrate_allocation(payload: dict[str, Any], *, shared_id: str, titles: set[s
         if result["sourceColumnMap"] == old:
             result["sourceColumnMap"] = new
             if category == "gas":
-                result.setdefault("sourceValues", {}).setdefault("location", result.get("location", ""))
+                saved_location = (locations or {}).get(result.get("sourceActionId", ""))
+                if not result.get("location") and saved_location:
+                    result["location"] = saved_location
+                result.setdefault("sourceValues", {})["location"] = result.get("location", "")
         elif result["sourceColumnMap"] != new:
             raise ValueError("A reimbursement has unknown source columns.")
     revision = result.get("sourceRevision", {})

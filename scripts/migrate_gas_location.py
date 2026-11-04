@@ -100,7 +100,7 @@ def build_plan(captures: dict[str, Any], database: dict[str, Any], accounts: lis
         plan["books"].append({"id":capture["id"], "requests":edits})
     for record in database["app_reimbursement_allocations"]:
         original = record["payload_json"]
-        updated = migrate_allocation(json.loads(original), shared_id=shared["id"], titles=titles)
+        updated = migrate_allocation(json.loads(original), shared_id=shared["id"], titles=titles, locations=locations)
         if updated != json.loads(original):
             plan["db"].append({"table":"app_reimbursement_allocations", "id":record["id"], "field":"payload_json", "before":original, "after":json.dumps(updated,sort_keys=True,separators=(",",":"))})
             plan["summary"]["allocations"] += 1
@@ -169,6 +169,8 @@ def apply_plan(plan: dict[str, Any], captures: dict[str, Any], env_file: Path | 
             raise ValueError("A transaction command is not complete; no migration writes made")
         if db.execute("SELECT COUNT(*) AS n FROM app_reimbursement_allocations WHERE version != projected_version").fetchone()["n"]:
             raise ValueError("Reimbursements are still syncing; no migration writes made")
+        if db.execute("SELECT COUNT(*) AS n FROM bank_import_operations WHERE status != 'completed'").fetchone()["n"]:
+            raise ValueError("A bank import needs recovery; no migration writes made")
         for update in plan["db"]:
             query=sql.SQL("SELECT {} AS value FROM {} WHERE {}=%s FOR UPDATE").format(sql.Identifier(update["field"]),sql.Identifier(update["table"]),sql.Identifier(update.get("key","id")))
             row = db.execute(query,(update["id"],)).fetchone()
