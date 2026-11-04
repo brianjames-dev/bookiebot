@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-04 - Display Shared Bills At Confirmed Cash Exposure
+
+The user wants dynamic bills in Transactions to reflect how much the payer is currently carrying. Display canonical `cash_v1` bill payments as gross minus confirmed `settledCents`, rather than the original charge or allocated payer share. Pending sent reports and cleared debt are not receipts; reversals restore exposure. This supersedes the full-gross Transactions display policy for shared bills only. Other purchases and historical net-accounting sources retain their existing policy.
+
+Keep API `amountCents`, editable fields, share calculations and bank matching gross. Derive optional `displayAmountCents` from the same versioned canonical overlay; row/day/graph/headline totals and feedback use this display amount, including zero. Search accepts both amounts. Never infer received cash from a stale sheet, cleared/outstanding balance or future schedule. A manual zero bill source can still resolve its managed gross identity; unentered zero/blank bills remain excluded by the normal positive-source rule. Partner bill cells already hold confirmed receipts and are not discounted again. Keep withdrawal timing, financial writers, repayment/reset guards and audit identities unchanged; no schema/migration or live financial repair is required.
+
 ## 2026-11-04 - Count Entered Bills On Their Withdrawal Date
 
 The user explicitly approves queuing known bill amounts before autopay rather than waiting for a bank match or a second payment confirmation. The saved withdrawal/pull day is the payment assumption, not a separate invoice due date or the logging timestamp. Require exactly one valid matching monthly/quarterly schedule; clamp to month-end and leave missing, overlapping or off-cycle timing queued. Estimates without an entered monthly amount never become recorded payments merely because their day passes.

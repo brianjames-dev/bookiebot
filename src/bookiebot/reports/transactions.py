@@ -155,6 +155,10 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
             "person": values.get("person") or action.metadata.get("person") or get_user_config(actor).name,
             "kind": kind, "category": category, "categoryLabel": expense_category_label(category) if category else kind.title(),
             "amountCents": cents(values.get("amount", "")), "fields": values,
+            # Keep gross as the edit/split/bank authority. Bill presentation
+            # follows confirmed canonical cash, even while Sheets is syncing.
+            **({"displayAmountCents": gross_cents - int(action.metadata.get("canonical_settled_cents", "0"))}
+               if kind == "payment" and action.metadata.get("accounting") == "cash_v1" else {}),
             "split": action.metadata.get("split_method", "") if capabilities.can_change_split else "",
             "splitOptions": split_options,
             "capabilities": {"update": capabilities.can_update and not generated, "move": capabilities.can_move and not generated,
@@ -198,7 +202,7 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
     payment_labels = {**PAYMENT_GROUPS, **_bill_schedule_labels(bill_schedule_rows or [], BudgetMonth(period.year, period.month))}
     for row, values in enumerate(personal, 1):
         label = cell(personal, row, 2)
-        if label and _normalize_label(label) in payment_labels and cents(cell(personal, row, 3)):
+        if label and _normalize_label(label) in payment_labels:
             yield undo.LoggedAction(id=f"sheet-payment-{row}", created_at=month + "-01", user_key=actor,
                 action=undo.UndoAction(worksheet="income", kind="restore_cells", row=row, columns=[3], previous_values=[""],
                     new_values=[cell(personal, row, 3)], metadata={"type": "payment", "category": label, "exact_source_label": label}, description=label))
@@ -323,7 +327,7 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping"} else "needs") == query["bucket"])
         and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
         and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
-                or word == f"{row['amountCents'] / 100:.2f}" for word in search)]
+                or word in {f"{row['amountCents'] / 100:.2f}", f"{row.get('displayAmountCents', row['amountCents']) / 100:.2f}"} for word in search)]
     result = {"items": [public_row(row) for row in selected[offset:offset + 40]], "total": len(selected),
             "nextOffset": offset + 40 if len(selected) > offset + 40 else None,
             "categories": sorted({row["category"] for row in rows if row["category"]}),
@@ -333,15 +337,16 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         # These are recorded sources only; no estimates acquire edit capabilities.
         days: dict[str, dict[str, Any]] = {}
         for row in selected:
+            amount = row.get("displayAmountCents", row["amountCents"])
             key = row["date"] or row["month"] + ":undated"
             day = days.setdefault(key, {"date": row["date"], "month": row["month"], "count": 0,
                                        "totalCents": 0, "needsCents": 0, "wantsCents": 0})
             day["count"] += 1
-            day["totalCents"] += row["amountCents"]
-            day["wantsCents" if row["category"] in {"food", "shopping"} else "needsCents"] += row["amountCents"]
+            day["totalCents"] += amount
+            day["wantsCents" if row["category"] in {"food", "shopping"} else "needsCents"] += amount
         result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected])
         result["days"] = list(days.values())
-        result["totalAmountCents"] = sum(row["amountCents"] for row in selected)
+        result["totalAmountCents"] = sum(row.get("displayAmountCents", row["amountCents"]) for row in selected)
     return result
 
 

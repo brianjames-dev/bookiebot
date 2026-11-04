@@ -6,6 +6,8 @@ The payer keeps the full purchase in their expenses until repayment is confirmed
 
 For a $200 purchase split equally, the payer initially records $200 and is owed $100. Confirming $40 changes the original expense to $160, records a $40 reimbursement expense for the other person, and leaves $60 owed. Confirming the remaining $60 leaves each person with $100 of expenses.
 
+Transactions displays shared **bill payments** using that same current exposure: full bill minus confirmed receipts. Its row, day total, Total Spent and optional graph agree. Pending reports and debt resets do not reduce it; a receipt reversal restores it. Original gross remains the authority for bill editing, split shares and bank matching. The recipient's linked bill cell is displayed once at its existing received amount. See [Transactions](TRANSACTIONS.md).
+
 ## Phone workflow
 
 - **Owed to you / You owe** shows both directions and the net difference. The month segments describe which purchases make up the selected balance.
