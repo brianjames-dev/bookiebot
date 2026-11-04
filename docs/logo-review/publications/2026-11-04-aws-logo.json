@@ -1,0 +1,23 @@
+{
+  "kind": "bookiebot-logo-publication",
+  "version": 1,
+  "approval": {
+    "date": "2026-11-04",
+    "channel": "chat",
+    "context": "User said \"yes please use it\" after the displayed AWS circle and pending approval were explicitly discussed. Approval applies to the exact latest candidate hash in this record.",
+    "candidates": {
+      "merchant:aws": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe"
+    }
+  },
+  "changes": [
+    {
+      "key": "merchant:aws",
+      "batch": "docs/logo-review/batches/2026-11-04-aws/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-04-aws/candidates/merchant-aws-f604b52ec9f1ba0a.png",
+      "sha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-aws-f604b52ec9f1ba0a.png",
+      "previous": null,
+      "background": "#ffffff"
+    }
+  ]
+}

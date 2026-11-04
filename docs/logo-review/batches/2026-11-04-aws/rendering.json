@@ -1,0 +1,13 @@
+{
+  "method": "Official navigation vector / deterministic circle framing",
+  "sourceSha256": "5fffc69099f60c99a39b2464521eda8a2bb5e156475ae598c8ac56294bdf5bff",
+  "sha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+  "size": [
+    256,
+    256
+  ],
+  "background": "#ffffff",
+  "fill": 0.7734375,
+  "ai": false,
+  "status": "candidate-review"
+}

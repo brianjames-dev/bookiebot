@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-04",
+  "focusedTests": 42,
+  "frontendTypecheck": "passed",
+  "pythonTypecheck": "0 errors, 0 warnings",
+  "frontendBuild": "passed; Node 22",
+  "browser": {
+    "cases": 12,
+    "publishedLogos": 18,
+    "matchedAliases": [
+      "Starbucks Coffee Company",
+      "Valero",
+      "Amazon Web Services"
+    ],
+    "status": "passed"
+  },
+  "visualReview": "390px WebKit light/dark screenshots inspected; approved circle is crisp and full-face at the existing 28px size. Actual component checks verify unchanged image identity through expansion/collapse.",
+  "approvalMessage": "yes please use it",
+  "publishedSha256": "f604b52ec9f1ba0a40f7cd033cd002cff0b297b2f9dc4456a91dd0808d38bdfe",
+  "scope": "Only AWS added; prior 248 runtime entries preserved. No financial data accessed or changed.",
+  "fullUnitSuite": {
+    "passed": 2961,
+    "skipped": 587,
+    "skipReason": "Optional PostgreSQL contracts; required CI supplies PostgreSQL."
+  },
+  "appsScriptChecks": "passed"
+}

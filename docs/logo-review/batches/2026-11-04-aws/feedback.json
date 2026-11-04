@@ -1,0 +1,17 @@
+{
+  "kind": "bookiebot-logo-feedback",
+  "version": 1,
+  "snapshotId": "5c56c30bbe26377e55273cb2e668a9a5644213f2b79bcb69fc2fbd60c2e79bcf",
+  "batchRef": "/Users/brianjames/.codex/visualizations/2026/10/04/01a1047d-1f70-79c2-8231-c3d6ca75d3db/aws-logo-review/batch.json",
+  "items": [
+    {
+      "key": "merchant:aws",
+      "notes": "Add an AWS logo for locations named Amazon Web Services or AWS. Keep separate from Amazon retail and Amazon Prime. Proposal uses the current official AWS navigation artwork.",
+      "referenceUrls": [
+        "https://aws.amazon.com/"
+      ],
+      "ready": false
+    }
+  ],
+  "newRequests": []
+}
