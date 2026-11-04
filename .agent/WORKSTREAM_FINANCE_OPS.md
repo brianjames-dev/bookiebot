@@ -4,6 +4,10 @@ Last updated: 2026-11-03
 
 ## Goal
 
+### Transactions chart spacing — 2026-11-03
+
+Corrected the list workspace's inherited full-height chart rule: use natural height so the graph/legend cannot stretch to the transaction list and push Total Spent hundreds of pixels down. Scope the fix to Transactions, leaving fixed carousel stages unchanged. Added browser geometry regression across phone/desktop, both themes, scroll round trips, pagination and unified scopes; it fails on the previous CSS. **7 targeted / 2,854 full passed / 565 optional PostgreSQL skipped** in the full run, clean Python/frontend types/build and **36 Chromium/WebKit browser cases** pass. Phone renders inspected. Existing financial flows and backlog are unchanged; native acceptance is STATUS checklist 249. Required release evidence follows in the task PR; no live financial test reads/writes.
+
 ### Approved inline transaction editors — 2026-11-03
 
 The selected Row Context/Quiet extension workflow is now implemented: compact inline Update/Split/Delete, uniform headerless server review with Slide + resize, shared-track icon-only actions, confirmed value feedback and category placement, and an eight-second supported Undo popup. Rising fill uses the chosen pie income shortcut; pure read metadata exposes exact writer income/current-share cents for either owner. No financial writer, schema, source identity, repayment or reconciliation protocol changes. Confirmation/recovery remains immutable; feedback identities stay inert until a successful fresh listing. Final local full 2,854 / 565 optional skips, final 67 targeted / 55 skips, clean types/build/Apps Script, 20 workspace/inline browser cases and both 120-entry motion checks pass. Release checks/merge are tracked in PR #127; native acceptance is checklist 248. This completes the earlier design exploration; the general Finance Ops backlog stays unchanged.

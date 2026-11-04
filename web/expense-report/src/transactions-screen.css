@@ -35,7 +35,9 @@
 .bb-recorded-search button { flex:0 0 30px; width:30px; min-height:40px; padding:6px; border:0; background:transparent; color:inherit; }
 .bb-recorded-search button svg { width:17px; height:17px; }
 .bb-transactions .bb-daily-transactions { padding-top:12px; }
-.bb-transactions .bb-chart-layout { margin-bottom:0; }
+/* This chart lives in the scrolling list, not a fixed-height carousel stage.
+   A percentage height can stretch both grid rows to the whole workspace. */
+.bb-transactions .bb-chart-layout { height:auto; margin-bottom:0; }
 .bb-transactions .bb-daily-summary { margin-bottom:0; }
 .bb-transactions .bb-daily-summary .bb-category-mix-filter { flex:none; min-width:64px; max-width:min(190px,50%); grid-template-columns:minmax(0,1fr); }
 .bb-transactions .bb-category-filter-label { min-width:0; max-width:100%; overflow:hidden; }
