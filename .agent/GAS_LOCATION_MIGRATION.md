@@ -1,44 +1,78 @@
-# Gas location — active implementation plan (2026-11-03)
+# Gas Location — cutover record (2026-11-03)
 
-User authorizes adding Location throughout Gas logging/editing/reports, recovering existing locations where exact saved evidence exists, and changing Shared Expenses plus templates. Also requests a brief itemized downstream-impact report. Standing preference: verify, commit/push, merge and verify production. No synthetic financial writes. No live changes made yet.
+## Published state
 
-Working tree: work/quiet-header-release, branch codex/gas-location, based on merged main 2bf7be1 (Transactions PR129). Outer worktree is stale; do not implement there. Preserve pre-existing untracked work/.
+[Implementation PR #130](https://github.com/brianjames-dev/bookiebot/pull/130)
+merged as `766eadecf28e0e62fca1abb0b75417069c7cecd0`. Both required CI runs
+(41775432131 / 41775438165) passed **3,457 tests with zero skips**, Python types,
+Apps Script checks, frontend types/build and exact asset comparison. The final
+local run passed **2,892 tests with 565 optional PostgreSQL skips**. Frontend
+assets did not change.
 
-## Grounded findings
+The live migration is complete: all 9 shared tabs (8 existing months and
+Template), the separate annual shared master, 735 action records, 56 quoted
+personal imports, 19 current canonical payloads and 86 bank/import column
+reservations. Restored 11 of 44 existing Gas locations: 5 in June, 2 in July and
+4 in October. The remaining 33 stay blank. Deleted, ambiguous and conflicting
+evidence was excluded; no financial transaction was created or guessed.
 
-- `sheets/config.py` maps Gas H=date, I=amount, J=person, with no location. `writer.normalize_expense_data` already extracts location, then `log_category_row` and `record_expense_undo` discard it because it is absent from the map.
-- Shared Expenses 2026: 1t2Nm5luEjm-RKiiMyuIFvJBhdI0ubufWkrdjRzBsTgU. Metadata verified via Google Drive. Existing Template, January, May–November; per-month hidden action logs May–November. Template/current tabs mostly 40 columns; January has 32 and predates Needs. See functions store gas_sheet_metadata and gas_header_cells for live headers/formats.
-- Template old blocks: Grocery A:D, Gas H:J, Food N:R, Shopping V:Z, Needs AD:AH. Gas totals K:L are occupied, so J insertion affects the full right-hand layout.
-- Proposed new Gas: H Date / I Amount / J Location / K Person. Physical insertion at J shifts old J:AN to K:AO. Food O:S; Shopping W:AA; Needs AE:AI. Totals: Gas L:M, Food T:U, Shopping AB:AC, Needs AJ:AK; grand totals AL:AM -> AM:AN. Grocery unchanged.
-- Apps Script (`scripts/google-apps-script/budget-system-automation.gs`) hardcodes imports F/L/T/AB/AJ, amount/person/date columns and 40-column prepared-template validation. IMPORTRANGE A1 strings in BOTH personal budgets must be rewritten explicitly; native Sheets insertion will update native formulas/ranges but not quoted cross-workbook ranges.
-- Static category mappings appear in sheets/utils, writer, undo; reports/transactions and expense_breakdown; banking matching; reimbursements migration/service/projection/batch_projection. Undo/action JSON arrays, canonical sourceColumnMap/anchors/revisions and bank matched_sheet_ref require an explicit compatibility/migration strategy. Preserve immutable confirmation IDs/fingerprints/history and all monetary/repayment state.
-- New Location cells must be free text, not inherited currency/Person dropdown. Preserve strict Person choices Brian (AL), Brian (BofA), Hannah; existing formatting/dimensions/formulas outside scope.
-- Legacy/new layout compatibility required before live migration; no global static-column flip against still-old tabs. Need explicit header-aware mapping, metadata migration and concurrency guard. Architecture not selected yet; inspect existing locks before adding an abstraction.
+Independent readback preserved all original purchase fields, category totals,
+DB monetary values, lifecycle state, repayments, resets, commands and immutable
+audit events. It verified 132 exact native SUMIF references, 56 unchanged
+personal import outputs, 9 free-text Location / preserved Person validator
+pairs and all 233 named ranges with their original IDs and shifted bounds.
 
-## Work remaining
+The live read-only `auditGasLocationSetup` completed at 9:16 PM Pacific and
+verified shared tabs, the annual master and both current budgets. Existing
+clocks/triggers were retained; the evening preparation had finished at 8:41 PM.
 
-1. Complete trace of category configs/calls, all hardcoded A1/numeric columns, Apps Script templates/rollover, intent/card/shortcut logging, canonical/Undo/bank refs and frontend Gas editable Merchant.
-2. Capture bounded live formulas, metadata and exact current data with private backups. Discover any annual master template in Apps Script in addition to internal Template.
-3. Read-only DB inventory/backfill candidates: use only exact stored action/confirmed source identity; never guess a station or import unmatched bank transactions. Unknown locations remain blank. Local /Users/brianjames/Dev/bookiebot/.env has Google service-account JSON but NO DB URL. Railway OAuth list_variables returns NAMES ONLY; cannot obtain DB credentials there. Need supported existing CLI/UI session or another authorized app access path. ~/.railway contains version/update files but no config token. Prior `/private/tmp/bookiebot-reimbursement-audit-2026-11-01.json` is a private DB snapshot, and `/private/tmp/bookiebot_reimbursement_preflight.py` shows safe read-only Sheets capture patterns; don't treat Nov1 snapshot as a complete current DB audit.
-4. Implement regression tests + compatible code and a guarded, idempotent backup/dry-run/apply migration, including exact location recovery, saved source metadata, both personal imports and templates. Resolve safe live-write coordination before apply.
-5. Verify isolated fixtures for old/new layouts, every category right of J, queries/reports/graph/logo/search, update/move/split/delete/Undo, bank links and repayment guards; Apps Script monthly/annual rollover, types/build/full CI.
-6. Deploy compatibility, migrate authorized live sheets/DB with backups/readback, publish live Apps Script, verify totals/formulas/validation and actual Transactions location/logo data. No test purchases.
-7. Update tracking/Decisions/product docs, merge, verify release, brief itemized final report including recovery counts and unrecovered locations.
+## Maintenance and product verification
 
-## Skills / tools already read
+Writers were stopped with `railway down --yes` from an exactly verified linked
+maintenance folder. All app deployments were REMOVED and `/health` returned 404
+before mutation; Postgres remained running. Scaling to zero did not stop the
+real replica on this service. Do not use a scale response as proof of shutdown.
 
-Google Drive router + Google Sheets SKILL, edit workflow, live-read safety, native-cell structure, visual quality. Spreadsheets routing/google_sheets.md explicitly directs existing-sheet edits back to Google Drive Sheets workflow, so no new XLSX/import. Need read batch-update and formula recipes before large native writes. Existing repository CLI migration patterns may be needed for coordinated DB + Sheets changes. User authorization covers intended changes; no repeat permission needed for the described task.
+The verified build resumed as deployment
+`effa857f-5b8d-4024-a46b-6b0628f61a49`, status SUCCESS, `stopped=false`, with the
+original one-replica `us-west2` configuration. `/health` returned 200 and the
+unauthenticated `/app/transactions` route returned 401.
 
-Use `/private/tmp/refined-flow-venv/bin/python` (3.12; full deps) and Node22 `/private/tmp/bookiebot-ci-node22/node_modules/node/bin/node`. Pyright needs explicit `--pythonpath` to that venv. Loopback/browser/network/git .git operations may need require_escalated (auto-review). Never print credentials. No subagents authorized in this turn.
+Actual Transactions listing readback covered both actors and 39 Gas rows in
+their available personal-budget months. All 11 recovered locations were
+visible and editable. Nine purchases resolve existing merchant artwork; two
+unregistered brands retain the category-colored Gas fallback. The audit used a
+read-only repeatable-read DB snapshot and 8 read-only Google requests. No
+synthetic purchase or correction was submitted.
 
-## Implementation / evidence milestone
+## Column mapping and compatibility
 
-Railway CLI is now authenticated by the user. Standard `railway run --project … --environment production --service Postgres --no-local <python>` injects DATABASE_PUBLIC_URL privately. Never print credentials. Private captures and approved offline plan: `/private/tmp/bookiebot-gas-location-2026-11-03` (0700; files0600). Scripts `/private/tmp/bookiebot_gas_capture.py` and `bookiebot_gas_db_history.py` are read-only. Live source backup equals HEAD exactly: `live-budget-before.gs` (73880 chars). Script project 1kVI9PEgWGC5C8SC67VEB7ng7s7lSzk2Tq9L_fe_2uJ4CAtvaNPcuRthX. Annual masters accessible through owner-connected Sheets tools, not service account. Only the shared annual master needs insertion: personal masters point to untouched old shared book 10w4dpeNPmn0y-xG1IRWfCDWXA5cpK7gSRXYzdch7G50, and annual initialization regenerates imports. Do not shift those old-source literals.
+Gas is H Date / I Amount / J Location / K Person. Food moves to O:S, Shopping to
+W:AA and Needs to AE:AI. Summary amounts move L→M, T→U, AB→AC and AJ→AK; F stays
+unchanged. Grand totals move AL:AM→AM:AN. January predates Needs, grows from 32
+to 33 columns and moves totals AD:AE→AE:AF. Native insertion preserves formulas,
+formats, merges, validators, conditional rules and named anchors.
 
-Pure helpers and `scripts/migrate_gas_location.py` now plan/apply with all-workbook preflight, exact source recovery, native insert/format/validation + action log batch, quoted imports, readback, guarded PG coordinate updates and same-plan retry. Runtime resolves headers, tags saved layouts, covers every static coordinate consumer. No generalized schema/locking abstraction added: verify app replicas zero and no active Apps Script before cutover. CLI supports `railway service scale --project <id> --environment production --service <id> <region>=0` and restoration. Determine original region/count first. No live changes yet.
+Header resolution supports untouched old-year layouts; migrated saved actions
+carry `gas_location_v1`. Personal annual masters still reference the untouched
+old shared workbook. Their old-source literals must stay unchanged; annual
+preparation regenerates imports from the actual new-year shared header. See
+`docs/GAS_LOCATION.md` for the full flow and controlled migration procedure.
 
-Preflight: 44 existing Gas rows, 11 recoverable (June5/July2/October4); 33 unknown stay blank. One incorrect duplicate coffee link fails exact authorized-date comparison and is excluded. Canonical Gas location Costco Wholesale belongs to a deleted source and is not recreated. 147 decoded checkpoint message/start payloads contain no additional exact Gas logging evidence. 9 shared tabs (8 months+Template), 735 action records, 56 quoted imports, 19 current canonical payloads and86 bank/import refs translate. Financial replay:755 owner expense entries retain every category total;735 histories retain every prior display field. Full local2889 passed/565 pgskipped;2 additional migration preflight/retry tests pass;566 targeted/290pgskipped earlier,90 alias/newGas checks after fix. Pyright clean; frontend/release verification pending.
+## Evidence and next steps
 
-CUA works through native `chromeApp` and `backupEditor` handles; browser DOM snapshot/clipboard wrappers currently fail with timeoutMs runtime error. `gasBrowser.tabs.get(id)` works but clipboard.readText fails. Native copy all from Apps Script editor -> TextEdit plain text -> save provides exact private source backup. Current Chrome task tab id974758828, native source editor index1638 (refresh AX before acting); sourceTab binding exists but browser methods bugged. TextEdit backup saved at private path above; use native paste from local fs text to replace source only after tests. Avoid dumping full TextEdit AX (contains73880 chars); use emit:false and filter. Need still publish source, run read-only auditGasLocationSetup after migration, leave existing triggers unchanged.
-
-Compatible live Apps Script has now been published through its existing native editor and read back via an independent saved source copy: exact repo match,76847 bytes, SHA2567364ead7667dc636ea606e06337cacf18495d4206ef48ceb36f6f3cb8a216244. Existing clocks/triggers untouched, no function run. Original config replica count1 in region us-west2, no staged Railway changes. Python/full2889+2 additional cutover tests, Pyright and frontend types/build pass; assets unchanged. Need commit/PR/CI/merge/deploy, controlled live cutover, master migration and read-only audit. `chromeApp` currently points at whichever Chrome window is foreground; use native Window menu to choose Budget Automation Script if the user switched windows. Current native source editor87 in that window; refresh AX indices. Both private before/after source copies saved through TextEdit; avoid printing whole source AX.
+- Initial snapshots and exact Apps Script source backups:
+  `/private/tmp/bookiebot-gas-location-2026-11-03`.
+- Fresh stopped-writer capture, applied plan, DB comparison, financial audit and
+  native screenshot: `/private/tmp/bookiebot-gas-location-cutover-2026-11-03`.
+  Directories are private (0700), files 0600. Do not commit financial backups
+  or reuse the applied plan after writers resume.
+- Live script source was read back byte-for-byte: 76,847 bytes, SHA256
+  `7364ead7667dc636ea606e06337cacf18495d4206ef48ceb36f6f3cb8a216244`.
+- Fetch named ranges separately from bounded grid reads: Sheets filters names
+  when ranges are supplied. The independent full inventory retained all 233.
+- Native user acceptance remains in STATUS checklist 251: inspect existing
+  recovered/blank purchases, review/cancel Merchant, then verify the next
+  intended real purchase or correction. No financial test writes are needed.
+- Actual working tree: `work/quiet-header-release`; the outer checkout is stale.
+  Preserve its pre-existing untracked `work/` directory.
