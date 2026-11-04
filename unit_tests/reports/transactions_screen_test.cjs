@@ -11,7 +11,7 @@ const presentation={
  './app-navigation':{useAppNavigation:()=>null},
  './transaction-swipe':{TransactionSwipeContext:SwipeContext,wrapTransactionRow:(entry)=>React.createElement(ActionFixture,{entry})},
  './daily-transactions':{DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))},
- './report-app':{DailySpendingChart:props=>React.createElement('div',null,props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
+ './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
 const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(){},removeEventListener(){},dispatchEvent(e){events.push(e.type)},matchMedia(){return {matches:true}}}
@@ -49,6 +49,8 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
 ;(async()=>{
  await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0)
  await run(()=>tree.update(fixture(true)));await tick();await respond(listing())
+ assert.equal(tree.root.findByProps({'data-graph-open':false}).props['data-graph-open'],false)
+ const beforeGraph=requests.length;await click('Show spending graph');assert.equal(button('Hide spending graph').props['aria-expanded'],true);assert.equal(tree.root.findByProps({'data-graph-open':true}).props['data-graph-open'],true);await click('Hide spending graph');assert.equal(requests.length,beforeGraph,'Graph disclosure is presentation-only and cannot request or mutate financial data')
  await change('Search transactions','cable');await tick();await respond(listing())
  await click('Update');assert.equal(button('Clear search').props.disabled,true,'The search clear control cannot detach an active inline editor');assert.equal(work.dirty,true);assert.equal(button('Review change').props.disabled,true,'Unchanged edits cannot request a review')
  await change('Amount','15.99');assert.equal(requests.filter(r=>r.options.body).length,0)

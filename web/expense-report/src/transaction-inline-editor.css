@@ -5,8 +5,8 @@
 .bi-product .bb-daily-single-day .bb-recorded-swipe { margin-right:0; }
 .bi-product .bb-daily-single-day:has(.bi-selected-row[data-editing="true"]) .bb-daily-single-date { align-self:start; padding-top:3px; }
 /* One physical track: the entire bar begins just beyond the row and moves
-   by precisely the same number of pixels, preserving its 12px clearance. */
-.bi-product .bb-recorded-swipe-actions { transform:translateX(calc(var(--bb-recorded-track-start,174px) + var(--bb-recorded-offset,0px))); transition:transform var(--bb-recorded-swipe-duration,0ms) cubic-bezier(.2,.85,.25,1); }
+   by precisely the same number of pixels, with no seam at the row edge. */
+.bi-product .bb-recorded-swipe-actions { transform:translateX(calc(var(--bb-recorded-track-start,162px) + var(--bb-recorded-offset,0px))); transition:transform var(--bb-recorded-swipe-duration,0ms) cubic-bezier(.2,.85,.25,1); }
 .bi-product .bb-recorded-action { flex-direction:row; gap:0; padding:0; }
 .bi-product .bb-recorded-action svg { width:20px; height:20px; flex:none; transform:none; }
 .bi-product { --bi-split-ink:light-dark(hsl(211 42% 37%),hsl(211 53% 74%)); }

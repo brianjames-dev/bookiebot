@@ -14,7 +14,7 @@
 
 .bb-recorded-swipe { position:relative; min-width:0; overflow:hidden; touch-action:pan-y; }
 .bb-recorded-swipe-icon-viewport { position:absolute; inset:0; pointer-events:none; }
-.bb-recorded-swipe-actions { position:absolute; inset-block:0; width:var(--bb-recorded-action-width); max-width:calc(100% - 12px); display:grid; grid-template-columns:repeat(var(--bb-recorded-action-count,3),minmax(0,1fr)); align-items:stretch; gap:0; z-index:0; visibility:hidden; pointer-events:none; }
+.bb-recorded-swipe-actions { position:absolute; inset-block:0; width:var(--bb-recorded-action-width); max-width:100%; display:grid; grid-template-columns:repeat(var(--bb-recorded-action-count,3),minmax(0,1fr)); align-items:stretch; gap:0; z-index:0; visibility:hidden; pointer-events:none; }
 .bb-recorded-actions-left { right:0; }
 .bb-recorded-actions-right { left:0; }
 .bb-recorded-swipe[data-side="left"] .bb-recorded-actions-left,.bb-recorded-swipe[data-side="right"] .bb-recorded-actions-right { visibility:visible; pointer-events:auto; }
@@ -27,7 +27,7 @@
 .bb-transactions .bb-recorded-swipe-actions { border-radius:var(--bb-recorded-roundness); overflow:hidden; }
 .bb-transactions .bb-recorded-action + .bb-recorded-action { box-shadow:inset 1px 0 0 hsl(var(--background) / .2); }
 
-.bb-transactions { --bb-recorded-roundness:8px; }
+.bb-transactions { --bb-recorded-roundness:8px; --bb-recorded-day-height:72px; }
 .bb-transactions .bb-daily-transaction { position:relative; z-index:1; background:hsl(var(--background)); padding-block:6px; }
 .bb-recorded-search { display:flex; align-items:center; gap:9px; height:44px; padding:0 12px; margin:20px 0 0; background:hsl(var(--foreground) / .035); border:1px solid hsl(var(--border) / .75); border-radius:13px; color:hsl(var(--muted-foreground)); }
 .bb-recorded-search>svg { flex:0 0 17px; width:17px; height:17px; }
@@ -37,9 +37,29 @@
 .bb-transactions .bb-daily-transactions { padding-top:12px; }
 /* This chart lives in the scrolling list, not a fixed-height carousel stage.
    A percentage height can stretch both grid rows to the whole workspace. */
-.bb-transactions .bb-chart-layout { height:auto; margin-bottom:0; }
-.bb-transactions .bb-daily-summary { margin-bottom:0; }
-.bb-transactions .bb-daily-summary .bb-category-mix-filter { flex:none; min-width:64px; max-width:min(190px,50%); grid-template-columns:minmax(0,1fr); }
+.bb-transactions .bb-chart-layout { display:flex; flex-direction:column; gap:0; min-height:0; height:auto; margin-bottom:0; }
+.bb-transactions .bb-chart-side.bb-daily-summary { order:-1; border:0; padding:0; min-height:0; margin-bottom:0; }
+.bb-transactions .bb-daily-amount-row { gap:10px; }
+.bb-recorded-summary-controls { display:flex; align-items:center; flex:none; min-width:0; max-width:55%; gap:8px; }
+.bb-transactions .bb-recorded-summary-controls .bb-category-mix-filter { flex:0 1 auto; min-width:64px; max-width:calc(100% - 52px); grid-template-columns:minmax(0,1fr); }
+.bb-recorded-graph-toggle { display:grid; place-items:center; flex:none; width:44px; height:44px; min-height:44px; padding:0; border:1px solid hsl(var(--border)); border-radius:50%; color:hsl(var(--muted-foreground)); background:hsl(var(--primary) / .08); -webkit-tap-highlight-color:transparent; transition:background-color 180ms ease,color 180ms ease; }
+.bb-recorded-graph-toggle[aria-expanded="true"] { color:hsl(var(--primary)); background:hsl(var(--primary) / .16); }
+.bb-recorded-graph-toggle svg { width:19px; height:19px; }
+.bb-recorded-graph-reveal { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows 440ms cubic-bezier(.2,.85,.25,1),opacity 220ms ease; }
+.bb-recorded-graph-reveal[data-open="true"] { grid-template-rows:1fr; opacity:1; }
+.bb-recorded-graph-clip { min-height:0; overflow:hidden; }
+.bb-recorded-graph-clip>.bb-daily-plot { padding-top:12px; }
+/* The grouped header excludes its section's 1px divider; the flat singleton
+   includes that divider in its own border box. Keep both day sections equal. */
+.bb-transactions .bb-daily-day-header { padding-block:8px; min-height:var(--bb-recorded-day-height); }
+.bb-transactions .bb-daily-single-day { padding-block:8px; min-height:calc(var(--bb-recorded-day-height) + 1px); }
+/* Retain the original border slot so logo/editor anchors do not move, but
+   stop the painted guide before the day divider without adding list space. */
+.bb-transactions .bb-daily-day-entries { position:relative; padding-bottom:0; margin-bottom:0; border-left-color:transparent; }
+.bb-transactions .bb-daily-day-entries::before { content:""; position:absolute; left:-1px; top:0; bottom:6px; width:1px; background:hsl(var(--border)); pointer-events:none; }
+.bb-transactions .bi-editable-row::before { display:none; }
+.bb-transactions .bi-selected-row,.bb-transactions .bi-selected-row>.bb-recorded-swipe,.bb-transactions .bi-selected-row>.bb-recorded-swipe>.bb-daily-transaction { background:hsl(var(--background)); }
+.bb-transactions.bi-product .bi-editor { border-radius:var(--bi-radius); padding-block:4px; }
 .bb-transactions .bb-category-filter-label { min-width:0; max-width:100%; overflow:hidden; }
 .bb-transactions .bb-category-mix-filter select { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .bb-transaction-period { position:relative; margin:0 0 18px; font-size:13px; color:hsl(var(--muted-foreground)); }
@@ -51,6 +71,6 @@
 .bb-recorded-day-chip { display:flex; align-items:center; gap:8px; padding:8px 12px; margin-top:12px; color:hsl(var(--primary)); background:hsl(var(--primary) / .08); border:1px solid hsl(var(--border)); border-radius:24px; }
 .bb-recorded-day-chip svg { width:14px; height:14px; }
 .bb-recorded-loading,.bb-daily-page-note { color:hsl(var(--muted-foreground)); font-size:12px; padding:12px 0; }
-@media(prefers-reduced-motion:reduce) { .bb-recorded-swipe * { transition:none!important; } }
+@media(prefers-reduced-motion:reduce) { .bb-recorded-swipe * { transition:none!important; } .bb-recorded-graph-reveal,.bb-recorded-graph-toggle { transition:none; } }
 /* The approved workspace has no visible focus chrome; controls retain native focus and keyboard behavior. */
 .bb-transactions :focus,.bb-transactions :focus-visible,.bb-transactions .bb-category-mix-filter:focus-within { outline:none!important; box-shadow:none!important; }
