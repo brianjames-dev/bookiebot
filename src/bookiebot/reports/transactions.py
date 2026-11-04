@@ -30,7 +30,7 @@ from bookiebot.sheets.routing import (
 )
 
 logger = logging.getLogger(__name__)
-_CACHE: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
+_CACHE: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]]]] = {}
 _CACHE_LOCK = threading.RLock()
 _READ_LOCKS: dict[str, Any] = {}
 _factory_lock = threading.Lock()
@@ -168,7 +168,8 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
             "_logged": logged, "_manual": manual, "_current": current}
 
 
-def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal: list[list[str]]):
+def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal: list[list[str]],
+                    bill_schedule_rows: list[list[str]] | None = None):
     persons = set(get_user_config(actor).expense_persons)
     for category, config in category_layout(expenses).items():
         columns = undo._category_columns(category, values=expenses)
@@ -192,10 +193,12 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
             yield undo.LoggedAction(id=f"sheet-income-{row}", created_at=month + "-01", user_key=actor,
                 action=undo.UndoAction(worksheet="income", kind="delete_row", row=row, columns=[], previous_values=[],
                     new_values=list(personal[row - 1]), metadata=metadata, description=f"income from {source}"))
-    from bookiebot.reports.expense_breakdown import _payment_group_for_label
+    from bookiebot.reports.expense_breakdown import BudgetMonth, PAYMENT_GROUPS, _bill_schedule_labels, _normalize_label
+    period = parse_phone_report_month(month)
+    payment_labels = {**PAYMENT_GROUPS, **_bill_schedule_labels(bill_schedule_rows or [], BudgetMonth(period.year, period.month))}
     for row, values in enumerate(personal, 1):
         label = cell(personal, row, 2)
-        if label and _payment_group_for_label(label) and cents(cell(personal, row, 3)):
+        if label and _normalize_label(label) in payment_labels and cents(cell(personal, row, 3)):
             yield undo.LoggedAction(id=f"sheet-payment-{row}", created_at=month + "-01", user_key=actor,
                 action=undo.UndoAction(worksheet="income", kind="restore_cells", row=row, columns=[3], previous_values=[""],
                     new_values=[cell(personal, row, 3)], metadata={"type": "payment", "category": label, "exact_source_label": label}, description=label))
@@ -209,7 +212,9 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
 
 
 def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[dict[str, Any]]:
-    key = (actor, month)
+    from bookiebot.sheets.bills import bill_payment_state, list_bill_schedules
+    as_of = now_pacific().date()
+    key = (actor, month, as_of.isoformat())
     with _READ_LOCKS.setdefault(actor, threading.RLock()):
         with _CACHE_LOCK:
             if not fresh and key in _CACHE and time.monotonic() - _CACHE[key][0] < 30:
@@ -226,7 +231,8 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
             logs = [f"_BookieBot Action Log - {year:04d}-{number:02d}" for number in numbers]
-            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), titles)
+            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule"])
+            schedules = list_bill_schedules(personal.get("_BookieBot Bill Schedule", []))
             shared_rows = read_workbook_tabs(client, get_shared_expenses_spreadsheet_id(year), [*titles, *logs])
             for number, title, log in zip(numbers, titles, logs):
                 if title not in shared_rows or title not in personal:
@@ -246,7 +252,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                     entry for entry in history if entry.status == "active" and entry.action.metadata.get("type") not in {"system_state", "delete"}
                 ], history=history), history)
                 occupied = set()
-                for logged, manual in [(entry, False) for entry in active] + [(entry, True) for entry in _manual_actions(actor, period, shared_rows[title], personal[title])]:
+                for logged, manual in [(entry, False) for entry in active] + [(entry, True) for entry in _manual_actions(actor, period, shared_rows[title], personal[title], personal.get("_BookieBot Bill Schedule", []))]:
                     a = logged.action
                     if manual:
                         managed = [value for value in allocations if value["payerOwner"] == owner and value["sourceYear"] == year
@@ -279,6 +285,12 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                             continue
                     occupied.add(address)
                     row = _public(actor, period, logged, rows, manual=manual)
+                    if row["kind"] == "payment":
+                        timing = bill_payment_state(row["category"], year, number, schedules, as_of=as_of)
+                        if not timing.paid:
+                            continue
+                        row["date"] = timing.withdrawal_date.isoformat() if timing.withdrawal_date else ""
+                        row["version"] = digest([row["version"], row["date"]])
                     if row["amountCents"] > 0:
                         result.append(row)
         result.sort(key=lambda row: (row["month"], row["date"], row["_logged"].created_at, row["id"]), reverse=True)

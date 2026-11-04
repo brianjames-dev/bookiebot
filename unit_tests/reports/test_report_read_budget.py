@@ -219,10 +219,11 @@ async def test_phone_many_comparison_months_and_fresh_refresh_fit_one_read_budge
         assert result == reference
         assert result["throughDay"] == 7
         assert result["status"] == "partial"
-        assert result["selected"]["undatedSpending"] == 1612  # Rent + PG&E + legacy Needs
+        assert result["selected"]["undatedSpending"] == 44  # Legacy Needs only; rent now has its withdrawal date.
         assert result["selected"]["scheduledSpending"] == 27  # Schedule is not a receipt
         # Day 20, the other owner and Brian's non-default account are excluded.
-        assert result["baseline"]["datedSpending"] < 1000
+        lunch = float(books[SHARED][calendar.month_name[month]][2][15])
+        assert result["baseline"]["datedSpending"] == 1540 + 2 * month + lunch  # Rent + lunch + grocery; PG&E is still queued.
         return result
 
     try:

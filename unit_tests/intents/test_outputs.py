@@ -464,6 +464,12 @@ def test_intent_scenarios(llm_client_factory, monkeypatch):
     monkeypatch.setattr(sheet_utils, "get_local_today", lambda: anchor)
     for case in SCENARIOS:
         repo = build_repo_from_fixture(case.sheet_fixture) if case.sheet_fixture else None
+        if repo:
+            from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS
+            repo.bill_schedule._rows = [BILL_SCHEDULE_HEADERS, *[
+                [label.lower(), label, "monthly", "1", "", label, "", "", ""]
+                for label in ("Rent", "PG&E", "Recology", "Water")
+            ]]
         llm_client = llm_client_factory(case.llm_fixture)
 
         async def _run():

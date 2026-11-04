@@ -133,10 +133,24 @@ def test_schedule_does_not_fill_actual_on_read():
     with repo.patched(), sheet_user_context(BRIAN):
         assert loans.student_loan_status() == {
             "configured": True, "label": "Student Loan", "amount": 0.0, "paid": False,
+            "queued": False,
             "expectedAmount": 59.0, "pullDay": 12,
-            "note": "Recorded current-month payment; a schedule alone does not confirm a payment.",
+            "note": "Entered amount counts as paid on its withdrawal date; an unentered estimate remains projected.",
         }
     assert repo.income.get_all_values()[0][2] == ""
+
+
+@pytest.mark.parametrize("day,paid", [(11, False), (12, True)])
+def test_entered_loan_waits_for_its_withdrawal_date(monkeypatch, day, paid):
+    from datetime import datetime
+    from bookiebot.sheets import routing
+    monkeypatch.setattr(routing, "now_pacific", lambda: datetime(2026, 9, day, tzinfo=routing.PACIFIC_TZ))
+    repo = repo_for(rows=[["", "Student Loan", "59"]])
+    with repo.patched(), sheet_user_context(BRIAN):
+        status = loans.student_loan_status()
+        assert status["paid"] is paid and status["queued"] is not paid
+        assert status["amount"] == 59
+    assert repo.income.get_all_values()[0][2] == "59"
 
 
 def automatic_repo():

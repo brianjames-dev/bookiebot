@@ -1,5 +1,9 @@
 # Daily Spending presentation
 
+Entered bills stay queued until their saved withdrawal/autopay date. Current
+and the app's Transactions workspace include them only on/after that date;
+Calendar and Projected retain known queued amounts. See [Bill payment timing](BILL_PAYMENT_TIMING.md).
+
 ## Authenticated Transactions workspace (2026-11-03)
 
 The approved compact inline editors, headerless Slide + resize reviews, Rising fill/pie shortcut, shared-track icon actions, confirmed value/category motion and timed Undo are described in [Transactions](TRANSACTIONS.md). Current-date captions show the actual weekday; the soft date marker remains.

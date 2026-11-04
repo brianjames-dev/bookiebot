@@ -153,6 +153,7 @@ def reconcile_transaction(
         transaction,
         action_log,
         classification,
+        scheduled_pulls=scheduled_pulls,
         excluded_action_ids=(excluded_action_ids or set()) | claimed_schedule_action_ids(
             scheduled_pulls, action_log, excluded_sheet_refs or set(),
         ),
@@ -189,6 +190,7 @@ def match_action_log(
     classification: ReconciliationClassification | None = None,
     *,
     excluded_action_ids: set[str] | None = None,
+    scheduled_pulls: Iterable[ScheduledPullCandidate] = (),
 ) -> ActionLogMatch | None:
     transaction_date = _transaction_date(transaction)
     if transaction.pending or transaction_date is None:
@@ -197,6 +199,7 @@ def match_action_log(
     compatible = _compatible_action_types(transaction, classification)
     excluded = excluded_action_ids or set()
     candidates = []
+    scheduled_pulls = tuple(scheduled_pulls)
     for logged in action_log:
         if logged.id in excluded:
             continue
@@ -205,6 +208,13 @@ def match_action_log(
             continue
         if round(candidate["amount"] * 100) != round(abs(transaction.amount) * 100):
             continue
+        if candidate["type"] == "payment":
+            pulls = [pull for pull in scheduled_pulls if pull.source_type == "bill" and pull.amount_recorded
+                     and _schedule_represents_action(pull, candidate)]
+            if len({pull.occurrence_ref for pull in pulls}) == 1:
+                # Bill amounts may be entered weeks before autopay. Match the
+                # same source action at withdrawal, retaining both reservations.
+                candidate = {**candidate, "date": min(pulls, key=lambda pull: _transaction_day_delta(transaction, pull.pull_date)).pull_date}
         day_delta = _transaction_day_delta(transaction, candidate["date"])
         if day_delta > 7:
             continue

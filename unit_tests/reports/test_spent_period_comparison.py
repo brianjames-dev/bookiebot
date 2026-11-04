@@ -118,14 +118,15 @@ def test_expected_bill_only_enters_projected_window_when_due(monkeypatch, today,
     assert projected["selected"]["scheduledSpending"] == expected_projected
 
 
-def test_recorded_bill_is_included_once_without_inventing_payment_date(monkeypatch):
+@pytest.mark.parametrize("today,amount", [(9, 0), (18, 59.96)])
+def test_entered_bill_is_included_once_on_its_withdrawal_date(monkeypatch, today, amount):
     from unit_tests.reports.test_expected_bill_reports import _report
-    _, selected = _report(monkeypatch, [["Student Loan", "59.96"]], today=9)
+    _, selected = _report(monkeypatch, [["Student Loan", "59.96"]], today=today)
     for mode in ("current", "projected"):
-        result = compare(selected, month(2026, 8, 0), mode, now=datetime(2026, 9, 9, tzinfo=PACIFIC_TZ))
-        assert result["selected"]["spending"] == 59.96
-        assert result["selected"]["undatedSpending"] == 59.96
-        assert result["selected"]["datedSpending"] == 0
+        result = compare(selected, month(2026, 8, 0), mode, now=datetime(2026, 9, today, tzinfo=PACIFIC_TZ))
+        assert result["selected"]["spending"] == amount
+        assert result["selected"]["undatedSpending"] == 0
+        assert result["selected"]["datedSpending"] == amount
         assert result["selected"]["scheduledSpending"] == 0
 
 
@@ -174,6 +175,7 @@ def test_every_batched_month_matches_opening_that_month_with_four_http_reads(mon
         ["1st", "Needs elapsed", "10", "", "1st", "Wants elapsed", "5"],
         ["30th", "Needs later", "20", "", "30th", "Wants later", "15"]]
     personal["_BookieBot Bill Schedule"] = [BILL_SCHEDULE_HEADERS,
+        ["rent", "Rent", "monthly", "1", "", "Rent", "", "", ""],
         ["pge", "PG&E", "monthly", "20", "", "PG&E", "", "", ""]]
     tabs = {f"personal-{year}": personal, f"shared-{year}": {calendar.month_name[n]: [] for n in range(1, count + 1)}}
     client, calls = client_for(tabs)

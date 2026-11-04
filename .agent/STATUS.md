@@ -1,6 +1,8 @@
 # Agent Status
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
+
+Queued bill payments (2026-11-04): implemented the approved withdrawal/autopay-date rule. Entered amounts remain in Calendar/Projected until that date, then count once in Transactions/Current under their original source IDs. Missing/ambiguous/off-cycle schedules stay queued; unentered estimates never become actuals. Aligned totals/subtotal fallbacks, history, comparisons/explanations, drilldown status, bot confirmations/queries and standalone loans. Transactions batches its schedule and keys cache by Pacific day. Later bank charges can reuse an early-entered bill's action/occurrence with both duplicate reservations intact. No schema, midnight writer or production financial test changes. **2,915 full local passed / 565 optional PostgreSQL skipped**, final **140 targeted checks**, clean Python/frontend types and locked Node 22 build; **4 iPhone queued-to-paid + 12 existing workspace Chromium/WebKit cases** pass. Both phone themes inspected. README, bill timing/Transactions/Daily Spending guides, Finance Ops and Decisions updated. Native checklist 254; required CI/merge and automatic rollout follow in the task PR.
 
 Approved gas logo publication (2026-11-03): published the exact approved BP, Chevron, Circle K, Sheetz and Sam's Club replacements and added Valero with explicit name/store-number aliases. All six prepared circles have zero inset; old assets, aliases and source/framing/hash/approval history remain. The durable six-item batch and publication record protect unselected entries and matching boundaries. **40 focused / 2,894 full local tests passed / 565 optional PostgreSQL skipped**, clean Python/frontend types and locked Node 22 build; **12 Chromium/WebKit actual-component cases** pass at 320/390/1280px in both themes, retaining the same images through expansion/collapse. Phone renders inspected. Daily Spending/review guides updated; Finance Ops backlog unchanged. Native acceptance is checklist 253; required CI/merge and automatic rollout follow in the task PR.
 
@@ -390,6 +392,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
+First: native acceptance of queued-to-paid bills (checklist 254) after required CI/merge and rollout. Refresh the app; inspect a known future withdrawal in Calendar/Projected and an elapsed withdrawal in Transactions/Current, with one original source and unchanged repayments. No synthetic financial actions.
+
 First: native acceptance of the six approved gas circles (checklist 253) after required checks/merge and automatic rollout. Refresh the app, inspect known station purchases including Valero, and expand/collapse in both themes. Preserve reviewed bytes and existing exact matching; no financial test edits.
 
 First: native Logo Studio input acceptance (checklist 252) in the refreshed review: type continuously in notes, move the caret, undo, and enter multiple new stations with Enter/Shift+Enter. Preserve the six-logo batch's exact-hash approvals and publication history.
@@ -561,6 +565,10 @@ Student-loan activation is complete. Verify the deployed fixed-bill display and 
 25. Harden recent-action pending state across restarts/deploys, since selections currently live only in process memory.
 26. Improve targeted recent-action search so commands can find older matches, not only the latest 10 recent actions.
 27. Explore clarifying questions before logging when BookieBot is uncertain instead of guessing or silently failing.
+
+## Completed 2026-11-04
+
+- Implemented the user-approved queued bill lifecycle using existing monthly cells and withdrawal schedules, preserving source IDs and bank/repayment/Undo boundaries. Current/Transactions exclude future/unresolved bills; Calendar/Projected retain entered amounts, and estimates never promote without an entered amount. Covered quarterly/missing/duplicate dates, short/leap months, midnight cache invalidation, existing manual/logged sources, exact totals and early-entry bank duplicate reservations. Full local **2,915 passed / 565 optional PostgreSQL skipped**, final **140 targeted checks**, clean types/build and **16 Chromium/WebKit cases** pass. Documentation/Decisions/Finance Ops and native checklist 254 updated; required CI/merge and rollout follow.
 
 ## Completed 2026-11-03
 
@@ -2801,3 +2809,5 @@ python -m pyright
 252. Logo Studio: use the refreshed gallery to type notes through several autosaves, place the caret in the middle, and undo a native edit. Enter and Shift+Enter must create new lines in notes and the new-station list, including a trailing blank line; leaving/reopening the review restores the draft. Send preserves distinct trimmed station names and notes, and only explicit exact candidate approvals permit publication. No financial test actions.
 
 253. Approved gas logos: refresh the app after rollout and inspect BP, Chevron, Circle K, Sheetz, Sam's Club and Valero on existing purchases where those locations are present. Valero, Valero gas, Valero fuel and Valero gas station/store-number variants resolve the new circle; unknown locations retain their category fallback. Check collapsed stacks and expanded rows in light/dark themes for full circular framing, unchanged category dots and smooth retained-image motion. Review only; no synthetic production transaction or financial edits.
+
+254. Queued bill payments: refresh after rollout. A known future bill appears in Calendar/Projected, stays out of Transactions/Current and is Scheduled in its detail. An entered bill whose withdrawal day has arrived appears exactly once under that day with its normal logo and amount-only edit/split capabilities. Projected retains the same amount without adding its estimate. Missing/ambiguous/off-cycle schedules remain queued until corrected; an unentered estimate remains scheduled after its date. Check Current/Projected Spent, Left, Needs, bill ribbon and comparison over matching days. Confirm existing repayment balances remain unchanged. Use existing purchases/read-only review; no synthetic live bill, bank match, receipt or repayment.

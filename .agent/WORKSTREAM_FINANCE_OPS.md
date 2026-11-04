@@ -1,8 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-11-03
+Last updated: 2026-11-04
 
 ## Goal
+
+### Queued bills and withdrawal-date payment visibility — 2026-11-04
+
+Implemented the user-approved bill slice of scheduled/recorded semantics: entered amounts stay in Calendar/Projected until their saved withdrawal date, then become paid in Current/Transactions once, under the same source identity. Missing/ambiguous/off-cycle dates stay queued; unentered estimates remain projected after their day passes. Report totals, subtotal fallbacks, comparisons, explanations, bill history, drilldowns and bot status/logging feedback agree. The schedule joins the existing Transactions batch and the cache includes the Pacific date. Bank matching can use the recorded monthly occurrence for an action logged weeks early while preserving both reservations and duplicate guards. No schema/midnight writer, sheet or production financial test mutations. Verification/release is tracked in STATUS checklist 254; the broader recent-action/inbox backlog remains unchanged. This completes the entered-bill timing slice previously deferred by the Transactions consolidation.
 
 ### Gas Location schema and exact recovery — 2026-11-03
 

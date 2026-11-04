@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import calendar
 import html
 import json
@@ -189,6 +189,7 @@ class ExpenseBreakdownReport:
     entries: list[ExpenseEntry] = field(default_factory=list)
     need_expenses: list[PaymentItem] = field(default_factory=list)
     payments: list[PaymentItem] = field(default_factory=list)
+    queued_bills: list[PaymentItem] = field(default_factory=list)
     utility_history: list[UtilityHistoryItem] = field(default_factory=list)
     bill_comparison_history: list[UtilityHistoryItem] = field(default_factory=list)
     subscriptions: list[SubscriptionItem] = field(default_factory=list)
@@ -492,7 +493,10 @@ def build_expense_breakdown_report(
                                   "unavailableYears": [], "excludedRecords": 0}
 
     entries = _shared_expense_entries(shared_rows, persons, month)
-    payments = _payment_items(personal_rows, bill_schedule_rows, month)
+    entered_bills = _payment_items(personal_rows, bill_schedule_rows, month, as_of=generated_at.date())
+    payments = [item for item in entered_bills if item.status == "paid"]
+    queued_bills = [item for item in entered_bills if item.status == "queued"]
+    queued_total = round(sum(item.amount for item in queued_bills), 2)
     subscriptions = _subscription_items(subscription_rows)
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
@@ -548,11 +552,12 @@ def build_expense_breakdown_report(
         budget_history,
         bill_schedule_rows,
         month,
+        as_of=generated_at.date(),
     )
     calendar_events = _calendar_events(
         month=month,
         subscriptions=current_month_subscriptions,
-        payments=payments,
+        payments=entered_bills,
         income_entries=income_entries,
         income_total=income_total,
         income_projection_config=income_projection_config,
@@ -579,7 +584,10 @@ def build_expense_breakdown_report(
             breakdown_amounts[category] = itemized_shared_totals[category]
 
     budget_breakdown_amounts = dict(breakdown_amounts)
-    budget_breakdown_amounts["static_bills_subscriptions_needs"] = round(budget_static_needs_total + fixed_needs_payments, 2)
+    entered_totals = _payment_totals_by_group(entered_bills)
+    budget_breakdown_amounts["rent"] = entered_totals["rent"]
+    budget_breakdown_amounts["bills_utilities"] = entered_totals["bills_utilities"]
+    budget_breakdown_amounts["static_bills_subscriptions_needs"] = round(budget_static_needs_total + entered_totals["static_bills_subscriptions_needs"], 2)
     budget_breakdown_amounts["subscriptions_wants"] = budget_wants_total
     for event in calendar_events:
         if event.kind == "bill" and event.amount_estimated:
@@ -593,7 +601,7 @@ def build_expense_breakdown_report(
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
     personal_expense_total = _personal_expense_subtotal_total(personal_rows)
-    personal_total = grand_total if grand_total > 0 else (personal_expense_total or 0.0)
+    personal_total = grand_total if grand_total > 0 else max(0.0, round((personal_expense_total or 0.0) - queued_total, 2))
     category_budgets = _category_budget_amounts(personal_rows, income_total)
     if savings_plan.present:
         savings_values = _calculate_month_savings(savings_plan, income_total, income_entries, month)
@@ -604,6 +612,7 @@ def build_expense_breakdown_report(
         breakdown,
         amount_saved=amount_saved,
         use_sheet_subtotals=not subscriptions,
+        queued_bills_total=queued_total,
     )
     remaining_budget = round(category_budgets["needs"] - category_spending["needs"], 2)
     remaining_wants_budget = round(category_budgets["wants"] - category_spending["wants"], 2)
@@ -641,11 +650,13 @@ def build_expense_breakdown_report(
         entries=entries,
         need_expenses=need_expenses,
         payments=payments,
+        queued_bills=queued_bills,
         utility_history=utility_history,
         subscriptions=subscriptions,
         bill_comparison_history=_utility_history_items(
             budget_history, bill_schedule_rows, month,
             groups=frozenset({"rent", "bills_utilities", "static_bills_subscriptions_needs"}),
+            as_of=generated_at.date(),
         ),
         calendar_events=calendar_events,
         calendar_context=_calendar_adjacent_months(
@@ -872,16 +883,18 @@ def _entries_for_category(entries: list[ExpenseEntry], category: str) -> list[Ex
     return [entry for entry in entries if entry.category == category]
 
 
-def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], month: BudgetMonth) -> list[PaymentItem]:
-    from bookiebot.sheets.bills import bill_source_amount, list_bill_schedules
+def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], month: BudgetMonth,
+                   *, as_of: date | None = None) -> list[PaymentItem]:
+    from bookiebot.sheets.bills import bill_payment_state, bill_source_amount, list_bill_schedules
 
+    schedules = list_bill_schedules(bill_schedule_rows)
+    as_of = as_of or now_pacific().date()
     items_by_label: dict[str, PaymentItem] = {}
     labels = dict(PAYMENT_GROUPS)
     labels.update(_bill_schedule_labels(bill_schedule_rows, month))
     configured_amounts = {
         _normalize_label(bill.source_label): bill_source_amount(rows, bill.source_label)
-        for bill in list_bill_schedules(bill_schedule_rows)
-        if bill.expected_amount is not None
+        for bill in schedules
     }
 
     for row in rows:
@@ -897,36 +910,36 @@ def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], m
             amount = (
                 configured_amounts[label_text]
                 if label_text in configured_amounts
-                else _next_money_value(row, index + 1)
+                else _cell_money(_cell(row, index + 1))
             ) or 0.0
             if amount <= 0:
                 continue
             key = _normalize_label(display_label)
-            items_by_label[key] = PaymentItem(display_label, round(amount, 2), group)
+            timing = bill_payment_state(display_label, month.year, month.month, schedules, as_of=as_of)
+            items_by_label[key] = PaymentItem(display_label, round(amount, 2), group,
+                status="paid" if timing.paid else "queued",
+                date=timing.withdrawal_date.isoformat() if timing.withdrawal_date else "")
     return sorted(items_by_label.values(), key=lambda item: (item.group, item.label.lower()))
 
 
 def _bill_schedule_labels(rows: list[list[str]], month: BudgetMonth) -> dict[str, tuple[str, str]]:
+    """Recognize dedicated source labels even while their timing needs repair."""
     if not rows:
         return {}
-    try:
-        from bookiebot.sheets.bills import list_bill_schedules
-
-        labels: dict[str, tuple[str, str]] = {}
-        for bill in list_bill_schedules(rows):
-            if bill.recurrence == "quarterly" and month.month not in bill.pull_months:
-                continue
-            for label in {bill.bill_key, bill.display_name, bill.source_label}:
-                normalized = _normalize_label(label)
-                if normalized:
-                    group = _payment_group_for_label(normalized) or "bills_utilities"
-                    labels[normalized] = (
-                        group,
-                        bill.display_name or bill.source_label or bill.bill_key,
-                    )
-        return labels
-    except Exception:
+    header = {_normalize_label(value): index for index, value in enumerate(rows[0])}
+    if not {"display name", "source label"} <= header.keys():
         return {}
+    labels: dict[str, tuple[str, str]] = {}
+    for row in rows[1:]:
+        display = _cell(row, header.get("display name"))
+        source = _cell(row, header.get("source label")) or display
+        if not display or not source:
+            continue
+        group = _payment_group_for_label(_normalize_label(source)) or "bills_utilities"
+        for label in {display, source, _cell(row, header.get("bill key"))}:
+            if normalized := _normalize_label(label):
+                labels[normalized] = group, display
+    return labels
 
 
 def _quarterly_bill_months_by_label(rows: list[list[str]]) -> dict[str, frozenset[int]]:
@@ -1161,16 +1174,11 @@ def _bill_calendar_events(
     if not bill_schedule_rows:
         return []
     try:
-        from bookiebot.sheets.bills import list_bill_schedules
+        from bookiebot.sheets.bills import bill_payment_state, list_bill_schedules
     except Exception:
         return []
 
-    payment_amounts = {_normalize_label(item.label): item.amount for item in payments}
-    known_utility_amounts = {
-        _normalize_label(item.label): item.current_amount
-        for item in utility_history
-        if item.current_amount > 0
-    }
+    entered = {_bill_subscription_identity(item.label): item for item in payments}
     events: list[CalendarEvent] = []
     bills = list_bill_schedules(bill_schedule_rows)
     source_counts: dict[str, int] = defaultdict(int)
@@ -1178,12 +1186,12 @@ def _bill_calendar_events(
         source_counts[_normalize_label(bill.source_label)] += 1
     for bill in bills:
         day = _bill_day_in_month(bill, month)
-        if day is None:
+        timing = bill_payment_state(bill.source_label, month.year, month.month, bills, as_of=now_pacific().date())
+        if day is None or timing.withdrawal_date is None:
             continue
         labels = [bill.source_label, bill.display_name, bill.bill_key]
-        amount = next((payment_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in payment_amounts), 0.0)
-        if amount <= 0:
-            amount = next((known_utility_amounts[_normalize_label(label)] for label in labels if _normalize_label(label) in known_utility_amounts), 0.0)
+        payment = next((entered[_bill_subscription_identity(label)] for label in labels if _bill_subscription_identity(label) in entered), None)
+        amount = payment.amount if payment else 0.0
         amount_estimated = False
         if (
             amount <= 0
@@ -1209,7 +1217,7 @@ def _bill_calendar_events(
                 amount=round(amount, 2),
                 day=day,
                 group=group,
-                projected_only=amount_estimated or day > elapsed_days,
+                projected_only=amount_estimated or (payment.status == "queued" if payment else day > elapsed_days),
                 amount_estimated=amount_estimated,
             )
         )
@@ -1634,6 +1642,7 @@ def _category_spending_amounts(
     *,
     amount_saved: float | None,
     use_sheet_subtotals: bool,
+    queued_bills_total: float = 0.0,
 ) -> dict[str, float]:
     budget_groups = _budget_group_totals(breakdown)
     subtotals = _personal_expense_subtotals(rows) if use_sheet_subtotals else {}
@@ -1641,7 +1650,7 @@ def _category_spending_amounts(
         "needs": round(
             budget_groups["Needs"]
             if budget_groups["Needs"] > 0
-            else subtotals.get("needs", 0.0),
+            else max(0.0, round(subtotals.get("needs", 0.0) - queued_bills_total, 2)),
             2,
         ),
         "wants": round(
@@ -2250,6 +2259,7 @@ def _utility_history_items(
     selected_month: BudgetMonth,
     *,
     groups: frozenset[str] = frozenset({"bills_utilities"}),
+    as_of: date | None = None,
 ) -> list[UtilityHistoryItem]:
     history = sorted(
         (item for item in budget_history if item.month.year == selected_month.year and item.month.month <= selected_month.month),
@@ -2261,7 +2271,7 @@ def _utility_history_items(
     quarterly_months_by_label = _quarterly_bill_months_by_label(bill_schedule_rows)
     by_label: dict[str, dict[str, Any]] = {}
     for history_item in history:
-        monthly_items = _payment_items(history_item.rows, bill_schedule_rows, history_item.month)
+        monthly_items = _payment_items(history_item.rows, bill_schedule_rows, history_item.month, as_of=as_of)
         monthly_amounts = {
             _normalize_label(item.label): item
             for item in monthly_items
@@ -2271,7 +2281,7 @@ def _utility_history_items(
             by_label.setdefault(key, {"label": item.label, "amounts": {}})
         for key, bucket in by_label.items():
             item = monthly_amounts.get(key)
-            bucket["amounts"][history_item.month.month] = round(item.amount if item else 0.0, 2)
+            bucket["amounts"][history_item.month.month] = round(item.amount if item and item.status != "queued" else 0.0, 2)
 
     items: list[UtilityHistoryItem] = []
     month_labels = {
@@ -2651,6 +2661,7 @@ def _report_client_payload(
         "topEntries": [_expense_entry_payload(entry) for entry in top_entries],
         "dailyEntries": [_expense_entry_payload(entry) for entry in activity_entries],
         "needExpenses": [_payment_payload(item) for item in report.need_expenses],
+        "queuedBills": [{**_payment_payload(item), "date": item.date or None} for item in report.queued_bills],
         "calendarEvents": [_calendar_event_payload(item) for item in report.calendar_events],
         "calendarLogoAliases": _calendar_logo_aliases(report.actor_key),
         "calendarContext": [

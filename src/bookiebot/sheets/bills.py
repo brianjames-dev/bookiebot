@@ -60,6 +60,34 @@ class BillSchedule:
 
 
 @dataclass(frozen=True)
+class BillPaymentState:
+    """Timing of an entered monthly amount, not evidence of a bank posting."""
+    withdrawal_date: date | None
+    paid: bool
+    reason: str = ""
+
+
+def bill_payment_state(
+    label: str, year: int, month: int, schedules: list[BillSchedule], *, as_of: date,
+) -> BillPaymentState:
+    def key(value: str) -> str:
+        normalized = re.sub(r"[^a-z0-9]", "", value.casefold())
+        return "studentloan" if normalized == "studentloanpayment" else normalized
+
+    target = key(label)
+    matches = [bill for bill in schedules if target and target in {
+        key(bill.bill_key), key(bill.display_name), key(bill.source_label),
+    }]
+    if len(matches) != 1:
+        return BillPaymentState(None, False, "ambiguous_schedule" if matches else "missing_schedule")
+    bill = matches[0]
+    if bill.recurrence == "quarterly" and month not in bill.pull_months:
+        return BillPaymentState(None, False, "outside_billing_month")
+    withdrawal = _clamped_date(year, month, bill.pull_day)
+    return BillPaymentState(withdrawal, withdrawal <= as_of)
+
+
+@dataclass(frozen=True)
 class BillReminder:
     bill: BillSchedule
     pull_date: date

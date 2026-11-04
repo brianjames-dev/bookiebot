@@ -52,8 +52,8 @@ assert.ok(!html.includes('CalendarFilterControl'));assert.ok(!html.includes('20 
 const details=renderToStaticMarkup(React.createElement(view.CalendarDayDetails,{selection:{key:'day',title:'Day',events:[outgoing,unknown,income]},aliases:{water:'santa-rosa-water','student loan':'aidvantage'}}))
 assert.ok(details.includes('$18.75'));assert.ok(details.includes('Not entered'));assert.ok(details.includes('Scheduled dates do not confirm bank posting'))
 assert.ok(view.calendarEventDescription(unknown).includes('Amount not entered'))
-for (const [amountEstimated,status] of [[true,'Scheduled'],[false,'Recorded']]) {
- const bill=event({kind:'bill',label:'Student Loan',group:'static_bills_subscriptions_needs',amount:59.96,amountEstimated,projectedOnly:true})
+for (const [amountEstimated,projectedOnly,status] of [[true,true,'Scheduled'],[false,true,'Scheduled'],[false,false,'Recorded']]) {
+ const bill=event({kind:'bill',label:'Student Loan',group:'static_bills_subscriptions_needs',amount:59.96,amountEstimated,projectedOnly})
  assert.ok(view.calendarEventDescription(bill).includes(status))
  const html=renderToStaticMarkup(React.createElement(view.CalendarDayDetails,{selection:{key:'loan',title:'Loan',events:[bill]},aliases:{water:'santa-rosa-water','student loan':'aidvantage'}}))
  assert.ok(html.includes('Bill · '+status));assert.ok(html.includes('$59.96'));assert.ok(html.includes('Student Loan'))

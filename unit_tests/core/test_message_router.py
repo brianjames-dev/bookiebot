@@ -271,7 +271,9 @@ async def test_utility_message_writes_bill_cell_and_opens_working_split_dialog(m
     assert action.new_values == ["124.46"]
     replies = channel.send.await_args_list
     assert len(replies) == 2
-    assert "Logged" in replies[0].args[0] and "$124.46" in replies[0].args[0]
+    assert "Saved" in replies[0].args[0] and "$124.46" in replies[0].args[0]
+    assert replies[0].args[0].startswith("✅ Saved")
+    assert "withdrawal date" in replies[0].args[0]
     assert replies[1].args == (splits.SPLIT_PROMPT,)
     view = replies[1].kwargs["view"]
     assert [button.label for button in view.children] == ["By income", "50/50", "Fronted", "No split"]

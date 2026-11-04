@@ -28,7 +28,9 @@ def _report(monkeypatch, rows, *, month=9, today=9, schedule=None, subscriptions
             shared_expenses=InMemoryWorksheet([]),
             personal_budget=InMemoryWorksheet([["Monthly Income", "$1,000"], *rows]),
             subscriptions=InMemoryWorksheet(subscriptions or []),
-            bill_schedule=InMemoryWorksheet(_schedule() if schedule is None else schedule),
+            bill_schedule=InMemoryWorksheet((_schedule() + [
+                ["pge", "PG&E", "monthly", "1", "", "PG&E", "", "", "", ""],
+            ]) if schedule is None else schedule),
             budget_history=history,
         ),
     )
@@ -72,14 +74,16 @@ def test_upcoming_widget_reuses_the_scheduled_expectation(monkeypatch, mode):
 def test_recorded_student_loan_supersedes_expectation_and_is_not_variable_utility_history(monkeypatch, actual, month):
     amount = float(actual[1:])
     report, payload = _report(monkeypatch, [["Student Loan", actual]], month=month)
-    assert [(item.label, item.amount) for item in report.payments] == [("Student Loan", amount)]
-    assert report.payments[0].group == "static_bills_subscriptions_needs"
+    paid = month < 9
+    assert [(item.label, item.amount) for item in report.payments] == ([("Student Loan", amount)] if paid else [])
+    assert (report.payments or report.queued_bills)[0].group == "static_bills_subscriptions_needs"
     assert report.utility_history == []
     assert _outflows(payload)[0]["amount"] == amount
     assert "amountEstimated" not in _outflows(payload)[0]
     for mode in ("current", "projected"):
-        assert payload["modeViews"][mode]["metrics"]["totalExpenses"] == amount
-        assert payload["modeViews"][mode]["categorySpending"]["needs"] == amount
+        expected = amount if mode == "projected" or paid else 0
+        assert payload["modeViews"][mode]["metrics"]["totalExpenses"] == expected
+        assert payload["modeViews"][mode]["categorySpending"]["needs"] == expected
 
 
 def test_automatic_loan_budget_row_counts_once_as_need_and_preserves_historical_actuals(monkeypatch):
@@ -119,9 +123,9 @@ def test_future_month_expected_bill_and_unrelated_bill_are_both_counted_once(mon
         history=(reports.BudgetHistoryRows(reports.BudgetMonth(2026, 8), [["PG&E", "$80"]]),))
     # Incomplete optional history must never overwrite the authoritative current bill rows.
     assert sum(item.current_amount for item in report.utility_history) == 0
-    assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == 100
+    assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == 0
     assert payload["modeViews"]["projected"]["metrics"]["totalExpenses"] == 159.96
-    assert _outflows(payload)[0]["day"] == 12
+    assert next(event for event in _outflows(payload) if event["label"] == "Student Loan")["day"] == 12
 
 
 @pytest.mark.parametrize("rows", [[], [["Student Loan Payment", "0"]], [["Student Loan reminder", "0"]],
@@ -231,7 +235,7 @@ def test_fixed_loan_and_xfinity_share_a_category_without_overwriting_or_double_c
     recorded_loan = float(actual.removeprefix("$"))
     projected_loan = recorded_loan or 59.96
     current_sub = 65.99 if subscription_day <= today else 0
-    expected_totals = {"current": round(recorded_loan + current_sub, 2),
+    expected_totals = {"current": round((recorded_loan if today >= 12 else 0) + current_sub, 2),
                        "projected": round(projected_loan + 65.99, 2)}
     assert [(item.label, item.current_amount) for item in report.utility_history] == [("PG&E", 100.01)]
     assert [item["name"] for item in payload["subscriptionsNeeds"]] == ["Xfinity"]
@@ -254,12 +258,12 @@ def test_fixed_loan_and_xfinity_share_a_category_without_overwriting_or_double_c
 def test_fixed_loan_explanations_and_comparison_keep_actuals_distinct_from_subscriptions(monkeypatch, actual):
     subscriptions = [["Needs", "", "(Monthly)"], ["Recurring:", "Name:", "Amount:"],
                      ["5th", "Xfinity", "$65.99"]]
-    _, payload = _report(monkeypatch, [["Student Loan", actual]], subscriptions=subscriptions)
+    _, payload = _report(monkeypatch, [["Student Loan", actual]], subscriptions=subscriptions, today=18)
     recorded = float(actual.removeprefix("$"))
     comparison = payload["comparisonData"]
     assert comparison["recordedExpenses"] == ([{
         "label": "Student Loan", "amount": recorded,
-        "category": "static_bills_subscriptions_needs", "date": None,
+        "category": "static_bills_subscriptions_needs", "date": "2026-09-12",
     }] if recorded else [])
     assert [(item["label"], item["amount"]) for item in comparison["scheduledExpenses"]] == [("Xfinity", 65.99)]
     assert comparison["unitemizedExpenses"] == 0
@@ -272,7 +276,7 @@ def test_fixed_loan_explanations_and_comparison_keep_actuals_distinct_from_subsc
         loan_parts = [item for item in detail["components"] if item["label"].startswith("Student Loan")]
         assert loan_parts == ([{
             "label": "Student Loan" if recorded else "Student Loan · expected",
-            "amount": recorded or 59.96, "source": "recorded" if recorded else "scheduled", "date": None,
+            "amount": recorded or 59.96, "source": "recorded" if recorded else "scheduled", "date": "2026-09-12" if recorded else None,
         }] if recorded or mode == "projected" else [])
 
 
@@ -301,10 +305,19 @@ def test_only_needs_shortfall_changes_wants_allowance_not_wants_spending(monkeyp
     ]
 
 
-def test_legacy_student_loan_payment_remains_a_bill_without_variable_utility_history(monkeypatch):
+def test_legacy_student_loan_without_schedule_remains_queued_without_variable_utility_history(monkeypatch):
     report, payload = _report(monkeypatch, [["Student Loan Payment", "$119.92"]], month=8, schedule=[])
-    assert report.payments == [reports.PaymentItem("Student Loan Payment", 119.92, "static_bills_subscriptions_needs")]
+    assert report.payments == []
+    assert report.queued_bills == [reports.PaymentItem("Student Loan Payment", 119.92, "static_bills_subscriptions_needs", status="queued")]
     assert report.utility_history == []
     assert payload["subscriptionsNeeds"] == []
     for mode in ("current", "projected"):
-        assert payload["modeViews"][mode]["metrics"]["totalExpenses"] == 119.92
+        assert payload["modeViews"][mode]["metrics"]["totalExpenses"] == (119.92 if mode == "projected" else 0)
+
+
+@pytest.mark.parametrize("today", [9, 18])
+def test_legacy_loan_label_uses_one_calendar_occurrence_with_its_configured_schedule(monkeypatch, today):
+    result, payload = _report(monkeypatch, [["Student Loan Payment", "119.92"]], today=today)
+    assert [(event["amount"], event["day"], event["projectedOnly"]) for event in _outflows(payload)] == [(119.92, 12, today < 12)]
+    assert payload["modeViews"]["projected"]["metrics"]["totalExpenses"] == 119.92
+    assert len(result.payments) == int(today >= 12)
