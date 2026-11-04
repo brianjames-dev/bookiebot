@@ -84,7 +84,7 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  const posts=requests.filter(r=>r.options.body).length;await run(()=>{tree=Renderer.create(fixture(false))});assert.equal(requests.filter(r=>r.options.body).length,posts)
  await click('Check saved status');assert.match(latest().url,new RegExp('/commands/'+deleted.requestId+'$'));await respond({state:'done',success:true});await respond(listing());assert.equal(storage.size,0);assert.equal(work.uncertain,false);await run(()=>tree.unmount())
  for(const editing of[false,true]){
-  const customRow={...row,split:editing?'custom':'',splitOptions:{...row.splitOptions,incomePayerCents:799,...(editing?{payerCents:411,payerBasisPoints:3333}:{})}}
+  const customRow={...row,capabilities:{...row.capabilities,cancel_split:editing},split:editing?'custom':'',splitOptions:{...row.splitOptions,incomePayerCents:799,...(editing?{payerCents:411,payerBasisPoints:3333}:{})}}
   await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing([customRow]));await click(editing?'Edit split':'Split')
   assert.equal(input("Brian's share amount").props.value,editing?'4.11':'7.99')
   assert.ok(tree.root.findAll(node=>node.type==='svg'&&node.props.className?.includes('lucide-chart-pie')).length)
@@ -95,7 +95,9 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
   await submit();assert.equal(body().method,'custom');assert.equal(body().payerShareCents,926)
   const checked=review(body(),customRow);checked.review.share={method:'custom',payerCents:926,partnerCents:308,payerName:'Brian',partnerName:'Hannah'};await respond(checked);assert.match(text(tree.toJSON()),/No repayment will be marked received/)
   await click('Back');assert.equal(input("Brian's share amount").props.value,'9.26');await click('Split by income');assert.equal(input("Brian's share amount").props.value,'7.99');assert.equal(button('Split by income').props.disabled,true)
-  await cancel();await run(()=>tree.unmount())
+  await cancel()
+  if(editing){await click('Edit split');await click('Remove split');await submit();assert.equal(body().operation,'cancel_split');await respond(review(body(),customRow));assert.match(text(tree.toJSON()),/Not split/);assert.match(text(tree.toJSON()),/No repayment will be marked received/);await cancel()}
+  await run(()=>tree.unmount())
  }
  await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing());await click('Update');await change('Amount','22.00');await submit();await respond(review(body()));await click('Confirm update');await respond({state:'done',success:true,summary});await reject()
  assert.ok(button('Update').props.disabled,'Confirmed presentation identities remain inert after a failed refresh')

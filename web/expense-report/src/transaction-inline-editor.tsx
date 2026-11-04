@@ -20,6 +20,10 @@ export function transactionReviewChanges(summary:TransactionChangeSummary,row:Re
   const prior=row.split?splitMethodLabel(row.split as SplitMethod,0,partner):'Not split',next=splitMethodLabel(share.method as SplitMethod,0,partner).replace(' · 0/100','')
   for(const change of[{field:'split-method',label:'Split',before:prior.replace(' · 0/100',''),after:next},{field:'payer-share',label:`${payer}’s share`,before:splitMoney(old),after:splitMoney(share.payerCents)},{field:'partner-share',label:`${partner} owes ${payer}`,before:splitMoney(row.amountCents-old),after:splitMoney(share.partnerCents)}])if(change.before!==change.after)changes.push(change)
  }
+ if(summary.operation==='cancel_split'){
+  const payer=row.splitOptions?.payerName??'You',partner=row.splitOptions?.partnerName??'Partner',old=row.splitOptions?.payerCents??row.amountCents
+  for(const change of[{field:'split-method',label:'Split',before:splitMethodLabel(row.split as SplitMethod,0,partner).replace(' · 0/100',''),after:'Not split'},{field:'payer-share',label:`${payer}’s share`,before:splitMoney(old),after:splitMoney(row.amountCents)},{field:'partner-share',label:`${partner} owes ${payer}`,before:splitMoney(row.amountCents-old),after:splitMoney(0)}])if(change.before!==change.after)changes.push(change)
+ }
  return changes
 }
 export function InlineTransactionEditor(props:Props){
@@ -48,7 +52,7 @@ export function InlineTransactionEditor(props:Props){
   </>} confirm={<>
    {review&&<><dl className="bi-review-changes" aria-label="Changes to review">{changes.map(change=><div className="bi-review-change" key={change.field} data-field={change.field}><dt>{change.label}</dt><dd><del>{change.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span>{change.field==='category'?(categories[change.after]??change.after):change.after}</span></span></dd></div>)}</dl>
     {operation==='delete'&&<p className="bi-footnote">{row.title} · {splitMoney(row.amountCents)}. Only this purchase will be removed.</p>}
-    {review.share&&<p className="bs-review-note">No repayment will be marked received.</p>}
+    {(review.share||operation==='cancel_split')&&<p className="bs-review-note">No repayment will be marked received.</p>}
    </>}
    <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={current.onBack}><ArrowLeft aria-hidden="true"/>Back</button><button type="button" className="bi-primary" disabled={locked||!review} onClick={current.onConfirm} aria-label={`Confirm ${operation==='move'?'update':operation}`}>{busy?'Saving…':operation==='delete'?'Delete purchase':operation==='split'?'Save split':operation==='cancel_split'?'Remove split':operation==='undo'?'Undo change':'Save changes'}</button></footer>
   </>}/>
