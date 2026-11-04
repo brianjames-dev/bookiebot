@@ -6,6 +6,21 @@ const fixture=JSON.parse(fs.readFileSync(process.env.BOOKIEBOT_TRANSACTION_WORKS
 const assets=path.join(root,'src/bookiebot/reports/assets'),css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8')
 const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx',contents:`import React from 'react';import{createRoot}from'react-dom/client';import{TransactionsScreen}from'./src/transactions-screen';import{ChartTooltipDismissProvider}from'./src/components/ui/chart';createRoot(document.getElementById('root')).render(<ChartTooltipDismissProvider revision={0}><TransactionsScreen active ownerName="Brian" initialMonth="${fixture.month}"/></ChartTooltipDismissProvider>);`},outfile:'/private/tmp/bookiebot-transactions-fixture.js',bundle:true,write:false,format:'iife',define:{'process.env.NODE_ENV':'"production"'},plugins:[{name:'unused-overview-worker',setup(build){build.onResolve({filter:/\?worker&url$/},()=>({path:'unused-worker',namespace:'fixture-worker'}));build.onLoad({filter:/.*/,namespace:'fixture-worker'},()=>({contents:'export default "data:application/javascript,"',loader:'js'}))}}]})
 const money=c=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(c/100)
+async function chartSpacing(page,screen){
+ const measure=()=>screen.evaluate(root=>{
+  const rect=selector=>root.querySelector(selector).getBoundingClientRect(),layout=rect('.bb-chart-layout'),plot=rect('.bb-chart-box'),legend=rect('.bb-daily-legend'),summary=rect('.bb-daily-summary'),kicker=rect('.bb-chart-kicker'),search=rect('.bb-recorded-search'),mobile=matchMedia('(max-width:860px)').matches
+  return{mobile,height:layout.height,naturalHeight:plot.height+legend.height,legendGap:summary.top-legend.bottom,metricGap:kicker.top-legend.bottom,searchGap:search.top-summary.bottom}
+ })
+ const check=g=>{
+  assert(g.height<=g.naturalHeight+(g.mobile?160:1),`The chart must size to its own contents, not the transaction list: ${JSON.stringify(g)}`)
+  if(g.mobile)assert(g.legendGap>=-1&&g.legendGap<=37&&g.metricGap<=57,`Total Spent must sit just below the graph legend: ${JSON.stringify(g)}`)
+  assert(g.searchGap>=19&&g.searchGap<=21,`Search must retain its normal gap: ${JSON.stringify(g)}`)
+ }
+ check(await measure())
+ // Recheck after the graph and list move in/out of the viewport, not only at first paint.
+ await screen.locator('.bb-recorded-search').scrollIntoViewIfNeeded();await page.evaluate(()=>new Promise(requestAnimationFrame));check(await measure())
+ await page.evaluate(()=>scrollTo(0,0));await page.evaluate(()=>new Promise(requestAnimationFrame));check(await measure())
+}
 async function noFocusChrome(screen){
  const failures=await screen.evaluate(root=>{const failures=[];for(const el of root.querySelectorAll('button,input,select,summary,[tabindex]')){
   if(el.disabled||el.closest('[inert]')||!el.getClientRects().length)continue
@@ -48,6 +63,7 @@ for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
   await page.goto('https://transactions.test/fixture');const screen=page.getByRole('region',{name:'Recorded transactions',exact:true}),ready=()=>page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false')
   await screen.locator('.bb-chart-total').waitFor().catch(async error=>{console.error(await page.locator('body').innerText());await page.screenshot({path:'/private/tmp/inline-workspace-failure.png'});throw error});await ready()
   const filter=screen.getByRole('combobox',{name:'Filter transactions',exact:true}),total=screen.locator('.bb-chart-total')
+  await chartSpacing(page,screen)
   assert.equal(await total.innerText(),money(fixture.results.all.totalAmountCents));assert.equal(await screen.getByRole('combobox').count(),1);assert.equal(await screen.locator('.bb-daily-single-day').count(),1)
   const geometry=await screen.evaluate(el=>{const single=el.querySelector('.bb-daily-single-day .bb-daily-day-total'),regular=el.querySelector('.bb-daily-day-header .bb-daily-day-total'),a=el.querySelector('.bb-chart-total').getBoundingClientRect(),f=el.querySelector('.bb-category-mix-filter').getBoundingClientRect(),search=el.querySelector('.bb-recorded-search').getBoundingClientRect();return{singleRight:single.getBoundingClientRect().right,regularRight:regular.getBoundingClientRect().right,singleSize:getComputedStyle(single).fontSize,regularSize:getComputedStyle(regular).fontSize,beside:a.right<f.left,above:f.bottom<search.top,overflow:document.documentElement.scrollWidth>innerWidth}})
   assert(Math.abs(geometry.singleRight-geometry.regularRight)<1&&geometry.singleSize===geometry.regularSize&&geometry.beside&&geometry.above&&!geometry.overflow,JSON.stringify(geometry))
@@ -68,7 +84,7 @@ for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
    assert.equal(await single.getAttribute('data-side'),'closed','Micro-movement and vertical scroll gestures cannot reveal actions')
   }
   await noFocusChrome(screen)
-  await screen.getByRole('button',{name:'Load more transactions',exact:true}).click();await ready();assert.equal(await total.innerText(),money(fixture.results.all.totalAmountCents));assert.equal(await screen.getByRole('button',{name:'Load more transactions',exact:true}).count(),0)
+  await screen.getByRole('button',{name:'Load more transactions',exact:true}).click();await ready();assert.equal(await total.innerText(),money(fixture.results.all.totalAmountCents));assert.equal(await screen.getByRole('button',{name:'Load more transactions',exact:true}).count(),0);await chartSpacing(page,screen)
   const first=screen.locator('.bb-daily-day-group').first();await first.locator('.bb-daily-day-header').click();await page.waitForFunction(()=>document.querySelector('.bb-daily-day-group').dataset.moving==='false')
   const rowBorders=await first.locator('.bb-daily-row-shell').evaluateAll(rows=>rows.map(el=>({shell:getComputedStyle(el).borderTopWidth,swipe:getComputedStyle(el.querySelector('.bb-recorded-swipe')).borderTopWidth})))
   assert(rowBorders.every((row,i)=>row.swipe==='0px'&&row.shell===(i?'1px':'0px')),'Only the native separators between expanded rows remain')
@@ -82,7 +98,7 @@ for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
   await first.getByRole('button',{name:'Update Starbucks Coffee Company',exact:true}).click();await screen.getByRole('combobox',{name:'Update category',exact:true}).selectOption('gas');await screen.getByRole('region',{name:'Edit transaction',exact:true}).getByLabel('Amount',{exact:true}).fill('9.45')
   await noFocusChrome(screen)
   await screen.getByRole('button',{name:'Review change',exact:true}).click();await screen.getByRole('button',{name:'Confirm update',exact:true}).waitFor();assert.equal(reviews.at(-1).operation,'move');assert.equal(reviews.at(-1).updates.amount,945);assert.equal(reviews.at(-1).destination,'gas');assert((await screen.locator('.bi-review-changes').innerText()).includes('$9.45'));assert((await screen.locator('.bi-review-change[data-field="category"]').innerText()).includes('Gas'));await noFocusChrome(screen);await screen.getByRole('button',{name:'Back',exact:true}).click();await screen.getByRole('button',{name:'Cancel',exact:true}).click()
-  for(const[value,key]of[['needs','needs'],['wants','wants'],['shared','shared'],['category:food','food'],['income','income'],['savings','savings'],['all','all']]){await filter.selectOption(value);await ready();assert.equal(await total.innerText(),money(fixture.results[key].totalAmountCents));if(value==='shared')assert.equal(await screen.locator('.bb-daily-single-day').count(),2)}
+  for(const[value,key]of[['needs','needs'],['wants','wants'],['shared','shared'],['category:food','food'],['income','income'],['savings','savings'],['all','all']]){await filter.selectOption(value);await ready();assert.equal(await total.innerText(),money(fixture.results[key].totalAmountCents));if(value==='shared')assert.equal(await screen.locator('.bb-daily-single-day').count(),2);await chartSpacing(page,screen)}
   await screen.getByRole('searchbox',{name:'Search transactions',exact:true}).fill('star');await page.waitForTimeout(300);await ready();assert.equal(await total.innerText(),'$8.45');assert.equal(await screen.locator('.bb-recorded-search button').count(),1);assert.equal(await screen.locator('.bb-daily-single-day').count(),1);await screen.getByRole('button',{name:'Clear search',exact:true}).click();await ready()
   if(width===390&&dark){await page.waitForTimeout(1700);await screen.getByRole('heading',{name:'Transactions',exact:true}).click();await screen.screenshot({path:`/private/tmp/transactions-workspace-${engine.name()}.png`})}
   assert.deepEqual(errors,[]);assert.deepEqual(commands,[],'No financial command is sent by the browser acceptance');cases++;console.log(JSON.stringify({engine:engine.name(),width,dark,passed:true}));await page.close()
