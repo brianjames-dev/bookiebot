@@ -1,0 +1,293 @@
+{
+  "kind": "bookiebot-logo-batch",
+  "version": 1,
+  "snapshotId": "f2e0db6aa782c2bd040445bc9943b718269259ef1b693c3dbcfdc92f7478a5bc",
+  "createdAt": "2026-11-04T06:30:13.860787+00:00",
+  "items": [
+    {
+      "key": "merchant:bp",
+      "kind": "merchant",
+      "id": "bp",
+      "name": "BP",
+      "expectedRevision": "77d42fdc1e7fc58d15eb8d10042126960bd21cc2ece9074d0ad2833f477d291e",
+      "current": {
+        "key": "merchant:bp",
+        "kind": "merchant",
+        "id": "bp",
+        "name": "BP",
+        "group": "Gas stations",
+        "aliases": [
+          "BP",
+          "British Petroleum",
+          "BP gas"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-bp-9dad127421af0a14.svg",
+        "sha256": "9dad127421af0a14172ee55627e2c06f24ebe5593510428812c16f29dabfcd7f",
+        "revision": "77d42fdc1e7fc58d15eb8d10042126960bd21cc2ece9074d0ad2833f477d291e",
+        "background": "#ffffff",
+        "inset": 4,
+        "sourceUrl": "https://en.wikipedia.org/wiki/File:BP_Helios_logo.svg"
+      },
+      "notes": "",
+      "referenceUrls": [
+        "https://images.seeklogo.com/logo-png/47/2/british-petroleum-logo-png_seeklogo-471800.png"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "8a338f5c78179ecd0abb21294e836cf66c2db91a07fcd8e4a187ebe1f8a364ae",
+          "asset": "candidates/merchant-bp-8a338f5c78179ecd.png",
+          "source": {
+            "path": "references/merchant-bp-a2bff7cd966ac7f9.png",
+            "sha256": "a2bff7cd966ac7f9be152995f622dba58867500393152afcdf6c5e1418f3a28b"
+          },
+          "sourceUrl": "https://images.seeklogo.com/logo-png/47/2/british-petroleum-logo-png_seeklogo-471800.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T06:44:25.994547+00:00"
+        }
+      ],
+      "status": "approved",
+      "approvedSha256": "8a338f5c78179ecd0abb21294e836cf66c2db91a07fcd8e4a187ebe1f8a364ae",
+      "approvedAt": "2026-11-04T07:38:49.209325+00:00"
+    },
+    {
+      "key": "merchant:chevron",
+      "kind": "merchant",
+      "id": "chevron",
+      "name": "Chevron",
+      "expectedRevision": "1db9e2a41e789864c576073e30ef7452632c50eeb6c5e84e715a10df64230bcf",
+      "current": {
+        "key": "merchant:chevron",
+        "kind": "merchant",
+        "id": "chevron",
+        "name": "Chevron",
+        "group": "Gas stations",
+        "aliases": [
+          "Chevron"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-chevron-9493eafb2e48bf90.svg",
+        "sha256": "9493eafb2e48bf909a88c744006d8c37e4973d1bad8abcde2db306f92d7adffc",
+        "revision": "1db9e2a41e789864c576073e30ef7452632c50eeb6c5e84e715a10df64230bcf",
+        "background": "#ffffff",
+        "inset": 7,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Chevron_Logo.svg"
+      },
+      "notes": "We need the logo to be slightly bigger than it is currently",
+      "referenceUrls": [
+        "https://1000logos.net/wp-content/uploads/2017/12/Chevron-Logo.png"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "aa6c37eeb3765599c44cab2f39044f2ccb340fbd1deaa1af0e13805619e7b7a8",
+          "asset": "candidates/merchant-chevron-aa6c37eeb3765599.png",
+          "source": {
+            "path": "references/merchant-chevron-ba9c44f6aff25292.png",
+            "sha256": "ba9c44f6aff2529254248c69afcb1b6255c74018546637108a453c2f38f433c7"
+          },
+          "sourceUrl": "https://1000logos.net/wp-content/uploads/2017/12/Chevron-Logo.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T06:44:26.068911+00:00"
+        }
+      ],
+      "status": "approved",
+      "approvedSha256": "aa6c37eeb3765599c44cab2f39044f2ccb340fbd1deaa1af0e13805619e7b7a8",
+      "approvedAt": "2026-11-04T07:38:49.281899+00:00"
+    },
+    {
+      "key": "merchant:circle-k",
+      "kind": "merchant",
+      "id": "circle-k",
+      "name": "Circle K",
+      "expectedRevision": "43260957d5457d521d28726bd76ccb3063c7bc85da001c2774db0192bf09b562",
+      "current": {
+        "key": "merchant:circle-k",
+        "kind": "merchant",
+        "id": "circle-k",
+        "name": "Circle K",
+        "group": "Gas stations",
+        "aliases": [
+          "Circle K",
+          "CircleK"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-circle-k-1e61fb816fae4afc.svg",
+        "sha256": "1e61fb816fae4afc3cd3ee0622baf6bcf085e38d2b35e177787f6f95b6a1ba64",
+        "revision": "43260957d5457d521d28726bd76ccb3063c7bc85da001c2774db0192bf09b562",
+        "background": "#ffffff",
+        "inset": 4,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Circle_K_logo_2015.svg"
+      },
+      "notes": "This circular logo should perfectly encompass all the space",
+      "referenceUrls": [
+        "https://logos-world.net/wp-content/uploads/2022/04/Circle-K-Symbol.png"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "e5aa2d50538310beb42f4f28f4e212b0171e6cb61408430beefc675876b2ae86",
+          "asset": "candidates/merchant-circle-k-e5aa2d50538310be.png",
+          "source": {
+            "path": "references/merchant-circle-k-e04884df456d730d.png",
+            "sha256": "e04884df456d730db5d4689cb01fcb83061a369264056d76f5981e24fce6647c"
+          },
+          "sourceUrl": "https://logos-world.net/wp-content/uploads/2022/04/Circle-K-Symbol.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T06:44:26.141337+00:00"
+        }
+      ],
+      "status": "approved",
+      "approvedSha256": "e5aa2d50538310beb42f4f28f4e212b0171e6cb61408430beefc675876b2ae86",
+      "approvedAt": "2026-11-04T07:38:49.353137+00:00"
+    },
+    {
+      "key": "merchant:sheetz",
+      "kind": "merchant",
+      "id": "sheetz",
+      "name": "Sheetz",
+      "expectedRevision": "3453c9959b69b3077200a5af99cfd07c684d8b1ba0f23965ffe022b8dc5c5308",
+      "current": {
+        "key": "merchant:sheetz",
+        "kind": "merchant",
+        "id": "sheetz",
+        "name": "Sheetz",
+        "group": "Gas stations",
+        "aliases": [
+          "Sheetz"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-sheetz-774e74d49b65e776.svg",
+        "sha256": "774e74d49b65e776a4274d5921dc3df570f07673d71bf3c9a8c08b6f9409aebd",
+        "revision": "3453c9959b69b3077200a5af99cfd07c684d8b1ba0f23965ffe022b8dc5c5308",
+        "background": "#ffffff",
+        "inset": 4,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sheetz_logo.svg"
+      },
+      "notes": "We need the logo to be slightly bigger thant what it is currently",
+      "referenceUrls": [
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Sheetz_logo.svg/3840px-Sheetz_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail"
+      ],
+      "references": [],
+      "candidates": [
+        {
+          "sha256": "7515b42c5eda43afa5ea43099b4d67acc3085c73a53652756b1385f4df61016d",
+          "asset": "candidates/merchant-sheetz-7515b42c5eda43af.png",
+          "source": {
+            "path": "references/merchant-sheetz-965b3bdfee84f274.png",
+            "sha256": "965b3bdfee84f274f240c518afb268784db576247cff033a47e54950e4947342"
+          },
+          "sourceUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Sheetz_logo.svg/3840px-Sheetz_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T06:44:26.217938+00:00"
+        }
+      ],
+      "status": "approved",
+      "approvedSha256": "7515b42c5eda43afa5ea43099b4d67acc3085c73a53652756b1385f4df61016d",
+      "approvedAt": "2026-11-04T07:38:49.423783+00:00"
+    },
+    {
+      "key": "merchant:sam-s-club",
+      "kind": "merchant",
+      "id": "sam-s-club",
+      "name": "Sam’s Club",
+      "expectedRevision": "f4bbb55cb5aa3e1371e706b7bde91783b0e43168c1ed23ee122f537dec084b59",
+      "current": {
+        "key": "merchant:sam-s-club",
+        "kind": "merchant",
+        "id": "sam-s-club",
+        "name": "Sam’s Club",
+        "group": "Groceries",
+        "aliases": [
+          "Sam’s Club",
+          "Sam's Club",
+          "Sams Club",
+          "Sam's Club gas",
+          "Sams Club gas",
+          "Sam’s Club fuel"
+        ],
+        "asset": "src/bookiebot/reports/assets/company-logo-merchant-sam-s-club-c6b487847135e78f.svg",
+        "sha256": "c6b487847135e78f908f989ba9b302f7d3bcd328bcf50dbb3310c5fa83d208ec",
+        "revision": "f4bbb55cb5aa3e1371e706b7bde91783b0e43168c1ed23ee122f537dec084b59",
+        "background": "#ffffff",
+        "inset": 4,
+        "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sam%27s_Club_Logo_2020.svg"
+      },
+      "notes": "",
+      "referenceUrls": [
+        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTFm3Ii8ZUhCUWBnEmcJZnJbXxqEctKc9PXucc9qqfsxjuhcKtX7_pY335S&s=10"
+      ],
+      "references": [
+        {
+          "path": "references/merchant-sam-s-club-3b5e333ee85ea29a.jpg",
+          "sha256": "3b5e333ee85ea29a51604135867f77a91b43e1579be50a75f1b4713407db4920"
+        }
+      ],
+      "candidates": [
+        {
+          "sha256": "f127c1365cd136a9fa6e3e15add9ad644b3b27a2c704be6fbeb27686395b3bc0",
+          "asset": "candidates/merchant-sam-s-club-f127c1365cd136a9.png",
+          "source": {
+            "path": "references/merchant-sam-s-club-6818e534109d71e6.svg",
+            "sha256": "6818e534109d71e65cb511097fa655f45f7e0bccb4d05f61a63bec450f7e7352"
+          },
+          "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Sams_Club.svg",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T06:44:26.297791+00:00"
+        }
+      ],
+      "status": "approved",
+      "approvedSha256": "f127c1365cd136a9fa6e3e15add9ad644b3b27a2c704be6fbeb27686395b3bc0",
+      "approvedAt": "2026-11-04T07:38:49.495071+00:00"
+    },
+    {
+      "key": "merchant:valero",
+      "kind": "merchant",
+      "id": "valero",
+      "name": "Valero",
+      "expectedRevision": null,
+      "current": null,
+      "notes": "Use the user-supplied Valero reference; received in chat after initial intake.",
+      "referenceUrls": [
+        "https://brandlogos.net/wp-content/uploads/2012/11/valero-logo-vector.png"
+      ],
+      "references": [
+        {
+          "path": "references/merchant-valero-345945c7bf9da99f.png",
+          "sha256": "345945c7bf9da99f8233035c7ed3749c391d18b7c819ef452ba2320371d40f50"
+        }
+      ],
+      "candidates": [
+        {
+          "sha256": "57190617f3f23016dab6157870673a03d33eeef75c767ed7bae7b2dbc5577395",
+          "asset": "candidates/merchant-valero-57190617f3f23016.png",
+          "source": {
+            "path": "references/merchant-valero-345945c7bf9da99f.png",
+            "sha256": "345945c7bf9da99f8233035c7ed3749c391d18b7c819ef452ba2320371d40f50"
+          },
+          "sourceUrl": "https://brandlogos.net/wp-content/uploads/2012/11/valero-logo-vector.png",
+          "method": "reframe",
+          "tool": "original artwork / deterministic framing",
+          "prompt": "",
+          "generatedOutput": null,
+          "createdAt": "2026-11-04T06:44:26.450357+00:00"
+        }
+      ],
+      "status": "approved",
+      "approvedSha256": "57190617f3f23016dab6157870673a03d33eeef75c767ed7bae7b2dbc5577395",
+      "approvedAt": "2026-11-04T07:38:49.567043+00:00"
+    }
+  ]
+}

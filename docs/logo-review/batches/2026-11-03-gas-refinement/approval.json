@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-03",
+  "channel": "chat",
+  "context": "User said \"approved.\" after confirming the six displayed gas logo candidates were awaiting approval. Approval applies to the exact latest hashes in this record.",
+  "candidates": {
+    "merchant:bp": "8a338f5c78179ecd0abb21294e836cf66c2db91a07fcd8e4a187ebe1f8a364ae",
+    "merchant:chevron": "aa6c37eeb3765599c44cab2f39044f2ccb340fbd1deaa1af0e13805619e7b7a8",
+    "merchant:circle-k": "e5aa2d50538310beb42f4f28f4e212b0171e6cb61408430beefc675876b2ae86",
+    "merchant:sheetz": "7515b42c5eda43afa5ea43099b4d67acc3085c73a53652756b1385f4df61016d",
+    "merchant:sam-s-club": "f127c1365cd136a9fa6e3e15add9ad644b3b27a2c704be6fbeb27686395b3bc0",
+    "merchant:valero": "57190617f3f23016dab6157870673a03d33eeef75c767ed7bae7b2dbc5577395"
+  }
+}

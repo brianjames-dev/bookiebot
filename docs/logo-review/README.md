@@ -49,6 +49,15 @@ Amazon's exact smile-only candidate was published with those ten refinements;
 Amazon Prime remains independent. Future review should start from a fresh
 inventory of the now-published catalogs rather than reusing the old snapshot.
 
+The six-item gas publication is recorded in
+`publications/2026-11-03-gas-logos.json`: BP, Chevron, Circle K, Sheetz and
+Sam's Club replacements plus the Valero addition. The user approved the exact
+latest candidates in chat. The batch in `batches/2026-11-03-gas-refinement`
+retains the complete pre-publication inventory, supplied references, matching
+Sam's Club vector and its unmodified original, deterministic framing, hashes
+and approvals. Current merchant entries retain their previous versions; all
+prepared circles use zero inset. Valero adds only explicit name aliases.
+
 Manual review: open the current gallery on a phone; flag an icon, confirm the
 editor appears beside it, enter notes and send with readiness off. The next chat
 intake should invite replacement images before refining. After intake, inspect

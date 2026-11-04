@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "candidates": 6,
+  "sourceAndCandidateHashes": "passed",
+  "fullCircleGeometry": "passed",
+  "activeCatalogUnchanged": true,
+  "published": false,
+  "browserCases": 14,
+  "browsers": [
+    "Chromium",
+    "WebKit"
+  ],
+  "widths": [
+    320,
+    390,
+    736
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ]
+}

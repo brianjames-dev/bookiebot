@@ -1,0 +1,126 @@
+{
+  "kind": "bookiebot-logo-publication",
+  "version": 1,
+  "approval": {
+    "date": "2026-11-03",
+    "channel": "chat",
+    "context": "User said \"approved.\" after confirming the six displayed gas logo candidates were awaiting approval. Approval applies to the exact latest hashes in this record.",
+    "candidates": {
+      "merchant:bp": "8a338f5c78179ecd0abb21294e836cf66c2db91a07fcd8e4a187ebe1f8a364ae",
+      "merchant:chevron": "aa6c37eeb3765599c44cab2f39044f2ccb340fbd1deaa1af0e13805619e7b7a8",
+      "merchant:circle-k": "e5aa2d50538310beb42f4f28f4e212b0171e6cb61408430beefc675876b2ae86",
+      "merchant:sheetz": "7515b42c5eda43afa5ea43099b4d67acc3085c73a53652756b1385f4df61016d",
+      "merchant:sam-s-club": "f127c1365cd136a9fa6e3e15add9ad644b3b27a2c704be6fbeb27686395b3bc0",
+      "merchant:valero": "57190617f3f23016dab6157870673a03d33eeef75c767ed7bae7b2dbc5577395"
+    }
+  },
+  "changes": [
+    {
+      "key": "merchant:bp",
+      "batch": "docs/logo-review/batches/2026-11-03-gas-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-03-gas-refinement/candidates/merchant-bp-8a338f5c78179ecd.png",
+      "sha256": "8a338f5c78179ecd0abb21294e836cf66c2db91a07fcd8e4a187ebe1f8a364ae",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-bp-8a338f5c78179ecd.png",
+      "previous": {
+        "id": "bp",
+        "name": "BP",
+        "aliases": [
+          "BP",
+          "British Petroleum",
+          "BP gas"
+        ],
+        "asset": "company-logo-merchant-bp-9dad127421af0a14.svg",
+        "background": "#ffffff",
+        "inset": 4
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:chevron",
+      "batch": "docs/logo-review/batches/2026-11-03-gas-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-03-gas-refinement/candidates/merchant-chevron-aa6c37eeb3765599.png",
+      "sha256": "aa6c37eeb3765599c44cab2f39044f2ccb340fbd1deaa1af0e13805619e7b7a8",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-chevron-aa6c37eeb3765599.png",
+      "previous": {
+        "id": "chevron",
+        "name": "Chevron",
+        "aliases": [
+          "Chevron"
+        ],
+        "asset": "company-logo-merchant-chevron-9493eafb2e48bf90.svg",
+        "background": "#ffffff",
+        "inset": 7
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:circle-k",
+      "batch": "docs/logo-review/batches/2026-11-03-gas-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-03-gas-refinement/candidates/merchant-circle-k-e5aa2d50538310be.png",
+      "sha256": "e5aa2d50538310beb42f4f28f4e212b0171e6cb61408430beefc675876b2ae86",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-circle-k-e5aa2d50538310be.png",
+      "previous": {
+        "id": "circle-k",
+        "name": "Circle K",
+        "aliases": [
+          "Circle K",
+          "CircleK"
+        ],
+        "asset": "company-logo-merchant-circle-k-1e61fb816fae4afc.svg",
+        "background": "#ffffff",
+        "inset": 4
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:sheetz",
+      "batch": "docs/logo-review/batches/2026-11-03-gas-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-03-gas-refinement/candidates/merchant-sheetz-7515b42c5eda43af.png",
+      "sha256": "7515b42c5eda43afa5ea43099b4d67acc3085c73a53652756b1385f4df61016d",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sheetz-7515b42c5eda43af.png",
+      "previous": {
+        "id": "sheetz",
+        "name": "Sheetz",
+        "aliases": [
+          "Sheetz"
+        ],
+        "asset": "company-logo-merchant-sheetz-774e74d49b65e776.svg",
+        "background": "#ffffff",
+        "inset": 4
+      },
+      "background": "#ffffff"
+    },
+    {
+      "key": "merchant:sam-s-club",
+      "batch": "docs/logo-review/batches/2026-11-03-gas-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-03-gas-refinement/candidates/merchant-sam-s-club-f127c1365cd136a9.png",
+      "sha256": "f127c1365cd136a9fa6e3e15add9ad644b3b27a2c704be6fbeb27686395b3bc0",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-sam-s-club-f127c1365cd136a9.png",
+      "previous": {
+        "id": "sam-s-club",
+        "name": "Sam’s Club",
+        "aliases": [
+          "Sam’s Club",
+          "Sam's Club",
+          "Sams Club",
+          "Sam's Club gas",
+          "Sams Club gas",
+          "Sam’s Club fuel"
+        ],
+        "asset": "company-logo-merchant-sam-s-club-c6b487847135e78f.svg",
+        "background": "#ffffff",
+        "inset": 4
+      },
+      "background": "#004b8d"
+    },
+    {
+      "key": "merchant:valero",
+      "batch": "docs/logo-review/batches/2026-11-03-gas-refinement/batch.json",
+      "candidate": "docs/logo-review/batches/2026-11-03-gas-refinement/candidates/merchant-valero-57190617f3f23016.png",
+      "sha256": "57190617f3f23016dab6157870673a03d33eeef75c767ed7bae7b2dbc5577395",
+      "asset": "src/bookiebot/reports/assets/company-logo-merchant-valero-57190617f3f23016.png",
+      "previous": null,
+      "background": "#ffffff"
+    }
+  ]
+}
