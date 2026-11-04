@@ -62,7 +62,7 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  }
  await click('Update');await change('Amount','22.00');await submit();const changed=body();await respond(review(changed));await click('Confirm update');const frozen=body()
  assert.equal(frozen.reviewVersion,'review-update');assert.equal(work.pending,true);assert.equal(work.uncertain,true);assert.equal(button('Back').props.disabled,true)
- const count=requests.length;await click('Check saved status').catch(()=>{});assert.equal(requests.length,count,'Locked controls never issue another request')
+ const count=requests.length;assert.equal(button('Check saved status'),undefined,'Ordinary saves stay in their row without inserting a recovery panel');assert.equal(requests.length,count,'Locked controls never issue another request')
  await reject();assert.equal(work.uncertain,true);await click('Retry same confirmation');assert.deepEqual(body(),frozen)
  const summary={operation:'update',title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:1234,before:row.fields,after:{...row.fields,amount:'22.00'}}
  await respond({state:'done',success:true,detail:'Raw Discord text must stay hidden',summary,undo:{month:row.month,id:row.month+':update-1'}})
