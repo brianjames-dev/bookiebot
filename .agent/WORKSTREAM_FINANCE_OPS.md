@@ -4,6 +4,10 @@ Last updated: 2026-11-03
 
 ## Goal
 
+### Gas Location schema and exact recovery — 2026-11-03
+
+Implemented compatibility and a coordinated migration for Gas H/I/J/K with optional Location at J. Header-aware writers/readers, tagged saved field layouts, compaction/Move/Delete/Undo snapshots, canonical sources/receipts, bank/import reservations, both budgets’ quoted imports and Apps Script rollover/date stamping follow the insertion. Preflight finds 11 eligible exact bank-linked locations; unknown/deleted/conflicting sources stay untouched. Financial values, statuses, repayment/reset state, IDs/fingerprints and immutable DB audit receipts are preserved. Captured replay covers 755 expenses and 735 histories. Full local **2,889 passed / 565 PostgreSQL skipped**, 2 cutover regression checks and Pyright pass; CI/release and fresh-backup live cutover remain pending. Existing backlog priorities/invariants remain; STATUS checklist 251 and `docs/GAS_LOCATION.md` specify manual verification.
+
 ### Approved Transactions list-first spacing — 2026-11-03
 
 Ported the selected Full row draft: optional retained native graph behind a circular All-adjacent button, metric/filter above graph/search, equal single/grouped day heights, shortened nested guide with zero bottom list padding/gap, seamless full-height red/sage/blue swipe rail and rounded editor-only tint/4px padding. Existing financial actions, confirmation/recovery and Finance Ops backlog remain unchanged. **7 targeted / 2,854 full local tests passed / 565 optional PostgreSQL skipped**; Python/frontend types, Node 22 build and Apps Script checks pass. **12 workspace + 8 inline-editor + 16 shipped section-spacing Chromium/WebKit cases** pass, including exact 390×844 iPhone geometry, rapid graph reversals, chart retention, day/guide/action geometry, review/cancel/Undo and reduced motion. Phone renders inspected. Required CI/merge and automatic rollout follow in the task PR; STATUS checklist 250 supersedes 248's row tint and 249's always-visible graph placement. No live financial test reads/writes.

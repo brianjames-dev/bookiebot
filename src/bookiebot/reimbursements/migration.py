@@ -17,7 +17,7 @@ from bookiebot.sheets.collaboration import (
     actor_key_for_owner, allocation_visible_amount, expense_person_for_owner,
     partner_owner_key, split_amounts,
 )
-from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.config import get_category_columns, category_layout
 from bookiebot.sheets.reimbursement_history import read_reimbursement_history, _expense_date, _validated_allocation
 from bookiebot.sheets.routing import get_shared_expenses_spreadsheet_id, get_budget_spreadsheet_id_for_user
 
@@ -96,6 +96,7 @@ def verify_budget_links(client: Any, owner: str, when: date, category: str, *, p
     row, column = a1_to_rowcol(reference[3] + reference[4])
     source_rows = formulas(source_id)
     formula = str(source_rows[row - 1][column - 1]).strip() if len(source_rows) >= row and len(source_rows[row - 1]) >= column else ""
+    config = category_layout(source_rows)[category]
     person_col, amount_col = config["columns"]["person"], config["columns"]["amount"]
     matched = re.fullmatch(
         rf'=\s*SUMIF\(\s*\$?{person_col}:\$?{person_col}\s*[,;]\s*"([^"]+)"\s*[,;]\s*\$?{amount_col}:\$?{amount_col}\s*\)\s*',
@@ -205,14 +206,14 @@ def _plan_allocation(client: Any, identity: str, allocation: Any, original: Any,
             verify_budget_links(client, owner, spent_on, allocation.source_category, person=payload["payerPerson"], cache=formula_cache)
             verify_budget_links(client, partner_owner_key(owner), spent_on, allocation.source_category, cache=formula_cache)
         source = client.open_by_key(source_id).worksheet(spent_on.strftime("%B"))
+        rows = source.get_all_values()
         if allocation.source_worksheet == "expense":
-            config = get_category_columns.get(allocation.source_category)
+            config = category_layout(rows).get(allocation.source_category)
             if config is None:
                 raise ValueError("unsupported source category")
             columns = {field: a1_to_rowcol(column + "1")[1] for field, column in config["columns"].items()}
         else:
             columns = {"item": 2, "amount": 3}
-        rows = source.get_all_values()
         source_row = rows[allocation.source_row - 1] if 0 < allocation.source_row <= len(rows) else []
         values = {field: str(source_row[column - 1]) if len(source_row) >= column else "" for field, column in columns.items()}
         # Any corrected record must still be compared against its original

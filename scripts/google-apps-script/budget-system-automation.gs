@@ -179,6 +179,43 @@ const SHARED_EXPENSES_DATE_COLUMN_MAP = {
   32: 30,
 };
 
+/** Resolve the native header; old annual files remain readable. */
+function sharedExpenseColumnShift(sheet) {
+  const headers = sheet.getRange(1, 1, 2, Math.min(41, sheet.getMaxColumns())).getDisplayValues();
+  const fields = headers[1].slice(7, 11).map(value => String(value).trim().replace(/:$/, "").toLowerCase());
+  if (fields[0] === "date" && fields[1] === "amount" && fields[2] === "location" && fields[3] === "person") return 1;
+  if (fields[0] === "date" && fields[1] === "amount" && fields[2] === "person") return 0;
+  throw new Error("Shared Gas headers could not be verified.");
+}
+
+function personalBudgetImportRules(sharedId, monthName, owner) {
+  const book = SpreadsheetApp.openById(sharedId);
+  const shared = book.getSheetByName(monthName) || getMonthlyTemplateSheet(book);
+  const shift = sharedExpenseColumnShift(shared);
+  const shifted = {F: "F", L: "M", T: "U", AB: "AC", AJ: "AK"};
+  const rules = PERSONAL_BUDGET_IMPORT_RULES[owner];
+  if (!rules) throw new Error(`No import rules found for budget owner: ${owner}`);
+  return rules.map(rule => ({...rule, sharedExpenseCell: shift ? rule.sharedExpenseCell.replace(/^[A-Z]+/, col => shifted[col]) : rule.sharedExpenseCell}));
+}
+
+/** Read-only deployment check. Never prepares, closes or relinks a month. */
+function auditGasLocationSetup() {
+  return withBudgetRolloverLock(() => {
+    const config = getYearConfig(getYear(new Date()));
+    if (!config) throw new Error("Current year configuration is missing.");
+    const shared = SpreadsheetApp.openById(config.sharedExpensesId);
+    const sheets = shared.getSheets().filter(sheet => MONTH_NAMES.includes(sheet.getName()) || MONTH_TEMPLATE_SHEET_NAMES.includes(sheet.getName()));
+    for (const sheet of sheets) if (sharedExpenseColumnShift(sheet) !== 1) throw new Error(`Gas Location is missing: ${sheet.getName()}`);
+    if (sharedExpenseColumnShift(SpreadsheetApp.openById(TEMPLATE_IDS.sharedExpenses).getSheetByName("Template")) !== 1) throw new Error("Annual shared master is missing Gas Location.");
+    const month = getMonthName(new Date());
+    for (const owner of ["brian", "hannah"]) {
+      const sheet = SpreadsheetApp.openById(config[`${owner}BudgetId`]).getSheetByName(month);
+      validatePreparedBudgetMonthTab(sheet, config, {name:month}, owner);
+    }
+    Logger.log(`Gas Location verified in ${sheets.length} shared tabs, annual master and both current personal budgets. No cells changed.`);
+  });
+}
+
 const PERSONAL_BUDGET_INCOME_HEADER_SCAN_ROWS = 20;
 const PERSONAL_BUDGET_INCOME_HEADER_SCAN_COLUMNS = 10;
 
@@ -300,16 +337,19 @@ function prepareBudgetMonthTab(bookId, config, period, owner) {
 
 function validatePreparedBudgetMonthTab(sheet, config, period, owner) {
   if (!owner) {
-    if (sheet.getMaxColumns() < 40) throw new Error("Shared template is missing required expense columns.");
-    const headers = sheet.getRange(1, 1, 2, 40).getDisplayValues();
-    for (const [column, category, amountColumn, personColumn] of [[1, "GROCERY", 2, 4], [8, "GAS", 9, 10], [14, "FOOD", 16, 18], [22, "SHOPPING", 24, 26], [30, "NEEDS", 32, 34]]) {
+    const shift = sharedExpenseColumnShift(sheet);
+    if (sheet.getMaxColumns() < 40 + shift) throw new Error("Shared template is missing required expense columns.");
+    const headers = sheet.getRange(1, 1, 2, 40 + shift).getDisplayValues();
+    const shifted = column => column + (column >= 10 ? shift : 0);
+    for (const [oldColumn, category, oldAmount, oldPerson] of [[1, "GROCERY", 2, 4], [8, "GAS", 9, 10], [14, "FOOD", 16, 18], [22, "SHOPPING", 24, 26], [30, "NEEDS", 32, 34]]) {
+      const column = shifted(oldColumn), amountColumn = shifted(oldAmount), personColumn = shifted(oldPerson);
       if (headers[0][column - 1] !== category || headers[1][column - 1] !== "Date" || headers[1][amountColumn - 1] !== "Amount" || headers[1][personColumn - 1] !== "Person") throw new Error(`Shared template headers are incomplete: ${category}`);
     }
     return;
   }
   if (!findCellByAnyExactTextInTopLeft(sheet, [period.name])) throw new Error(`Prepared month label is missing: ${period.key}`);
   if (!hasPersonalBudgetIncomeSettings(sheet) || !findPersonalBudgetIncomeLayout(sheet) || !findCellByExactText(sheet, "Monthly Income:")) throw new Error("Prepared personal income layout is incomplete.");
-  for (const rule of PERSONAL_BUDGET_IMPORT_RULES[owner]) {
+  for (const rule of personalBudgetImportRules(config.sharedExpensesId, period.name, owner)) {
     const label = findCellByExactText(sheet, rule.label);
     const expected = `=IMPORTRANGE("${buildSpreadsheetUrl(config.sharedExpensesId)}", "${buildSheetRangeReference(period.name, rule.sharedExpenseCell)}")`;
     if (!label || label.offset(0, rule.targetColumnOffsetFromLabel).getFormula() !== expected) throw new Error(`Prepared import is incomplete: ${rule.label}`);
@@ -1373,7 +1413,7 @@ function updatePersonalBudgetImportRanges(
   budgetOwnerKey,
 ) {
   const sharedExpensesUrl = buildSpreadsheetUrl(sharedExpensesSpreadsheetId);
-  const rules = PERSONAL_BUDGET_IMPORT_RULES[budgetOwnerKey];
+  const rules = personalBudgetImportRules(sharedExpensesSpreadsheetId, monthName, budgetOwnerKey);
 
   if (!rules) {
     throw new Error(
@@ -1694,17 +1734,13 @@ function handleSharedExpensesEdit(e) {
   /**
    * Only run below the header row.
    */
-  if (editedRow <= 1) {
+  if (editedRow <= 2) {
     return;
   }
 
   /**
    * Only run for configured amount columns.
    */
-  if (!(editedCol in SHARED_EXPENSES_DATE_COLUMN_MAP)) {
-    return;
-  }
-
   /**
    * Make sure this spreadsheet is one of our known yearly Shared Expenses files.
    */
@@ -1712,7 +1748,10 @@ function handleSharedExpensesEdit(e) {
     return;
   }
 
-  const dateCol = SHARED_EXPENSES_DATE_COLUMN_MAP[editedCol];
+  const shift = sharedExpenseColumnShift(editedSheet);
+  const dateColumns = Object.fromEntries(Object.entries(SHARED_EXPENSES_DATE_COLUMN_MAP).map(([amount, date]) => [Number(amount) + (Number(amount) >= 10 ? shift : 0), date + (date >= 10 ? shift : 0)]));
+  if (!(editedCol in dateColumns)) return;
+  const dateCol = dateColumns[editedCol];
   const dateCell = editedSheet.getRange(editedRow, dateCol);
 
   /**

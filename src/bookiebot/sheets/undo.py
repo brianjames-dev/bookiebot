@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from openpyxl.utils import get_column_letter
 
-from bookiebot.sheets.config import expense_category_label, normalize_expense_category
+from bookiebot.sheets.config import expense_category_label, normalize_expense_category, category_layout, layout_for_version, expense_layout_metadata
 from bookiebot.sheets.income import (
     apply_income_row_properties,
     capture_income_row_properties,
@@ -962,6 +962,14 @@ def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_recon
     if value["accounting"] != "cash_v1":
         return replace(logged, action=replace(action, metadata=metadata))
     fields = value.get("sourceColumnMap", {})
+    if value["sourceWorksheet"] == "expense" and fields:
+        category = value["category"]
+        from openpyxl.utils import get_column_letter
+        new_columns = layout_for_version("gas_location_v1")[category]["columns"]
+        if {key: get_column_letter(col) for key, col in fields.items()} == new_columns:
+            metadata["expense_layout"] = "gas_location_v1"
+        else:
+            metadata.pop("expense_layout", None)
     values = dict(value.get("sourceValues", {}))
     values.update(amount=f"{value['grossCents'] / 100:.2f}", person=value["payerPerson"],
                   item=value["item"], location=value["location"])
@@ -1296,11 +1304,11 @@ def _field_columns_for_action(action: UndoAction) -> dict[str, int]:
         from bookiebot.sheets.config import get_category_columns
         from openpyxl.utils import column_index_from_string
 
-        category = action.metadata.get("category")
+        category = normalize_expense_category(action.metadata.get("category"))
         if category and category in get_category_columns:
             return {
                 field: column_index_from_string(col_letter)
-                for field, col_letter in get_category_columns[category]["columns"].items()
+                for field, col_letter in layout_for_version(action.metadata.get("expense_layout", ""))[category]["columns"].items()
             }
 
     if action.worksheet == "income" and (
@@ -1662,15 +1670,11 @@ def _update_logged_new_values(
     _write_logged_action(ws, row_index, logged)
 
 
-def _category_columns(category: str) -> dict[str, int]:
+def _category_columns(category: str, *, values: list[list[Any]] | None = None, layout_version: str = "") -> dict[str, int]:
     from openpyxl.utils import column_index_from_string
 
-    from bookiebot.sheets.config import get_category_columns
-
-    return {
-        field: column_index_from_string(col_letter)
-        for field, col_letter in get_category_columns[category]["columns"].items()
-    }
+    config = (category_layout(values) if values is not None else layout_for_version(layout_version))[category]
+    return {field: column_index_from_string(col) for field, col in config["columns"].items()}
 
 
 def _first_empty_category_row(ws: Any, category: str, *, values: list[list[Any]] | None = None) -> int:
@@ -1678,8 +1682,8 @@ def _first_empty_category_row(ws: Any, category: str, *, values: list[list[Any]]
 
     config = get_category_columns[category]
     row_start = config["start_row"]
-    columns = list(_category_columns(category).values())
     rows = ws.get_all_values() if values is None else values
+    columns = list(_category_columns(category, values=rows).values())
     for row in range(row_start, len(rows) + 1):
         if not any(column <= len(rows[row - 1]) and str(rows[row - 1][column - 1]).strip() for column in columns):
             return row
@@ -1691,8 +1695,8 @@ def _last_occupied_category_row(ws: Any, category: str, *, values: list[list[Any
 
     config = get_category_columns[category]
     row_start = int(config["start_row"])
-    columns = list(_category_columns(category).values())
     rows = ws.get_all_values() if values is None else values
+    columns = list(_category_columns(category, values=rows).values())
     for row in range(len(rows), row_start - 1, -1):
         if any(column <= len(rows[row - 1]) and str(rows[row - 1][column - 1]).strip() for column in columns):
             return row
@@ -1920,10 +1924,10 @@ def _shift_income_logged_action_rows(
             _GLOBAL_LAST_ACTION = None
 
 
-def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any]) -> dict[str, str]:
+def _values_for_category(source_values: dict[str, str], destination_category: str, overrides: dict[str, Any], *, columns: dict[str, Any] | None = None) -> dict[str, str]:
     from bookiebot.sheets.config import get_category_columns
 
-    destination_fields = get_category_columns[destination_category]["columns"].keys()
+    destination_fields = (columns or get_category_columns[destination_category]["columns"]).keys()
     clean_overrides = {
         field: value
         for field, value in overrides.items()
@@ -2042,7 +2046,7 @@ def move_recent_action(
 
     source_category = action.metadata.get("category", "")
     if _is_canonical_reimbursement(action):
-        destination_values = _values_for_category(_field_values_for_action(action), destination_category, updates)
+        destination_values = _values_for_category(_field_values_for_action(action), destination_category, updates, columns=_category_columns(destination_category, layout_version=action.metadata.get("expense_layout", "")))
         missing = _missing_required_move_fields(destination_values, destination_category)
         if missing:
             if missing == ["item"]:
@@ -2056,16 +2060,16 @@ def move_recent_action(
 
     try:
         ws = _worksheet("expense")
-        source_columns_by_field = _category_columns(source_category)
+        sheet_values = ws.get_all_values()
+        source_columns_by_field = _category_columns(source_category, values=sheet_values)
         source_fields = list(source_columns_by_field)
         source_category_columns = list(source_columns_by_field.values())
-        sheet_values = ws.get_all_values()
         source_current_values = _category_snapshot(ws, range(action.row, action.row + 1), source_category_columns, values=sheet_values)[0]
         source_values = {
             field: source_current_values[index]
             for index, field in enumerate(source_fields)
         }
-        destination_values = _values_for_category(source_values, destination_category, updates)
+        destination_values = _values_for_category(source_values, destination_category, updates, columns=_category_columns(destination_category, values=sheet_values))
         missing = _missing_required_move_fields(destination_values, destination_category)
         if missing:
             if missing == ["item"]:
@@ -2076,7 +2080,7 @@ def move_recent_action(
         source_end_row = max(action.row, _last_occupied_category_row(ws, source_category, values=sheet_values))
         source_snapshot = _category_snapshot(ws, range(action.row, source_end_row + 1), source_category_columns, values=sheet_values)
         destination_row = _first_empty_category_row(ws, destination_category, values=sheet_values)
-        destination_columns_by_field = _category_columns(destination_category)
+        destination_columns_by_field = _category_columns(destination_category, values=sheet_values)
         destination_fields = list(destination_values.keys())
         destination_columns = [destination_columns_by_field[field] for field in destination_fields]
         destination_new_values = [destination_values[field] for field in destination_fields]
@@ -2130,6 +2134,7 @@ def move_recent_action(
             new_values=destination_new_values,
             metadata={
                 "type": "move",
+                **expense_layout_metadata(category_layout(sheet_values)),
                 "category": destination_category,
                 "person": destination_values.get("person", ""),
                 "source_action_id": logged.id,
@@ -2160,6 +2165,7 @@ def move_recent_action(
         new_values=destination_new_values,
         metadata={
             "type": "expense",
+            **expense_layout_metadata(category_layout(sheet_values)),
             "category": destination_category,
             "person": destination_values.get("person", ""),
             "display_fields": json.dumps(destination_fields),
@@ -3119,9 +3125,9 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
 
     try:
         ws = _worksheet("expense")
-        category_columns_by_field = _category_columns(category)
-        columns = list(category_columns_by_field.values())
         values = ws.get_all_values()
+        category_columns_by_field = _category_columns(category, values=values)
+        columns = list(category_columns_by_field.values())
         end_row = max(action.row, _last_occupied_category_row(ws, category, values=values))
         snapshot = _category_snapshot(ws, range(action.row, end_row + 1), columns, values=values)
         # Reject a shifted/changed source rather than deleting its neighbor.
@@ -3171,6 +3177,7 @@ def _delete_expense_action_with_compaction(user_key: str | None, logged: LoggedA
             new_values=[],
             metadata={
                 "type": "delete",
+                **expense_layout_metadata(category_layout(values)),
                 "category": category,
                 "deleted_action_id": logged.id,
                 "deleted_action_ids": json.dumps(sorted(lineage_ids)),

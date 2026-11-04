@@ -223,7 +223,7 @@ def import_reconciliation_item(
                 }
                 category = fields['category']
                 row = log_category_row(values, worksheet, category)
-                action_id = record_expense_undo(category, row, values, values['person'], actor_key, metadata)
+                action_id = record_expense_undo(category, row, values, values['person'], actor_key, metadata, worksheet=worksheet)
             else:
                 values = {
                     'date': bank_date.isoformat(), 'amount': abs(transaction.amount),

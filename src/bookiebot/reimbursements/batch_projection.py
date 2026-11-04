@@ -17,7 +17,7 @@ from bookiebot.reimbursements.projection import (
     ProjectionConflictError, SheetsProjection, _PERSONAL_BILL_LABELS, _cents,
     _identity_matches, _name, _projection_events, _source_targets, projection_lock, validate_named_anchors,
 )
-from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.config import get_category_columns, category_layout
 from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user, get_shared_expenses_spreadsheet_id
 
 
@@ -142,7 +142,7 @@ class ReceiptBatch:
         paid = date.fromisoformat(event["date"])
         key, title = get_shared_expenses_spreadsheet_id(paid.year), paid.strftime("%B")
         category = allocation["category"] if allocation["category"] in get_category_columns else "need_expenses"
-        config = get_category_columns[category]
+        config = category_layout(self.book(key)["rows"][title])[category]
         fields = {field: a1_to_rowcol(column + "1")[1] for field, column in config["columns"].items()}
         book = self.book(key)
         full, amount = _name("receipt", event["id"]), _name("receipt_amount", event["id"])

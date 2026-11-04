@@ -20,7 +20,7 @@ from bookiebot.reports.worksheet_reads import (
     worksheet_by_name as _worksheet_by_name,
     worksheet_rows as _rows,
 )
-from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.config import category_layout
 from bookiebot.sheets.collaboration import SharedAllocation, split_method_label
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.reimbursement_history import (
@@ -832,7 +832,7 @@ def _ordered_breakdown_amounts() -> dict[str, float]:
 def _shared_expense_entries(rows: list[list[str]], persons: list[str], month: BudgetMonth) -> list[ExpenseEntry]:
     person_filter = set(persons)
     entries: list[ExpenseEntry] = []
-    for category, config in get_category_columns.items():
+    for category, config in category_layout(rows).items():
         columns = config["columns"]
         date_idx = column_index_from_string(columns["date"]) - 1
         amount_idx = column_index_from_string(columns["amount"]) - 1

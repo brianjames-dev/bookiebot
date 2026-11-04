@@ -190,7 +190,7 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
     """
     from gspread.utils import a1_to_rowcol
     from bookiebot.sheets.collaboration import normalize_split_method, split_amounts, split_method_label
-    from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
+    from bookiebot.sheets.config import expense_category_label, get_category_columns, worksheet_category_layout, normalize_expense_category
     from bookiebot.sheets import undo
     from bookiebot.reimbursements.projection import sync_pending
 
@@ -267,8 +267,10 @@ def mutate_recent_action(user_key: str, logged: Any, operation: str, *,
                     raise ReimbursementValidationError("Choose a valid expense category.")
                 if category == value["category"] and value.get("sourceRevision", {}).get("operation") != "move":
                     return False, f"That expense is already in {expense_category_label(category)}."
+                from bookiebot.sheets.auth import get_gspread_client
+                source_sheet = get_gspread_client().open_by_key(value["sourceSpreadsheetId"]).worksheet(value["sourceSheetTitle"])
                 fields = {field: a1_to_rowcol(column + "1")[1]
-                          for field, column in get_category_columns[category]["columns"].items()}
+                          for field, column in worksheet_category_layout(source_sheet)[category]["columns"].items()}
                 allowed = set(fields) - {"date"}
             if set(updates) - allowed:
                 raise ReimbursementValidationError("I can update " + ", ".join(sorted(allowed)) + " for this expense.")

@@ -9,6 +9,10 @@ def test_month_preparation_closing_and_retry_contracts():
 SCRIPT_PATH = Path("scripts/google-apps-script/budget-system-automation.gs")
 
 
+def test_gas_location_imports_and_date_stamps_runtime():
+    subprocess.run(["node", "unit_tests/scripts/gas_location_test.cjs"], check=True, capture_output=True, text=True)
+
+
 def test_income_settings_migration_and_rollover_runtime():
     subprocess.run(["node", "unit_tests/scripts/income_settings_test.cjs"], check=True, capture_output=True, text=True)
 
