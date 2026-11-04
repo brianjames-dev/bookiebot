@@ -4,6 +4,10 @@ Last updated: 2026-11-03
 
 ## Goal
 
+### Approved Transactions list-first spacing — 2026-11-03
+
+Ported the selected Full row draft: optional retained native graph behind a circular All-adjacent button, metric/filter above graph/search, equal single/grouped day heights, shortened nested guide with zero bottom list padding/gap, seamless full-height red/sage/blue swipe rail and rounded editor-only tint/4px padding. Existing financial actions, confirmation/recovery and Finance Ops backlog remain unchanged. **7 targeted / 2,854 full local tests passed / 565 optional PostgreSQL skipped**; Python/frontend types, Node 22 build and Apps Script checks pass. **12 workspace + 8 inline-editor + 16 shipped section-spacing Chromium/WebKit cases** pass, including exact 390×844 iPhone geometry, rapid graph reversals, chart retention, day/guide/action geometry, review/cancel/Undo and reduced motion. Phone renders inspected. Required CI/merge and automatic rollout follow in the task PR; STATUS checklist 250 supersedes 248's row tint and 249's always-visible graph placement. No live financial test reads/writes.
+
 ### Transactions chart spacing — 2026-11-03
 
 Corrected the list workspace's inherited full-height chart rule: use natural height so the graph/legend cannot stretch to the transaction list and push Total Spent hundreds of pixels down. Scope the fix to Transactions, leaving fixed carousel stages unchanged. Added browser geometry regression across phone/desktop, both themes, scroll round trips, pagination and unified scopes; it fails on the previous CSS. **7 targeted / 2,854 full passed / 565 optional PostgreSQL skipped** in the full run, clean Python/frontend types/build and **36 Chromium/WebKit browser cases** pass. Phone renders inspected. Existing financial flows and backlog are unchanged; native acceptance is STATUS checklist 249. Required release evidence follows in the task PR; no live financial test reads/writes.

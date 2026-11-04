@@ -2245,7 +2245,7 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   </>
 }
 
-export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel }: {
+export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel, graphOpen }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total: number
@@ -2256,9 +2256,11 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
   transactionControl?: ReactNode
   metricLabel?: string
   legendLabel?: string
+  graphOpen?: boolean
 }) {
+  const plot = <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} legendLabel={legendLabel} />
   return <div className="bb-chart-layout">
-    <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} legendLabel={legendLabel} />
+    {graphOpen === undefined ? plot : <div id={`${detailsId}-graph`} className="bb-recorded-graph-reveal" data-open={graphOpen} aria-hidden={!graphOpen} inert={!graphOpen}><div className="bb-recorded-graph-clip">{plot}</div></div>}
     <div className="bb-chart-side bb-daily-summary">
       <div className="bb-chart-kicker">{metricLabel}</div>
       <div className="bb-daily-amount-row" data-open={detailsOpen}>

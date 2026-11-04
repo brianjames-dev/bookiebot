@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-03 - Approved List-First Transactions Spacing
+
+Port the selected Full row draft into existing production components. Transactions starts with the graph hidden; a circular icon beside All expands/collapses the retained native chart below its total/filter and above search. CSS owns resizing/fading and rapid reversals; hiding makes the plot inert and inaccessible. Keep visibility in component state, without a new saved preference or network read. Standalone reports keep their existing always-visible chart and presentation.
+
+Use the same 72px content minimum/8px vertical padding for flat single days and grouped headers, accounting for the singleton's own 1px divider. End the nested guide 6px above the day divider without adding bottom list padding/gap or moving logo anchors. Keep full-height joined sage/blue/red actions, zero row/rail seam, existing amount inset, hard icon clipping and symmetric 420ms motion. Tint only the rounded editor (4% sage, 4px vertical padding); its purchase row stays on the page surface. Existing financial identities, reviewed commands, save/Undo feedback and guards remain unchanged. Preview controls and sample fixture remain outside the shipped app.
+
 ## 2026-11-03 - Inline Transaction Editors And Confirmed Feedback
 
 Use the approved Row Context surface around the purchase and its compact editor, with an untinted logo/nested guide gutter. Keep merchant/card fields visible, review only meaningful valid changes, and slide/resize into a headerless uniform old-strike → new review. A parent's collapse discards its nested action/review. Joined icon-only sage Update, blue Split and red Delete travel on the row's physical track; retain swipe-only pointer activation, native scroll arbitration, fixed hard logo clipping, symmetric timing and hidden focus chrome.

@@ -16,7 +16,7 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
  const recorded=context.rows.get(entry.id??'')
  const available=actions.filter(([operation])=>recorded?.capabilities[operation])
  const actionWidth=settings.buttonWidth*available.length
- const revealWidth=()=>Math.min(actionWidth,Math.max(0,(shell.current?.clientWidth??actionWidth+12)-12))+12
+ const revealWidth=()=>Math.min(actionWidth,Math.max(0,shell.current?.clientWidth??actionWidth))
  const readonly=context.locked||entry.status==='scheduled'||!recorded||!available.length
  const paint=(value:number,animate=false)=>{
   const el=shell.current;if(!el)return
@@ -33,7 +33,7 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
   el.style.setProperty('--bb-recorded-swipe-duration',`${duration}ms`)
   el.style.setProperty('--bb-recorded-track-start',`${width}px`)
   el.style.setProperty('--bb-recorded-offset',`${value}px`)
-  el.style.setProperty('--bb-recorded-reveal',String(Math.min(1,Math.abs(value)/width)))
+  el.style.setProperty('--bb-recorded-reveal',String(width?Math.min(1,Math.abs(value)/width):0))
   row.style.transition=`transform ${transition},border-radius ${transition}`
   // A closed row uses normal text painting, including after a completed
   // reveal. Avoid retaining an identity 3D layer when nothing is moving.

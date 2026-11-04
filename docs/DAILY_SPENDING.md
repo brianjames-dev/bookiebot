@@ -2,18 +2,25 @@
 
 ## Authenticated Transactions workspace (2026-11-03)
 
-The approved inline Row Context editors, headerless Slide + resize reviews, Rising fill/pie shortcut, shared-track icon actions, confirmed value/category motion and timed Undo are described in [Transactions](TRANSACTIONS.md). Current-date captions show the actual weekday; the soft date marker remains.
+The approved compact inline editors, headerless Slide + resize reviews, Rising fill/pie shortcut, shared-track icon actions, confirmed value/category motion and timed Undo are described in [Transactions](TRANSACTIONS.md). Current-date captions show the actual weekday; the soft date marker remains.
 
 The app now reuses the native chart and row/motion components on **Transactions**;
 Overview ends after its four-chart carousel. One All chooser beside Total Spent
 filters the recorded chart and list together (Needs/Wants/Shared/categories,
-plus Income/Savings); search follows below. Single-entry days are flat and keep
+plus Income/Savings); search follows below. A circular graph button beside All
+reveals/hides the retained native chart between the total/filter and search;
+the chart starts hidden, with CSS resizing/fading and no additional data reads.
+Single-entry days are flat and keep
 the same total alignment, 28px logo and category badge. Multi-entry days retain
-the Date column, quiet indent, Today and persistent-circle snake motion.
+the Date column, quiet indent, current-date marker and persistent-circle snake motion.
 Joined right-side Update/Split/Delete actions slide out on a left swipe, with
-8px corners, a 12px gap and matching 420ms entry/exit easing. A fixed viewport
+8px corners, no row/rail seam and matching 420ms entry/exit easing. A fixed viewport
 clips the painted circle at the row edge without opacity changes. Controls have
 no visible focus borders, outlines or focus shadows while retaining keyboard use.
+Singletons and collapsed grouped-day sections have matching 73px border boxes,
+including their divider; the nested guide ends 6px before that divider with no
+extra final-row padding. Only the rounded editor is tinted (4%) with 4px
+vertical padding; the purchase row retains the page surface.
 Totals/counts cover the complete recorded snapshot, not just a 40-row page.
 Category changes are part of one reviewed Update, delegated to the existing Move
 writer. Full canonical purchase amounts can differ from projected/net budget

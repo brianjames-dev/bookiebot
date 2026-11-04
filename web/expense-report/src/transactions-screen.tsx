@@ -1,5 +1,5 @@
 import { cloneElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react"
-import { ChevronDown, RefreshCw, Search, X } from "lucide-react"
+import { ChartNoAxesColumn, ChevronDown, RefreshCw, Search, X } from "lucide-react"
 import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import {DailySpendingChart, CategoryFilterControl} from './report-app'
@@ -58,6 +58,7 @@ function checkedListing(value: any): Listing {
 
 export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {active: boolean; ownerName: string; initialMonth: string;aliases?:Record<string,string>}) {
   const navigation=useAppNavigation()
+  const [graphOpen,setGraphOpen]=useState(false)
   const [month, setMonth] = useState(initialMonth)
   const [search, setSearch] = useState("")
   useEffect(()=>{const request=navigation?.sourceRequest;if(active&&request?.section==='activity')navigation?.consumeSource?.(request.id)},[active,navigation?.sourceRequest?.id])
@@ -290,8 +291,8 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
     <div className="bi-workspace" inert={Boolean(notice)}>
     <header className="bb-transactions-heading"><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={refreshDisabled} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
     <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>
-    {listing && <DailySpendingChart data={chart} total={total/100} filter={displayedFilter==='needs'||displayedFilter==='wants'?displayedFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={value=>{if(!loading&&!locked&&!operation&&!notice)setDay(previous=>previous===value?'':value)}} metricLabel={metricLabel} legendLabel={displayedFilter==='income'?'Income':displayedFilter==='savings'?'Savings':undefined}
-      transactionControl={<CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/>}/>}
+    {listing && <DailySpendingChart graphOpen={graphOpen} data={chart} total={total/100} filter={displayedFilter==='needs'||displayedFilter==='wants'?displayedFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={value=>{if(!loading&&!locked&&!operation&&!notice)setDay(previous=>previous===value?'':value)}} metricLabel={metricLabel} legendLabel={displayedFilter==='income'?'Income':displayedFilter==='savings'?'Savings':undefined}
+      transactionControl={<div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div>}/>}
     <label className="bb-recorded-search"><Search aria-hidden="true"/><input type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder="Search transactions" maxLength={200} value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>setSearch(event.target.value)}/>{search&&<button type="button" aria-label="Clear search" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setSearch('')}><X aria-hidden="true"/></button>}</label>
     {day&&<button type="button" className="bb-recorded-day-chip" onClick={()=>setDay('')}>Day {day}<X aria-hidden="true"/></button>}
     {error && <div role="alert" className="bb-transaction-notice"><p>{error}</p>{listing&&<button type="button" disabled={refreshDisabled} onClick={()=>void load(0,false,true)}>Refresh transactions</button>}</div>}
