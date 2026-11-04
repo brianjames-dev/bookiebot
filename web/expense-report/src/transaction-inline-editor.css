@@ -1,0 +1,140 @@
+.bi-product .bb-daily-day-entries { padding-right:0; }
+.bi-product .bb-daily-day-header,.bi-product .bb-daily-transaction { padding-inline-end:var(--bi-right-inset,10px); }
+.bi-product .bb-daily-row-shell + .bb-daily-row-shell { border-top:1px solid hsl(var(--border) / .55); }
+.bi-product .bb-daily-single-day>.bi-selected-row { min-width:0; margin-right:24px; }
+.bi-product .bb-daily-single-day .bb-recorded-swipe { margin-right:0; }
+.bi-product .bb-daily-single-day:has(.bi-selected-row[data-editing="true"]) .bb-daily-single-date { align-self:start; padding-top:3px; }
+/* One physical track: the entire bar begins just beyond the row and moves
+   by precisely the same number of pixels, preserving its 12px clearance. */
+.bi-product .bb-recorded-swipe-actions { transform:translateX(calc(var(--bb-recorded-track-start,174px) + var(--bb-recorded-offset,0px))); transition:transform var(--bb-recorded-swipe-duration,0ms) cubic-bezier(.2,.85,.25,1); }
+.bi-product .bb-recorded-action { flex-direction:row; gap:0; padding:0; }
+.bi-product .bb-recorded-action svg { width:20px; height:20px; flex:none; transform:none; }
+.bi-product { --bi-split-ink:light-dark(hsl(211 42% 37%),hsl(211 53% 74%)); }
+.bi-product .bb-recorded-action-update { color:hsl(var(--primary)); background:color-mix(in srgb,hsl(var(--primary)) 18%,hsl(var(--background))); }
+.bi-product .bb-recorded-action-split { color:var(--bi-split-ink); background:color-mix(in srgb,var(--bi-split-ink) 18%,hsl(var(--background))); }
+.bi-product { --bi-tint-source:hsl(var(--foreground)); --bi-panel-surface:color-mix(in srgb,hsl(var(--background)),var(--bi-tint-source) var(--bi-tint-strength,5%)); }
+.bi-product[data-tone="sage"] { --bi-tint-source:hsl(var(--primary)); }
+/* Keep the logo and nested guide gutter on the page surface. */
+.bi-selected-row { position:relative; isolation:isolate; min-width:0; background:hsl(var(--background)); }
+.bi-product .bi-selected-row>.bb-recorded-swipe,.bi-product .bi-selected-row>.bb-recorded-swipe>.bb-daily-transaction { background-color:inherit; }
+.bi-editable-row { position:relative; isolation:isolate; }
+.bi-editable-row::before { content:""; position:absolute; inset:0 0 0 var(--bi-surface-start,28px); z-index:-1; pointer-events:none; border-radius:var(--bi-radius) var(--bi-radius) 0 0; background:var(--bi-panel-surface); opacity:0; transition:opacity 220ms ease; }
+.bi-selected-row:is([data-design="grouped"],[data-design="joined"],[data-design="levels"],[data-design="circles"])[data-editing="true"] .bi-editable-row::before { opacity:1; }
+.bi-expansion { position:relative; display:grid; grid-template-rows:0fr; transition:grid-template-rows 360ms cubic-bezier(.2,.85,.25,1),opacity 220ms ease; opacity:0; }
+.bi-expansion::before { content:""; position:absolute; left:13.5px; top:4px; bottom:var(--bi-bottom-gap,8px); width:1px; background:hsl(var(--border)); pointer-events:none; }
+.bi-expansion[data-open="true"] { grid-template-rows:1fr; opacity:1; }
+.bi-expansion-clip { min-height:0; overflow:hidden; }
+.bi-editor { min-width:0; margin-left:var(--bi-surface-start,28px); margin-bottom:var(--bi-bottom-gap,8px); padding:8px var(--bi-right-inset,10px) 8px 8px; border-radius:var(--bi-radius); background:var(--bi-panel-surface); }
+.bi-editor:is([data-design="grouped"],[data-design="joined"],[data-design="levels"],[data-design="circles"]) { border-radius:0 0 var(--bi-radius) var(--bi-radius); }
+.bi-product .bi-editor button { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:8px 12px; border-radius:10px; border:0; font:inherit; font-size:13px; font-weight:500; cursor:inherit; }
+.bi-step-viewport { position:relative; overflow:hidden; min-width:0; }
+.bi-step-pane { position:absolute; inset:0 0 auto; min-width:0; visibility:hidden; background:var(--bi-panel-surface); }
+/* WAAPI exclusively owns these surfaces. The app's universal reduced-motion
+   duration must not accidentally create CSS visibility transitions in WebKit. */
+.bi-step-viewport,.bi-step-pane { transition:none!important; }
+.bi-step-edit { padding-top:4px; padding-bottom:4px; }
+.bi-step-viewport[data-moving="true"]>.bi-step-pane { will-change:transform,opacity; }
+.bi-fields { display:grid; gap:var(--bi-gap); margin:0; }
+/* A short label and a quiet baseline replace the large rounded boxes.
+   The complete label remains the touch target; editable text stays 16px. */
+.bi-editor label { display:grid; align-content:start; gap:0; min-width:0; min-height:44px; color:hsl(var(--muted-foreground)); font-size:11px; line-height:14px; }
+.bi-editor :is(input:not([type="range"]),select) { box-sizing:border-box; width:100%; min-width:0; height:var(--bi-field-height); min-height:0; padding:4px 0; border:0; border-bottom:1px solid hsl(var(--border) / .8); border-radius:0; color:hsl(var(--foreground)); background:transparent; font:inherit; font-size:16px; line-height:22px; text-overflow:ellipsis; }
+.bi-key-fields { display:grid; grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); gap:16px; }
+.bi-money-input { display:flex; align-items:center; gap:3px; height:var(--bi-field-height); box-sizing:border-box; border-bottom:1px solid hsl(var(--border) / .8); color:hsl(var(--foreground)); }
+.bi-money-input>span { font-size:16px; line-height:22px; }
+.bi-editor .bi-money-input input { height:100%; border:0; padding-left:0; background:transparent; font-variant-numeric:tabular-nums; }
+.bi-select { position:relative; display:block; min-width:0; }
+.bi-editor .bi-select select { appearance:none; -webkit-appearance:none; padding-right:20px; }
+.bi-select>svg { position:absolute; right:0; top:50%; width:14px; height:14px; transform:translateY(-50%); pointer-events:none; color:hsl(var(--muted-foreground)); }
+.bi-secondary-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; }
+.bi-editor-footer { display:flex; align-items:center; justify-content:flex-end; gap:var(--bi-action-gap,8px); margin-top:8px; }
+.bi-product .bi-editor .bi-cancel { color:hsl(var(--muted-foreground)); background:transparent; flex:none; padding-inline:6px; }
+.bi-cancel svg { width:14px; height:14px; }
+.bi-product .bi-editor .bi-primary { margin-left:0; background:hsl(var(--primary) / .14); color:hsl(var(--primary)); padding-inline:16px; }
+.bi-product .bi-editor .bi-primary:disabled { opacity:.4; cursor:default; }
+.bi-review-changes { display:grid; gap:0; min-width:0; margin:0; }
+.bi-review-change { display:grid; gap:4px; min-width:0; padding:9px 0; border-bottom:1px solid hsl(var(--border) / .55); }
+.bi-review-change:first-child { padding-top:0; }
+.bi-review-change dt { color:hsl(var(--muted-foreground)); font-size:11px; font-weight:400; line-height:1.4; margin:0; }
+.bi-review-change dd { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 7px; min-width:0; margin:0; font-size:13px; line-height:1.5; }
+.bi-review-change del { min-width:0; max-width:100%; overflow-wrap:anywhere; color:hsl(var(--muted-foreground)); font-weight:400; text-decoration-thickness:1px; }
+.bi-review-new { display:inline-flex; align-items:baseline; gap:7px; min-width:0; max-width:100%; color:hsl(var(--foreground)); font-weight:500; }
+.bi-review-new>svg { flex:none; align-self:center; width:14px; height:14px; color:hsl(var(--muted-foreground)); }
+.bi-review-new>span { min-width:0; overflow-wrap:anywhere; }
+.bi-editor[data-operation="delete"] .bi-primary { background:hsl(var(--destructive) / .12); color:hsl(var(--destructive)); }
+.bi-footnote { color:hsl(var(--muted-foreground)); font-size:11px; line-height:1.5; margin:8px 0 0; }
+.bi-delete-copy p { font-size:13px; line-height:1.5; margin:0 0 6px; color:hsl(var(--foreground)); }
+.bi-delete-copy>span { font-size:11px; line-height:1.5; color:hsl(var(--muted-foreground)); display:block; }
+.bi-product :is(input,select,button,summary),.bi-product :is(input,select,button,summary):focus,.bi-product :is(input,select,button,summary):focus-visible { outline:0!important; box-shadow:none!important; }
+/* During a category placement the real rows and persistent icon viewports
+   share a stacking context. The lifted purchase covers passing neighbors as
+   one surface; their final layout leaves its destination open underneath. */
+.bi-product .bb-daily-day-group[data-row-reordering="true"] .bb-daily-day-panel { overflow:visible; }
+.bi-product .bb-daily-day-group[data-row-reordering="true"] .bb-daily-day-entries { contain:none; }
+.bi-product .bb-daily-day-group[data-row-reordering="true"] .bb-daily-icon-layer { z-index:auto; }
+.bi-product .bb-daily-day-group[data-row-reordering="true"] .bb-details-content-inner { overflow:visible; }
+.bi-product .bi-selected-row[data-placement-row] { transition:none!important; }
+.bi-text-change { position:relative; display:inline-grid; vertical-align:baseline; max-width:100%; font:inherit; letter-spacing:inherit; font-kerning:inherit; font-feature-settings:inherit; font-variant-numeric:inherit; }
+.bi-text-layout { grid-area:1/1; visibility:hidden; min-width:0; white-space:inherit; overflow-wrap:inherit; }
+.bi-change-old,.bi-change-new { position:absolute; inset:0; display:block; min-width:0; white-space:inherit; overflow-wrap:inherit; }
+.bi-change-old { opacity:0; visibility:hidden; }
+.bi-change-new { opacity:1; }
+.bi-text-change[data-change-state="text"]>.bi-change-old { opacity:1; visibility:visible; }
+.bi-text-change[data-change-state="text"]>.bi-change-new { opacity:0; }
+.bi-change-strike { position:absolute; top:52%; inset-inline:0; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; }
+.bi-money-change { display:inline; white-space:nowrap; font:inherit; letter-spacing:inherit; font-variant-numeric:inherit; }
+.bi-reel-window { position:relative; display:inline-block; vertical-align:baseline; font:inherit; font-variant-numeric:inherit; font-feature-settings:inherit; }
+.bi-reel-layout { visibility:hidden; white-space:pre; }
+.bi-reel-measure { position:absolute; visibility:hidden; white-space:pre; }
+.bi-reel-clip { position:absolute; inset:0; overflow:hidden; }
+.bi-reel-track { position:absolute; inset:0; display:block; }
+.bi-reel-cell { position:absolute; top:0; inset-inline:0; height:100%; display:block; line-height:inherit; white-space:pre; }
+.bi-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.bi-undo-overlay { position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:center; padding:16px; box-sizing:border-box; border-radius:inherit; z-index:30; background:hsl(var(--background) / .08); }
+.bi-undo-popup { position:relative; display:flex; align-items:center; gap:8px; width:100%; max-width:360px; box-sizing:border-box; padding:6px 8px 6px 14px; overflow:hidden; border:1px solid hsl(var(--border)); border-radius:18px; color:hsl(var(--foreground)); background:var(--bi-panel-surface); box-shadow:0 8px 26px hsl(var(--foreground) / .08); font-size:13px; line-height:1.4; }
+.bi-undo-popup>svg { flex:none; width:16px; height:16px; color:hsl(var(--primary)); }
+.bi-product .bi-undo-popup button { display:flex; flex:none; align-items:center; justify-content:center; gap:5px; min-height:44px; padding:6px 9px; border:0; border-radius:10px; background:transparent; color:hsl(var(--primary)); font:inherit; font-weight:500; }
+.bi-undo-popup button svg { width:15px; height:15px; }
+.bi-product .bi-undo-popup .bi-undo-dismiss { min-width:36px; padding-inline:6px; color:hsl(var(--muted-foreground)); }
+.bi-undo-time { position:absolute; inset:auto 0 0; height:2px; transform-origin:left; background:hsl(var(--primary) / .55); }
+.bs-split { min-width:0; }
+.bs-context { position:relative; height:28px; margin-bottom:4px; }
+.bi-product .bi-editor .bs-income-reset { position:absolute; isolation:isolate; top:-4px; right:0; width:44px; height:44px; min-height:44px; padding:0; border:0; border-radius:0; background:transparent; color:hsl(var(--primary)); transition:color 160ms ease,transform 160ms ease; }
+.bs-income-reset::before { content:""; position:absolute; inset:8px; z-index:-1; border-radius:50%; background:hsl(var(--primary) / .14); transition:background-color 160ms ease; }
+.bi-product .bi-editor .bs-income-reset:disabled { opacity:1; color:hsl(var(--muted-foreground) / .45); }
+.bs-income-reset:disabled::before { background:hsl(var(--muted-foreground) / .045); }
+.bs-income-reset:active:not(:disabled) { transform:scale(.95); }
+.bs-income-reset svg { width:16px; height:16px; stroke-width:1.8; }
+.bs-split { --bs-tint:hsl(var(--primary)); }
+.bs-central { display:grid; place-items:center; height:92px; margin-bottom:7px; pointer-events:none; }
+.bs-allocation { position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; width:100%; height:84px; }
+.bs-orb { position:relative; display:grid; place-items:center; height:84px; }
+.bs-orb[data-person="partner"] { --bs-tint:var(--bi-split-ink); }
+.bs-orb-vessel { position:relative; display:block; width:76px; height:76px; overflow:hidden; border-radius:50%; background:hsl(var(--muted-foreground) / .075); }
+.bs-orb-level { position:absolute; inset:auto 0 0; display:block; background:linear-gradient(to bottom,color-mix(in srgb,var(--bs-tint) 60%,transparent),color-mix(in srgb,var(--bs-tint) 28%,transparent)); box-shadow:inset 0 1px 0 hsl(var(--foreground) / .08); transition:height 120ms cubic-bezier(.2,.8,.25,1); }
+.bs-orb-percent { position:absolute; inset:0; display:grid; place-items:center; color:hsl(var(--foreground)); font-size:12px; line-height:18px; font-variant-numeric:tabular-nums; }
+.bs-shares { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.bi-editor .bs-share { min-width:0; display:grid; gap:0; }
+.bs-share-name { display:flex; flex-wrap:wrap; justify-content:space-between; gap:0 4px; min-width:0; color:hsl(var(--muted-foreground)); }
+.bs-amount { display:flex; align-items:center; gap:2px; height:32px; border-bottom:1px solid hsl(var(--border) / .8); color:hsl(var(--foreground)); font-size:16px; font-variant-numeric:tabular-nums; }
+.bi-editor .bs-amount input { width:100%; min-width:0; height:32px; padding:4px 0; border:0; background:transparent; font:inherit; font-size:16px; line-height:22px; }
+.bs-slider { position:relative; height:44px; margin-top:3px; }
+.bs-rail { position:absolute; inset:19px 10px auto; height:6px; border-radius:99px; pointer-events:none; }
+.bs-notch { position:absolute; top:-3px; width:1px; height:12px; transform:translateX(-50%); background:hsl(var(--muted-foreground) / .7); }
+.bs-notch[data-active="true"] { width:2px; background:hsl(var(--foreground)); }
+.bi-editor .bs-slider input { position:relative; z-index:1; display:block; appearance:none; -webkit-appearance:none; width:100%; height:44px; min-height:44px; margin:0; padding:0; border:0; border-radius:0; background:transparent; touch-action:pan-y; }
+.bs-slider input::-webkit-slider-runnable-track { height:6px; border:0; background:transparent; }
+.bs-slider input::-webkit-slider-thumb { appearance:none; -webkit-appearance:none; box-sizing:border-box; width:20px; height:20px; margin-top:-7px; border:2px solid hsl(var(--background)); border-radius:50%; background:hsl(var(--foreground)); }
+.bs-slider input::-moz-range-track { height:6px; border:0; background:transparent; }
+.bs-slider input::-moz-range-thumb { box-sizing:border-box; width:20px; height:20px; border:2px solid hsl(var(--background)); border-radius:50%; background:hsl(var(--foreground)); }
+.bs-split:has(input:disabled) :is(.bs-orb,.bs-orb-fill,.bs-orb-level) { transition:none; }
+@media (prefers-reduced-motion:reduce) { :is(.bs-orb,.bs-orb-fill,.bs-orb-level) { transition:none; } }
+.bs-error { margin:6px 0 0; color:hsl(var(--destructive)); font-size:11px; line-height:16px; }
+.bs-review-context { margin:0 0 10px; color:hsl(var(--muted-foreground)); font-size:11px; line-height:16px; }
+.bs-review-note { margin:10px 0 0; color:hsl(var(--muted-foreground)); font-size:11px; line-height:16px; }
+@container biphone (max-width:340px) { .bi-product { padding-inline:12px; } .bi-key-fields,.bi-secondary-fields { grid-template-columns:minmax(0,1fr); gap:var(--bi-gap); } }
+@media(prefers-reduced-motion:reduce) { .bi-expansion,.bi-editable-row::before { transition:none; } }
+.bi-product.bb-transactions { --bi-padding:12px; --bi-radius:14px; --bi-gap:8px; --bi-field-height:32px; --bi-tint-strength:4%; --bi-right-inset:10px; }
+.bi-undo-overlay { position:fixed; z-index:80; padding-bottom:calc(110px + env(safe-area-inset-bottom)); border-radius:0; }
+
+.bi-undo-popup>#bi-undo-title { flex:1; min-width:0; }

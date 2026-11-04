@@ -326,7 +326,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
   let disposed = false
   let resizeFrame: number | null = null
   let measuredWidth = section.getBoundingClientRect().width
-  const sync = () => { if (!disposed) { fit(); cancel(controller, true); transition(controller, controller.target, true) } }
+  const sync = () => { if (!disposed && section.dataset.rowReordering !== 'true') { fit(); cancel(controller, true); transition(controller, controller.target, true) } }
   fit()
   transition(controller, initialOpen, true)
   section.dataset.motionReady = 'true'
@@ -343,6 +343,7 @@ export function createDailyDayMotion(section: HTMLElement, initialOpen: boolean)
   reduced.addEventListener('change', sync)
   document.fonts?.ready.then(sync)
   return {
+    refit() { fit() },
     setOpen(open: boolean) {
       if (open === controller.target) return
       transition(controller, open)

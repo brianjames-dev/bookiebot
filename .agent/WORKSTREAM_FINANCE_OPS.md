@@ -4,6 +4,10 @@ Last updated: 2026-11-03
 
 ## Goal
 
+### Approved inline transaction editors — 2026-11-03
+
+The selected Row Context/Quiet extension workflow is now implemented: compact inline Update/Split/Delete, uniform headerless server review with Slide + resize, shared-track icon-only actions, confirmed value feedback and category placement, and an eight-second supported Undo popup. Rising fill uses the chosen pie income shortcut; pure read metadata exposes exact writer income/current-share cents for either owner. No financial writer, schema, source identity, repayment or reconciliation protocol changes. Confirmation/recovery remains immutable; feedback identities stay inert until a successful fresh listing. Local full 2,852 / 563 optional skips, final 67 targeted / 55 skips, clean types/build/Apps Script, 20 workspace/inline browser cases and both 120-entry motion checks pass. Final CI/merge and checklist 248 acceptance remain. This completes the earlier design exploration; the general Finance Ops backlog stays unchanged.
+
 ### Transaction tap/line refinements and inline-editor exploration — 2026-11-03
 
 Completed the two requested production refinements: pointer/touch taps no longer reveal a row's actions, while directional swipe and keyboard/assistive access remain; remove the duplicate swipe-wrapper border so flat singles and expanded rows retain only native separators. **12 Chromium/WebKit cases** cover touch/mouse taps, micro-drags, vertical gestures, singleton/expanded separators, actual swipes, review/cancel and prior financial UI contracts. **55 targeted / 2,851 full local tests passed / 563 optional PostgreSQL skipped**, clean Python/frontend types/build. Existing writers, forms, confirmation/recovery and Finance Ops lifecycle backlog are unchanged. Three source-backed inline-editor directions are a separate preview-only exploration; implementation remains pending the user's design selection. STATUS checklist 247 records acceptance.

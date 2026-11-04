@@ -22,6 +22,8 @@ def test_workspace_filters_aggregate_recorded_rows_and_export_browser_samples(sa
         sources.append({**base,'id':f'{saved.month}:workspace-{index}','version':f'fixture-version-{index}',
             'date':date,'title':item,'location':merchant,'category':keys[category],'categoryLabel':category,
             'amountCents':amount,'split':'equal' if index in {2,4} else '',
+            'splitOptions':{**base['splitOptions'],'incomePayerCents':round(amount*156/241),
+                            **({'payerCents':(amount+1)//2} if index in {2,4} else {})},
             'fields':{**base['fields'],'date':date,'item':item,'location':merchant,'amount':f'{amount/100:.2f}'}})
     sources += [{**base,'id':f'{saved.month}:income','kind':'income','amountCents':300000,'category':'','categoryLabel':'Income'},
                 {**base,'id':f'{saved.month}:savings','kind':'savings','amountCents':50000,'category':'','categoryLabel':'Savings'}]

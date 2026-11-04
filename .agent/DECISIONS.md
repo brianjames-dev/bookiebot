@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-03 - Inline Transaction Editors And Confirmed Feedback
+
+Use the approved Row Context surface around the purchase and its compact editor, with an untinted logo/nested guide gutter. Keep merchant/card fields visible, review only meaningful valid changes, and slide/resize into a headerless uniform old-strike → new review. A parent's collapse discards its nested action/review. Joined icon-only sage Update, blue Split and red Delete travel on the row's physical track; retain swipe-only pointer activation, native scroll arbitration, fixed hard logo clipping, symmetric timing and hidden focus chrome.
+
+Rising fill replaces the split method picker with proportional circle fills and a gentle notched range. The pie shortcut restores the server writer's exact income cents, available away/disabled at that allocation. Quarter-dollar pointer/keyboard stops retain exact percentage notches; manual values retain arbitrary cents and existing custom/legacy capability guards. Return income/current-share cents from the existing pure split calculation, with no added sheet reads or stored data.
+
+After a verified successful command, close the editor, roll changed amounts, delay/draw/hold/fade changed text, then lift/make room/move/land a category-reordered row. Same-position changes skip placement. Confirmed presentation stays inert until a fresh canonical listing succeeds; failed reloads offer retry without another writer. The only normal Undo UI is an eight-second modal popup after feedback. Tapping it is the explicit Undo instruction: obtain a fresh existing server Undo review, then submit that exact reviewed command once. Expiry/dismissal removes the UI only. Remove persistent success receipts and Undo last change shortcuts. Keep immutable request IDs, server revalidation, lost-response recovery, canonical/receipt guards and backend Undo eligibility; no repayment is marked received by editing/splitting.
+
 ## 2026-11-03 - Require A Pointer Swipe To Reveal Transaction Actions
 
 Ordinary pointer/touch clicks must not reveal or toggle a transaction rail. Keep the existing directional drag threshold, vertical-scroll arbitration and one-open-row state; retain keyboard/assistive activation without pointer movement. Let native day boundaries and adjacent row shells own separators, removing the redundant border on every swipe wrapper (including flat singles). User-requested editors that expand inside their selected row are a design exploration only in this pass; existing production financial forms/reviews/confirmations remain unchanged until a draft is selected.

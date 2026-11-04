@@ -84,6 +84,21 @@ def test_list_uses_owner_recorded_sources_deduplicates_and_searches_filters(save
     assert all(not any(k.startswith("_") for k in r) for r in result["items"])
 
 
+@pytest.mark.parametrize("actor", [B, H])
+def test_income_notch_uses_exact_writer_allocation_without_mutating_sources(saved, actor):
+    from bookiebot.sheets.collaboration import split_amounts
+    with saved.repos[saved.month].patched():
+        columns = undo._category_columns("shopping")
+        source_row = 3 if actor == B else 5
+        saved.repos[saved.month].expense.update_cell(source_row, columns["amount"], "3000.00")
+    before = deepcopy(saved.repos[saved.month].expense._rows)
+    result = tx.listing(actor, {"month": saved.month, "search": f"Fixture cable {source_row}"})
+    public = result["items"][0]
+    owner = "brian" if actor == B else "hannah"
+    assert public["splitOptions"]["incomePayerCents"] == round(split_amounts(3000, "income", owner)[0] * 100)
+    assert saved.repos[saved.month].expense._rows == before
+
+
 @pytest.mark.parametrize("operation,extra",[("update",{}),("move",{"destination":"food"}),("delete",{})])
 def test_review_cancel_is_readonly_and_commands_preserve_undo_in_exact_month(saved,operation,extra):
     repo=saved.repos[saved.previous]
@@ -417,7 +432,7 @@ def custom_source(canonical,saved,monkeypatch):
 
 def test_transaction_custom_split_creation_edit_replay_and_exact_ratio_preload(canonical,saved,monkeypatch):
     logged,rows,public=custom_source(canonical,saved,monkeypatch)
-    assert public["splitOptions"]=={"custom":True,"payerName":"Brian","partnerName":"Hannah","payerBasisPoints":5000}
+    assert public["splitOptions"]=={"custom":True,"payerName":"Brian","partnerName":"Hannah","payerBasisPoints":5000,"incomePayerCents":30081}
     change={"id":public["id"],"month":"2026-01","version":public["version"],"operation":"split","method":"custom","payerBasisPoints":3333}
     cells=deepcopy(canonical.sheet.rows)
     history=deepcopy(canonical.history)
