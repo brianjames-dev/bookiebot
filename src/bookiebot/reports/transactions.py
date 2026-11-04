@@ -20,7 +20,7 @@ from bookiebot.reports.worksheet_reads import read_workbook_tabs
 from bookiebot.reimbursements import service as shared
 from bookiebot.sheets import undo
 from bookiebot.sheets.auth import get_gspread_client
-from bookiebot.sheets.config import get_category_columns, expense_category_label
+from bookiebot.sheets.config import category_layout, expense_layout_metadata, get_category_columns, expense_category_label
 from bookiebot.sheets.income import income_sheet_layout
 from bookiebot.sheets.repo import GSpreadSheetsRepository, sheets_repository_context, sheet_command_context
 from bookiebot.sheets.reimbursement_history import configured_reimbursement_workbooks
@@ -170,15 +170,15 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
 
 def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal: list[list[str]]):
     persons = set(get_user_config(actor).expense_persons)
-    for category, config in get_category_columns.items():
-        columns = undo._category_columns(category)
+    for category, config in category_layout(expenses).items():
+        columns = undo._category_columns(category, values=expenses)
         for row in range(int(config["start_row"]), len(expenses) + 1):
             values = {key: cell(expenses, row, col) for key, col in columns.items()}
             if cents(values.get("amount")) <= 0 or values.get("person") not in persons:
                 continue
             action = undo.UndoAction(worksheet="expense", kind="clear_cells", row=row,
                 columns=list(columns.values()), previous_values=[""] * len(columns), new_values=list(values.values()),
-                metadata={"type": "expense", "category": category}, description=values.get("item") or category)
+                metadata={"type": "expense", "category": category, **expense_layout_metadata(category_layout(expenses))}, description=values.get("item") or category)
             yield undo.LoggedAction(id=f"sheet-expense-{category}-{row}", created_at=month + "-01", user_key=actor, action=action)
     summary = next((i for i, row in enumerate(personal, 1) if "Monthly Income:" in row), None)
     if summary:
@@ -413,9 +413,9 @@ def _undo_review_row(actor: str, month: str, action_id: str) -> dict[str, Any]:
     restored = dict(row["fields"])
     if action.kind == "compact_category_cells":
         snapshot = json.loads(action.metadata["category_snapshot"])[0]
-        restored = dict(zip(undo._category_columns(action.metadata["category"]), snapshot))
+        restored = dict(zip(undo._category_columns(action.metadata["category"], values=cells), snapshot))
     elif action.kind == "move_expense":
-        restored = dict(zip(undo._category_columns(action.metadata["source_category"]), json.loads(action.metadata["source_values"])))
+        restored = dict(zip(undo._category_columns(action.metadata["source_category"], values=cells), json.loads(action.metadata["source_values"])))
     elif action.kind == "restore_row":
         columns = undo._field_columns_for_action(action)
         restored = {field: str(action.previous_values[col - 1]) if col <= len(action.previous_values) else "" for field, col in columns.items()}

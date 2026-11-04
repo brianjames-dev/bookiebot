@@ -5,7 +5,7 @@ import os
 import re
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
-from bookiebot.sheets.config import get_category_columns, normalize_expense_category
+from bookiebot.sheets.config import category_layout, normalize_expense_category
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 from bookiebot.sheets.routing import (
@@ -249,7 +249,8 @@ async def total_spent_at_store(store, persons=None, top_n=5):
     matches = []
 
     store_norm = (store or "").lower().replace(" ", "")
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
     persons_filter = set(persons) if persons else None
 
     for category, config in category_columns.items():
@@ -267,7 +268,7 @@ async def total_spent_at_store(store, persons=None, top_n=5):
         location_idx = column_index_from_string(location_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, location_idx, person_idx) >= len(row):
@@ -323,13 +324,15 @@ async def highest_expense_category(persons=None):
     persons_filter = set(persons) if persons else None
     category_totals = {}
 
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
     categories = {
         category: {
             "amount": config["columns"]["amount"],
             "person": config["columns"].get("person"),
             "start_row": int(config["start_row"]),
         }
-        for category, config in get_category_columns.items()
+        for category, config in category_columns.items()
     }
 
     for category, cols in categories.items():
@@ -607,11 +610,13 @@ async def total_for_category(category, persons=None):
     persons_filter = set(persons) if persons else None
 
     category = normalize_expense_category(category)
-    if category not in get_category_columns:
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
+    if category not in category_columns:
         print(f"[ERROR] Unknown category: {category}")
         return 0.0
 
-    category_config = get_category_columns[category]
+    category_config = category_columns[category]
     columns = category_config["columns"]
     person_column = columns.get("person")
     if not person_column:
@@ -619,7 +624,7 @@ async def total_for_category(category, persons=None):
     amount_idx = column_index_from_string(columns['amount']) - 1
     person_idx = column_index_from_string(person_column) - 1
 
-    rows = ws.get_all_values()[int(category_config['start_row']) - 1:]
+    rows = sheet_rows[int(category_config['start_row']) - 1:]
     total = 0.0
 
     for row in rows:
@@ -652,11 +657,12 @@ async def largest_single_expense(persons=None):
     ws = _expense_ws()
     if ws is None:
         return 0.0, None
-    rows = ws.get_all_values()[2:]  # skip header rows
-
+    sheet_rows = ws.get_all_values()
+    rows = sheet_rows[2:]  # skip header rows
+    category_columns = category_layout(sheet_rows)
     configs = {
         category: config["columns"]
-        for category, config in get_category_columns.items()
+        for category, config in category_columns.items()
         if config["columns"].get("person")
     }
 
@@ -711,11 +717,12 @@ async def top_n_expenses(n=5, persons=None):
 
 async def top_n_expenses_all_categories(persons, n=5):
     ws = _expense_ws()
-    rows = ws.get_all_values()[2:]  # skip header
-
+    sheet_rows = ws.get_all_values()
+    rows = sheet_rows[2:]  # skip header
+    category_columns = category_layout(sheet_rows)
     configs = {
         category: config["columns"]
-        for category, config in get_category_columns.items()
+        for category, config in category_columns.items()
         if config["columns"].get("person")
     }
 
@@ -774,7 +781,8 @@ async def spent_this_week(persons=None):
     start_of_week = today - timedelta(days=today.weekday())  # Monday
     total = 0.0
 
-    category_columns = get_category_columns  # dict
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)  # dict
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -789,7 +797,7 @@ async def spent_this_week(persons=None):
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -829,7 +837,8 @@ async def projected_spending(persons=None):
     ws = _expense_ws()
     total_so_far = 0.0
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -844,7 +853,7 @@ async def projected_spending(persons=None):
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -891,7 +900,8 @@ async def weekend_vs_weekday(persons=None):
     weekend = 0.0
     weekday = 0.0
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -906,7 +916,7 @@ async def weekend_vs_weekday(persons=None):
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -946,7 +956,8 @@ async def no_spend_days(persons=None):
     today = get_local_today()
     days_with_expense = set()
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -961,7 +972,7 @@ async def no_spend_days(persons=None):
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -998,7 +1009,8 @@ async def total_spent_on_item(item, persons, top_n=5):
 
     item_norm = item.lower().replace(" ", "")
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -1015,7 +1027,7 @@ async def total_spent_on_item(item, persons, top_n=5):
         item_idx = column_index_from_string(item_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, item_idx, person_idx) >= len(row):
@@ -1062,7 +1074,8 @@ async def daily_spending_series(persons: list[str]) -> dict[str, Any]:
     today = get_local_today()
     daily_totals: dict[int, float] = defaultdict(float)
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for _category, config in category_columns.items():
         start_row = config["start_row"]
@@ -1078,7 +1091,7 @@ async def daily_spending_series(persons: list[str]) -> dict[str, Any]:
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -1133,7 +1146,8 @@ async def best_worst_day_of_week(persons):
     weekday_totals = defaultdict(float)
     weekday_counts = defaultdict(int)
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -1148,7 +1162,7 @@ async def best_worst_day_of_week(persons):
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -1199,7 +1213,8 @@ async def longest_no_spend_streak(persons):
     today = get_local_today()
     daily_totals = {day: 0.0 for day in range(1, today.day + 1)}
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -1214,7 +1229,7 @@ async def longest_no_spend_streak(persons):
         amount_idx = column_index_from_string(amount_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):
@@ -1283,7 +1298,8 @@ async def most_frequent_purchases(persons, n=3):
     item_counts = Counter()
     item_totals = defaultdict(float)
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -1300,7 +1316,7 @@ async def most_frequent_purchases(persons, n=3):
         item_idx = column_index_from_string(item_col_letter) - 1
         person_idx = column_index_from_string(person_col_letter) - 1
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, item_idx, person_idx) >= len(row):
@@ -1358,7 +1374,8 @@ async def expenses_on_day(day_str, persons):
     entries = []
     total = 0.0
 
-    category_columns = get_category_columns
+    sheet_rows = ws.get_all_values()
+    category_columns = category_layout(sheet_rows)
 
     for category, config in category_columns.items():
         start_row = config["start_row"]
@@ -1377,7 +1394,7 @@ async def expenses_on_day(day_str, persons):
         item_idx = column_index_from_string(item_col_letter) - 1 if item_col_letter else None
         location_idx = column_index_from_string(location_col_letter) - 1 if location_col_letter else None
 
-        rows = ws.get_all_values()[start_row - 1:]
+        rows = sheet_rows[start_row - 1:]
 
         for row in rows:
             if max(date_idx, amount_idx, person_idx) >= len(row):

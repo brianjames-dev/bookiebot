@@ -21,7 +21,7 @@ from gspread import WorksheetNotFound
 from gspread.utils import a1_to_rowcol
 
 from bookiebot.reports.app_access import PostgresAppAccessStore
-from bookiebot.sheets.config import get_category_columns
+from bookiebot.sheets.config import get_category_columns, category_layout
 from bookiebot.sheets.routing import (
     get_budget_spreadsheet_id_for_user, get_shared_expenses_spreadsheet_id,
 )
@@ -321,7 +321,8 @@ class SheetsProjection:
 
     def _move_source(self, book: Any, sheet: Any, allocation: dict[str, Any], before: dict[str, Any], expected: dict[str, Any]) -> None:
         fields, old_fields = allocation["sourceColumnMap"], before["sourceColumnMap"]
-        category = get_category_columns[allocation["category"]]
+        rows = sheet.get_all_values()
+        category = category_layout(rows)[allocation["category"]]
         configured = {field: a1_to_rowcol(column + "1")[1] for field, column in category["columns"].items()}
         if fields != configured:
             raise ProjectionConflictError("The destination category columns changed before this move.")
@@ -329,7 +330,6 @@ class SheetsProjection:
         old_first, old_last = min(old_fields.values()), max(old_fields.values())
         if not (last < old_first or old_last < first):
             raise ProjectionConflictError("The source and destination category columns overlap.")
-        rows = sheet.get_all_values()
         occupied = [index for index, values in enumerate(rows, start=1)
                     if index >= category["start_row"] and any(str(value).strip() for value in values[first - 1:last])]
         row = max(occupied, default=category["start_row"] - 1) + 1
@@ -488,7 +488,8 @@ class SheetsProjection:
         book = self._book(get_shared_expenses_spreadsheet_id(paid_on.year))
         sheet = self._sheet(get_shared_expenses_spreadsheet_id(paid_on.year), paid_on.strftime("%B"))
         category = allocation["category"] if allocation["category"] in get_category_columns else "need_expenses"
-        config = get_category_columns[category]
+        rows = sheet.get_all_values()
+        config = category_layout(rows)[category]
         fields = {field: a1_to_rowcol(column + "1")[1] for field, column in config["columns"].items()}
         full = _name("receipt", event["id"])
         amount = _name("receipt_amount", event["id"])
@@ -503,7 +504,6 @@ class SheetsProjection:
         if full not in names:
             if not target:  # Reversed before the first projection: nothing to add.
                 return
-            rows = sheet.get_all_values()
             occupied = [index for index, values in enumerate(rows, start=1)
                         if index >= config["start_row"] and any(str(v).strip() for v in values[first - 1:last])]
             row = max(occupied, default=config["start_row"] - 1) + 1

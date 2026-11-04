@@ -190,7 +190,7 @@ def test_missing_action_id_never_marks_import_confirmed(store, writers):
 def test_persisted_action_recovers_after_confirmation_failure(store, writers, monkeypatch):
     item = seed(store)
     original = store.complete_reconciliation_import
-    def record(*args):
+    def record(*args, **kwargs):
         metadata = args[5]
         writers.actions.append(action_for(metadata['bank_import_operation_id'], item.id, action_id='expense-action'))
         return 'expense-action'
@@ -207,7 +207,7 @@ def test_persisted_action_recovers_after_confirmation_failure(store, writers, mo
 
 def test_logging_that_succeeded_despite_lost_response_recovers_without_second_write(store, writers):
     item = seed(store)
-    def lost_response(*args):
+    def lost_response(*args, **kwargs):
         writers.actions.append(action_for(args[5]['bank_import_operation_id'], item.id))
         return None
     writers.record.side_effect = lost_response

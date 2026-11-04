@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-03 - Optional Gas Location and coordinated column migration
+
+Add optional Location at J between Gas Amount and Person; physically insert a column rather than overwrite the occupied Gas summaries. Resolve legacy/new worksheet coordinates from fresh headers, rejecting unknown identifiable layouts, and stamp new/migrated expense actions with `gas_location_v1`. Preserve untagged legacy meanings. All categories to the right, compaction/Move/Delete/Undo snapshots, canonical source/receipt maps and bank reservations must follow the same schema.
+
+Perform the cross-system cutover with app writers stopped, private native backups, a plan, whole-workbook atomic batches and readback before coordinate-only DB commit. Translate current canonical projection baselines; retain immutable DB audit rows, completed confirmation receipts, action IDs, financial versions, money/repayment/reset state and request fingerprints. Restart clears ephemeral selections. A lost response resumes the same plan; do not repeat a raw column insertion. Both personal budgets require explicit quoted import rewrites; Apps Script derives future imports and date stamps from the shared header. Update the annual shared master; leave personal annual masters’ literals pointing at their untouched older source until annual initialization regenerates them.
+
+Backfill only an existing uniquely identified active Gas row, using a persisted bank/action link independently verified by exact amount, owner/account and posted/authorized date. Reject pending/removed banks, deleted/changed/duplicate sources and conflicting merchants. This enriches authorized existing purchases; it neither imports bank transactions nor changes reconciliation/payment statuses. Unknown locations remain blank with the existing category fallback. See `docs/GAS_LOCATION.md` for the column trace and cutover procedure.
+
 ## 2026-11-03 - Approved List-First Transactions Spacing
 
 Port the selected Full row draft into existing production components. Transactions starts with the graph hidden; a circular icon beside All expands/collapses the retained native chart below its total/filter and above search. CSS owns resizing/fading and rapid reversals; hiding makes the plot inert and inaccessible. Keep visibility in component state, without a new saved preference or network read. Standalone reports keep their existing always-visible chart and presentation.

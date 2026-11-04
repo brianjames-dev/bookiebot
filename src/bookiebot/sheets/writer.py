@@ -9,7 +9,7 @@ import asyncio
 import os
 import re
 from zoneinfo import ZoneInfo
-from bookiebot.sheets.config import expense_category_label, get_category_columns, normalize_expense_category
+from bookiebot.sheets.config import expense_category_label, get_category_columns, worksheet_category_layout, expense_layout_metadata, normalize_expense_category
 from bookiebot.sheets.income import (
     MONTHLY_INCOME_SUMMARY_PATTERN,
     copy_income_row_properties as _copy_income_row_properties,
@@ -467,6 +467,7 @@ async def write_expense_to_sheet(data, message):
                 values,
                 selected_card,
                 stored.get("undo_user_key"),
+                worksheet=ws,
             )
 
             await interaction.followup.send(
@@ -504,7 +505,7 @@ async def write_expense_to_sheet(data, message):
 
     row = log_category_row(values_to_write, ws, category)
     actor_key = get_current_discord_user_id() or discord_user_id
-    action_id = record_expense_undo(category, row, values_to_write, selected_person, actor_key)
+    action_id = record_expense_undo(category, row, values_to_write, selected_person, actor_key, worksheet=ws)
 
     if message:
         await message.channel.send(
@@ -538,7 +539,7 @@ def normalize_expense_data(data, person):
 def log_category_row(values, worksheet, category):
     logger.debug("Values passed to log_category_row", extra={"values": values})
 
-    config = get_category_columns[category]
+    config = worksheet_category_layout(worksheet)[category]
     row_start = config["start_row"]
     columns = config["columns"]
 
@@ -564,8 +565,9 @@ def log_category_row(values, worksheet, category):
     return first_empty_row
 
 
-def record_expense_undo(category, row, values_or_amount, person, user_key=None, metadata_extra: dict | None = None):
-    columns = get_category_columns[category]["columns"]
+def record_expense_undo(category, row, values_or_amount, person, user_key=None, metadata_extra: dict | None = None, *, worksheet=None):
+    layout = worksheet_category_layout(worksheet) if worksheet is not None else get_category_columns
+    columns = layout[category]["columns"]
     col_indexes = [column_index_from_string(col_letter) for col_letter in columns.values()]
     if isinstance(values_or_amount, dict):
         values = values_or_amount
@@ -583,7 +585,7 @@ def record_expense_undo(category, row, values_or_amount, person, user_key=None, 
             columns=col_indexes,
             previous_values=["" for _ in col_indexes],
             new_values=new_values,
-            metadata={"type": "expense", "category": category, "person": str(person), **(metadata_extra or {})},
+            metadata={"type": "expense", "category": category, "person": str(person), **expense_layout_metadata(layout), **({"supplied_location": str(values.get("location", ""))} if isinstance(values_or_amount, dict) and values.get("location") else {}), **(metadata_extra or {})},
             description=f"{category} expense ${amount} for {person}",
         ),
     )

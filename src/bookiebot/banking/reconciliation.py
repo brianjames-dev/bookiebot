@@ -310,7 +310,8 @@ def action_sheet_ref(logged: LoggedAction, scheduled_pulls: Iterable[ScheduledPu
     if logged.action.worksheet == 'expense' and category in get_category_columns:
         # An update may list only its changed cells; reserve the whole purchase
         # block. Categories share row numbers in the same monthly worksheet.
-        columns = [column_index_from_string(col) for col in get_category_columns[category]['columns'].values()]
+        from bookiebot.sheets.undo import _field_columns_for_action
+        columns = list(_field_columns_for_action(logged.action).values())
     column_suffix = f"#cols={','.join(str(col) for col in sorted(set(columns)))}" if columns else ''
     refs = [f"{logged.action.worksheet}!row {logged.action.row}{column_suffix}{month_suffix}"]
     if candidate is not None:
@@ -675,7 +676,8 @@ def _action_candidate(logged: LoggedAction) -> dict | None:
         return None
 
     category = normalize_expense_category(action.metadata.get('category'))
-    fields = list(get_category_columns[category]['columns']) if category in get_category_columns else []
+    from bookiebot.sheets.undo import _field_columns_for_action
+    fields = list(_field_columns_for_action(action)) if category in get_category_columns else []
     try:
         fields = json.loads(action.metadata.get('display_fields', '')) or fields
     except (ValueError, TypeError):
