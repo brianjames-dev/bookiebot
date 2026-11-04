@@ -18,10 +18,10 @@ async function swipeMotion(page,first){
  const access=first.getByRole('button',{name:'Show actions for Starbucks Coffee Company',exact:true}),shell=access.locator('..')
  const sample=()=>shell.evaluate(async el=>{const group=el.closest('.bb-daily-day-group'),bead=group.querySelector('.bb-daily-bead[data-entry="0"]'),row=el.querySelector('.bb-daily-transaction'),rail=el.querySelector('.bb-recorded-swipe-actions'),viewport=bead.closest('.bb-recorded-swipe-icon-viewport'),frames=[];for(let i=0;i<19;i++){await new Promise(requestAnimationFrame);const r=getComputedStyle(row),b=getComputedStyle(bead);frames.push({row:new DOMMatrix(r.transform).m41,bead:parseFloat(b.translate)||0,opacity:b.opacity,duration:r.transitionDuration,easing:r.transitionTimingFunction,clip:viewport.style.clipPath,rail:getComputedStyle(rail).visibility})}return frames})
  await access.press('ArrowRight');const close=await sample();assert(close.some(f=>f.row< -1)&&close.at(-1).row>close[0].row)
- assert(close.every(f=>f.rail==='visible'&&f.opacity==='1'&&Math.abs(f.row-f.bead)<1.1&&f.clip.startsWith('inset(')),JSON.stringify(close))
+ assert(close.every(f=>f.rail==='visible'&&f.opacity==='1'&&Math.abs(f.row-f.bead)<1.1&&f.clip.startsWith('polygon(')),JSON.stringify(close))
  await page.waitForTimeout(460)
  const bounds=await access.boundingBox();await page.mouse.move(bounds.x+bounds.width*.7,bounds.y+bounds.height/2);await page.mouse.down();await page.mouse.move(bounds.x+bounds.width*.7-130,bounds.y+bounds.height/2,{steps:10});await page.mouse.up();const open=await sample()
- assert(open.some(f=>f.row< -130));assert(open.every(f=>f.opacity==='1'&&Math.abs(f.row-f.bead)<1.1&&f.clip.startsWith('inset(')),JSON.stringify(open))
+ assert(open.some(f=>f.row< -130));assert(open.every(f=>f.opacity==='1'&&Math.abs(f.row-f.bead)<1.1&&f.clip.startsWith('polygon(')),JSON.stringify(open))
  assert(open.every(f=>f.duration===close[0].duration&&f.easing===close[0].easing),'Entry and exit share the same CSS curve and duration');assert.equal(open[0].duration,'0.42s, 0.42s')
  await page.waitForTimeout(460)
 }
@@ -29,7 +29,7 @@ async function swipeMotion(page,first){
 for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
  for(const width of[320,390,1280])for(const dark of[false,true]){
   const page=await browser.newPage({viewport:{width,height:1000},hasTouch:true,isMobile:width<700,colorScheme:dark?'dark':'light'}),errors=[],commands=[],reviews=[]
-  page.on('pageerror',e=>errors.push(e.message))
+  page.on('pageerror',e=>{errors.push(e.message);console.error(e.message)})
   await page.route('**/*',route=>{
    const request=route.request(),url=new URL(request.url()),reply=value=>route.fulfill({contentType:'application/json',body:JSON.stringify(value)})
    if(url.origin!=='https://transactions.test')return route.abort()
@@ -46,7 +46,7 @@ for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
    commands.push({url:url.href,method:request.method()});return route.abort()
   })
   await page.goto('https://transactions.test/fixture');const screen=page.getByRole('region',{name:'Recorded transactions',exact:true}),ready=()=>page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false')
-  await screen.locator('.bb-chart-total').waitFor();await ready()
+  await screen.locator('.bb-chart-total').waitFor().catch(async error=>{console.error(await page.locator('body').innerText());await page.screenshot({path:'/private/tmp/inline-workspace-failure.png'});throw error});await ready()
   const filter=screen.getByRole('combobox',{name:'Filter transactions',exact:true}),total=screen.locator('.bb-chart-total')
   assert.equal(await total.innerText(),money(fixture.results.all.totalAmountCents));assert.equal(await screen.getByRole('combobox').count(),1);assert.equal(await screen.locator('.bb-daily-single-day').count(),1)
   const geometry=await screen.evaluate(el=>{const single=el.querySelector('.bb-daily-single-day .bb-daily-day-total'),regular=el.querySelector('.bb-daily-day-header .bb-daily-day-total'),a=el.querySelector('.bb-chart-total').getBoundingClientRect(),f=el.querySelector('.bb-category-mix-filter').getBoundingClientRect(),search=el.querySelector('.bb-recorded-search').getBoundingClientRect();return{singleRight:single.getBoundingClientRect().right,regularRight:regular.getBoundingClientRect().right,singleSize:getComputedStyle(single).fontSize,regularSize:getComputedStyle(regular).fontSize,beside:a.right<f.left,above:f.bottom<search.top,overflow:document.documentElement.scrollWidth>innerWidth}})
@@ -81,7 +81,7 @@ for(const engine of[chromium,webkit]){const browser=await engine.launch();try{
   await noFocusChrome(screen)
   await first.getByRole('button',{name:'Update Starbucks Coffee Company',exact:true}).click();await screen.getByRole('combobox',{name:'Update category',exact:true}).selectOption('gas');await screen.getByRole('region',{name:'Edit transaction',exact:true}).getByLabel('Amount',{exact:true}).fill('9.45')
   await noFocusChrome(screen)
-  await screen.getByRole('button',{name:'Review change',exact:true}).click();await screen.getByRole('button',{name:'Confirm update',exact:true}).waitFor();assert.equal(reviews.at(-1).operation,'move');assert.equal(reviews.at(-1).updates.amount,945);assert.equal(reviews.at(-1).destination,'gas');assert((await screen.locator('.bb-change-details').innerText()).includes('$9.45'));assert((await screen.locator('.bb-change-category').innerText()).includes('Gas'));await noFocusChrome(screen);await screen.getByRole('button',{name:'Cancel',exact:true}).click()
+  await screen.getByRole('button',{name:'Review change',exact:true}).click();await screen.getByRole('button',{name:'Confirm update',exact:true}).waitFor();assert.equal(reviews.at(-1).operation,'move');assert.equal(reviews.at(-1).updates.amount,945);assert.equal(reviews.at(-1).destination,'gas');assert((await screen.locator('.bi-review-changes').innerText()).includes('$9.45'));assert((await screen.locator('.bi-review-change[data-field="category"]').innerText()).includes('Gas'));await noFocusChrome(screen);await screen.getByRole('button',{name:'Back',exact:true}).click();await screen.getByRole('button',{name:'Cancel',exact:true}).click()
   for(const[value,key]of[['needs','needs'],['wants','wants'],['shared','shared'],['category:food','food'],['income','income'],['savings','savings'],['all','all']]){await filter.selectOption(value);await ready();assert.equal(await total.innerText(),money(fixture.results[key].totalAmountCents));if(value==='shared')assert.equal(await screen.locator('.bb-daily-single-day').count(),2)}
   await screen.getByRole('searchbox',{name:'Search transactions',exact:true}).fill('star');await page.waitForTimeout(300);await ready();assert.equal(await total.innerText(),'$8.45');assert.equal(await screen.locator('.bb-recorded-search button').count(),1);assert.equal(await screen.locator('.bb-daily-single-day').count(),1);await screen.getByRole('button',{name:'Clear search',exact:true}).click();await ready()
   if(width===390&&dark){await page.waitForTimeout(1700);await screen.getByRole('heading',{name:'Transactions',exact:true}).click();await screen.screenshot({path:`/private/tmp/transactions-workspace-${engine.name()}.png`})}

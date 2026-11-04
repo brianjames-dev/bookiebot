@@ -2,6 +2,8 @@
 
 ## Authenticated Transactions workspace (2026-11-03)
 
+The approved inline Row Context editors, headerless Slide + resize reviews, Rising fill/pie shortcut, shared-track icon actions, confirmed value/category motion and timed Undo are described in [Transactions](TRANSACTIONS.md). Current-date captions show the actual weekday; the soft date marker remains.
+
 The app now reuses the native chart and row/motion components on **Transactions**;
 Overview ends after its four-chart carousel. One All chooser beside Total Spent
 filters the recorded chart and list together (Needs/Wants/Shared/categories,

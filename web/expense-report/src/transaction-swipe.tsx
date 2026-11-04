@@ -28,9 +28,16 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
   const transition=`${duration}ms ${easing}`,closing=duration>0&&Math.abs(value)<.1&&el.dataset.side==='left'
   el.dataset.side=closing?'left':value<-.1?'left':value>.1?'right':'closed'
   el.dataset.revealed=String(closing||Math.abs(value)>.1)
+  // Shared-track motion uses the exact row offset, including rubber banding.
+  // Direct manipulation is immediate; entry and exit share one settle curve.
+  el.style.setProperty('--bb-recorded-swipe-duration',`${duration}ms`)
+  el.style.setProperty('--bb-recorded-track-start',`${width}px`)
+  el.style.setProperty('--bb-recorded-offset',`${value}px`)
   el.style.setProperty('--bb-recorded-reveal',String(Math.min(1,Math.abs(value)/width)))
   row.style.transition=`transform ${transition},border-radius ${transition}`
-  row.style.transform=`translate3d(${value}px,0,0)`
+  // A closed row uses normal text painting, including after a completed
+  // reveal. Avoid retaining an identity 3D layer when nothing is moving.
+  row.style.transform=Math.abs(value)>.1||closing?`translate3d(${value}px,0,0)`:'none'
   const access=el.querySelector<HTMLElement>('.bb-recorded-row-access')
   if(access){access.style.transition=`transform ${transition}`;access.style.transform=`translate3d(${value}px,0,0)`}
   // The existing day motion reads this invisible anchor on resize. Keep it
@@ -42,13 +49,17 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
    // erases it before it reaches the edge and lets it leak on the way back.
    if(viewport&&(Math.abs(value)>.1||closing)){
     const bounds=el.getBoundingClientRect(),origin=viewport.getBoundingClientRect()
-    viewport.style.clipPath=`inset(${bounds.top-origin.top}px ${origin.right-bounds.right}px ${origin.bottom-bounds.bottom}px ${bounds.left-origin.left}px)`
+    // The editor changes the height of the day-sized viewport. A pixel
+    // bottom inset is measured from that changing edge and can collapse
+    // the window during closure. Keep all four edges in row coordinates.
+    const left=bounds.left-origin.left,top=bounds.top-origin.top,right=bounds.right-origin.left,bottom=bounds.bottom-origin.top
+    viewport.style.clipPath=`polygon(${left}px ${top}px,${right}px ${top}px,${right}px ${bottom}px,${left}px ${bottom}px)`
    }else if(viewport)viewport.style.clipPath=''
    bead.style.setProperty('transition',`translate ${transition}`,'important')
    bead.style.translate=`${value}px 0`
    bead.style.clipPath=''
   }
-  if(closing)settleTimer.current=setTimeout(()=>{settleTimer.current=null;if(target.current!==0||!el.isConnected)return;el.dataset.side='closed';el.dataset.revealed='false';if(viewport)viewport.style.clipPath=''},duration+20)
+  if(closing)settleTimer.current=setTimeout(()=>{settleTimer.current=null;if(target.current!==0||!el.isConnected)return;el.dataset.side='closed';el.dataset.revealed='false';row.style.transition='none';row.style.transform='none';if(viewport)viewport.style.clipPath=''},duration+20)
   x.current=value
  }
  const close=(instant=false)=>{target.current=0;setSide(0);paint(0,!instant)}
@@ -62,8 +73,10 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
   const el=shell.current!,group=el.closest<HTMLElement>('.bb-daily-day-group')!,ownedBead=group.querySelector<HTMLElement>(`.bb-daily-bead[data-entry="${position}"]`)
   const closeOnDay=(event:Event)=>{if((event.target as Element).closest('.bb-daily-day-header'))close(true)}
   group.addEventListener('click',closeOnDay,true)
-  const frame=requestAnimationFrame(()=>{if(initial&&!readonly&&group.querySelector('.bb-daily-day-header')?.getAttribute('aria-expanded')==='true')reveal(initial,false)})
-  return()=>{cancelAnimationFrame(frame);if(settleTimer.current!==null)clearTimeout(settleTimer.current);group.removeEventListener('click',closeOnDay,true);const bead=ownedBead;if(bead){bead.style.translate='';bead.style.clipPath='';bead.style.removeProperty('transition');const viewport=bead.closest<HTMLElement>('.bb-recorded-swipe-icon-viewport');if(viewport)viewport.style.clipPath=''}}
+  let lastWidth=el.clientWidth
+  const sizeObserver=new ResizeObserver(()=>{const width=el.clientWidth;if(width>0&&width!==lastWidth){lastWidth=width;drag.current=null;paint(target.current*revealWidth(),false)}})
+  sizeObserver.observe(el)
+  return()=>{sizeObserver.disconnect();if(settleTimer.current!==null)clearTimeout(settleTimer.current);group.removeEventListener('click',closeOnDay,true);const bead=ownedBead;if(bead){bead.style.translate='';bead.style.clipPath='';bead.style.removeProperty('transition');const viewport=bead.closest<HTMLElement>('.bb-recorded-swipe-icon-viewport');if(viewport)viewport.style.clipPath=''}}
  },[position,entry.id])
  useLayoutEffect(()=>{const id=requestAnimationFrame(()=>paint(target.current*revealWidth(),false));return()=>cancelAnimationFrame(id)},[actionWidth,settings.duration])
  function down(event:React.PointerEvent){
@@ -83,11 +96,12 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
  function up(event:React.PointerEvent){
   const d=drag.current;if(!d||d.id!==event.pointerId)return;drag.current=null
   if(d.active){suppressed.current=true;reveal(x.current< -revealWidth()*.3?-1:0);setTimeout(()=>{suppressed.current=false},100)}
+  else paint(target.current*revealWidth(),true)
  }
  function activate(operation:'update'|'split'|'delete'){if(readonly||!recorded)return;reveal(0);context.onAction(recorded,operation)}
  return <div className="bb-recorded-swipe" ref={shell} data-readonly={readonly} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={()=>{drag.current=null;paint(target.current*revealWidth(),true)}} style={{'--bb-recorded-button-width':`${settings.buttonWidth}px`,'--bb-recorded-action-width':`${actionWidth}px`,'--bb-recorded-action-count':available.length} as React.CSSProperties}>
   {available.length>0&&<div className="bb-recorded-swipe-actions bb-recorded-actions-left" role="group" aria-label={`Actions for ${entry.location||entry.item}`} inert={side!==-1} aria-hidden={side!==-1}>
-   {available.map(([op,label,Icon])=><button type="button" className={`bb-recorded-action bb-recorded-action-${op}`} key={op} disabled={readonly} onClick={()=>activate(op)} aria-label={`${label} ${entry.location||entry.item}`}><Icon aria-hidden="true"/><span>{label}</span></button>)}
+   {available.map(([op,label,Icon])=><button type="button" className={`bb-recorded-action bb-recorded-action-${op}`} key={op} disabled={readonly} onClick={()=>activate(op)} aria-label={`${label} ${entry.location||entry.item}`}><Icon aria-hidden="true"/></button>)}
   </div>}
   {children}
   {/* Zero-detail activation preserves keyboard/assistive access; pointer taps do not reveal actions. */}

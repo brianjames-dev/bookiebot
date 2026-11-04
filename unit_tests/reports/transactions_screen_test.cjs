@@ -6,9 +6,11 @@ let serial=0,tree,work
 const SwipeContext=React.createContext(null)
 function ActionFixture({entry}){const ctx=React.useContext(SwipeContext),row=ctx.rows.get(entry.id);return React.createElement('div',null,entry.item,['update','split','delete'].filter(op=>row.capabilities[op]).map(op=>React.createElement('button',{key:op,disabled:ctx.locked,onClick:()=>ctx.onAction(row,op)},op==='split'&&row.split?'Edit split':op[0].toUpperCase()+op.slice(1))))}
 const presentation={
+ './transaction-step-motion':{StepMotion:({review,edit,confirm})=>React.createElement(React.Fragment,null,React.createElement('div',{inert:review},edit),React.createElement('div',{inert:!review},confirm))},
+ './transaction-undo-popup':{UndoPopup:({notice,onUndo,onDismiss})=>React.createElement('div',{'aria-label':'Undo popup'},notice.title,React.createElement('button',{onClick:onUndo},'Undo'),React.createElement('button',{onClick:onDismiss},'Dismiss undo'))},
  './app-navigation':{useAppNavigation:()=>null},
  './transaction-swipe':{TransactionSwipeContext:SwipeContext,wrapTransactionRow:(entry)=>React.createElement(ActionFixture,{entry})},
- './daily-transactions':{DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,null)))))},
+ './daily-transactions':{DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))},
  './report-app':{DailySpendingChart:props=>React.createElement('div',null,props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
@@ -17,8 +19,9 @@ global.IS_REACT_ACT_ENVIRONMENT=true
 function load(file){
  if(cache.has(file))return cache.get(file)
  const exports={};cache.set(file,exports)
- const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText
- vm.runInNewContext(code,{exports,AbortController,URLSearchParams,Intl,Date,Error,Event:class{constructor(type){this.type=type}},window:win,crypto:{randomUUID:()=>`isolated-request-${++serial}-command`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>presentation[name]??(name.endsWith('.css')?{}:name==='./app-work-guard'?{useAppWorkStatus(value){const id=React.useId();statuses.set(id,value);update();React.useEffect(()=>()=>{statuses.delete(id);update()},[id]);return React.useCallback(next=>{statuses.set(id,next);update()},[id])}}:name.startsWith('.')?load(['.tsx','.ts'].map(ext=>path.resolve(path.dirname(file),name)+ext).find(fs.existsSync)):req(name))})
+ const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
+ vm.runInNewContext(code,{exports,AbortController,URLSearchParams,Intl,Date,Error,Event:class{constructor(type){this.type=type}},window:win,matchMedia:win.matchMedia,requestAnimationFrame:fn=>{queueMicrotask(fn);return 1},cancelAnimationFrame(){},crypto:{randomUUID:()=>`isolated-request-${++serial}-command`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>presentation[name]??(name.endsWith('.css')?{}:name==='./app-work-guard'?{useAppWorkStatus(value){const id=React.useId();statuses.set(id,value);update();React.useEffect(()=>()=>{statuses.delete(id);update()},[id]);return React.useCallback(next=>{statuses.set(id,next);update()},[id])}}:name.startsWith('.')?(name.endsWith('.json')?JSON.parse(fs.readFileSync(path.resolve(path.dirname(file),name),'utf8')):load(['.tsx','.ts'].map(ext=>path.resolve(path.dirname(file),name)+ext).find(fs.existsSync))):req(name))})
+ if(file.endsWith('/transaction-feedback.ts'))exports.settledTransactionRow=async()=>{}
  return exports
 }
 const {TransactionsScreen}=load(path.resolve('web/expense-report/src/transactions-screen.tsx'))
@@ -40,144 +43,66 @@ const listing=(items=[row],extra={})=>({items,total:items.length,nextOffset:null
 const review=(change,item=row)=>({review:{item,after:{...item.fields,amount:change.updates?.amount?String(change.updates.amount/100):item.fields.amount},operation:change.operation,destination:change.destination,reviewVersion:'review-'+change.operation,share:change.operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}})
 const expand=async()=>run(()=>{})
 const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}))
+const input=label=>tree.root.findAllByType('input').filter(visible).find(node=>node.props['aria-label']===label)
+const change=async(label,value)=>run(()=>input(label).props.onChange({target:{value}}))
+const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel')}
 ;(async()=>{
- await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0,'Hidden Transactions does not add startup reads')
- await run(()=>tree.update(fixture(true)));await tick();assert.match(latest().url,/\/app\/transactions\?/);await respond(listing())
- await click('Refresh transactions');assert.match(latest().url,/fresh=1/);await respond(listing())
- await expand();await click('Update');assert.equal(work.dirty,true)
- await run(()=>tree.root.findAllByType('input').find(n=>n.props.value==='12.34').props.onChange({target:{value:'15.99'}}))
- assert.equal(requests.filter(r=>r.options.body).length,0,'Editing does not write')
- await submit();assert.equal(body().updates.amount,1599);assert.equal(latest().url,'/app/transactions/review');const updateBody=body();await respond(review(updateBody))
- assert.equal(body().operation,'update','Unchanged category uses the existing Update writer');
- assert.ok(button('Confirm update'));assert.equal(requests.filter(r=>r.url==='/app/transactions').length,0,'Review is not confirmation')
- await click('Cancel');assert.equal(work.dirty,false)
- for(const [label,op] of [['Update','move'],['Delete','delete'],['Split','split']]){
-  await expand();await click(label)
-  if(op==='move'){await run(()=>tree.root.findByProps({'aria-label':'Update category'}).props.onChange({target:{value:'food'}}));await run(()=>tree.root.findAllByType('input').find(n=>n.props.value==='12.34').props.onChange({target:{value:'19.99'}}))}
-  await submit();const change=body();assert.equal(change.operation,op);if(op==='move'){assert.equal(change.updates.amount,1999);assert.equal(change.destination,'food')}await respond(review(change))
-  if(op==='split')assert.match(text(tree.toJSON()),/No repayment will be marked received/)
-  await click('Cancel')
+ await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0)
+ await run(()=>tree.update(fixture(true)));await tick();await respond(listing())
+ await change('Search transactions','cable');await tick();await respond(listing())
+ await click('Update');assert.equal(button('Clear search').props.disabled,true,'The search clear control cannot detach an active inline editor');assert.equal(work.dirty,true);assert.equal(button('Review change').props.disabled,true,'Unchanged edits cannot request a review')
+ await change('Amount','15.99');assert.equal(requests.filter(r=>r.options.body).length,0)
+ await submit();assert.equal(body().updates.amount,1599);await respond(review(body()));assert.ok(button('Confirm update'));await cancel();assert.equal(work.dirty,false);await click('Clear search');await tick();await respond(listing())
+ for(const [label,op]of[['Update','move'],['Delete','delete'],['Split','split']]){
+  await click(label)
+  if(op==='move'){await run(()=>tree.root.findByProps({'aria-label':'Update category'}).props.onChange({target:{value:'food'}}));await change('Amount','19.99')}
+  await submit();const command=body();assert.equal(command.operation,op)
+  if(op==='move'){assert.equal(command.destination,'food');assert.equal(command.updates.amount,1999)}
+  await respond(review(command));if(op==='split')assert.match(text(tree.toJSON()),/No repayment will be marked received/)
+  await cancel()
  }
- await expand();await click('Update');await run(()=>tree.root.findAllByType('input').find(n=>n.props.value==='12.34').props.onChange({target:{value:'22.00'}}));await submit();const change=body();await respond(review(change))
- await click('Confirm update');const original=body();assert.equal(original.reviewVersion,'review-update');assert.equal(work.pending,true);assert.equal(work.uncertain,true)
- assert.ok(button('Cancel').props.disabled)
- const count=requests.filter(r=>r.url==='/app/transactions').length
- await run(()=>button('Saving…').props.onClick());assert.equal(requests.filter(r=>r.url==='/app/transactions').length,count,'Concurrent confirmation cannot submit twice')
- await reject();assert.equal(work.uncertain,true);assert.ok(button('Cancel').props.disabled)
- assert.ok(!text(tree.toJSON()).includes('Transaction updated'),'An uncertain save never shows a success receipt')
- await click('Retry same confirmation');assert.deepEqual(body(),original,'Recovery retains the exact confirmed command and ID')
- const summary={operation:'update',title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:row.amountCents,before:row.fields,after:{...row.fields,amount:'22.00'}}
- await respond({state:'done',success:true,detail:'Updated logged action: Before: ``` raw Discord before ``` After: ``` raw Discord after ```',summary,undo:{month:'2026-10',id:'2026-10:update-1'}})
- assert.match(text(tree.toJSON()),/Transaction updated/)
- assert.match(text(tree.toJSON()),/Previous\$12.34Updated\$22.00/)
- assert.ok(!text(tree.toJSON()).includes('```')&&!text(tree.toJSON()).includes('Updated logged action'),'Discord audit formatting never renders as a web success receipt')
- assert.equal(work.uncertain,false);assert.equal(work.pending,false);assert.ok(events.includes('bookiebot:transactions-changed'));assert.ok(events.includes('bookiebot:reimbursements-changed'))
- assert.ok(button('Undo this change'));await click('Undo this change');assert.equal(body().operation,'undo');assert.equal(body().id,'2026-10:update-1')
- const undoReview=review(body(),{...row,id:'2026-10:update-1'})
- undoReview.review.restoration={operation:'update',current:{...row.fields,amount:'22.00'},currentCategory:'Shopping',restoredCategory:'Shopping'}
- await respond(undoReview);assert.ok(button('Confirm undo'));assert.match(text(tree.root.findByProps({'aria-label':'Edit transaction'})),/Current\$22.00Restore to\$12.34/);await click('Cancel')
- await tick();await respond(listing())
- await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'cable'}}));await tick();assert.match(latest().url,/search=cable/)
- const old=latest();await run(()=>tree.root.findByProps({'aria-label':'Search transactions'}).props.onChange({target:{value:'payroll'}}));await tick();const current=latest()
+ await click('Update');await change('Amount','22.00');await submit();const changed=body();await respond(review(changed));await click('Confirm update');const frozen=body()
+ assert.equal(frozen.reviewVersion,'review-update');assert.equal(work.pending,true);assert.equal(work.uncertain,true);assert.equal(button('Back').props.disabled,true)
+ const count=requests.length;assert.equal(button('Check saved status'),undefined,'Ordinary saves stay in their row without inserting a recovery panel');assert.equal(requests.length,count,'Locked controls never issue another request')
+ await reject();assert.equal(work.uncertain,true);await click('Retry same confirmation');assert.deepEqual(body(),frozen)
+ const summary={operation:'update',title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:1234,before:row.fields,after:{...row.fields,amount:'22.00'}}
+ await respond({state:'done',success:true,detail:'Raw Discord text must stay hidden',summary,undo:{month:row.month,id:row.month+':update-1'}})
+ assert.match(latest().url,/fresh=1/,'Only a confirmed result advances to feedback and a fresh read')
+ await respond(listing([{...row,amountCents:2200,fields:summary.after}]))
+ assert.equal(work.uncertain,false);assert.equal(work.pending,false);assert.ok(button('Undo'));assert.ok(!button('Undo last change'));assert.ok(!text(tree.toJSON()).includes('Raw Discord'))
+ assert.ok(events.includes('bookiebot:transactions-changed'));assert.ok(events.includes('bookiebot:reimbursements-changed'))
+ await click('Undo');assert.equal(body().operation,'undo');assert.equal(body().id,row.month+':update-1')
+ const undoReview=review(body(),{...row,id:row.month+':update-1'});undoReview.review.restoration={operation:'update',current:summary.after,currentCategory:'Shopping',restoredCategory:'Shopping'}
+ await respond(undoReview);assert.equal(latest().url,'/app/transactions');assert.equal(body().operation,'undo','Explicit timed Undo still obtains a fresh server review before confirmation')
+ await respond({state:'done',success:true,summary:{...summary,operation:'undo'}});await respond(listing());assert.ok(!button('Undo'))
+ await change('Search transactions','cable');await tick();const old=latest();await change('Search transactions','payroll');await tick();const current=latest()
  await respond(listing([{...row,title:'Payroll fixture',fields:{...row.fields,item:'Payroll fixture'},id:'payroll'}]),200,current);await respond(listing(),200,old)
- const resultList=()=>text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'}))
- assert.match(resultList(),/Payroll fixture/);assert.ok(!resultList().includes('Fixture cable'),'Stale search responses cannot replace the latest results')
- assert.match(text(tree.root.findByProps({'aria-label':'Saved transaction change'})),/Fixture cable/,'The saved receipt retains its confirmed transaction through unrelated searches')
- await run(()=>tree.root.findByProps({'aria-label':'Filter transactions'}).props.onChange({target:{value:'income'}}));await tick();assert.match(latest().url,/kind=income/)
- assert.equal(tree.root.findByType(presentation['./report-app'].DailySpendingChart).props.metricLabel,'Total Spent','Pending filters keep the previous chart data and its matching label together')
- await respond(listing([]));assert.equal(tree.root.findByType(presentation['./report-app'].DailySpendingChart).props.metricLabel,'Total Income')
- assert.match(text(tree.toJSON()),/No transactions match/)
+ const listText=text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'}));assert.match(listText,/Payroll fixture/);assert.ok(!listText.includes('Fixture cable'))
+ await run(()=>tree.root.findByProps({'aria-label':'Filter transactions'}).props.onChange({target:{value:'income'}}));await tick();assert.match(latest().url,/kind=income/);await respond(listing([]));assert.match(text(tree.toJSON()),/No transactions match/)
  await click('Clear search and filters');await tick();await respond(listing())
- await click('Refresh transactions');await respond(listing([row],{snapshotVersion:'one',nextOffset:40,total:2}))
- await click('Load more transactions');await respond(listing([{...row,id:'shifted'}],{snapshotVersion:'two'}))
- assert.match(text(tree.toJSON()),/Recorded activity changed/)
- assert.equal(tree.root.findByType(presentation['./daily-transactions'].DailyTransactionDays).props.groups[0].entries.length,1,'Changed source snapshots cannot append duplicate or shifted page rows')
- await click('Refresh transactions');await respond(listing())
- await expand();await click('Delete');await submit();await respond(review(body()));await click('Confirm delete');const deletion=body();await reject()
- await run(()=>tree.unmount());assert.ok(storage.size,'Uncertain confirmation survives a page reload in this owner session')
- const before=requests.filter(r=>r.options.body).length
- await run(()=>{tree=Renderer.create(fixture(false))});assert.equal(requests.filter(r=>r.options.body).length,before,'Reload never repeats a financial writer')
- await click('Check saved status');assert.match(latest().url,new RegExp('/commands/'+deletion.requestId+'$'));await respond({state:'done',success:true,detail:'Deleted isolated fixture'})
- assert.equal(storage.size,0);assert.equal(work.uncertain,false)
- assert.match(text(tree.toJSON()),/Change saved/,'Older saved results have a clear success fallback')
- assert.ok(!text(tree.toJSON()).includes('Deleted isolated fixture'),'Legacy Discord result text stays out of the success card')
- const beforeDismiss=requests.length;await click('Dismiss transaction result');assert.equal(requests.length,beforeDismiss,'Dismiss is presentation only')
- await run(()=>tree.unmount())
- const {TransactionCompletion,TransactionChangeDetails}=load(path.resolve('web/expense-report/src/transaction-change-summary.tsx'))
- for(const saved of [false,true])for(const operation of ['update','move']){
-  const restoration={operation,current:{...row.fields,amount:'24.88'},currentCategory:operation==='move'?'Food':'Shopping',restoredCategory:'Shopping'}
-  const restored={...summary,operation:'undo',amountCents:3988,before:{...row.fields,amount:'39.88'},after:{...row.fields,amount:'39.88'},restoration}
-  await run(()=>{tree=Renderer.create(React.createElement(TransactionChangeDetails,{summary:restored,saved}))})
-  const rendered=text(tree.toJSON())
-  if(operation==='update')assert.match(rendered,new RegExp(saved?'Previous\\$24.88Restored\\$39.88':'Current\\$24.88Restore to\\$39.88'))
-  else{
-   assert.match(text(tree.root.findByProps({className:'bb-change-meta'})),/Shopping/)
-   assert.match(rendered,new RegExp(saved?'PreviousFoodRestoredShopping':'CurrentFoodRestore toShopping'))
-  }
-  await run(()=>tree.unmount())
- }
- for(const [operation,title] of [['update','Transaction updated'],['move','Transaction moved'],['delete','Transaction deleted'],['split','Split saved'],['cancel_split','Split removed'],['undo','Change undone']]){
-  let undone=0,dismissed=0
-  const receipt={...summary,operation,destination:operation==='move'?'food':undefined,share:operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}
-  await run(()=>{tree=Renderer.create(React.createElement(TransactionCompletion,{summary:receipt,canUndo:operation!=='undo',disabled:false,onUndo:()=>undone++,onDismiss:()=>dismissed++}))})
-  assert.match(text(tree.toJSON()),new RegExp(title));assert.match(text(tree.toJSON()),/Fixture shop/)
-  if(operation==='move')assert.match(text(tree.toJSON()),/ShoppingFood/)
-  if(operation==='split'){assert.match(text(tree.toJSON()),/By income/);assert.match(text(tree.toJSON()),/Your share\$8.00Partner’s share\$4.34/);assert.match(text(tree.toJSON()),/Repayments are unchanged/)}
-  if(operation!=='undo'){await click('Undo this change');assert.equal(undone,1)}else assert.ok(!button('Undo this change'))
-  await click('Dismiss transaction result');assert.equal(dismissed,1)
-  await run(()=>tree.unmount())
- }
- for(const editing of [false,true]){
-  const customRow={...row,split:editing?'custom':'',splitOptions:{...row.splitOptions,payerBasisPoints:editing?3333:5000,...(editing?{payerCents:411}:{})}}
-  await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing([customRow]));await expand();await click(editing?'Edit split':'Split')
-  const select=tree.root.findByType('form').findByType('select')
-  assert.ok(select.findAllByType('option').some(n=>n.props.value==='custom'))
-  if(!editing)await run(()=>select.props.onChange({target:{value:'custom'}}))
-  const slider=()=>tree.root.findAllByType('input').find(n=>n.props.type==='range')
-  assert.equal(slider().props.value,editing?411:617)
-  assert.equal(slider().props.step,'1')
+ await click('Refresh transactions');await respond(listing([row],{snapshotVersion:'one',nextOffset:40,total:2}));await click('Load more transactions');await respond(listing([{...row,id:'shifted'}],{snapshotVersion:'two'}));assert.match(text(tree.toJSON()),/Recorded activity changed/)
+ await click('Refresh transactions');await respond(listing());await click('Delete');await submit();await respond(review(body()));await click('Confirm delete');const deleted=body();await reject();await run(()=>tree.unmount());assert.ok(storage.size)
+ const posts=requests.filter(r=>r.options.body).length;await run(()=>{tree=Renderer.create(fixture(false))});assert.equal(requests.filter(r=>r.options.body).length,posts)
+ await click('Check saved status');assert.match(latest().url,new RegExp('/commands/'+deleted.requestId+'$'));await respond({state:'done',success:true});await respond(listing());assert.equal(storage.size,0);assert.equal(work.uncertain,false);await run(()=>tree.unmount())
+ for(const editing of[false,true]){
+  const customRow={...row,capabilities:{...row.capabilities,cancel_split:editing},split:editing?'custom':'',splitOptions:{...row.splitOptions,incomePayerCents:799,...(editing?{payerCents:411,payerBasisPoints:3333}:{})}}
+  await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing([customRow]));await click(editing?'Edit split':'Split')
+  assert.equal(input("Brian's share amount").props.value,editing?'4.11':'7.99')
+  assert.ok(tree.root.findAll(node=>node.type==='svg'&&node.props.className?.includes('lucide-chart-pie')).length)
+  if(editing)assert.equal(button('Review split').props.disabled,true,'An unchanged existing split cannot be saved again')
   const beforeInvalid=requests.length
-  for(const invalid of['','-1','12.35','1.001','1e2']){
-   await run(()=>tree.root.findByProps({'aria-label':"Brian's share amount"}).props.onChange({target:{value:invalid}}))
-   assert.equal(button('Review change').props.disabled,true)
-   await submit();assert.equal(requests.length,beforeInvalid,'Invalid dollar input cannot request a review')
-  }
-  await run(()=>slider().props.onChange({target:{value:'411'}}))
-  assert.equal(button('Review change').props.disabled,false,'The slider clears an invalid dollar draft')
-  assert.equal(tree.root.findByProps({'aria-label':"Brian's share amount"}).props.value,'4.11')
-  await run(()=>tree.root.findByProps({'aria-label':"Hannah's share amount"}).props.onChange({target:{value:'3.08'}}))
-  assert.equal(slider().props.value,926)
-  assert.equal(tree.root.findByProps({'aria-label':"Brian's share amount"}).props.value,'9.26')
-  assert.match(text(tree.toJSON()),/75.04%.*24.96%/)
-  const writes=requests.filter(r=>r.url==='/app/transactions').length
+  for(const value of['','-1','12.35','1.001','1e2']){await change("Brian's share amount",value);assert.equal(button('Review split').props.disabled,true);await submit();assert.equal(requests.length,beforeInvalid)}
+  await change("Hannah's share amount",'3.08');assert.equal(input("Brian's share amount").props.value,'9.26')
   await submit();assert.equal(body().method,'custom');assert.equal(body().payerShareCents,926)
-  const prepared=review(body(),customRow);prepared.review.share={method:'custom',payerCents:926,partnerCents:308,payerBasisPoints:7500,payerName:'Brian',partnerName:'Hannah'}
-  await respond(prepared)
-  assert.match(text(tree.toJSON()),/Brian\$9.2675.04%Hannah\$3.0824.96%/)
-  assert.match(text(tree.toJSON()),/No repayment will be marked received/)
-  await click('Back');assert.equal(slider().props.value,926,'Back keeps the exact custom draft')
-  await click('Cancel');assert.equal(requests.filter(r=>r.url==='/app/transactions').length,writes,'Custom preview/cancel never writes')
-  await expand();await click(editing?'Edit split':'Split');if(!editing)await run(()=>tree.root.findByType('form').findByType('select').props.onChange({target:{value:'custom'}}))
-  assert.equal(slider().props.value,editing?411:617,'Cancel/reopen restores the saved percentage')
-  if(editing){
-   await submit();const prepared=review(body(),customRow);prepared.review.share={method:'custom',payerCents:411,partnerCents:823,payerBasisPoints:3333,payerName:'Brian',partnerName:'Hannah'}
-   await respond(prepared);await click('Confirm split');const frozen=body();assert.equal(frozen.payerShareCents,411)
-   await reject();await click('Retry same confirmation');assert.deepEqual(body(),frozen,'Custom recovery retains the reviewed percentage and request ID')
-   await respond({state:'done',success:true,summary:{...summary,operation:'split',share:prepared.review.share}})
-   assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.31%Hannah\$8.2366.69%/)
-  }else await click('Cancel')
+  const checked=review(body(),customRow);checked.review.share={method:'custom',payerCents:926,partnerCents:308,payerName:'Brian',partnerName:'Hannah'};await respond(checked);assert.match(text(tree.toJSON()),/No repayment will be marked received/)
+  await click('Back');assert.equal(input("Brian's share amount").props.value,'9.26');await click('Split by income');assert.equal(input("Brian's share amount").props.value,'7.99');assert.equal(button('Split by income').props.disabled,true)
+  await cancel()
+  if(editing){await click('Edit split');await click('Remove split');await submit();assert.equal(body().operation,'cancel_split');await respond(review(body(),customRow));assert.match(text(tree.toJSON()),/Not split/);assert.match(text(tree.toJSON()),/No repayment will be marked received/);await cancel()}
   await run(()=>tree.unmount())
  }
- const customReceipt={...summary,operation:'split',share:{method:'custom',payerCents:411,partnerCents:823,payerBasisPoints:3333,payerName:'Brian',partnerName:'Hannah'}}
- await run(()=>{tree=Renderer.create(React.createElement(TransactionCompletion,{summary:customReceipt,canUndo:false,disabled:false,onUndo(){},onDismiss(){}}))})
- assert.match(text(tree.toJSON()),/Custom splitBrian\$4.1133.31%Hannah\$8.2366.69%/)
- assert.match(text(tree.toJSON()),/Repayments are unchanged/)
- await run(()=>tree.unmount())
- for(const {options} of requests){
-  assert.equal(options.referrerPolicy,'same-origin','Transactions must preserve its real Origin under the private page no-referrer policy, including reviews and saved-command retries')
-  assert.equal(options.mode,'same-origin')
-  assert.equal(options.credentials,'same-origin')
-  assert.equal(options.headers['X-BookieBot-App'],'1')
- }
- console.log('Transactions search/filter, stale responses, review/cancel, every action, Undo, private recovery and request identity passed')
-})().catch(e=>{console.error(e);process.exitCode=1})
+ await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing());await click('Update');await change('Amount','22.00');await submit();await respond(review(body()));await click('Confirm update');await respond({state:'done',success:true,summary});await reject()
+ assert.ok(button('Update').props.disabled,'Confirmed presentation identities remain inert after a failed refresh')
+ await click('Refresh transactions');await respond(listing());assert.equal(button('Update').props.disabled,false,'A successful fresh read restores authoritative actionable identities');await run(()=>tree.unmount())
+ for(const {options}of requests){assert.equal(options.referrerPolicy,'same-origin');assert.equal(options.mode,'same-origin');assert.equal(options.credentials,'same-origin');assert.equal(options.headers['X-BookieBot-App'],'1')}
+ console.log('Inline transaction review/cancel, combined Move, split cents/pie shortcut, explicit confirmation, immutable recovery, fresh reads, timed Undo handoff and search races passed')
+})().catch(error=>{console.error(error);process.exitCode=1})

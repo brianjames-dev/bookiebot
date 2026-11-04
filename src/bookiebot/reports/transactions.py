@@ -140,6 +140,16 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
         if "custom_payer_ratio" in action.metadata:
             numerator, denominator = json.loads(action.metadata["custom_payer_ratio"])
             split_options["payerBasisPoints"] = (2 * numerator * 10_000 + denominator) // (2 * denominator)
+    # Share notches use the writer's exact cents, never a rounded UI percentage.
+    # This is pure calculation from the existing row; it adds no sheet reads.
+    gross_cents = cents(values.get("amount", ""))
+    if gross_cents > 0:
+        from bookiebot.sheets.collaboration import split_amounts, normalize_split_method
+        split_options["incomePayerCents"] = round(split_amounts(gross_cents / 100, "income", owner)[0] * 100)
+        split_method = normalize_split_method(action.metadata.get("split_method", ""))
+        if split_method in {"income", "equal", "fronted"}:
+            split_options["payerCents"] = (cents(action.metadata["payer_share"]) if canonical and "payer_share" in action.metadata
+                                            else round(split_amounts(gross_cents / 100, split_method, owner)[0] * 100))
     return {"id": uid, "actionId": logged.id, "month": month, "version": version,
             "date": _date(values.get("date", "")), "title": description, "location": values.get("location", ""),
             "person": values.get("person") or action.metadata.get("person") or get_user_config(actor).name,
