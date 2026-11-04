@@ -49,9 +49,10 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
 ;(async()=>{
  await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0)
  await run(()=>tree.update(fixture(true)));await tick();await respond(listing())
- await click('Update');assert.equal(work.dirty,true);assert.equal(button('Review change').props.disabled,true,'Unchanged edits cannot request a review')
+ await change('Search transactions','cable');await tick();await respond(listing())
+ await click('Update');assert.equal(button('Clear search').props.disabled,true,'The search clear control cannot detach an active inline editor');assert.equal(work.dirty,true);assert.equal(button('Review change').props.disabled,true,'Unchanged edits cannot request a review')
  await change('Amount','15.99');assert.equal(requests.filter(r=>r.options.body).length,0)
- await submit();assert.equal(body().updates.amount,1599);await respond(review(body()));assert.ok(button('Confirm update'));await cancel();assert.equal(work.dirty,false)
+ await submit();assert.equal(body().updates.amount,1599);await respond(review(body()));assert.ok(button('Confirm update'));await cancel();assert.equal(work.dirty,false);await click('Clear search');await tick();await respond(listing())
  for(const [label,op]of[['Update','move'],['Delete','delete'],['Split','split']]){
   await click(label)
   if(op==='move'){await run(()=>tree.root.findByProps({'aria-label':'Update category'}).props.onChange({target:{value:'food'}}));await change('Amount','19.99')}
