@@ -109,7 +109,7 @@ canonical scheduled entries. Category and Scheduled share the secondary line.
 The row's 28px anchor is the landing position for its single persistent logo.
 Bars retain the existing exact-day inspection dialog.
 
-Merchant identity reuses approved service/provider aliases, then the 158 reviewed
+Merchant identity reuses approved service/provider aliases, then the 159 reviewed
 merchant marks. Matching uses explicit normalized names and optional trailing
 store/location numbers. Normalize Unicode, case, punctuation and spacing; no
 fuzzy, substring or typo matching is used. Locations take precedence, with item
@@ -118,7 +118,12 @@ explicit alias for Starbucks; `Starbucks Coffee Company store #123` also matches
 An unrelated shop selling a Starbucks product cannot borrow its logo. Amazon and
 Amazon Prime stay distinct. The latest eleven reviewed circle refinements are
 published with their exact candidate hashes, including full-bleed Whole Foods
-and the smile-only Amazon. Runtime images are local content-addressed assets;
+and the smile-only Amazon. The approved gas pass replaces BP, Chevron, Circle K,
+Sheetz and Sam's Club with their exact reviewed circles and adds Valero. Valero,
+Valero gas, Valero fuel and Valero gas station match explicitly, including the
+existing store-number suffix rule; unrelated merchants keep their fallback.
+All six use zero inset and retain source, framing, approval and previous artwork
+in `docs/logo-review/batches/2026-11-03-gas-refinement`. Runtime images are local content-addressed assets;
 Calendar artwork/catalogs/import workflows are unchanged. No recategorization,
 sheet/bank writes, remote requests or extra settings are introduced.
 

@@ -21,6 +21,13 @@ for(const location of ['Starbucks Coffee Company','  STARBUCKS Coffee Company  '
 }
 assert.equal(transactionMerchant(input({location:'Unknown cafe',item:'Starbucks Coffee Company'})),null)
 assert.equal(transactionMerchant(input({location:'Starbucks Coffee Company gift card reseller'})),null)
+for(const location of ['Valero','VALERO GAS','Valero fuel','Valero gas station store #123']){
+ const merchant=transactionMerchant(input({category:'Gas',location,item:'Gas'}))
+ assert.equal(merchant?.id,'valero',location)
+ assert.equal(merchant.inset,0)
+}
+assert.equal(transactionMerchant(input({location:'Valero gift card reseller'})),null)
+assert.equal(transactionMerchant(input({location:'Unknown station',item:'Valero',category:'Gas'})),null)
 assert.equal(transactionMerchant(input({item:'Amazon'})).id,'amazon')
 assert.equal(transactionMerchant(input({item:'Amazon Prime'})).id,'amazon-prime')
 assert.equal(transactionMerchant(input({item:'Water'}),{water:'santa-rosa-water'}).id,'santa-rosa-water')
@@ -51,4 +58,4 @@ assert.equal(renderer.root.findAllByType('img').length,1)
 act(()=>renderer.update(React.createElement(TransactionIcon,{entry:input({item:'Unknown',category:'Income'})})))
 assert.equal(slot().props['data-merchant'],'fallback');assert.equal(renderer.root.findAllByType('img').length,0)
 act(()=>renderer.unmount())
-console.log('158 merchant names/store aliases, category families, exact matching, descriptions and reused logo states passed')
+console.log('159 merchant names/store aliases, category families, exact matching, descriptions and reused logo states passed')

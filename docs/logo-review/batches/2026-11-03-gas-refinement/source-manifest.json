@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "key": "merchant:bp",
+      "url": "https://images.seeklogo.com/logo-png/47/2/british-petroleum-logo-png_seeklogo-471800.png",
+      "resolvedUrl": "https://images.seeklogo.com/logo-png/47/2/british-petroleum-logo-png_seeklogo-471800.png",
+      "source": "sources/merchant-bp.png",
+      "sha256": "a2bff7cd966ac7f9be152995f622dba58867500393152afcdf6c5e1418f3a28b",
+      "size": [
+        320,
+        320
+      ],
+      "format": "PNG"
+    },
+    {
+      "key": "merchant:chevron",
+      "url": "https://1000logos.net/wp-content/uploads/2017/12/Chevron-Logo.png",
+      "resolvedUrl": "https://1000logos.net/wp-content/uploads/2017/12/Chevron-Logo.png",
+      "source": "sources/merchant-chevron.png",
+      "sha256": "ba9c44f6aff2529254248c69afcb1b6255c74018546637108a453c2f38f433c7",
+      "size": [
+        1920,
+        1080
+      ],
+      "format": "PNG"
+    },
+    {
+      "key": "merchant:circle-k",
+      "url": "https://logos-world.net/wp-content/uploads/2022/04/Circle-K-Symbol.png",
+      "resolvedUrl": "https://logos-world.net/wp-content/uploads/2022/04/Circle-K-Symbol.png",
+      "source": "sources/merchant-circle-k.png",
+      "sha256": "e04884df456d730db5d4689cb01fcb83061a369264056d76f5981e24fce6647c",
+      "size": [
+        3840,
+        2160
+      ],
+      "format": "PNG"
+    },
+    {
+      "key": "merchant:sheetz",
+      "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Sheetz_logo.svg/3840px-Sheetz_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+      "resolvedUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Sheetz_logo.svg/3840px-Sheetz_logo.svg.png?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=thumbnail",
+      "source": "sources/merchant-sheetz.png",
+      "sha256": "965b3bdfee84f274f240c518afb268784db576247cff033a47e54950e4947342",
+      "size": [
+        3840,
+        989
+      ],
+      "format": "PNG"
+    },
+    {
+      "key": "merchant:sam-s-club",
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Sams_Club.svg",
+      "resolvedUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Sams_Club.svg",
+      "source": "sources/merchant-sam-s-club.svg",
+      "sha256": "6818e534109d71e65cb511097fa655f45f7e0bccb4d05f61a63bec450f7e7352",
+      "size": [
+        111.45,
+        111.4525
+      ],
+      "format": "SVG",
+      "suppliedReference": {
+        "url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTFm3Ii8ZUhCUWBnEmcJZnJbXxqEctKc9PXucc9qqfsxjuhcKtX7_pY335S&s=10",
+        "source": "sources/merchant-sam-s-club.jpg",
+        "sha256": "3b5e333ee85ea29a51604135867f77a91b43e1579be50a75f1b4713407db4920",
+        "size": [
+          400,
+          400
+        ],
+        "format": "JPEG"
+      },
+      "originalVector": "sources/merchant-sam-s-club-original.svg",
+      "originalVectorSha256": "b60ab55ac76b2256cb8d016122b5694bd242461e9ecb15c2dcd635bcd3231427",
+      "license": "PD-textlogo; trademark retained",
+      "licenseUrl": "https://commons.wikimedia.org/wiki/File:Sams_Club.svg",
+      "preparation": "Removed non-rendered editor metadata; preserved original paths/colors; added intrinsic viewBox"
+    },
+    {
+      "key": "merchant:valero",
+      "url": "https://brandlogos.net/wp-content/uploads/2012/11/valero-logo-vector.png",
+      "source": "sources/merchant-valero.png",
+      "sha256": "345945c7bf9da99f8233035c7ed3749c391d18b7c819ef452ba2320371d40f50",
+      "size": [
+        400,
+        400
+      ],
+      "format": "PNG"
+    }
+  ]
+}

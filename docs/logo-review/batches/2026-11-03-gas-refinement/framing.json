@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "size": 256,
+  "items": [
+    {
+      "key": "merchant:bp",
+      "background": "#ffffff",
+      "fill": 0.94,
+      "fit": "radial"
+    },
+    {
+      "key": "merchant:chevron",
+      "background": "#ffffff",
+      "fill": 0.96,
+      "fit": "radial"
+    },
+    {
+      "key": "merchant:circle-k",
+      "background": "#ffffff",
+      "fill": 1.01,
+      "fit": "short-side"
+    },
+    {
+      "key": "merchant:sheetz",
+      "background": "#ffffff",
+      "fill": 0.96,
+      "fit": "radial"
+    },
+    {
+      "key": "merchant:sam-s-club",
+      "background": "#004b8d",
+      "fill": 0.96,
+      "fit": "long-side",
+      "crop": [
+        0,
+        0,
+        111.45,
+        111.4525
+      ]
+    },
+    {
+      "key": "merchant:valero",
+      "background": "#ffffff",
+      "fill": 0.94,
+      "fit": "radial"
+    }
+  ]
+}

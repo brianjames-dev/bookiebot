@@ -542,9 +542,9 @@
     "aliases": [
       "Chevron"
     ],
-    "asset": "company-logo-merchant-chevron-9493eafb2e48bf90.svg",
+    "asset": "company-logo-merchant-chevron-aa6c37eeb3765599.png",
     "background": "#ffffff",
-    "inset": 7
+    "inset": 0
   },
   {
     "id": "home-depot",
@@ -856,9 +856,9 @@
       "Sams Club gas",
       "Sam’s Club fuel"
     ],
-    "asset": "company-logo-merchant-sam-s-club-c6b487847135e78f.svg",
-    "background": "#ffffff",
-    "inset": 4
+    "asset": "company-logo-merchant-sam-s-club-f127c1365cd136a9.png",
+    "background": "#004b8d",
+    "inset": 0
   },
   {
     "id": "bj-s-wholesale",
@@ -1040,9 +1040,9 @@
       "Circle K",
       "CircleK"
     ],
-    "asset": "company-logo-merchant-circle-k-1e61fb816fae4afc.svg",
+    "asset": "company-logo-merchant-circle-k-e5aa2d50538310be.png",
     "background": "#ffffff",
-    "inset": 4
+    "inset": 0
   },
   {
     "id": "sheetz",
@@ -1050,9 +1050,9 @@
     "aliases": [
       "Sheetz"
     ],
-    "asset": "company-logo-merchant-sheetz-774e74d49b65e776.svg",
+    "asset": "company-logo-merchant-sheetz-7515b42c5eda43af.png",
     "background": "#ffffff",
-    "inset": 4
+    "inset": 0
   },
   {
     "id": "speedway",
@@ -1638,9 +1638,9 @@
       "British Petroleum",
       "BP gas"
     ],
-    "asset": "company-logo-merchant-bp-9dad127421af0a14.svg",
+    "asset": "company-logo-merchant-bp-8a338f5c78179ecd.png",
     "background": "#ffffff",
-    "inset": 4
+    "inset": 0
   },
   {
     "id": "wawa",
@@ -1716,5 +1716,18 @@
     "asset": "company-logo-merchant-kroger-2204dd1bb885a8af.svg",
     "background": "#ffffff",
     "inset": 3
+  },
+  {
+    "id": "valero",
+    "name": "Valero",
+    "aliases": [
+      "Valero",
+      "Valero gas",
+      "Valero fuel",
+      "Valero gas station"
+    ],
+    "asset": "company-logo-merchant-valero-57190617f3f23016.png",
+    "background": "#ffffff",
+    "inset": 0
   }
 ]
