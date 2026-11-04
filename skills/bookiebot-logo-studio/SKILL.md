@@ -33,6 +33,8 @@ Use the visualize skill to show the generated fragment inline. Its embedded loss
 
 Flags default to `ready=false`. The gallery collects notes, an optional HTTPS reference URL and readiness. Its Send action submits concrete feedback JSON in a follow-up message. Widget state is a convenience only; never claim it is durable intake or rely on it reaching the model. Replacement files must be attached in chat; the gallery does not upload them.
 
+Keep native textarea focus, selection, undo and multiline entry intact during autosave. Ignore the current gallery's echoed saves, preserve raw new-merchant text separately from the trimmed submission list, and verify typing against host state echoes when changing the gallery.
+
 ## Intake before refinement
 
 Save the exact submitted `bookiebot-logo-feedback` object as `feedback.json`, then import:
