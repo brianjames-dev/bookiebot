@@ -54,8 +54,9 @@ function validate(scene) {
   }
 }
 let count=0
-for(const [width,height] of [[288,350],[358,374],[388,396],[700,400]]) {
-  const rows=input(raw,width),before=JSON.stringify(rows),scene=refineContourScene(prepareContourScene(rows,width,height));validate(scene);count++;console.log('geometry',width,height)
+for(const [width,height] of [[288,350],[320,385.5],[358,374],[388,396],[700,400]]) {
+  const rows=input(raw,width),before=JSON.stringify(rows),prepared=prepareContourScene(rows,width,height),scene=refineContourScene(prepared);validate(scene);count++;console.log('geometry',width,height)
+  if(width===320)assert.ok(scene.radius>=prepared.radius*.75,'Shorter stems must not replace a readable valid ring with a dramatically smaller one')
   assert.equal(JSON.stringify(rows),before,'Layout must not mutate financial inputs')
   if(scene.assignment)assert.ok(scene.assignment.after<=scene.assignment.before,'Optional seed swaps improve the cheap placement estimate')
 }
@@ -143,12 +144,45 @@ const investingRows=[...projectedRows.filter(row=>row[0]!=='left'),['espp','Spac
 const investingPrepared=prepareContourScene(input(investingRows,390),390,354.1),investingBefore=JSON.stringify(investingPrepared)
 const investingStarted=performance.now(),investingLayout=refineContourScene(investingPrepared)
 validate(investingLayout)
+// A complete, fast layout can still be unreadable. The former one-layer
+// perimeter plan wound several stems around the ring to far-away cards.
+function readableCompactStems(scene) {
+  const probe=createContourPathProbe();let total=0
+  for(const route of scene.curvedRoutes) {
+    probe.setAttribute('d',route.d)
+    const length=probe.getTotalLength(),first=probe.getPointAtLength(0),last=probe.getPointAtLength(length)
+    assert.ok(Number.isFinite(length)&&length>=18,'Optimized stems remain finite and visibly long enough')
+    assert.ok(length<150,`Cards use nearby free space rather than distant perimeter slots (${route.id}: ${Math.round(length)}px)`)
+    assert.ok(length-Math.hypot(last.x-first.x,last.y-first.y)<18,'A short connection must not wrap around the ring')
+    let travel=0,prior=first
+    for(let at=.65;at<=length;at+=.65) {
+      const p=probe.getPointAtLength(at),x=prior.x-scene.cx,y=prior.y-scene.cy,u=p.x-scene.cx,v=p.y-scene.cy
+      travel+=Math.abs(Math.atan2(x*v-y*u,x*u+y*v));prior=p
+    }
+    assert.ok(travel<1.5,'Stems cannot swirl through distant quadrants')
+    total+=length
+  }
+  assert.ok(total<950,'Optimize the complete layout as well as the longest individual stem')
+}
+readableCompactStems(investingLayout)
 assert.ok(performance.now()-investingStarted<1500,'Projected ESPP must not turn a dense first reveal into an incomplete or multi-second search')
 assert.equal(JSON.stringify(investingPrepared),investingBefore,'The ordered fallback does not mutate the prepared input')
 for(const item of investingLayout.items)for(const key of ['amount','amountLabel','start','end','mid'])assert.equal(item[key],investingPrepared.items.find(i=>i.id===item.id)[key],'The ordered fallback preserves exact financial inputs and slice angles')
 const renamedInvesting=structuredClone(investingPrepared)
 renamedInvesting.items.forEach((item,index)=>{item.id=`renamed-${index}`})
-validate(refineContourScene(renamedInvesting))
+const renamedLayout=refineContourScene(renamedInvesting)
+validate(renamedLayout);readableCompactStems(renamedLayout)
+
+// A dispersed allocation can produce a complete raster plan with one large
+// detour. Compare its compact alternative, rather than reserving DP only for
+// outright routing failures. Synthetic weights sum to a round 10,000.
+const dispersedRows=[['rent','Rent',2777],['bills_utilities','Bills & Utilities',242],['static_bills_subscriptions_needs','Subscriptions (Needs)',391],['need_expenses','Need transactions',772],['grocery','Groceries',509],['gas','Gas',388],['food','Eating out',1017],['shopping','Shopping',918],['subscriptions_wants','Subscriptions (Wants)',45],['savings','Saved',2000],['left','Income left',941]]
+const dispersedWidths=[95,79,84,79,79,79,86,79,73,86,79]
+const dispersedStarted=performance.now(),dispersed=refineContourScene(prepareContourScene(input(dispersedRows,390).map((row,index)=>({...row,width:dispersedWidths[index]})),390,354.1))
+validate(dispersed);readableCompactStems(dispersed)
+const dispersedElapsed=performance.now()-dispersedStarted
+assert.ok(dispersedElapsed<1500,`Comparing quality must not restore the multi-second search (${Math.round(dispersedElapsed)}ms)`)
+console.log('Cold dispersed allocation resolves in',Math.round(dispersedElapsed),'ms')
 
 // Reusing identical route endpoints is only safe when the card obstacles also
 // match. A wider neighboring label can block a previously clear connection.
