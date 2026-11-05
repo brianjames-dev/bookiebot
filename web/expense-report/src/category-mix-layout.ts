@@ -1,7 +1,7 @@
 // Geometry for the approved Refined flow. Runs in a dedicated, cancellable
 // worker; this module has no page, network, storage, or financial side effects.
 import { createContourPathProbe, roundedContourRoute as roundedRoute } from "./category-mix-path";
-import { placePerimeterContour } from "./category-mix-fallback";
+import { placeCompactContour } from "./category-mix-fallback";
 export type Point = [
     number,
     number
@@ -733,24 +733,27 @@ export function prepareContourScene(data: ContourInput[], width: number, height:
     }
     return { style, width, height, radius, inner: Math.max(8, radius - style.thickness), cx, cy, items, routes: null };
 }
-// Search actual free space, independent of the seed's top/bottom banks. Grid
-// candidates are ranked cheaply, then accepted only against complete routes.
-// An attachment may slide within its slice; its financial angles never move.
-function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourScene {
-    const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
-    const shortPenalty = (length: number) => Math.max(0, 24 - length) * 1.5 + Math.max(0, 18 - length) ** 2 * 4;
-    function cost(routes: ContourRoute[]) {
-        let total = 0, worst = 0;
+function shortStemPenalty(length: number): number {
+    return Math.max(0, 24 - length) * 1.5 + Math.max(0, 18 - length) ** 2 * 4;
+}
+// Score drawn curves consistently for local moves and complete-plan choices.
+function stemCost(routes: ContourRoute[]) {
+        let total = 0, worst = 0, longest = 0;
         const details = new Map<string, number>();
         for (const route of routes) {
             probe.setAttribute('d', route.d!);
             const length = probe.getTotalLength(), a = route.points[0], b = route.points[route.points.length - 1];
             const excess = Math.max(0, length - Math.hypot(b[0] - a[0], b[1] - a[1]));
-            const value = length + excess * 2 + shortPenalty(length);
-            details.set(route.id, value); total += value; worst = Math.max(worst, excess);
+            const value = length + excess * 2 + shortStemPenalty(length);
+            details.set(route.id, value); total += value; worst = Math.max(worst, excess); longest = Math.max(longest, length);
         }
-        return {total: total + worst, details};
-    }
+        return {total: total + worst, details, worst, longest};
+}
+// Search actual free space, independent of the seed's top/bottom banks. Grid
+// candidates are ranked cheaply, then accepted only against complete routes.
+// An attachment may slide within its slice; its financial angles never move.
+function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourScene {
+    const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
     function anchor(item: ContourItem, x: number, y: number) {
         // Keep thin adjacent slices centered; pulling each attachment toward
         // its nearest edge can collapse the separation between their stems.
@@ -770,7 +773,7 @@ function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourSc
         const angle = angleOverride ?? anchor(item, x, y), start = point(scene, scene.radius + 1.2, angle);
         const end: Point = [clamp(start[0], x, x + item.width), clamp(start[1], top, bottom)];
         const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
-        let score = length + shortPenalty(length);
+        let score = length + shortStemPenalty(length);
         // Obstacle penalties only increase this lower bound. Skip expensive
         // sampling when even a completely clear stem cannot improve the plan.
         if (score >= ceiling) return null;
@@ -810,7 +813,7 @@ function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourSc
         }
         return scene;
     }
-    let actual = cost(scene.curvedRoutes!), trials = 0, moves = 0;
+    let actual = stemCost(scene.curvedRoutes!), trials = 0, moves = 0;
     const before = actual.total;
     for (let pass = 0; pass < 6 && trials < 24; pass++) {
         const proposals: NonNullable<ReturnType<typeof candidate>>[] = [];
@@ -848,7 +851,7 @@ function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourSc
             });
             const routes = clear ? routeStems(scene, true, fixed) : null, curves = routes ? curveStems({...scene, routes}, true) : null;
             if (curves && curves.every(route => route.smoothing !== 'unresolved')) {
-                const next = cost(curves);
+                const next = stemCost(curves);
                 probe.setAttribute('d', curves.find(route => route.id === item.id)!.d!);
                 if (probe.getTotalLength() >= 18 && next.total < actual.total - 3) {
                     scene.routes = routes; scene.curvedRoutes = curves; actual = next; improved = true; moves++; break;
@@ -863,7 +866,26 @@ function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourSc
 }
 
 export function refineContourScene(prepared: ContourScene): ContourScene {
-    let last = structuredClone(prepared), fallbackTried = false;
+    let last = structuredClone(prepared), compact: ContourScene | null | undefined;
+    const compactPlan = () => {
+        if (compact === undefined) {
+            const candidate = placeCompactContour(prepared);
+            compact = candidate ? optimizeFreePlacement(candidate) : null;
+        }
+        return compact;
+    };
+    const finish = (scene: ContourScene) => {
+        const refined = optimizeFreePlacement(scene), quality = stemCost(refined.curvedRoutes!);
+        if (quality.worst <= 32 && quality.longest <= 140) return refined;
+        // A feasible grid plan can still contain a distant card or a detour.
+        // Compare one memoized alternative; never restart exhaustive routing.
+        const alternative = compactPlan();
+        // Shorter stems are not an improvement if they squeeze the settled
+        // ring dramatically. Keep a readable existing composition in that case.
+        if (!alternative || alternative.radius < refined.radius * .75) return refined;
+        const score = (scene: ContourScene, value: ReturnType<typeof stemCost>) => value.total + value.worst * 3 + Math.max(0, value.longest - 120) ** 2 * .04 + Math.max(0, prepared.radius - scene.radius) * 6;
+        return score(alternative, stemCost(alternative.curvedRoutes!)) < score(refined, quality) - 3 ? alternative : refined;
+    };
     const roots = prepared.items.map(item => point(prepared, prepared.radius + 1.2, item.mid));
     // Below the two-pixel planning grid, independent roots can alias into one
     // corridor. Try the ordered continuous fallback before repeated grid work.
@@ -878,17 +900,16 @@ export function refineContourScene(prepared: ContourScene): ContourScene {
             scene.routes = routeStems(scene, dense);
             if (scene.routes) {
                 scene.curvedRoutes = curveStems(scene, dense);
-                if (scene.curvedRoutes.every(route => route.smoothing !== 'unresolved')) return optimizeFreePlacement(scene);
+                if (scene.curvedRoutes.every(route => route.smoothing !== 'unresolved')) return finish(scene);
             }
         }
         if (crowded && extra === 0 && strength === 1 && !neighbors) {
-            fallbackTried = true;
-            const fallback = placePerimeterContour(prepared);
+            const fallback = compactPlan();
             if (fallback) return fallback;
         }
         last = scene;
     }
-    return fallbackTried ? last : placePerimeterContour(prepared) ?? last;
+    return compactPlan() ?? last;
 }
 
 function point(scene: ContourScene, radius: number, angle: number): Point { return [scene.cx + radius * Math.sin(angle), scene.cy - radius * Math.cos(angle)]; }

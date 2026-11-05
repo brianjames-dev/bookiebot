@@ -51,20 +51,31 @@ function expectedCount(view,filter) {
 const assets=path.join(root,'src/bookiebot/reports/assets'),css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8')
 const csp=fs.readFileSync(path.join(root,'src/bookiebot/reports/phone_app.py'),'utf8').match(/"Content-Security-Policy": "([^"]+)"/)[1]
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script type="module" src="/app/assets/expense-report-app.js"></script></body></html>`
-async function checkGeometry(category,expected,checkPlacement=false,breakdown=[]) {
+async function checkGeometry(category,expected,checkPlacement=false,breakdown=[],checkQuality=false) {
   const state=await category.evaluate(el=>{
     const svg=el.querySelector('.bb-contour-callouts'),labels=[...svg.querySelectorAll('.bb-contour-label')],paths=[...svg.querySelectorAll('.bb-contour-stem')]
     const boxes=labels.map(label=>({id:label.dataset.category,box:label.querySelector('rect').getBBox()})),samples=[],cells=new Map()
+    const host=el.querySelector('.bb-category-pie-host').getBoundingClientRect(),center=el.querySelector('.bb-category-pie-center').getBoundingClientRect()
+    const origin={x:host.width/2,y:center.y+center.height/2-host.y}
+    const quality={longestStem:0,totalLength:0,maximumDetour:0,maximumAngularTravel:0}
     let intrusion=false,minSeparation=Infinity,overlap=false
     for(let i=0;i<boxes.length;i++)for(const {box:b} of boxes.slice(i+1)){const a=boxes[i].box;if(a.x<b.x+b.width+5&&a.x+a.width>b.x-5&&a.y<b.y+b.height+5&&a.y+a.height>b.y-5)overlap=true}
-    for(const path of paths)for(let at=0;at<path.getTotalLength();at+=.65){
+    for(const path of paths){
+      const length=path.getTotalLength(),first=path.getPointAtLength(0),last=path.getPointAtLength(length)
+      quality.longestStem=Math.max(quality.longestStem,length);quality.totalLength+=length
+      quality.maximumDetour=Math.max(quality.maximumDetour,length-Math.hypot(last.x-first.x,last.y-first.y))
+      let prior=first,travel=0
+      for(let at=0;at<length;at+=.65){
       const p=path.getPointAtLength(at),id=path.dataset.category;samples.push({id,x:p.x,y:p.y})
+      const x=prior.x-origin.x,y=prior.y-origin.y,u=p.x-origin.x,v=p.y-origin.y
+      travel+=Math.abs(Math.atan2(x*v-y*u,x*u+y*v));prior=p
       for(const box of boxes){if(box.id===id)continue;const b=box.box,r=Math.min(18,b.height/2),qx=Math.abs(p.x-b.x-b.width/2)-b.width/2+r,qy=Math.abs(p.y-b.y-b.height/2)-b.height/2+r;if(Math.hypot(Math.max(qx,0),Math.max(qy,0))+Math.min(Math.max(qx,qy),0)-r<.8)intrusion=true}
+      }
+      quality.maximumAngularTravel=Math.max(quality.maximumAngularTravel,travel)
     }
     for(const p of samples){const x=Math.floor(p.x/4),y=Math.floor(p.y/4);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(const q of cells.get(`${x+dx},${y+dy}`)||[])if(q.id!==p.id)minSeparation=Math.min(minSeparation,Math.hypot(q.x-p.x,q.y-p.y));const key=`${x},${y}`;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(p)}
-    const host=el.querySelector('.bb-category-pie-host').getBoundingClientRect()
-    const left=boxes.find(b=>b.id==='left'),leftPath=paths.find(p=>p.dataset.category==='left'),center=el.querySelector('.bb-category-pie-center').getBoundingClientRect()
-    return {labels:labels.length,paths:paths.length,amounts:Object.fromEntries(labels.map(n=>[n.dataset.category,n.querySelector('.bb-contour-amount tspan').textContent])),visible:labels.every(n=>+getComputedStyle(n).opacity>.99),parentOpacity:getComputedStyle(svg).opacity,overlap,intrusion,minSeparation,fits:boxes.every(({box:b})=>b.x>=0&&b.y>=0&&b.x+b.width<=host.width+.1&&b.y+b.height<=host.height+.1),left:left?{x:left.box.x+left.box.width/2,y:left.box.y+left.box.height/2,length:leftPath.getTotalLength()}:null,foodLength:paths.find(p=>p.dataset.category==='food')?.getTotalLength(),center:{x:host.width/2,y:center.y+center.height/2-host.y}}
+    const left=boxes.find(b=>b.id==='left'),leftPath=paths.find(p=>p.dataset.category==='left')
+    return {quality,labels:labels.length,paths:paths.length,amounts:Object.fromEntries(labels.map(n=>[n.dataset.category,n.querySelector('.bb-contour-amount tspan').textContent])),visible:labels.every(n=>+getComputedStyle(n).opacity>.99),parentOpacity:getComputedStyle(svg).opacity,overlap,intrusion,minSeparation,fits:boxes.every(({box:b})=>b.x>=0&&b.y>=0&&b.x+b.width<=host.width+.1&&b.y+b.height<=host.height+.1),left:left?{x:left.box.x+left.box.width/2,y:left.box.y+left.box.height/2,length:leftPath.getTotalLength()}:null,foodLength:paths.find(p=>p.dataset.category==='food')?.getTotalLength(),center:origin}
   })
   assert.equal(state.labels,expected,JSON.stringify(state));assert.equal(state.paths,expected,JSON.stringify(state))
   assert.equal(state.visible,true,JSON.stringify(state));assert.equal(state.fits,true,JSON.stringify(state))
@@ -74,6 +85,11 @@ async function checkGeometry(category,expected,checkPlacement=false,breakdown=[]
   const dollars=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0})
   for(const item of breakdown)if(Object.hasOwn(state.amounts,item.key))assert.equal(state.amounts[item.key],dollars.format(item.amount),'Rendered category amounts retain the source totals')
   if(checkPlacement){assert.ok(state.left.x<state.center.x&&state.left.y<state.center.y,'The broad left slice can use the upper-left free space');assert.ok(state.left.length>=18&&state.left.length<65,'Income left uses a visible short stem instead of a long detour');assert.ok(state.foodLength<55,'Readability scoring must not replace a short clear stem with a distant card')}
+  if(checkQuality){
+    assert.ok(state.quality.longestStem<190,'Cards must stay near their slices: '+JSON.stringify(state.quality))
+    assert.ok(state.quality.maximumDetour<35&&state.quality.maximumAngularTravel<2,'Rendered paths must not wind around distant quadrants: '+JSON.stringify(state.quality))
+    console.log('Projected All quality',report.monthLabel,JSON.stringify(state.quality))
+  }
 }
 ;(async()=>{
   let count=0
@@ -115,7 +131,7 @@ async function checkGeometry(category,expected,checkPlacement=false,breakdown=[]
           const wait=await page.evaluate(()=>window.__categoryReadyAt-window.__categoryActionAt);readiness.push(wait)
           assert.ok(wait<(engine===chromium&&slowdown>1?3000:1500),`First reveal/mode/filter handoff must be timely (${mode}/${filter}: ${wait}ms)`)
           await page.waitForTimeout(dark?30:750)
-          await checkGeometry(category,expectedCount(report.modeViews[mode.toLowerCase()],filter),!externalFixture&&index===1&&filter==='all',report.modeViews[mode.toLowerCase()].breakdown)
+          await checkGeometry(category,expectedCount(report.modeViews[mode.toLowerCase()],filter),!externalFixture&&index===1&&filter==='all',report.modeViews[mode.toLowerCase()].breakdown,index===1&&filter==='all')
           count++
           if(filter==='all'){
             await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}))

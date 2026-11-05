@@ -92,7 +92,7 @@ async function checkCascade(category,reduced,fresh=true){
     if(!reduced){
      await page.waitForTimeout(100)
      const during=(await category.locator('.recharts-pie').boundingBox()).width
-     assert.ok(during<large.ring&&during>150,'The ring visibly interpolates its radius instead of snapping')
+     assert.ok(during<large.ring&&during>150,JSON.stringify({message:'The ring visibly interpolates its radius instead of snapping',during,large,width,dark}))
      await category.getByRole('button',{name:'Hide category callouts',exact:true}).click({force:true})
      await page.waitForTimeout(80)
      await category.getByRole('button',{name:'Show category callouts',exact:true}).click({force:true})
