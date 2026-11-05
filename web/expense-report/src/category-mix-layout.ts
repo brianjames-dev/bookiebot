@@ -30,6 +30,7 @@ export type ContourItem = ContourInput & {
     start: number;
     end: number;
     mid: number;
+    anchorAngle?: number;
     lineHeight: number;
     valueSize: number;
     padding: number;
@@ -90,6 +91,7 @@ export type ContourScene = {
     routes: ContourRoute[] | null;
     curvedRoutes?: ContourRoute[];
     placementStrength?: number;
+    placement?: {before: number; after: number; moves: number; trials: number};
     assignment?: {
         before: number;
         after: number;
@@ -130,18 +132,18 @@ function roundedRoute(points: Point[], bend: number | number[] = 2.2): string { 
 } return path + 'L' + points[points.length - 1].join(','); }
 function segmentDistance(x: number, y: number, a: Point, b: Point): number { const dx = b[0] - a[0], dy = b[1] - a[1], length = dx * dx + dy * dy, t = length ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / length)) : 0; return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy); }
 function roundedBoxDistance(x: number, y: number, b: Box): number { const r = b.r || 0, qx = Math.abs(x - b.x - b.w / 2) - b.w / 2 + r, qy = Math.abs(y - b.y - b.h / 2) - b.h / 2 + r; return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; }
-function routeStems(scene: ContourScene): ContourRoute[] | null {
-    const cacheKey = JSON.stringify([scene.width, scene.height, scene.radius, scene.cy, scene.style.calloutRadius, scene.items.map(item => [item.id, item.x, item.y, item.width, item.height, item.mid])]);
+function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = []): ContourRoute[] | null {
+    const cacheKey = JSON.stringify([dense, fixed.map(route => [route.id, route.d]), scene.width, scene.height, scene.radius, scene.cy, scene.style.calloutRadius, scene.items.map(item => [item.id, item.x, item.y, item.width, item.height, item.bank, item.anchorAngle ?? item.mid])]);
     if (stemRouteCache.has(cacheKey))
         return stemRouteCache.get(cacheKey)!;
-    const padding = 3, circlePadding = 2.8, reserveGap = 2.7, portReach = 3.6;
+    const padding = 3, circlePadding = 2.8, reserveGap = dense ? 1 : 2.7, portReach = 3.6;
     const step = 2, columns = Math.floor(scene.width / step), rows = Math.floor(scene.height / step), size = columns * rows, base = new Uint8Array(size), sourceGuard = new Uint16Array(size), sources = new Map<string, {
         bit: number;
         anchor: Point;
         outside: Point;
     }>(), rectangles = scene.items.map(item => ({ id: item.id, x: item.x, y: item.y - item.height / 2, w: item.width, h: item.height, r: Math.min(scene.style.calloutRadius, item.width / 2, item.height / 2) }));
     const position = (id: number): Point => [(id % columns + .5) * step, (Math.floor(id / columns) + .5) * step], indexAt = (x: number, y: number) => Math.max(0, Math.min(rows - 1, Math.floor(y / step))) * columns + Math.max(0, Math.min(columns - 1, Math.floor(x / step)));
-    scene.items.forEach((item, index) => sources.set(item.id, { bit: 1 << index, anchor: point(scene, scene.radius + 1.2, item.mid), outside: point(scene, scene.radius + 4.4, item.mid) }));
+    scene.items.forEach((item, index) => sources.set(item.id, { bit: 1 << index, anchor: point(scene, scene.radius + 1.2, item.anchorAngle ?? item.mid), outside: point(scene, scene.radius + 4.4, item.anchorAngle ?? item.mid) }));
     const destinations = scene.items.flatMap(item => targetsFor(item).map(port => ({ ...port, bit: sources.get(item.id)!.bit })));
     // Rasterize only each obstacle's own bounds. Scanning every label and
     // every port at every chart pixel made the draft's optimizer expensive.
@@ -155,8 +157,11 @@ function routeStems(scene: ContourScene): ContourRoute[] | null {
     }
     for(const box of rectangles)visitBounds(box.x-padding,box.y-padding,box.x+box.w+padding,box.y+box.h+padding,(id,x,y)=>{if(roundedBoxDistance(x,y,box)<padding)base[id]=1})
     function guard(a:Point,b:Point,r:number,bit:number){visitBounds(Math.min(a[0],b[0])-r,Math.min(a[1],b[1])-r,Math.max(a[0],b[0])+r,Math.max(a[1],b[1])+r,(id,x,y)=>{if(segmentDistance(x,y,a,b)<r)sourceGuard[id]|=bit})}
-    for(const source of sources.values())guard(source.anchor,source.outside,3.5,source.bit)
-    for(const target of destinations)guard(target.end,target.outside,1.8,target.bit!)
+    for(const source of sources.values())guard(source.anchor,source.outside,dense ? 1 : 3.5,source.bit)
+    // Unused candidate ports are not obstacles. Reserve actual routes below;
+    // guarding every possible port can seal the only corridor to another card.
+    if(!dense)for(const target of destinations)guard(target.end,target.outside,1.8,target.bit!)
+    if([...sources.values()].some(source => sourceGuard[indexAt(...source.outside)] & ~source.bit)) return null;
     function ports(item: ContourItem, sidePorts: boolean): Port[] {
         const box = rectangles.find(box => box.id === item.id)!, source = sources.get(item.id)!.anchor, top = item.bank === 'top', candidates: Port[] = [];
         function add(edge: string, x: number, y: number, nx: number, ny: number) { if (!candidates.some(port => Math.abs(port.end[0] - x) + Math.abs(port.end[1] - y) < 1))
@@ -183,10 +188,11 @@ function routeStems(scene: ContourScene): ContourRoute[] | null {
         const dx=sources.get(item.id)!.anchor[0]-(item.x+item.width/2)
         return [...ports(item,false),...ports(item,true).filter(port=>port.edge===(dx<0?'left':'right'))]
     }
-    const orders = [scene.items.slice().sort((a, b) => b.depth - a.depth || a.mid - b.mid), scene.items.slice().sort((a, b) => b.depth - a.depth || b.mid - a.mid), scene.items.slice().sort((a, b) => a.mid - b.mid), scene.items.slice().sort((a, b) => a.depth - b.depth || a.mid - b.mid), scene.items.slice().sort((a, b) => a.depth - b.depth || b.mid - a.mid)];
+    const movable = scene.items.filter(item => !fixed.some(route => route.id === item.id));
+    const orders = [movable.slice().sort((a, b) => b.depth - a.depth || a.mid - b.mid), movable.slice().sort((a, b) => b.depth - a.depth || b.mid - a.mid), movable.slice().sort((a, b) => a.mid - b.mid), movable.slice().sort((a, b) => a.depth - b.depth || a.mid - b.mid), movable.slice().sort((a, b) => a.depth - b.depth || b.mid - a.mid)].slice(0, movable.length === 1 ? 1 : 5);
     let seed = 84721;
-    for (let attempt = 0; attempt < 35; attempt++) {
-        const shuffled = [...scene.items];
+    for (let attempt = 0; attempt < (movable.length > 1 ? 35 : 0); attempt++) {
+        const shuffled = [...movable];
         for (let at = shuffled.length - 1; at > 0; at--) {
             seed = (seed * 1664525 + 1013904223) >>> 0;
             const next = seed % (at + 1);
@@ -198,7 +204,7 @@ function routeStems(scene: ContourScene): ContourRoute[] | null {
     function keep(routes: ContourRoute[]) { if (stemRouteCache.size > 128)
         stemRouteCache.clear(); stemRouteCache.set(cacheKey, routes); return routes; }
     for (const order of orders) {
-        const used = new Uint8Array(size), routes: ContourRoute[] = [];
+        const used = new Uint8Array(size), routes: ContourRoute[] = [...fixed];
         let failed = false;
         function free(id: number, bit: number) { return id >= 0 && id < size && !base[id] && !used[id] && !(sourceGuard[id] & ~bit); }
         function canConnect(a: Point, b: Point, bit: number) { const length = Math.hypot(b[0] - a[0], b[1] - a[1]), count = Math.ceil(length / .6); for (let i = 0; i <= count; i++) {
@@ -326,6 +332,12 @@ function routeStems(scene: ContourScene): ContourRoute[] | null {
                         used[id] = 1;
                 }
         } }
+        for (const route of fixed) {
+            probe.setAttribute('d', route.d!);
+            const points: Point[] = [], length = probe.getTotalLength();
+            for (let at = 0; at < length; at += .65) { const p = probe.getPointAtLength(at); points.push([p.x, p.y]); }
+            const end = probe.getPointAtLength(length); points.push([end.x, end.y]); reserve(points);
+        }
         for (const item of order) {
             const source = sources.get(item.id)!, start = nearest(source.outside, source.bit);
             let route = search(start, targetsFor(item), source.bit);
@@ -338,6 +350,7 @@ function routeStems(scene: ContourScene): ContourRoute[] | null {
             reserve(points);
         }
         if (!failed) {
+            if (dense && curveStems({ ...scene, routes }, true).some(route => route.smoothing === 'unresolved')) continue;
             let total = 0, stretch = 0;
             for (const route of routes) {
                 let length = 0;
@@ -360,15 +373,15 @@ function routeStems(scene: ContourScene): ContourRoute[] | null {
     return bestRoutes ? keep(bestRoutes) : null;
 }
 const curveCache = new Map<string, ContourRoute[]>();
-function curveStems(scene: ContourScene): ContourRoute[] {
-    const routes = scene.routes || [], key = JSON.stringify([scene.style.bend, scene.style.calloutRadius, scene.radius, routes]);
+function curveStems(scene: ContourScene, dense = false): ContourRoute[] {
+    const routes = scene.routes || [], key = JSON.stringify([dense, scene.style.bend, scene.style.calloutRadius, scene.radius, routes]);
     if (curveCache.has(key))
         return curveCache.get(key)!;
     function sample(d: string): Point[] { probe.setAttribute('d', d); const length = probe.getTotalLength(), points: Point[] = []; for (let at = 0; at < length; at += .65) {
         const p = probe.getPointAtLength(at);
         points.push([p.x, p.y]);
     } const end = probe.getPointAtLength(length); points.push([end.x, end.y]); return points; }
-    const curves = routes.map(route => { const d = 'M' + route.points.map(p => p.join(',')).join('L'); return { ...route, d, sampled: sample(d) }; }), boxes = scene.items.map(item => ({ id: item.id, x: item.x, y: item.y - item.height / 2, w: item.width, h: item.height, r: Math.min(scene.style.calloutRadius, item.width / 2, item.height / 2) }));
+    const curves = routes.map(route => { const d = route.d ?? ('M' + route.points.map(p => p.join(',')).join('L')); return { ...route, d, sampled: sample(d) }; }), boxes = scene.items.map(item => ({ id: item.id, x: item.x, y: item.y - item.height / 2, w: item.width, h: item.height, r: Math.min(scene.style.calloutRadius, item.width / 2, item.height / 2) }));
     function smoothPoints(points: Point[], allowed: (a: Point, b: Point) => boolean = () => true): Point[] { const result: Point[] = points.map(p => [p[0], p[1]]); let changed = true; while (changed) {
         changed = false;
         for (let i = 1; i < result.length - 1; i++) {
@@ -381,6 +394,7 @@ function curveStems(scene: ContourScene): ContourRoute[] {
         }
     } return result; }
     for (const curve of curves) {
+        if (curve.smoothing && curve.smoothing !== 'unresolved') continue;
         const cells = new Map<string, Point[]>(), cellKey = (x: number, y: number) => x + ',' + y;
         for (const other of curves)
             if (other !== curve)
@@ -402,15 +416,24 @@ function curveStems(scene: ContourScene): ContourRoute[] {
             for (let dy = -1; dy <= 1; dy++)
                 for (let dx = -1; dx <= 1; dx++)
                     for (const p of cells.get(cellKey(gx + dx, gy + dy)) || [])
-                        if (Math.hypot(x - p[0], y - p[1]) < 1.95)
+                        // During construction, other routes still include raw
+                        // grid corners. Judge the final curves together below.
+                        if (Math.hypot(x - p[0], y - p[1]) < (dense ? .4 : 1.95))
                             return false;
         } return true; }
         const item = scene.items.find(item => item.id === curve.id)!, a = curve.points[0], z = curve.points[curve.points.length - 1], distance = Math.hypot(z[0] - a[0], z[1] - a[1]), normal = ({ top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] } as Record<string, Point>)[curve.edge], candidates: string[] = [], clean = smoothPoints(curve.points, (a, b) => clear(sample('M' + a.join(',') + 'L' + b.join(',')))), softness = scene.style.bend;
         for (const scale of [1, .78, .56, .34]) {
             const handle = Math.min(distance * .6, softness * 1.6) * scale, first = .65, last = 1.25;
-            const ux = Math.sin(item.mid), uy = -Math.cos(item.mid);
+            const ux = Math.sin(item.anchorAngle ?? item.mid), uy = -Math.cos(item.anchorAngle ?? item.mid);
             const c1 = [a[0] + ux * handle * first, a[1] + uy * handle * first], c2 = [z[0] + normal[0] * handle * last, z[1] + normal[1] * handle * last];
             candidates.push('M' + a.join(',') + 'C' + c1.join(',') + ' ' + c2.join(',') + ' ' + z.join(','));
+        }
+        // A clear direct connection still gets a gentle bow. Its radial cubic
+        // can be blocked by a neighbor even when this shorter curve fits.
+        for (const scale of [1, .5, .2, .05]) for (const sign of [-1, 1]) {
+            const bend = Math.min(6, distance * .15) * scale * sign;
+            const control: Point = [(a[0] + z[0]) / 2 - (z[1] - a[1]) / Math.max(1, distance) * bend, (a[1] + z[1]) / 2 + (z[0] - a[0]) / Math.max(1, distance) * bend];
+            candidates.push('M' + a.join(',') + 'Q' + control.join(',') + ' ' + z.join(','));
         }
         for (const radius of [softness, softness * .65, softness * .35, 3]) {
             candidates.push(roundedRoute(smoothPoints(curve.points), radius));
@@ -420,7 +443,7 @@ function curveStems(scene: ContourScene): ContourRoute[] {
         let accepted = false;
         for (const d of candidates) {
             const points = sample(d);
-            if (clear(points)) {
+            if (/[CQ]/.test(d) && clear(points)) {
                 curve.d = d;
                 curve.sampled = points;
                 curve.smoothing = d.includes('C') ? 'cubic' : 'rounded';
@@ -444,7 +467,7 @@ function curveStems(scene: ContourScene): ContourRoute[] {
             }
             for (const scale of [1, .8, .6, .4, .2, .05]) {
                 const d = roundedRoute(clean, bends.map(value => value * scale)), points = sample(d);
-                if (clear(points)) {
+                if (/[CQ]/.test(d) && clear(points)) {
                     curve.d = d;
                     curve.sampled = points;
                     curve.smoothing = 'adaptive';
@@ -454,7 +477,7 @@ function curveStems(scene: ContourScene): ContourRoute[] {
             }
             if (!accepted) {
                 const d = roundedRoute(curve.points, .04), points = sample(d);
-                if (clear(points)) {
+                if (/[CQ]/.test(d) && clear(points)) {
                     curve.d = d;
                     curve.sampled = points;
                     curve.smoothing = 'adaptive';
@@ -464,6 +487,21 @@ function curveStems(scene: ContourScene): ContourRoute[] {
         }
         if (!accepted)
             curve.smoothing = 'unresolved';
+    }
+    if (dense) {
+        const cells = new Map<string, {point: Point; curve: typeof curves[number]}[]>();
+        for (const curve of curves) for (const p of curve.sampled) {
+            const x = Math.floor(p[0] / 4), y = Math.floor(p[1] / 4);
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                for (const other of cells.get(`${x + dx},${y + dy}`) ?? []) {
+                    if (other.curve !== curve && Math.hypot(p[0] - other.point[0], p[1] - other.point[1]) < 1.55)
+                        curve.smoothing = other.curve.smoothing = 'unresolved';
+                }
+            }
+            const key = `${x},${y}`;
+            if (!cells.has(key)) cells.set(key, []);
+            cells.get(key)!.push({point: p, curve});
+        }
     }
     const result = curves.map(({ sampled, ...curve }) => curve);
     if (curveCache.size > 90)
@@ -519,7 +557,7 @@ function softenPlacement(scene: ContourScene, strength: number) {
             }
         }
 }
-function optimizeNeighbors(scene: ContourScene) {
+function optimizeNeighbors(scene: ContourScene, dense = false) {
     const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)), position = (item: ContourItem) => ({ cx: item.x + item.width / 2, y: item.y, column: item.column, columnCount: item.columnCount, depth: item.depth }), set = (item: ContourItem, slot: {
         cx: number;
         y: number;
@@ -635,10 +673,10 @@ function optimizeNeighbors(scene: ContourScene) {
     }
     const seededPositions = capture();
     function routedCost(): Cost | null {
-        const routes = routeStems(scene);
+        const routes = routeStems(scene, dense);
         if (!routes)
             return null;
-        const curves = curveStems({ ...scene, routes });
+        const curves = curveStems({ ...scene, routes }, dense);
         if (curves.some(route => route.smoothing === 'unresolved'))
             return null;
         let total = 0, detour = 0, worst = 0;
@@ -755,17 +793,117 @@ export function prepareContourScene(data: ContourInput[], width: number, height:
     }
     return { style, width, height, radius, inner: Math.max(8, radius - style.thickness), cx, cy, items, routes: null };
 }
+// Search actual free space, independent of the seed's top/bottom banks. Grid
+// candidates are ranked cheaply, then accepted only against complete routes.
+// An attachment may slide within its slice; its financial angles never move.
+function optimizeFreePlacement(scene: ContourScene): ContourScene {
+    const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+    const shortPenalty = (length: number) => Math.max(0, 24 - length) * 1.5 + Math.max(0, 18 - length) ** 2 * 4;
+    function cost(routes: ContourRoute[]) {
+        let total = 0, worst = 0;
+        const details = new Map<string, number>();
+        for (const route of routes) {
+            probe.setAttribute('d', route.d!);
+            const length = probe.getTotalLength(), a = route.points[0], b = route.points[route.points.length - 1];
+            const excess = Math.max(0, length - Math.hypot(b[0] - a[0], b[1] - a[1]));
+            const value = length + excess * 2 + shortPenalty(length);
+            details.set(route.id, value); total += value; worst = Math.max(worst, excess);
+        }
+        return {total: total + worst, details};
+    }
+    function anchor(item: ContourItem, x: number, y: number) {
+        const angle = Math.atan2(x + item.width / 2 - scene.cx, scene.cy - y);
+        const margin = Math.min((item.end - item.start) * .2, 6 / scene.radius);
+        const lo = item.start + margin, hi = item.end - margin;
+        return [angle - Math.PI * 2, angle, angle + Math.PI * 2]
+            .map(value => ({angle: clamp(value, lo, hi), delta: Math.abs(value - clamp(value, lo, hi))}))
+            .sort((a, b) => a.delta - b.delta)[0].angle;
+    }
+    function candidate(item: ContourItem, x: number, y: number) {
+        const top = y - item.height / 2, bottom = y + item.height / 2, gap = scene.style.labelGap;
+        const px = clamp(scene.cx, x, x + item.width), py = clamp(scene.cy, top, bottom);
+        if (Math.hypot(px - scene.cx, py - scene.cy) < scene.radius + 8) return null;
+        for (const other of scene.items) if (other !== item && x < other.x + other.width + gap && x + item.width > other.x - gap && top < other.y + other.height / 2 + gap && bottom > other.y - other.height / 2 - gap) return null;
+        const angle = anchor(item, x, y), start = point(scene, scene.radius + 1.2, angle);
+        const end: Point = [clamp(start[0], x, x + item.width), clamp(start[1], top, bottom)];
+        const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
+        let score = length + shortPenalty(length);
+        for (let step = 1; step < 16; step++) {
+            const t = step / 16, px = start[0] + (end[0] - start[0]) * t, py = start[1] + (end[1] - start[1]) * t;
+            if (Math.hypot(px - scene.cx, py - scene.cy) < scene.radius + .5) { score += 160; break; }
+        }
+        for (const other of scene.items) if (other !== item) {
+            const box = {id: other.id, x: other.x, y: other.y - other.height / 2, w: other.width, h: other.height, r: Math.min(scene.style.calloutRadius, other.height / 2)};
+            for (let step = 1; step < 16; step++) {
+                const t = step / 16;
+                if (roundedBoxDistance(start[0] + (end[0] - start[0]) * t, start[1] + (end[1] - start[1]) * t, box) < 3) { score += 80; break; }
+            }
+        }
+        return {item, x, y, angle, score};
+    }
+    let actual = cost(scene.curvedRoutes!), trials = 0, moves = 0;
+    const before = actual.total;
+    for (let pass = 0; pass < 6 && trials < 24; pass++) {
+        const proposals: NonNullable<ReturnType<typeof candidate>>[] = [];
+        for (const item of scene.items) {
+            const choices: typeof proposals = [], inset = scene.style.inset;
+            const attached = candidate(item, item.x, item.y);
+            if (attached && attached.score < (actual.details.get(item.id) ?? 0) - 3) choices.push(attached);
+            for (let y = inset + item.height / 2; y <= scene.height - inset - item.height / 2; y += 12)
+                for (let x = inset; x <= scene.width - inset - item.width; x += 12) {
+                    const value = candidate(item, x, y);
+                    if (value && value.score < (actual.details.get(item.id) ?? 0) - 3) choices.push(value);
+                }
+            choices.sort((a, b) => a.score - b.score);
+            const selected: typeof proposals = [];
+            for (const value of choices) if (selected.every(other => Math.hypot(value.x - other.x, value.y - other.y) >= 24)) {
+                selected.push(value); proposals.push(value); if (selected.length === 3) break;
+            }
+        }
+        proposals.sort((a, b) => ((actual.details.get(b.item.id) ?? 0) - b.score) - ((actual.details.get(a.item.id) ?? 0) - a.score));
+        let improved = false;
+        for (const value of proposals) {
+            if (trials >= 24) break;
+            trials++;
+            const item = value.item, old = {x: item.x, y: item.y, bank: item.bank, anchorAngle: item.anchorAngle};
+            Object.assign(item, {x: value.x, y: value.y, bank: value.y < scene.cy ? 'top' : 'bottom', anchorAngle: value.angle});
+            const fixed = scene.curvedRoutes!.filter(route => route.id !== item.id);
+            const box = {id: item.id, x: item.x, y: item.y - item.height / 2, w: item.width, h: item.height, r: Math.min(scene.style.calloutRadius, item.height / 2)};
+            const clear = fixed.every(route => {
+                probe.setAttribute('d', route.d!);
+                for (let at = 0; at <= probe.getTotalLength(); at += .65) {
+                    const p = probe.getPointAtLength(at);
+                    if (roundedBoxDistance(p.x, p.y, box) < 1.1) return false;
+                }
+                return true;
+            });
+            const routes = clear ? routeStems(scene, true, fixed) : null, curves = routes ? curveStems({...scene, routes}, true) : null;
+            if (curves && curves.every(route => route.smoothing !== 'unresolved')) {
+                const next = cost(curves);
+                probe.setAttribute('d', curves.find(route => route.id === item.id)!.d!);
+                if (probe.getTotalLength() >= 18 && next.total < actual.total - 3) {
+                    scene.routes = routes; scene.curvedRoutes = curves; actual = next; improved = true; moves++; break;
+                }
+            }
+            Object.assign(item, old);
+        }
+        if (!improved) break;
+    }
+    scene.placement = {before, after: actual.total, moves, trials};
+    return scene;
+}
+
 export function refineContourScene(prepared: ContourScene, spacingAttempt = 0): ContourScene {
     const scene = structuredClone(prepared), positions = scene.items.map(item => ({ ...item }));
-    for (const strength of [1, .75, .5, .25, 0]) {
+    for (const dense of [false, true]) for (const strength of [1, .75, .5, .25, 0]) {
         scene.items.forEach((item, index) => Object.assign(item, positions[index]));
         softenPlacement(scene, strength);
-        optimizeNeighbors(scene);
-        scene.routes = routeStems(scene);
+        optimizeNeighbors(scene, dense);
+        scene.routes = routeStems(scene, dense);
         scene.placementStrength = strength;
         if (scene.routes) {
-            scene.curvedRoutes = curveStems(scene);
-            break;
+            scene.curvedRoutes = curveStems(scene, dense);
+            if (scene.curvedRoutes.every(route => route.smoothing !== 'unresolved')) return optimizeFreePlacement(scene);
         }
     }
     if ((!scene.routes || scene.curvedRoutes?.some(route => route.smoothing === "unresolved")) && spacingAttempt < 3)
