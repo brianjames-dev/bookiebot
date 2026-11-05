@@ -69,3 +69,21 @@ console.log(`${count} Refined flow geometry cases: measured whole-dollar cards, 
 const crowded=refineContourScene(prepareContourScene(input(raw,240).map(row=>({...row,width:210})),240,200,{diameter:193,thickness:24,labelSize:11,labelGap:8,inset:14,drift:17}))
 assert.equal(crowded.style.labelGap,14,'Crowded geometry exercises all three spacing retries')
 for(const [key,value] of Object.entries({diameter:193,thickness:24,labelSize:11,inset:14,drift:17}))assert.equal(crowded.style[key],value,'Spacing fallback preserves every selected style field')
+
+// A large remaining balance or bill clusters small categories at the ring.
+// One failed route used to hide every stem and card after the ring shrank.
+for(const [width,height,amounts] of [
+  [358,350,[1625,0,80,91,36,300,273,54,15,600,0,6000]],
+  [390,280,[2100,240,176,465,25,10,13,13,34,0,0,0]],
+]) {
+  const rows=input(raw.map((row,i)=>[row[0],row[1],amounts[i]]),width)
+  const before=JSON.stringify(rows),prepared=prepareContourScene(rows,width,height),scene=refineContourScene(prepared)
+  validate(scene)
+  assert.equal(scene.items.length,amounts.filter(amount=>amount>0).length)
+  assert.equal(JSON.stringify(rows),before,'Dense routing never mutates category inputs')
+  for(const item of scene.items) {
+    const original=prepared.items.find(row=>row.id===item.id)
+    for(const key of ['amount','amountLabel','start','end','mid'])assert.equal(item[key],original[key],'Dense routing preserves exact values and slice angles')
+  }
+}
+console.log('Dense early-month/zero-income callouts retain every card, separate curved stems and exact financial inputs')
