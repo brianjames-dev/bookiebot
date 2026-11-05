@@ -1,6 +1,7 @@
 // Geometry for the approved Refined flow. Runs in a dedicated, cancellable
 // worker; this module has no page, network, storage, or financial side effects.
-import { createContourPathProbe } from "./category-mix-path";
+import { createContourPathProbe, roundedContourRoute as roundedRoute } from "./category-mix-path";
+import { placePerimeterContour } from "./category-mix-fallback";
 export type Point = [
     number,
     number
@@ -69,16 +70,6 @@ export type ContourRoute = {
     sampled?: Point[];
     smoothing?: string;
 };
-type Cost = {
-    cost: number;
-    total: number;
-    detour: number;
-    worst: number;
-    details: Record<string, {
-        length: number;
-        excess: number;
-    }>;
-};
 export type ContourScene = {
     style: ContourStyle;
     width: number;
@@ -96,8 +87,6 @@ export type ContourScene = {
         before: number;
         after: number;
         swaps: string[][];
-        routedBefore: Cost | null;
-        routedAfter: Cost | null;
     };
 };
 export const CONTOUR_STYLE: ContourStyle = { diameter: 219, thickness: 26, centerSize: 24, labelSize: 11, labelGap: 6, inset: 8, stemOpacity: .65, bend: 10, calloutRadius: 18, sidePadding: 6, drift: 36 };
@@ -111,7 +100,9 @@ export function contourLabel(key: string, label: string): string {
     return names[key] ?? label;
 }
 const probe = createContourPathProbe();
-const stemRouteCache = new Map<string, ContourRoute[]>();
+// Negative plans matter too: neighboring placement candidates often revisit
+// the same blocked geometry. Never repeat that full search in this worker.
+const stemRouteCache = new Map<string, ContourRoute[] | null>();
 function simplifyRoute(points: Point[]): Point[] { const clean: Point[] = []; for (const point of points) {
     const last = clean[clean.length - 1];
     if (!last || Math.hypot(last[0] - point[0], last[1] - point[1]) > .05)
@@ -125,17 +116,15 @@ function simplifyRoute(points: Point[]): Point[] { const clean: Point[] = []; fo
     }
     result.push(point);
 } return result; }
-function roundedRoute(points: Point[], bend: number | number[] = 2.2): string { if (!points.length)
-    return ''; let path = 'M' + points[0].join(','); for (let index = 1; index < points.length - 1; index++) {
-    const a = points[index - 1], b = points[index], c = points[index + 1], before = Math.hypot(b[0] - a[0], b[1] - a[1]), after = Math.hypot(c[0] - b[0], c[1] - b[1]), r = Math.min(Array.isArray(bend) ? bend[index] ?? 2.2 : bend, before * .46, after * .46), p = [b[0] + (a[0] - b[0]) * r / before, b[1] + (a[1] - b[1]) * r / before], q = [b[0] + (c[0] - b[0]) * r / after, b[1] + (c[1] - b[1]) * r / after];
-    path += 'L' + p.join(',') + 'Q' + b.join(',') + ' ' + q.join(',');
-} return path + 'L' + points[points.length - 1].join(','); }
 function segmentDistance(x: number, y: number, a: Point, b: Point): number { const dx = b[0] - a[0], dy = b[1] - a[1], length = dx * dx + dy * dy, t = length ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / length)) : 0; return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy); }
 function roundedBoxDistance(x: number, y: number, b: Box): number { const r = b.r || 0, qx = Math.abs(x - b.x - b.w / 2) - b.w / 2 + r, qy = Math.abs(y - b.y - b.h / 2) - b.h / 2 + r; return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r; }
 function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = []): ContourRoute[] | null {
-    const cacheKey = JSON.stringify([dense, fixed.map(route => [route.id, route.d]), scene.width, scene.height, scene.radius, scene.cy, scene.style.calloutRadius, scene.items.map(item => [item.id, item.x, item.y, item.width, item.height, item.bank, item.anchorAngle ?? item.mid])]);
-    if (stemRouteCache.has(cacheKey))
-        return stemRouteCache.get(cacheKey)!;
+    const cacheKey = JSON.stringify([dense, fixed.map(route => [route.id, route.d]), scene.width, scene.height, scene.radius, scene.cx, scene.cy, scene.style.bend, scene.style.calloutRadius, scene.items.map(item => [item.id, item.x, item.y, item.width, item.height, item.bank, item.depth, item.anchorAngle ?? item.mid])]);
+    if (stemRouteCache.has(cacheKey)) {
+        const cached = stemRouteCache.get(cacheKey) ?? null;
+        stemRouteCache.delete(cacheKey); stemRouteCache.set(cacheKey, cached);
+        return cached;
+    }
     const padding = 3, circlePadding = 2.8, reserveGap = dense ? 1 : 2.7, portReach = 3.6;
     const step = 2, columns = Math.floor(scene.width / step), rows = Math.floor(scene.height / step), size = columns * rows, base = new Uint8Array(size), sourceGuard = new Uint16Array(size), sources = new Map<string, {
         bit: number;
@@ -161,7 +150,7 @@ function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = 
     // Unused candidate ports are not obstacles. Reserve actual routes below;
     // guarding every possible port can seal the only corridor to another card.
     if(!dense)for(const target of destinations)guard(target.end,target.outside,1.8,target.bit!)
-    if([...sources.values()].some(source => sourceGuard[indexAt(...source.outside)] & ~source.bit)) return null;
+    if([...sources.values()].some(source => sourceGuard[indexAt(...source.outside)] & ~source.bit)) return keep(null);
     function ports(item: ContourItem, sidePorts: boolean): Port[] {
         const box = rectangles.find(box => box.id === item.id)!, source = sources.get(item.id)!.anchor, top = item.bank === 'top', candidates: Port[] = [];
         function add(edge: string, x: number, y: number, nx: number, ny: number) { if (!candidates.some(port => Math.abs(port.end[0] - x) + Math.abs(port.end[1] - y) < 1))
@@ -191,7 +180,10 @@ function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = 
     const movable = scene.items.filter(item => !fixed.some(route => route.id === item.id));
     const orders = [movable.slice().sort((a, b) => b.depth - a.depth || a.mid - b.mid), movable.slice().sort((a, b) => b.depth - a.depth || b.mid - a.mid), movable.slice().sort((a, b) => a.mid - b.mid), movable.slice().sort((a, b) => a.depth - b.depth || a.mid - b.mid), movable.slice().sort((a, b) => a.depth - b.depth || b.mid - a.mid)].slice(0, movable.length === 1 ? 1 : 5);
     let seed = 84721;
-    for (let attempt = 0; attempt < (movable.length > 1 ? 35 : 0); attempt++) {
+    // Prefer another measured placement over exhaustively shuffling a blocked
+    // one. The deterministic orders plus twelve alternatives retain variety
+    // without spending seconds on an impossible narrow corridor.
+    for (let attempt = 0; attempt < (movable.length > 1 ? 12 : 0); attempt++) {
         const shuffled = [...movable];
         for (let at = shuffled.length - 1; at > 0; at--) {
             seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -201,9 +193,17 @@ function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = 
         orders.push(shuffled);
     }
     let bestRoutes: ContourRoute[] | null = null, bestScore = Infinity, validPlans = 0;
-    function keep(routes: ContourRoute[]) { if (stemRouteCache.size > 128)
-        stemRouteCache.clear(); stemRouteCache.set(cacheKey, routes); return routes; }
+    function keep(routes: ContourRoute[] | null) { if (stemRouteCache.size >= 128)
+        stemRouteCache.delete(stemRouteCache.keys().next().value!); stemRouteCache.set(cacheKey, routes); return routes; }
+    const visitedOrders = new Set<string>();
+    // Identical ordered prefixes have identical reserved paths and obstacles.
+    // Reuse their next path (including failure) instead of repeating A* for
+    // every permutation. This memo lives only for this geometry/clearance.
+    const prefixPlans = new Map<string, ContourRoute | null>();
     for (const order of orders) {
+        const identity = order.map(item => item.id).join("\u0000");
+        if (visitedOrders.has(identity)) continue;
+        visitedOrders.add(identity);
         const used = new Uint8Array(size), routes: ContourRoute[] = [...fixed];
         let failed = false;
         function free(id: number, bit: number) { return id >= 0 && id < size && !base[id] && !used[id] && !(sourceGuard[id] & ~bit); }
@@ -338,16 +338,23 @@ function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = 
             for (let at = 0; at < length; at += .65) { const p = probe.getPointAtLength(at); points.push([p.x, p.y]); }
             const end = probe.getPointAtLength(length); points.push([end.x, end.y]); reserve(points);
         }
+        const prefix: string[] = [];
         for (const item of order) {
-            const source = sources.get(item.id)!, start = nearest(source.outside, source.bit);
-            let route = search(start, targetsFor(item), source.bit);
-            if (!route) {
+            prefix.push(item.id);
+            const key = JSON.stringify(prefix);
+            let plan = prefixPlans.get(key);
+            if (!prefixPlans.has(key)) {
+                const source = sources.get(item.id)!, start = nearest(source.outside, source.bit);
+                const route = search(start, targetsFor(item), source.bit);
+                plan = route ? {id: item.id, edge: route.target.edge, points: simplifyRoute([source.anchor, source.outside, ...pull(route.points, source.bit), route.target.outside, route.target.end])} : null;
+                prefixPlans.set(key, plan);
+            }
+            if (!plan) {
                 failed = true;
                 break;
             }
-            const points = simplifyRoute([source.anchor, source.outside, ...pull(route.points, source.bit), route.target.outside, route.target.end]);
-            routes.push({ id: item.id, edge: route.target.edge, points });
-            reserve(points);
+            routes.push(plan);
+            reserve(plan.points);
         }
         if (!failed) {
             if (dense && curveStems({ ...scene, routes }, true).some(route => route.smoothing === 'unresolved')) continue;
@@ -370,13 +377,16 @@ function routeStems(scene: ContourScene, dense = false, fixed: ContourRoute[] = 
                 return keep(bestRoutes!);
         }
     }
-    return bestRoutes ? keep(bestRoutes) : null;
+    return keep(bestRoutes);
 }
 const curveCache = new Map<string, ContourRoute[]>();
 function curveStems(scene: ContourScene, dense = false): ContourRoute[] {
-    const routes = scene.routes || [], key = JSON.stringify([dense, scene.style.bend, scene.style.calloutRadius, scene.radius, routes]);
-    if (curveCache.has(key))
-        return curveCache.get(key)!;
+    const routes = scene.routes || [], key = JSON.stringify([dense, scene.style.bend, scene.style.calloutRadius, scene.radius, scene.cx, scene.cy, scene.items.map(item => [item.id, item.x, item.y, item.width, item.height]), routes]);
+    if (curveCache.has(key)) {
+        const cached = curveCache.get(key)!;
+        curveCache.delete(key); curveCache.set(key, cached);
+        return cached;
+    }
     function sample(d: string): Point[] { probe.setAttribute('d', d); const length = probe.getTotalLength(), points: Point[] = []; for (let at = 0; at < length; at += .65) {
         const p = probe.getPointAtLength(at);
         points.push([p.x, p.y]);
@@ -504,8 +514,8 @@ function curveStems(scene: ContourScene, dense = false): ContourRoute[] {
         }
     }
     const result = curves.map(({ sampled, ...curve }) => curve);
-    if (curveCache.size > 90)
-        curveCache.clear();
+    if (curveCache.size >= 90)
+        curveCache.delete(curveCache.keys().next().value!);
     curveCache.set(key, result);
     return result;
 }
@@ -557,7 +567,7 @@ function softenPlacement(scene: ContourScene, strength: number) {
             }
         }
 }
-function optimizeNeighbors(scene: ContourScene, dense = false) {
+function optimizeNeighbors(scene: ContourScene) {
     const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)), position = (item: ContourItem) => ({ cx: item.x + item.width / 2, y: item.y, column: item.column, columnCount: item.columnCount, depth: item.depth }), set = (item: ContourItem, slot: {
         cx: number;
         y: number;
@@ -640,7 +650,7 @@ function optimizeNeighbors(scene: ContourScene, dense = false) {
         if (valid())
             return true;
     } return false; }
-    const originalPositions = capture(), swaps: string[][] = [];
+    const swaps: string[][] = [];
     const before = score();
     let current = before;
     for (let pass = 0; pass < 5; pass++) {
@@ -671,79 +681,9 @@ function optimizeNeighbors(scene: ContourScene, dense = false) {
         swaps.push(best.ids);
         current = bestScore;
     }
-    const seededPositions = capture();
-    function routedCost(): Cost | null {
-        const routes = routeStems(scene, dense);
-        if (!routes)
-            return null;
-        const curves = curveStems({ ...scene, routes }, dense);
-        if (curves.some(route => route.smoothing === 'unresolved'))
-            return null;
-        let total = 0, detour = 0, worst = 0;
-        const details: Cost["details"] = {};
-        for (const route of curves) {
-            probe.setAttribute('d', route.d!);
-            const length = probe.getTotalLength(), a = route.points[0], b = route.points[route.points.length - 1], direct = Math.hypot(b[0] - a[0], b[1] - a[1]), excess = Math.max(0, length - direct);
-            total += length;
-            detour += excess;
-            worst = Math.max(worst, excess);
-            details[route.id] = { length, excess };
-        }
-        return { cost: total + detour * 2 + worst, total, detour, worst, details };
-    }
-    restore(originalPositions);
-    const initial = routedCost();
-    restore(seededPositions);
-    const seeded = routedCost();
-    let actual = seeded;
-    if (initial && (!seeded || initial.cost < seeded.cost)) {
-        restore(originalPositions);
-        actual = initial;
-        swaps.length = 0;
-    }
-    if (actual) {
-        for (let pass = 0; pass < 5; pass++) {
-            if(actual.worst < 6 && actual.detour < scene.items.length * 2.5) break
-            const currentPositions = capture(), pairs: {
-                a: ContourItem;
-                b: ContourItem;
-                priority: number;
-            }[] = [];
-            for (let i = 0; i < scene.items.length; i++)
-                for (let j = i + 1; j < scene.items.length; j++) {
-                    const a = scene.items[i], b = scene.items[j];
-                    if (a.bank === b.bank && Math.abs(a.mid - b.mid) <= 1.25 && Math.hypot(a.x + a.width / 2 - b.x - b.width / 2, a.y - b.y) <= 130)
-                        pairs.push({ a, b, priority: (actual.details[a.id]?.excess || 0) + (actual.details[b.id]?.excess || 0) });
-                }
-            pairs.sort((a, b) => b.priority - a.priority);
-            let best: {
-                positions: ReturnType<typeof capture>;
-                ids: string[];
-                value: Cost;
-            } | null = null;
-            for (const { a, b } of pairs.slice(0, 10)) {
-                const pa = position(a), pb = position(b);
-                set(a, pb);
-                set(b, pa);
-                if (valid() || settle(a, b)) {
-                    const value = routedCost();
-                    if (value && value.cost < actual.cost - 1)
-                        best = { positions: capture(), ids: [a.id, b.id], value };
-                }
-                restore(currentPositions);
-                // Accept a verified improvement, then rank again against the
-                // new routed paths. Avoid solving every remaining permutation.
-                if(best) break
-            }
-            if (!best)
-                break;
-            restore(best.positions);
-            actual = best.value;
-            swaps.push(best.ids);
-        }
-    }
-    scene.assignment = { before, after: score(), swaps, routedBefore: initial, routedAfter: actual };
+    scene.assignment = { before, after: score(), swaps };
 }
+
 export function prepareContourScene(data: ContourInput[], width: number, height: number, overrides: Partial<ContourStyle> = {}): ContourScene {
     const style = { ...CONTOUR_STYLE, ...overrides };
     if (width < 330)
@@ -796,7 +736,7 @@ export function prepareContourScene(data: ContourInput[], width: number, height:
 // Search actual free space, independent of the seed's top/bottom banks. Grid
 // candidates are ranked cheaply, then accepted only against complete routes.
 // An attachment may slide within its slice; its financial angles never move.
-function optimizeFreePlacement(scene: ContourScene): ContourScene {
+function optimizeFreePlacement(scene: ContourScene, seedOnly = false): ContourScene {
     const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
     const shortPenalty = (length: number) => Math.max(0, 24 - length) * 1.5 + Math.max(0, 18 - length) ** 2 * 4;
     function cost(routes: ContourRoute[]) {
@@ -812,6 +752,9 @@ function optimizeFreePlacement(scene: ContourScene): ContourScene {
         return {total: total + worst, details};
     }
     function anchor(item: ContourItem, x: number, y: number) {
+        // Keep thin adjacent slices centered; pulling each attachment toward
+        // its nearest edge can collapse the separation between their stems.
+        if (item.end - item.start < .15) return item.mid;
         const angle = Math.atan2(x + item.width / 2 - scene.cx, scene.cy - y);
         const margin = Math.min((item.end - item.start) * .2, 6 / scene.radius);
         const lo = item.start + margin, hi = item.end - margin;
@@ -819,15 +762,18 @@ function optimizeFreePlacement(scene: ContourScene): ContourScene {
             .map(value => ({angle: clamp(value, lo, hi), delta: Math.abs(value - clamp(value, lo, hi))}))
             .sort((a, b) => a.delta - b.delta)[0].angle;
     }
-    function candidate(item: ContourItem, x: number, y: number) {
+    function candidate(item: ContourItem, x: number, y: number, angleOverride?: number, ceiling = Infinity) {
         const top = y - item.height / 2, bottom = y + item.height / 2, gap = scene.style.labelGap;
         const px = clamp(scene.cx, x, x + item.width), py = clamp(scene.cy, top, bottom);
         if (Math.hypot(px - scene.cx, py - scene.cy) < scene.radius + 8) return null;
         for (const other of scene.items) if (other !== item && x < other.x + other.width + gap && x + item.width > other.x - gap && top < other.y + other.height / 2 + gap && bottom > other.y - other.height / 2 - gap) return null;
-        const angle = anchor(item, x, y), start = point(scene, scene.radius + 1.2, angle);
+        const angle = angleOverride ?? anchor(item, x, y), start = point(scene, scene.radius + 1.2, angle);
         const end: Point = [clamp(start[0], x, x + item.width), clamp(start[1], top, bottom)];
         const length = Math.hypot(end[0] - start[0], end[1] - start[1]);
         let score = length + shortPenalty(length);
+        // Obstacle penalties only increase this lower bound. Skip expensive
+        // sampling when even a completely clear stem cannot improve the plan.
+        if (score >= ceiling) return null;
         for (let step = 1; step < 16; step++) {
             const t = step / 16, px = start[0] + (end[0] - start[0]) * t, py = start[1] + (end[1] - start[1]) * t;
             if (Math.hypot(px - scene.cx, py - scene.cy) < scene.radius + .5) { score += 160; break; }
@@ -841,17 +787,40 @@ function optimizeFreePlacement(scene: ContourScene): ContourScene {
         }
         return {item, x, y, angle, score};
     }
+    // Move obviously distant cards before solving any obstacle graph. This
+    // shares the exact candidate geometry with the routed refinement below,
+    // without repeatedly routing every possible neighbor swap first.
+    if (seedOnly) {
+        for (let pass = 0; pass < 12; pass++) {
+            let best: NonNullable<ReturnType<typeof candidate>> | null = null, improvement = 3;
+            for (const item of scene.items) {
+                const current = candidate(item, item.x, item.y, item.anchorAngle ?? item.mid)?.score ?? 1000;
+                const consider = (x: number, y: number) => {
+                    const value = candidate(item, x, y, undefined, current - improvement);
+                    if (value && current - value.score > improvement) { best = value; improvement = current - value.score; }
+                };
+                consider(item.x, item.y);
+                for (let y = scene.style.inset + item.height / 2; y <= scene.height - scene.style.inset - item.height / 2; y += 12)
+                    for (let x = scene.style.inset; x <= scene.width - scene.style.inset - item.width; x += 12) consider(x, y);
+            }
+            // TS cannot narrow a value assigned by the local candidate visitor.
+            const selected = best as NonNullable<ReturnType<typeof candidate>> | null;
+            if (!selected) break;
+            Object.assign(selected.item, {x: selected.x, y: selected.y, bank: selected.y < scene.cy ? 'top' : 'bottom', anchorAngle: selected.angle});
+        }
+        return scene;
+    }
     let actual = cost(scene.curvedRoutes!), trials = 0, moves = 0;
     const before = actual.total;
     for (let pass = 0; pass < 6 && trials < 24; pass++) {
         const proposals: NonNullable<ReturnType<typeof candidate>>[] = [];
         for (const item of scene.items) {
             const choices: typeof proposals = [], inset = scene.style.inset;
-            const attached = candidate(item, item.x, item.y);
+            const attached = candidate(item, item.x, item.y, undefined, (actual.details.get(item.id) ?? 0) - 3);
             if (attached && attached.score < (actual.details.get(item.id) ?? 0) - 3) choices.push(attached);
             for (let y = inset + item.height / 2; y <= scene.height - inset - item.height / 2; y += 12)
                 for (let x = inset; x <= scene.width - inset - item.width; x += 12) {
-                    const value = candidate(item, x, y);
+                    const value = candidate(item, x, y, undefined, (actual.details.get(item.id) ?? 0) - 3);
                     if (value && value.score < (actual.details.get(item.id) ?? 0) - 3) choices.push(value);
                 }
             choices.sort((a, b) => a.score - b.score);
@@ -893,21 +862,33 @@ function optimizeFreePlacement(scene: ContourScene): ContourScene {
     return scene;
 }
 
-export function refineContourScene(prepared: ContourScene, spacingAttempt = 0): ContourScene {
-    const scene = structuredClone(prepared), positions = scene.items.map(item => ({ ...item }));
-    for (const dense of [false, true]) for (const strength of [1, .75, .5, .25, 0]) {
-        scene.items.forEach((item, index) => Object.assign(item, positions[index]));
+export function refineContourScene(prepared: ContourScene): ContourScene {
+    let last = structuredClone(prepared), fallbackTried = false;
+    const roots = prepared.items.map(item => point(prepared, prepared.radius + 1.2, item.mid));
+    // Below the two-pixel planning grid, independent roots can alias into one
+    // corridor. Try the ordered continuous fallback before repeated grid work.
+    const crowded = roots.some((a, i) => roots.slice(i + 1).some(b => Math.hypot(a[0] - b[0], a[1] - b[1]) < 2));
+    for (const extra of [0, 2, 4, 6]) for (const strength of [1, .5, 0]) for (const neighbors of [false, true]) {
+        const scene = extra === 0 ? structuredClone(prepared) : prepareContourScene(prepared.items, prepared.width, prepared.height, {...prepared.style, labelGap: prepared.style.labelGap + extra});
         softenPlacement(scene, strength);
-        optimizeNeighbors(scene, dense);
-        scene.routes = routeStems(scene, dense);
+        if (neighbors) optimizeNeighbors(scene);
+        optimizeFreePlacement(scene, true);
         scene.placementStrength = strength;
-        if (scene.routes) {
-            scene.curvedRoutes = curveStems(scene, dense);
-            if (scene.curvedRoutes.every(route => route.smoothing !== 'unresolved')) return optimizeFreePlacement(scene);
+        for (const dense of [false, true]) {
+            scene.routes = routeStems(scene, dense);
+            if (scene.routes) {
+                scene.curvedRoutes = curveStems(scene, dense);
+                if (scene.curvedRoutes.every(route => route.smoothing !== 'unresolved')) return optimizeFreePlacement(scene);
+            }
         }
+        if (crowded && extra === 0 && strength === 1 && !neighbors) {
+            fallbackTried = true;
+            const fallback = placePerimeterContour(prepared);
+            if (fallback) return fallback;
+        }
+        last = scene;
     }
-    if ((!scene.routes || scene.curvedRoutes?.some(route => route.smoothing === "unresolved")) && spacingAttempt < 3)
-        return refineContourScene(prepareContourScene(prepared.items, prepared.width, prepared.height, { ...prepared.style, labelGap: prepared.style.labelGap + 2 }), spacingAttempt + 1);
-    return scene;
+    return fallbackTried ? last : placePerimeterContour(prepared) ?? last;
 }
+
 function point(scene: ContourScene, radius: number, angle: number): Point { return [scene.cx + radius * Math.sin(angle), scene.cy - radius * Math.cos(angle)]; }

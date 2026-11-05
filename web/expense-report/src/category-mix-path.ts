@@ -1,4 +1,20 @@
 import type { Point } from "./category-mix-layout";
+
+export function roundedContourRoute(input: Point[], bend: number | number[] = 2.2): string {
+    const points = input.filter((p, i) => !i || Math.hypot(p[0] - input[i - 1][0], p[1] - input[i - 1][1]) > .000001);
+    if (!points.length) return '';
+    let path = 'M' + points[0].join(',');
+    for (let i = 1; i < points.length - 1; i++) {
+        const a = points[i - 1], b = points[i], c = points[i + 1];
+        const before = Math.hypot(b[0] - a[0], b[1] - a[1]), after = Math.hypot(c[0] - b[0], c[1] - b[1]);
+        const radius = Math.min(Array.isArray(bend) ? bend[i] ?? 2.2 : bend, before * .46, after * .46);
+        const p = [b[0] + (a[0] - b[0]) * radius / before, b[1] + (a[1] - b[1]) * radius / before];
+        const q = [b[0] + (c[0] - b[0]) * radius / after, b[1] + (c[1] - b[1]) * radius / after];
+        path += 'L' + p.join(',') + 'Q' + b.join(',') + ' ' + q.join(',');
+    }
+    return path + 'L' + points[points.length - 1].join(',');
+}
+
 // Small DOM-free M/L/Q/C sampler. Curves are checked at subpixel spacing in
 // the worker, so routing never relies on a browser SVG node or its layout.
 export function createContourPathProbe() {

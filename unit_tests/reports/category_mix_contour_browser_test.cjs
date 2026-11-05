@@ -184,7 +184,11 @@ async function checkCascade(category,reduced,fresh=true){
     assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'true','Inspecting a slice or callout never toggles visibility')
     const focus=await foodSlice.evaluate(el=>{el.focus();const css=getComputedStyle(el);return {outline:css.outlineStyle,stroke:css.stroke,width:css.strokeWidth}})
     assert.equal(focus.outline,'none');assert.equal(focus.stroke,'none');assert.equal(focus.width,'0px','Touch/dialog focus cannot add a selection stroke')
+    // Dialog focus restoration can scroll a previously measured chart corner
+    // outside the viewport. Bring the real background tap target back first.
+    await category.locator('.bb-category-pie-host').scrollIntoViewIfNeeded()
     const hostBox=await category.locator('.bb-category-pie-host').boundingBox()
+    assert.equal(await page.evaluate(({x,y})=>Boolean(document.elementFromPoint(x+3,y+3)?.closest('.bb-category-pie-host')),hostBox),true,'The background tap must hit the visible chart')
     await page.touchscreen.tap(hostBox.x+3,hostBox.y+3)
     await page.waitForTimeout(950)
     assert.equal(await category.locator('.bb-category-pie-host').getAttribute('data-callouts'),'false','Tapping empty chart background hides the callouts')
