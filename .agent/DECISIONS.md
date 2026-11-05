@@ -1641,3 +1641,12 @@ Decision: The user chose Student Loan as an automatic $60.23 monthly Need budget
 Automatic reminders use the configured fixed amount within the normal upcoming window and do not demand manual payment logging after the due day. Manual bill expectations, other owners, send claims/audit events and reconciliation lifecycle remain unchanged. Do not send a synthetic reminder to verify rollout; a user-requested read-only heartbeat checks the next real daily Discord digest.
 
 Rationale: The prior expectation restored reminders but intentionally left October at zero until a manual payment was recorded. The user explicitly requested and confirmed an automatic expense instead. Reusing the existing row avoids retroactively adding a global subscription to past months or counting the loan twice, while an explicit mode protects the automatic formula from standalone payment writes.
+
+
+## 2026-11-05 - Place Category Callouts in Free Space With Flexible Slice Attachments
+
+Decision: Treat top/bottom card banks as a feasible starting layout, not final placement constraints. Search measured card boxes on a 12px free-space grid, including their current positions, and allow the attachment to slide within its original slice with an inset from both slice edges. Rank candidates by connector length, detours, obstacles and a readability penalty below a preferred 24px stem; never accept a new connection shorter than 18px. No category gets a fixed corner or attachment.
+
+Validate proposed moves against the complete curved routes, actual cards, ring and host bounds. Retain unaffected valid curves and route only the moved connection through the existing obstacle graph. Bound refinement to six accepted moves and 24 routing trials; keep the last verified layout when a candidate fails. Dense routing separately validates finished curves together instead of rejecting them against unfinished grid corners. Run all geometry in the existing cancellable worker; exact financial values/slice angles, chart dimensions, styling, reveal/reverse clocks and persistence remain unchanged.
+
+Rationale: Column-constrained placement forced avoidable long paths, including a broad left-hand slice assigned to a distant lower card. Flexible placement and attachment shorten those paths without erasing the visible connector or introducing crossings. Category-renamed fixtures protect this from becoming an Income left special case.

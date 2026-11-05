@@ -87,3 +87,27 @@ for(const [width,height,amounts] of [
   }
 }
 console.log('Dense early-month/zero-income callouts retain every card, separate curved stems and exact financial inputs')
+
+// A broad slice can attach away from its midpoint. Its nearest free corner
+// should beat the long trip down a seeded column, regardless of category ID.
+for(const rename of [false,true]) {
+  const amounts=[2100,240,176,465,25,10,13,13,34,0,0,3798]
+  const prepared=prepareContourScene(input(raw.map((row,i)=>[row[0],row[1],amounts[i]]),390),390,354)
+  if(rename)prepared.items.forEach((item,index)=>{item.id=`allocation-${index}`})
+  const scene=refineContourScene(prepared);validate(scene)
+  const largest=scene.items.reduce((a,b)=>a.amount>b.amount?a:b)
+  assert.ok(largest.x+largest.width/2<scene.cx&&largest.y<scene.cy-scene.radius,'The broad left slice uses available space above/left of the ring')
+  const probe=createContourPathProbe()
+  for(const item of scene.items) {
+    const route=scene.curvedRoutes.find(route=>route.id===item.id)
+    probe.setAttribute('d',route.d)
+    assert.ok(probe.getTotalLength()>=18,'Short stems remain visible and readable')
+    const angle=item.anchorAngle??item.mid
+    assert.ok(angle>=item.start&&angle<=item.end,'Attachments remain inside their actual slice')
+    if(item.amount>=2000)assert.ok(probe.getTotalLength()<65,'Broad slices use nearby free space instead of long routed detours')
+  }
+  assert.ok(Math.abs(largest.anchorAngle-largest.mid)>.3,'A large slice is not pinned to its midpoint')
+  assert.ok(scene.placement.after<scene.placement.before*.8,'Grid placement materially reduces the routed cost')
+  assert.ok(scene.placement.trials<=24,'Free placement has a bounded routing budget')
+}
+console.log('Category-independent grid candidates shorten broad-slice stems without losing visibility or slice identity')
