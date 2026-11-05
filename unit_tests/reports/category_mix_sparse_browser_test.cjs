@@ -1,4 +1,5 @@
-// Run after npm run build. Full phone shell, real CSP/worker, synthetic budgets.
+// Run after npm run build. Full phone shell, real CSP/worker, synthetic budgets
+// or a private read-only category fixture. Measure cold work, not just cache hits.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module')
 const root=path.resolve(__dirname,'../..'),req=createRequire(path.join(root,'web/expense-report/package.json'))
 const {chromium,webkit}=process.env.BOOKIEBOT_PLAYWRIGHT_MODULE?require(process.env.BOOKIEBOT_PLAYWRIGHT_MODULE):req('playwright')
@@ -25,6 +26,20 @@ for(const [mode,view] of Object.entries(report.modeViews)) {
 }
 const monthKey=`${report.year}-${String(report.month).padStart(2,'0')}`
 const snapshotPrefix=path.basename(process.env.BOOKIEBOT_CATEGORY_SNAPSHOT_PREFIX||'category-sparse')
+const slowdown=Number(process.env.BOOKIEBOT_CATEGORY_CPU_SLOWDOWN||1)
+async function measureReadiness(control,event) {
+  await control.evaluate((el,event)=>el.addEventListener(event,()=>{
+    window.__categoryActionAt=performance.now();window.__categoryReadyAt=undefined
+    window.__categoryReadyObserver?.disconnect()
+    const host=document.querySelector('#bb-chart-category'),observer=new MutationObserver(()=>{
+      if(host.querySelector('.bb-contour-callouts[data-ready="true"]')){
+        window.__categoryReadyAt=performance.now();observer.disconnect()
+      }
+    })
+    window.__categoryReadyObserver=observer
+    observer.observe(host,{subtree:true,attributes:true,childList:true})
+  },{once:true}),event)
+}
 function expectedCount(view,filter) {
   const needs=['rent','bills_utilities','static_bills_subscriptions_needs','need_expenses','grocery','gas'],wants=['food','shopping','subscriptions_wants']
   let count=view.breakdown.filter(item=>item.amount>0&&(filter==='all'?item.key!=='savings':filter==='needs'?needs.includes(item.key):filter==='wants'?wants.includes(item.key):false)).length
@@ -65,9 +80,13 @@ async function checkGeometry(category,expected,checkPlacement=false,breakdown=[]
   for(const engine of [chromium,webkit]) {
     const browser=await engine.launch({headless:true})
     try {for(const dark of [false,true]) {
-      const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:3,hasTouch:true,isMobile:true,reducedMotion:dark?'reduce':'no-preference'}),errors=[],unexpected=[],workerErrors=[]
+      const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:3,hasTouch:true,isMobile:true,reducedMotion:dark?'reduce':'no-preference'}),errors=[],unexpected=[],workerErrors=[],readiness=[]
+      if(engine===chromium&&slowdown>1){const cdp=await page.context().newCDPSession(page);await cdp.send('Emulation.setCPUThrottlingRate',{rate:slowdown})}
       page.on('pageerror',e=>errors.push(e.message))
-      await page.addInitScript(dark=>{delete window.PushManager;localStorage.setItem('bookiebot-expense-report-theme',dark?'dark':'light');window.__workerErrors=[];const Native=Worker;window.Worker=class extends Native{constructor(...args){super(...args);this.addEventListener('error',e=>window.__workerErrors.push(e.message))}}},dark)
+      await page.addInitScript(dark=>{delete window.PushManager;localStorage.setItem('bookiebot-expense-report-theme',dark?'dark':'light');window.__workerErrors=[];window.__categoryLayouts=[];const Native=Worker;window.Worker=class extends Native{
+        constructor(...args){super(...args);this.addEventListener('error',e=>window.__workerErrors.push(e.message));this.addEventListener('message',e=>{if(this.timing){this.timing.ms=performance.now()-this.timing.started;this.timing.complete=Boolean(e.data.scene?.routes)&&!e.data.scene.curvedRoutes?.some(r=>r.smoothing==='unresolved')}})}
+        postMessage(scene){this.timing={started:performance.now(),items:scene.items.length};window.__categoryLayouts.push(this.timing);super.postMessage(scene)}
+      }},dark)
       await page.route('**/*',async route=>{
         const url=new URL(route.request().url()),name=url.pathname.split('/').pop()
         if(url.pathname==='/app/expenses')return route.fulfill({contentType:'text/html',headers:{'Content-Security-Policy':csp},body:html(dark)})
@@ -81,12 +100,20 @@ async function checkGeometry(category,expected,checkPlacement=false,breakdown=[]
       const category=page.locator('#bb-chart-category')
       await page.getByRole('button',{name:'Show Category Mix',exact:true}).click()
       // Open before the worker finishes, rather than waiting for labels first.
+      await measureReadiness(category.getByRole('button',{name:'Show category callouts',exact:true}),'click')
       await category.getByRole('button',{name:'Show category callouts',exact:true}).click()
       for(const [index,mode] of ['Current','Projected'].entries()) {
+        if(index)await measureReadiness(page.getByRole('button',{name:mode,exact:true}),'click')
         await page.getByRole('button',{name:mode,exact:true}).click()
         for(const filter of ['all','needs','wants','savings']) {
+          if(filter!=='all')await measureReadiness(category.getByRole('combobox',{name:'Category mix filter',exact:true}),'change')
           await category.getByRole('combobox',{name:'Category mix filter',exact:true}).selectOption(filter)
-          await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:60000})
+          try{await category.locator('.bb-contour-callouts[data-ready="true"]').waitFor({timeout:8000})}
+          catch(error){console.error(engine.name(),dark?'dark':'light',mode,filter,await page.evaluate(()=>window.__categoryLayouts));throw error}
+          // Observe the actual ready mutation; Playwright's selector polling
+          // can add hundreds of milliseconds after the frame already rendered.
+          const wait=await page.evaluate(()=>window.__categoryReadyAt-window.__categoryActionAt);readiness.push(wait)
+          assert.ok(wait<(engine===chromium&&slowdown>1?3000:1500),`First reveal/mode/filter handoff must be timely (${mode}/${filter}: ${wait}ms)`)
           await page.waitForTimeout(dark?30:750)
           await checkGeometry(category,expectedCount(report.modeViews[mode.toLowerCase()],filter),!externalFixture&&index===1&&filter==='all',report.modeViews[mode.toLowerCase()].breakdown)
           count++
@@ -113,7 +140,10 @@ async function checkGeometry(category,expected,checkPlacement=false,breakdown=[]
       await page.waitForTimeout(dark?30:750);await checkGeometry(category,expectedCount(report.modeViews.projected,'all'))
       workerErrors.push(...await page.evaluate(()=>window.__workerErrors))
       assert.deepEqual(errors,[]);assert.deepEqual(workerErrors,[]);assert.deepEqual(unexpected,[])
-      console.log(engine.name(),dark?'dark':'light','all Current/Projected scopes and repeated reveals passed')
+      const timings=await page.evaluate(()=>window.__categoryLayouts.filter(t=>t.ms!==undefined))
+      assert.ok(timings.length>=2,'Exercise cold worker calculations as well as cached returns')
+      for(const timing of timings){assert.equal(timing.complete,true,'Every completed worker returns a usable layout');assert.ok(timing.ms<(engine===chromium&&slowdown>1?3000:1500),`Cold layout must not delay the reveal for seconds: ${JSON.stringify(timing)}`)}
+      console.log(engine.name(),dark?'dark':'light','all Current/Projected scopes and repeated reveals passed; maximum cold layout',Math.round(Math.max(...timings.map(t=>t.ms))),'ms; maximum reveal wait',Math.max(...readiness),'ms',engine===chromium?`CPU ${slowdown}x`:'')
       await page.close()
     }}finally{await browser.close()}
   }
