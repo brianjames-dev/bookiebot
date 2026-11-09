@@ -1487,7 +1487,6 @@ button.bb-left-categories { cursor: pointer; }
 .bb-category-amount-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
 .bb-category-amount-row > .bb-chart-total { flex: 1 1 0; min-width: 0; }
 .bb-category-amount-row > .bb-chart-page-header-actions { flex: 0 0 auto; }
-.bb-category-mix-summary > .bb-category-pressure { width: 100%; margin: 12px 0 0; }
 .bb-category-summary-label { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 .bb-category-summary-label .bb-chart-kicker { font-size: 11px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; }
 .bb-category-summary-label .bb-chart-mode-note { margin: 0; font-size: 11px; font-weight: 400; }
@@ -3290,9 +3289,27 @@ button:focus-visible, summary:focus-visible {
 .bb-toolbar-button:disabled { opacity: .5; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .bb-toolbar-button { transition: none; } }
 
-/* Refined flow retains its chart stage and former footer height until the layout is redesigned. */
+/* Only scopes with budget pressure use a footer row in the shared chart stage. */
 .bb-category-mix-page { row-gap: 0; grid-template-rows: auto minmax(0, 1fr); padding-bottom: var(--bb-chart-bottom-gap, 24px); }
+.bb-category-mix-page:has(> .bb-category-overflow) { grid-template-rows: auto minmax(0, 1fr) auto; }
 .bb-category-mix-page .bb-category-chart-layout { max-width: none; width: calc(100% + 2 * var(--bb-chart-page-gutter)); margin-inline: calc(-1 * var(--bb-chart-page-gutter)); }
+.bb-category-overflow {
+  --bb-category-overflow-color: hsl(var(--destructive));
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid hsl(var(--border) / .75);
+}
+.bb-category-overflow[data-tone="covered"] { --bb-category-overflow-color: hsl(var(--chart-3)); }
+.bb-category-overflow-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; font-weight: 500; }
+.bb-category-overflow-head > span { min-width: 0; }
+.bb-category-overflow-value { flex: none; color: var(--bb-category-overflow-color); font-size: 17px; font-weight: 500; letter-spacing: -.025em; line-height: 1.15; }
+.bb-category-overflow-rail { display: flex; height: 5px; overflow: hidden; border-radius: 999px; background: hsl(var(--foreground) / .16); }
+.bb-category-overflow-rail > span { min-width: 0; }
+.bb-category-overflow-covered { background: hsl(var(--chart-3)); }
+.bb-category-overflow-excess { background: hsl(var(--destructive)); }
+.bb-category-overflow-note { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.35; }
 .bb-contour-callouts { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; transition: none !important; }
 .bb-contour-callouts[data-visible="true"][data-ready="true"] .bb-contour-label { pointer-events: auto; }
 .bb-category-pie-center:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 4px; border-radius: 12px; }
