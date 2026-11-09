@@ -3,12 +3,12 @@ const req=createRequire(require('node:path').resolve('web/expense-report/package
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const ast=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
 const React=req('react'),{renderToStaticMarkup}=req('react-dom/server')
-const names=new Set(['money','formatMoney','formatPct','roundCurrency','amountRowsTotal','reportSpentTotal','categoryMixRows','categoryMixRollover','categoryMixTransferRows','categoryBudgetTotal','CategoryMixChart','areCategoryMixChartPropsEqual','categoryBalancesEqual','breakdownRowsEqual'])
+const names=new Set(['money','formatMoney','formatPct','roundCurrency','clamp','amountRowsTotal','reportSpentTotal','categoryMixRows','categoryMixRollover','categoryMixTransferRows','categoryMixPressure','CategoryMixOverflowFooter','categoryBudgetTotal','CategoryMixChart','areCategoryMixChartPropsEqual','categoryBalancesEqual','breakdownRowsEqual'])
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))
 assert.equal(declarations.length,names.size)
 const passthrough=({children})=>React.createElement('div',null,children)
 let renderedRows=[]
-const runtime={exports:{},memo:React.memo,useState:React.useState,useRef:React.useRef,useCallback:React.useCallback,categoryCenterStyle:()=>({}),require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),categoryMixPressure:()=>null,ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:({data})=>{renderedRows=data;return null},CategoryContourCallouts:()=>null,CategoryMixFilterControl:()=>null,CategoryMixPressureBar:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
+const runtime={exports:{},memo:React.memo,useState:React.useState,useRef:React.useRef,useCallback:React.useCallback,categoryCenterStyle:()=>({}),require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:({data})=>{renderedRows=data;return null},CategoryContourCallouts:()=>null,CategoryMixFilterControl:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
 runtime.MetricAmount=runtime.FittedAmount
 vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.rows=categoryMixRows;exports.Chart=CategoryMixChart;exports.headline=reportSpentTotal;exports.equal=areCategoryMixChartPropsEqual',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const rows=(...args)=>JSON.parse(JSON.stringify(runtime.exports.rows(...args)))
@@ -75,3 +75,26 @@ const savingDonor={...donor,filter:'savings',categoryBalances:{...base.categoryB
 assert.equal(displayed(savingDonor),'$1,600.00','A transfer covering expenses is not counted as additional Saved')
 renderToStaticMarkup(React.createElement(Chart,savingDonor))
 assert.ok(renderedRows.some(row=>row.label==='Needs overspend coverage'))
+
+// A real shortfall uses a footer after the plot. A donor contributes budget
+// without overspending its own category, and All counts only the residual.
+const over={...base,data:[{key:'rent',label:'Rent',amount:3748.2},{key:'food',label:'Eating out',amount:1701.6}],
+  categoryBudgets:{needs:3200,wants:1920,savings:1280},
+  categoryBalances:{raw:{needs:-548.2,wants:218.4,savings:82},remaining:{needs:-247.8,wants:0,savings:0},
+    deficits:{needs:548.2,wants:0,savings:0},totalOverspend:247.8,
+    transfers:[{from:'wants',to:'needs',amount:218.4},{from:'savings',to:'needs',amount:82}]},
+  amountSaved:1198,allSpentTotal:5449.8,projected:true}
+const chart=props=>renderToStaticMarkup(React.createElement(Chart,props))
+const allOver=chart({...over,filter:'all'})
+assert.ok(allOver.indexOf('bb-category-overflow"')>allOver.indexOf('bb-category-chart-layout'),'Overflow follows the ring')
+assert.match(allOver,/\$6,400\.00 within this budget, \$247\.80 uncovered/)
+assert.doesNotMatch(allOver,/bb-category-overflow-covered/)
+const needsOver=chart({...over,filter:'needs'})
+assert.match(needsOver,/\$3,200\.00 within this budget, \$300\.40 in category coverage, \$247\.80 uncovered/)
+assert.match(needsOver,/Covered by \$218\.40 from Wants \+ \$82\.00 from Savings; \$247\.80 remains/)
+const wantsCoverage=chart({...over,filter:'wants'})
+assert.match(wantsCoverage,/data-tone="covered"/)
+assert.match(wantsCoverage,/\$1,701\.60 within this budget, \$218\.40 in category coverage/)
+assert.doesNotMatch(wantsCoverage,/bb-category-overflow-excess/)
+assert.doesNotMatch(chart(savingsOnly),/bb-category-overflow/,'No footer or placeholder in the absence of pressure')
+console.log('Category Mix places overflow below the ring and separates exact covered and uncovered amounts.')

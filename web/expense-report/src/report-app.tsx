@@ -1745,7 +1745,6 @@ const CategoryMixChart = memo(function CategoryMixChart({
           </div>
         </div>
         {selectedBudget > 0 ? <div className="bb-chart-budget-note">{formatMoney(selectedBudget)} budget</div> : null}
-        {pressure ? <CategoryMixPressureBar pressure={pressure} /> : null}
       </div>
       <div className="bb-chart-layout bb-category-chart-layout bb-chart-page-body">
         <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
@@ -1764,6 +1763,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
+      {pressure ? <CategoryMixOverflowFooter pressure={pressure} balances={categoryBalances} filter={filter} usedTotal={usedTotal} /> : null}
     </div>
   )
 }, areCategoryMixChartPropsEqual)
@@ -2013,6 +2013,40 @@ function CategoryMixPressureBar({ pressure }: { pressure: CategoryMixPressure })
       </div>
       <div className="bb-category-pressure-note">{pressure.note}</div>
     </div>
+  )
+}
+
+function CategoryMixOverflowFooter({ pressure, balances, filter, usedTotal }: {
+  pressure: CategoryMixPressure
+  balances: CategoryBalances
+  filter: CategoryMixFilter
+  usedTotal: number
+}) {
+  const uncovered = filter === "all" ? pressure.amount
+    : pressure.tone === "danger" ? Math.min(pressure.amount, Math.max(0, -balances.remaining[filter]))
+    : 0
+  const covered = roundCurrency(pressure.amount - uncovered)
+  const withinBudget = Math.max(0, roundCurrency(usedTotal - pressure.amount))
+  const label = filter === "all" ? "Over budget" : pressure.label
+  const railLabel = [
+    `${formatMoney(withinBudget)} within this budget`,
+    covered > 0 ? `${formatMoney(covered)} in category coverage` : "",
+    uncovered > 0 ? `${formatMoney(uncovered)} uncovered` : "",
+  ].filter(Boolean).join(", ")
+
+  return (
+    <section className="bb-category-overflow" aria-label={label} data-tone={uncovered > 0 ? "over" : "covered"}>
+      <div className="bb-category-overflow-head">
+        <span>{label}</span>
+        <MetricAmount className="bb-category-overflow-value" intrinsic>{formatMoney(pressure.amount)}</MetricAmount>
+      </div>
+      <div className="bb-category-overflow-rail" role="img" aria-label={railLabel}>
+        <span style={{ flex: withinBudget }} />
+        {covered > 0 ? <span className="bb-category-overflow-covered" style={{ flex: covered }} /> : null}
+        {uncovered > 0 ? <span className="bb-category-overflow-excess" style={{ flex: uncovered }} /> : null}
+      </div>
+      <p className="bb-category-overflow-note">{filter === "all" ? "Needs, Wants and Savings are fully used." : pressure.note}</p>
+    </section>
   )
 }
 
