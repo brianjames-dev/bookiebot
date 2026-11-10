@@ -1,4 +1,4 @@
-import { memo, useRef, useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type PointerEvent } from "react"
+import { memo, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentProps, type CSSProperties, type PointerEvent } from "react"
 import { Glass, Tabbar, TabbarLink } from "konsta/react"
 import { ClipboardCheck, House, PiggyBank, ReceiptText, Users } from "lucide-react"
 import { screenTitles, type AppNavigationStore, type MainScreen } from "./app-navigation"
@@ -35,9 +35,10 @@ function NavigationButton(props: ComponentProps<"button">) {
   return <button {...props} role={undefined} />
 }
 
-export const AppNavigationDock = memo(function AppNavigationDock({ navigation, expanded, ...props }: {
+export const AppNavigationDock = memo(function AppNavigationDock({ navigation, expanded, vertical = false, ...props }: {
   navigation: AppNavigationStore
   expanded: boolean
+  vertical?: boolean
   reconciliationVisible: boolean
   hidden: boolean
   disabled: boolean
@@ -45,13 +46,14 @@ export const AppNavigationDock = memo(function AppNavigationDock({ navigation, e
 }) {
   const selected = useSyncExternalStore(navigation.subscribe, navigation.getSnapshot, navigation.getSnapshot)
   return <AppNavigationBar {...props} active={selected.main} current={selected.screen === "settings" ? null : selected.screen}
-    compact={selected.compact && !expanded} />
+    compact={!vertical && selected.compact && !expanded} vertical={vertical} />
 })
 
-export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, onSelect }: {
+export function AppNavigationBar({ active, current = active, compact, vertical = false, reconciliationVisible, hidden, disabled = false, onSelect }: {
   active: MainScreen
   current?: MainScreen | null
   compact: boolean
+  vertical?: boolean
   reconciliationVisible: boolean
   hidden?: boolean
   disabled?: boolean
@@ -63,23 +65,31 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
   const pointer = useRef<{ id: number; x: number; y: number; selected: MainScreen | null } | null>(null)
   const suppressClick = useRef(false)
   const tabs = reconciliationVisible ? screens : screens.slice(0, 4)
-  const screenAt = (clientX: number): MainScreen | null => {
+  const screenAt = (clientX: number, clientY: number): MainScreen | null => {
     const buttons = paneRef.current?.querySelectorAll<HTMLButtonElement>("button[data-nav-screen]")
     if (!buttons?.length) return null
-    // Hit-test actual equal-width targets, including their outer edges.
-    const button = [...buttons].find(button => clientX < button.getBoundingClientRect().right) ?? buttons[buttons.length - 1]
+    // Hit-test the actual tracks on the current axis, including their edges.
+    const button = [...buttons].find(button => {
+      const box = button.getBoundingClientRect()
+      return vertical ? clientY < box.bottom : clientX < box.right
+    }) ?? buttons[buttons.length - 1]
     return button.dataset.navScreen as MainScreen
   }
   const finishPointer = () => {
     if (!pointer.current) return
     pointer.current = null; setPreview(null); lens.release()
   }
+  useLayoutEffect(() => {
+    const id = pointer.current?.id
+    finishPointer()
+    if (id !== undefined && paneRef.current?.hasPointerCapture(id)) paneRef.current.releasePointerCapture(id)
+  }, [vertical])
   const startPointer = (event: PointerEvent<HTMLElement>) => {
     suppressClick.current = false
     if (disabled) return
     if (event.pointerType !== "touch" && event.pointerType !== "pen") return
     const target = (event.target as Element).closest("button[data-nav-screen]") as HTMLElement | null
-    const selected = (target?.dataset.navScreen as MainScreen | undefined) ?? screenAt(event.clientX)
+    const selected = (target?.dataset.navScreen as MainScreen | undefined) ?? screenAt(event.clientX, event.clientY)
     pointer.current = { id: event.pointerId, x: event.clientX, y: event.clientY, selected }
     setPreview(selected)
     lens.start(event.clientX, event.clientY)
@@ -87,14 +97,14 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
   }
 
   return <Tabbar top component="nav" icons className="bb-bottom-navigation" aria-label="Main navigation"
-    data-compact={compact} data-tab-count={tabs.length} hidden={hidden}>
+    data-compact={compact} data-tab-count={tabs.length} data-vertical={vertical || undefined} hidden={hidden}>
     <Glass ref={paneRef} highlight={false} className="bb-navigation-pane bb-glass-control"
       style={{ "--bb-nav-count": tabs.length, "--bb-nav-position": Math.max(0, tabs.findIndex(tab => tab.id === (preview ?? active))) / tabs.length } as CSSProperties}
       onPointerDown={startPointer}
       onPointerMove={event => {
         const current = pointer.current
         if (!current || current.id !== event.pointerId || (current.x === event.clientX && current.y === event.clientY)) return
-        if (current.x !== event.clientX) current.selected = screenAt(event.clientX)
+        if (vertical ? current.y !== event.clientY : current.x !== event.clientX) current.selected = screenAt(event.clientX, event.clientY)
         current.x = event.clientX; current.y = event.clientY
         lens.move(event.clientX, event.clientY)
         setPreview(current.selected)
@@ -104,7 +114,8 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
         if (!current || current.id !== event.pointerId) return
         // Glass can scale while pressed. A stationary tap keeps its original
         // target; only real finger travel changes the preview/release choice.
-        const selected = current.x === event.clientX ? current.selected : screenAt(event.clientX)
+        const moved = vertical ? current.y !== event.clientY : current.x !== event.clientX
+        const selected = moved ? screenAt(event.clientX, event.clientY) : current.selected
         finishPointer()
         suppressClick.current = true
         if (selected && !disabled) onSelect(selected)

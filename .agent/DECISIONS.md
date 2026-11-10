@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-10 - Opt in to the iPhone Duo layout
+
+Offer an account-scoped appearance switch in the installed Home Screen app. Gate the vertical glass navigation on compatible layout viewport dimensions so inner portrait and windows that already exclude the gutter retain the bottom dock. Reuse the glass components, equal tab tracks and press/drag lifecycle on the vertical axis. A physical Duo pass verifies iOS hit testing in the gutter. Inner portrait provides the route back to the switch if iOS intercepts the taps.
+
+Open landscape adds a Category Mix breakdown from the existing ring data and moves the mounted transaction editor into a side pane. The same editor and selected row own the draft and review through a live viewport change. Existing request versions, financial confirmations, recovery, Undo and authorization remain authoritative.
+
 ## 2026-11-04 - Include Elapsed Subscription Charges In Transactions
 
 The user approves closing the $76.49 November Current/Transactions gap by including Xfinity ($61.50, November 2) and Slate Digital ($14.99, November 4), and the same rule for all recurring subscriptions. Reuse Current's active subscription parser, amount, Needs/Wants bucket and monthly/yearly day calculation. Show each occurrence on/after its withdrawal date in Pacific time; future charges stay in planning. Missing/invalid dates, inactive and nonpositive amounts create no rows. Clamp short months and include annual charges only in their charge month.
