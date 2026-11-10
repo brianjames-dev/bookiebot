@@ -197,7 +197,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
 
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
   return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource }}>
-    <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen} data-duo-layout={duo.layout}>
+    <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
+      data-duo-layout={duo.rail} data-duo-landscape={duo.landscape || undefined}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
         <ReportBrand owner={owner} avatarUrl={avatarUrl} status={controls} statusHidden={!reportVisible} />
@@ -211,7 +212,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
         disabled={!report} hidden={!reportVisible} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
-        {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader duoLandscape={duo.layout === "landscape"}
+        {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader duoLandscape={duo.landscape}
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
       </div>
       {!monthlyReady && <main className="bb-shell-report-loading bb-main" hidden={!reportVisible && Boolean(report)} aria-busy={reportBusy}>
@@ -222,7 +223,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
         {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`}
-          duoEnabled={duo.enabled} duoLandscape={duo.layout === "landscape"} />}
+          duoEnabled={duo.enabled} duoLandscape={duo.landscape} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}
@@ -262,9 +263,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </main>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
-      <AppNavigationDock navigation={navigation} expanded={askOpen} vertical={Boolean(duo.layout)}
+      <AppNavigationDock navigation={navigation} expanded={askOpen} vertical={Boolean(duo.rail)}
         reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
-      {report && <AskBookieBotPanel open={askOpen && monthlyReady} duoGutter={Boolean(duo.layout)} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
+      {report && <AskBookieBotPanel open={askOpen && monthlyReady} duoGutter={Boolean(duo.rail)} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
     </div>
   </AppNavigationContext.Provider>

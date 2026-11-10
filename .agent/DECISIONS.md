@@ -6,6 +6,8 @@ Offer an account-scoped appearance switch in the installed Home Screen app. Gate
 
 Open landscape adds a Category Mix breakdown from the existing ring data and moves the mounted transaction editor into a side pane. The same editor and selected row own the draft and review through a live viewport change. Existing request versions, financial confirmations, recovery, Undo and authorization remain authoritative.
 
+Physical screenshots showed the installed app ending at the iOS status strip in both poses, consistent with about 382 CSS px closed and 867 CSS px open. Enable the landscape workspace independently of the vertical rail. When iOS excludes the strip, use the full web viewport for content, keep the regular controls and give the sticky editor clearance above the bottom dock. A genuine system-strip placement on that setup needs native app support or a change in WebKit.
+
 ## 2026-11-04 - Include Elapsed Subscription Charges In Transactions
 
 The user approves closing the $76.49 November Current/Transactions gap by including Xfinity ($61.50, November 2) and Slate Digital ($14.99, November 4), and the same rule for all recurring subscriptions. Reuse Current's active subscription parser, amount, Needs/Wants bucket and monthly/yearly day calculation. Show each occurrence on/after its withdrawal date in Pacific time; future charges stay in planning. Missing/invalid dates, inactive and nonpositive amounts create no rows. Clamp short months and include annual charges only in their charge month.

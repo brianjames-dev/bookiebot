@@ -36,6 +36,7 @@ for (const view of Object.values(report.modeViews)) {
   if (view.savingsInvesting) view.savingsInvesting.cashSaved = 1000
 }
 const portrait = {width:466,height:657}, landscape = {width:951,height:648}
+const clippedPortrait = {width:382,height:657}, clippedLandscape = {width:867,height:669}
 const browserOptions = engine => {
   const executablePath = process.env['BOOKIEBOT_' + engine.name().toUpperCase() + '_EXECUTABLE']
   return executablePath ? {executablePath} : {}
@@ -58,6 +59,17 @@ async function checkGeometry(page) {
     }
   })
   assert.deepEqual(geometry,{navWidth:60,navHeight:256,tools:[44,44],room:true,aligned:true,lensAligned:true,inside:true})
+}
+
+async function checkHorizontalDock(page) {
+  await page.waitForFunction(width => {
+    const tools = document.querySelector('.bb-shell-toolbar-inner').getBoundingClientRect()
+    return tools.right <= width + 1 && document.documentElement.scrollWidth <= width + 1
+  }, page.viewportSize().width, {timeout:5000})
+  const nav = await page.locator('.bb-navigation-pane').boundingBox()
+  const tools = await page.locator('.bb-shell-toolbar-inner').boundingBox()
+  assert.ok(nav.width > nav.height && tools.width > tools.height)
+  return {nav, tools}
 }
 
 ;(async()=>{
@@ -163,10 +175,21 @@ async function checkGeometry(page) {
         assert.ok((await side.boundingBox()).y >= 15)
         await page.evaluate(() => { document.activeElement.blur(); scrollTo(0,0) })
         await shot('landscape-transactions')
+        await page.setViewportSize(clippedLandscape)
+        await mode(null)
+        await side.getByRole('region',{name:'Edit transaction'}).waitFor({timeout:5000})
+        assert.equal(await amount.inputValue(),'10.45')
+        assert.equal(await amount.evaluate(input => input===window.duoDraftInput),true)
+        await page.evaluate(() => { document.activeElement.blur(); scrollTo(0,240) })
+        const {nav: horizontalNav, tools: horizontalTools} = await checkHorizontalDock(page)
+        const editorBox = await side.boundingBox()
+        assert.ok(editorBox.y >= horizontalTools.y + horizontalTools.height && editorBox.y + editorBox.height <= horizontalNav.y + 1)
+        await shot('clipped-landscape-transactions')
         await editor.getByRole('button',{name:'Review change'}).tap()
         await editor.getByRole('button',{name:'Confirm update'}).waitFor()
-        await page.setViewportSize(portrait)
-        await mode('portrait')
+        await page.setViewportSize(clippedPortrait)
+        await mode(null)
+        await side.waitFor({state:'hidden'})
         await group.getByRole('button',{name:'Confirm update'}).waitFor()
         await editor.getByRole('button',{name:'Back',exact:true}).tap()
         assert.equal(await amount.inputValue(),'10.45')
@@ -183,6 +206,11 @@ async function checkGeometry(page) {
         assert.match(await categories.innerText(),/Eating out\s+\$670.00/)
         await checkGeometry(page)
         await shot('landscape-overview')
+        await page.setViewportSize(clippedLandscape)
+        await mode(null)
+        await categories.waitFor({timeout:5000})
+        await checkHorizontalDock(page)
+        await shot('clipped-landscape-overview')
         await page.getByRole('combobox',{name:'Category mix filter'}).selectOption('needs')
         assert.equal(await categories.getByText('Eating out',{exact:true}).count(),0)
         await page.getByRole('button',{name:'Show category callouts'}).tap()
@@ -191,8 +219,9 @@ async function checkGeometry(page) {
         await categories.waitFor()
         await page.getByRole('button',{name:'Show Calendar',exact:true}).tap()
         await categories.waitFor({state:'hidden'})
-        await page.setViewportSize({width:382,height:580})
+        await page.setViewportSize(clippedPortrait)
         await mode(null)
+        await checkHorizontalDock(page)
         await page.setViewportSize({width:669,height:869})
         await mode(null)
         await page.getByRole('button',{name:'Settings',exact:true}).tap()

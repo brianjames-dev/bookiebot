@@ -53,12 +53,12 @@ The icon-only Konsta navigation bar uses a neutral translucent surface, fine gla
 ## Try the iPhone Duo layout
 
 1. Launch BookieBot from its Home Screen icon and install the available app update if prompted. Open **Settings → Appearance** and turn on **iPhone Duo layout**.
-2. Close the Duo and hold it upright. Check that the existing glass tabs are vertical on the right and that **Ask BookieBot** and **Settings** sit above them. Tap both tools and switch between Overview and Transactions. Hold and slide between two tabs to check that the selection commits on release.
-3. Unfold and turn the Duo to landscape. On Overview, choose **Category Mix** and check that its breakdown fits beside the ring and follows the Current/Projected view and category filter. Tap the ring center to open the callouts, then tap it again to return to the breakdown.
+2. Close the Duo and hold it upright. If iOS reserves the right strip for system controls, BookieBot keeps its glass tabs at the bottom and **Ask BookieBot** and **Settings** in the header. In Home Screen windows that expose the full width, the tabs and tools stack on the right.
+3. Unfold and turn the Duo to landscape. On Overview, choose **Category Mix** and check that its breakdown fits beside the ring and follows the Current/Projected view and category filter, including when iOS reserves the right strip. Tap the ring center to open the callouts, then tap it again to return to the breakdown.
 4. In Transactions, swipe an existing row and open **Update**. Change an amount without saving. Fold and unfold again. The same draft should move between the inline editor and the side pane. You can tap **Review change** to check that the existing confirmation follows the editor, then use **Back** and **Cancel** to leave the transaction as it was.
 5. If the iOS system area intercepts taps, unfold and hold the phone upright. The regular bottom navigation returns, and you can turn the switch off in **Settings → Appearance**.
 
-The switch is off by default and stored for your account on this installation. The right gutter is available in compatible Home Screen window sizes. Safari tabs, split view, and inner portrait use the regular navigation.
+The switch is off by default and stored for your account on this installation. Safari tabs, split view, and inner portrait use the regular layout.
 
 ## Optional phone notifications
 
