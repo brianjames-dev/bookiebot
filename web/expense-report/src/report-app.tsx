@@ -556,6 +556,7 @@ type ExpenseReportAppProps = {
   appUpdate?: ReactNode
   appMonthControl?: ReactNode
   appComparison?: ReactNode
+  duoLandscape?: boolean
   report: ExpenseReportData
   appControls?: ReactNode
   appAvatarUrl?: string
@@ -564,7 +565,7 @@ type ExpenseReportAppProps = {
 export function ExpenseReportApp(props: ExpenseReportAppProps) {
   return <AmountAppearanceBoundary owner={props.report.ownerName}><ExpenseReportBody {...props} /></AmountAppearanceBoundary>
 }
-function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate, externalHeader = false }: ExpenseReportAppProps) {
+function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appMonthControl, appComparison, appUpdate, externalHeader = false, duoLandscape = false }: ExpenseReportAppProps) {
   const navigation = useAppNavigation()
   const { theme, toggleTheme } = useExpenseReportTheme(!navigation)
   const [metricInspection, setMetricInspection] = useState<MetricInspection | null>(null)
@@ -660,7 +661,7 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
         {appComparison}
         <OverviewCharts report={report} activeReport={activeReport} chartBreakdown={chartBreakdown}
           projected={projectionActive} preferredChart={viewPreferences.chartId} onChartChange={selectChart}
-          onInspectCategory={inspectCategory} collapseKey={chartCollapseKey}
+          onInspectCategory={inspectCategory} collapseKey={chartCollapseKey} duoLandscape={duoLandscape}
           sourceRequest={sourceRequest} />
         {!navigation && <DailySpendingCard report={report} calendarEvents={activeReport.calendarEvents}
           projected={projectionActive} categoryColors={categoryColors} onInspectDay={inspectDay} />}
@@ -700,12 +701,13 @@ const MemoizedBurnRateChart = memo(BurnRateChart)
 const MemoizedCalendarAnalyticsPanel = memo(CalendarAnalyticsPanel)
 const MemoizedBillsUtilitiesPanel = memo(BillsUtilitiesPanel)
 
-const OverviewCharts = memo(function OverviewCharts({ report, activeReport, chartBreakdown, projected: projectionActive,
+const OverviewCharts = memo(function OverviewCharts({ report, activeReport, chartBreakdown, projected: projectionActive, duoLandscape,
   preferredChart, onChartChange, onInspectCategory: inspectCategory, collapseKey, sourceRequest }: {
   report: ExpenseReportData
   activeReport: ReturnType<typeof buildReportView>
   chartBreakdown: BreakdownItem[]
   projected: boolean
+  duoLandscape: boolean
   preferredChart: PreferredChart
   onChartChange: (chart: PreferredChart) => void
   onInspectCategory: (item: BreakdownItem) => void
@@ -743,6 +745,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
           filter={categoryMixFilter}
           onFilterChange={switchCategoryMixFilter}
           projected={projectionActive}
+          duoLandscape={duoLandscape}
         />
       ),
     },
@@ -860,6 +863,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
   return <>
         <section
           className="bb-chart-carousel-band"
+          data-duo-category={duoLandscape && chartPanels[activeChartIndex].id === "category" || undefined}
           style={{ "--bb-chart-indicator-count": chartPanels.length } as CSSProperties}
           role="region"
           aria-roledescription="carousel"
@@ -1688,6 +1692,7 @@ type CategoryMixChartProps = {
   filter: CategoryMixFilter
   onFilterChange: (filter: CategoryMixFilter) => void
   projected: boolean
+  duoLandscape: boolean
 }
 
 const CategoryMixChart = memo(function CategoryMixChart({
@@ -1702,6 +1707,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   filter,
   onFilterChange,
   projected,
+  duoLandscape,
 }: CategoryMixChartProps) {
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
@@ -1732,7 +1738,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const usedPercent = selectedBudget > 0 ? (usedTotal / selectedBudget) * 100 : 0
 
   return (
-    <div className="bb-chart-stack bb-chart-page bb-category-mix-page">
+    <div className="bb-chart-stack bb-chart-page bb-category-mix-page" data-duo-callouts={duoLandscape && showCallouts || undefined}>
       <div className="bb-panel-head bb-chart-page-header bb-category-mix-summary">
         <div className="bb-category-summary-label">
             <span className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</span>
@@ -1764,6 +1770,12 @@ const CategoryMixChart = memo(function CategoryMixChart({
         </ChartContainer>
       </div>
       {pressure ? <CategoryMixOverflowFooter pressure={pressure} balances={categoryBalances} filter={filter} usedTotal={usedTotal} /> : null}
+      {duoLandscape && <aside className="bb-details-dialog-surface bb-duo-category-breakdown" aria-label="Category breakdown" hidden={showCallouts}>
+        <div className="bb-details-dialog-header"><strong>Category breakdown</strong></div>
+        <div className="bb-details-dialog-body" tabIndex={0}>
+          <AmountRowsTable columns={["Category", "Amount"]} rows={ringData.filter(item => item.key !== "left" && item.amount > 0)} hideHeader />
+        </div>
+      </aside>}
     </div>
   )
 }, areCategoryMixChartPropsEqual)
@@ -1875,6 +1887,7 @@ function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: Ca
     categoryBalancesEqual(previous.categoryBalances, next.categoryBalances) &&
     previous.filter === next.filter &&
     previous.projected === next.projected &&
+    previous.duoLandscape === next.duoLandscape &&
     breakdownRowsEqual(previous.data, next.data)
   )
 }

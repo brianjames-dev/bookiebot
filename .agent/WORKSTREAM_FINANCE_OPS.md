@@ -1,8 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-11-04
+Last updated: 2026-11-10
 
 ## Goal
+
+### iPhone Duo Transactions layout — 2026-11-10
+
+Implemented the approved appearance preview for the installed Home Screen app. Closed portrait uses the inline editor with the right-side glass dock. Open landscape docks the same mounted editor beside the list, retaining its selected transaction, draft and review across viewport changes. Financial writers, review versions, recovery and Undo continue through the existing flow. Native gutter hit testing is pending in STATUS checklist 262.
 
 ### Elapsed subscription charges in Transactions — 2026-11-04
 

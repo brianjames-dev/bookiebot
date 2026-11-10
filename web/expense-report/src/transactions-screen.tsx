@@ -4,16 +4,17 @@ import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import {DailySpendingChart, CategoryFilterControl} from './report-app'
 import {useAppNavigation} from './app-navigation'
-import {DailyTransactionDays} from './daily-transactions'
+import {DailyTransactionDays,TransactionIcon} from './daily-transactions'
 import {TransactionSwipeContext,wrapTransactionRow} from './transaction-swipe'
-import {displayedAmount,recordedDays,recordedChart,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
+import {displayedAmount,recordedDays,recordedChart,recordedCategoryColors,recordedEntry,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
+import {transactionMerchant,transactionText} from './transaction-identity'
 import { type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
 import {InlineTransactionEditor,transactionMotion,type InlineSnapshot} from './transaction-inline-editor'
 import {ChangeMotionContext,type ChangePlan} from './transaction-value-motion'
 import {preparePlacement,playPlacement,discardPlacement,type Placement} from './transaction-row-placement'
 import {UndoPopup,type UndoNotice} from './transaction-undo-popup'
 import {confirmedRows,motionValues,settledTransactionRow} from './transaction-feedback'
-import {allocate,type SplitMethod} from './transaction-split-model'
+import {allocate,splitMoney,type SplitMethod} from './transaction-split-model'
 import "./transactions-screen.css"
 
 type Operation = TransactionOperation
@@ -57,8 +58,11 @@ function checkedListing(value: any): Listing {
   return value
 }
 
-export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {active: boolean; ownerName: string; initialMonth: string;aliases?:Record<string,string>}) {
+export function TransactionsScreen({active, ownerName, initialMonth, aliases, duoEnabled = false, duoLandscape = false}: {
+  active: boolean; ownerName: string; initialMonth: string; aliases?: Record<string,string>; duoEnabled?: boolean; duoLandscape?: boolean
+}) {
   const navigation=useAppNavigation()
+  const [editorDock,setEditorDock]=useState<HTMLDivElement|null>(null)
   const [graphOpen,setGraphOpen]=useState(false)
   const [month, setMonth] = useState(initialMonth)
   const [search, setSearch] = useState("")
@@ -273,11 +277,15 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
   const canReview=Boolean(selected&&operation&&(operation==='update'?validAmount&&validFields&&(destination!==selected.category||selected.editableFields.some(field=>field==='amount'?Math.round(amountValue*100)!==selected.amountCents:(draft[field]??'').trim()!==(selected.fields[field]??'').trim())):operation==='split'?customValid&&(method!=='custom'||Boolean(selected.splitOptions?.custom))&&(method!=='fronted'||selected.kind==='expense')&&(selected.split?method!==selected.split||payerShareCents!==(selected.splitOptions?.payerCents??selected.amountCents):payerShareCents!==selected.amountCents):true))
   const summary:TransactionChangeSummary|null=review?{operation:review.operation,title:review.item.title,date:review.item.date,category:review.item.categoryLabel,location:review.item.location,person:review.item.person,amountCents:review.item.amountCents,before:review.item.fields,after:review.after,destination:review.destination,share:review.share,restoration:review.restoration}:null
   const snapshot:InlineSnapshot|null=selected&&operation?{row:selected,operation,draft,destination,method,payerCents:payerShareCents,review:summary,canReview,locked,busy,categories:{...categories,...(selected.category in categories?{}:{[selected.category]:selected.categoryLabel})},persons:['Hannah','Brian (BofA)','Brian (AL)'],error}:null
+  const sideEditor = duoLandscape && Boolean((snapshot && rows.has(snapshot.row.id)) || commit)
+  const contextEntry = sideEditor && snapshot ? recordedEntry(snapshot.row) : null
+  const contextText = contextEntry ? transactionText(contextEntry, transactionMerchant(contextEntry,aliases)) : null
+  const relocation = duoEnabled ? {dock: duoLandscape ? editorDock : null} : undefined
   const wrap=(entry:Parameters<typeof wrapTransactionRow>[0],position:number,children:ReactNode,standalone=false)=>{
     const row=rows.get(entry.id??'')
     return <div className="bi-selected-row" data-entry-id={entry.id} data-editing={selected?.id===entry.id&&Boolean(operation)} data-design="levels">
       {wrapTransactionRow(entry,position,cloneElement(children as ReactElement<{className:string}>,{className:(children as ReactElement<{className:string}>).props.className+' bi-editable-row'}),standalone)}
-      {row&&<InlineTransactionEditor snapshot={selected?.id===entry.id?snapshot:null} onField={(key,value)=>setDraft(previous=>({...previous,[key]:value}))} onCategory={setDestination} onShare={(value,method)=>{setPayerShareCents(value);setMethod(method);setCustomValid(true)}} onValidity={setCustomValid} onReview={()=>void preview()} onConfirm={()=>void confirm()} onBack={()=>{setReview(null);setReviewBody(null)}} onCancel={discard} onRemoveSplit={()=>begin(row,'cancel_split')}/>}
+      {row&&<InlineTransactionEditor snapshot={selected?.id===entry.id?snapshot:null} relocation={relocation} onField={(key,value)=>setDraft(previous=>({...previous,[key]:value}))} onCategory={setDestination} onShare={(value,method)=>{setPayerShareCents(value);setMethod(method);setCustomValid(true)}} onValidity={setCustomValid} onReview={()=>void preview()} onConfirm={()=>void confirm()} onBack={()=>{setReview(null);setReviewBody(null)}} onCancel={discard} onRemoveSplit={()=>begin(row,'cancel_split')}/>}
     </div>
   }
   function dayToggle(event:React.MouseEvent){
@@ -292,6 +300,8 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
     <div className="bi-workspace" inert={Boolean(notice)}>
     <header className="bb-transactions-heading"><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={refreshDisabled} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
     <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>
+    <div className="bi-workspace-body" data-side-editor={sideEditor || undefined}>
+    <div className="bi-workspace-list">
     {listing && <DailySpendingChart graphOpen={graphOpen} data={chart} total={total/100} filter={displayedFilter==='needs'||displayedFilter==='wants'?displayedFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={value=>{if(!loading&&!locked&&!operation&&!notice)setDay(previous=>previous===value?'':value)}} metricLabel={metricLabel} legendLabel={displayedFilter==='income'?'Income':displayedFilter==='savings'?'Savings':undefined}
       transactionControl={<div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div>}/>}
     <label className="bb-recorded-search"><Search aria-hidden="true"/><input type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder="Search transactions" maxLength={200} value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>setSearch(event.target.value)}/>{search&&<button type="button" aria-label="Clear search" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setSearch('')}><X aria-hidden="true"/></button>}</label>
@@ -304,6 +314,17 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
     <div className="bb-transaction-list bb-daily-transactions" id="bb-recorded-days"><ChangeMotionContext.Provider value={plan}><DailyTransactionDays groups={groups} year={Number(initialMonth.slice(0,4))} month={Number(initialMonth.slice(5))} flatSingles wrapRow={wrap} aliases={aliases} categoryColors={recordedCategoryColors}/></ChangeMotionContext.Provider></div>
     {listing?.nextOffset !== null && listing?.nextOffset !== undefined && <button className="bb-transaction-load" type="button" disabled={loading||locked||Boolean(operation)||Boolean(notice)} onClick={()=>void load(listing.nextOffset!,true)}>{loading ? "Loading…" : "Load more transactions"}</button>}
     {error && !listing && <button type="button" disabled={loading} onClick={()=>void load(0,false,true)}>Try again</button>}
+    </div>
+    {duoEnabled && <aside className="bi-workspace-editor" aria-label="Selected transaction" hidden={!sideEditor}>
+      {contextEntry && contextText && <div className="bb-daily-transaction">
+        <TransactionIcon entry={contextEntry} aliases={aliases} eager />
+        <span className="bb-daily-transaction-name">{contextText.primary}</span>
+        <span className="bb-daily-transaction-money">{splitMoney(Math.round(contextEntry.amount * 100))}</span>
+        <span className="bb-daily-transaction-meta"><span className="bb-daily-transaction-category" style={{color:recordedCategoryColors[contextEntry.category]}}>{contextText.category}</span>{contextText.item && ` · ${contextText.item}`}</span>
+      </div>}
+      <div ref={setEditorDock} />
+    </aside>}
+    </div>
     </div>
     <span className="bi-sr-only" role="status" aria-live="polite">{announcement}</span>
     {notice&&<UndoPopup notice={notice} onUndo={()=>{const undo=notice.undo;setNotice(null);if(undo)void preview(undo,true)}} onDismiss={()=>setNotice(null)} returnFocus={()=>product.current?.querySelector<HTMLButtonElement>('.bb-daily-day-header,.bb-recorded-row-access')??null}/>}

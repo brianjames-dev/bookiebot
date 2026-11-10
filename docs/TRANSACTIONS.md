@@ -24,6 +24,8 @@ Results load in pages of 40, but chart/day counts and exact-cent totals cover th
 
 ## Actions and confirmation
 
+With **iPhone Duo layout** enabled, open landscape places the active editor beside the list. Closing the Duo returns the same draft or review to its row. Swiping to reveal actions, review, confirmation, and Undo work through the existing transaction flow.
+
 Actions expand inside their selected row. Only the rounded editor surface receives the subtle 4% sage tint and 4px top/bottom padding; the purchase row and logo/guide gutter retain the page background. Update has compact underlined fields with merchant/card always visible; no repeated title or extra disclosure. Only valid meaningful changes enable Review. Review slides in from the right while height resizes (440ms), uses the same struck old → new styling for every field/category, and has no redundant heading. Back preserves the draft; Cancel or parent-day collapse discards its action/review.
 
 Split uses the approved **Rising fill** circles. Each circle’s filled area tracks the named person’s share. A small **pie icon** restores By income using the server writer’s exact cents; it is enabled away from that allocation and dim/disabled at it. The slider gently catches fronted, equal and income notches, with quarter-dollar increments elsewhere. Manual dollar fields retain exact cents. Current splits reopen their saved allocations; new ones begin at the actual income allocation. Legacy/custom capabilities and fronting eligibility remain enforced, and Remove split retains its reviewed flow.
