@@ -1,5 +1,4 @@
-import {useLayoutEffect,useRef,useState,type ReactNode} from 'react'
-import {createPortal} from 'react-dom'
+import {useLayoutEffect,useRef,useState} from 'react'
 import {ArrowLeft,ArrowRight,ChevronDown} from 'lucide-react'
 import type {RecordedTransaction} from './transactions-screen'
 import type {TransactionChangeSummary,TransactionOperation} from './transaction-change-summary'
@@ -10,7 +9,7 @@ import './transaction-inline-editor.css'
 
 export const transactionMotion={duration:440,rollDuration:1200,strikeDelay:360,strikeDuration:300,strikeHold:700,fadeDuration:260,undoSeconds:8,reorderLift:160,reorderGap:220,reorderTravel:400,reorderLand:180,reorderHeight:6,reorderSpace:3}
 export type InlineSnapshot={row:RecordedTransaction;operation:TransactionOperation;draft:Record<string,string>;destination:string;method:SplitMethod;payerCents:number;review:TransactionChangeSummary|null;canReview:boolean;locked:boolean;busy:boolean;categories:Record<string,string>;persons:string[];error:string}
-type Props={snapshot:InlineSnapshot|null;relocation?:{dock:HTMLElement|null};onField:(key:string,value:string)=>void;onCategory:(value:string)=>void;onShare:(value:number,method:SplitMethod)=>void;onValidity:(value:boolean)=>void;onReview:()=>void;onConfirm:()=>void;onBack:()=>void;onCancel:()=>void;onRemoveSplit:()=>void}
+type Props={snapshot:InlineSnapshot|null;onField:(key:string,value:string)=>void;onCategory:(value:string)=>void;onShare:(value:number,method:SplitMethod)=>void;onValidity:(value:boolean)=>void;onReview:()=>void;onConfirm:()=>void;onBack:()=>void;onCancel:()=>void;onRemoveSplit:()=>void}
 const names:Record<string,string>={amount:'Amount',item:'Item',source:'Income source',location:'Merchant',person:'Card',category:'Category'}
 export function transactionReviewChanges(summary:TransactionChangeSummary,row:RecordedTransaction){
  const restoration=summary.operation==='undo'?summary.restoration:undefined,before=restoration?.current??summary.before
@@ -27,23 +26,6 @@ export function transactionReviewChanges(summary:TransactionChangeSummary,row:Re
  }
  return changes
 }
-// A stable portal keeps the same inputs and split draft mounted as the phone
-// moves between the inline slot and the side pane.
-function EditorLocation({dock,open,children}:{dock:HTMLElement|null;open:boolean;children:ReactNode}){
- const inline=useRef<HTMLDivElement>(null)
- const [host]=useState(()=>document.createElement('div'))
- useLayoutEffect(()=>{
-  const target=dock??inline.current
-  if(!target||target===host.parentElement||(!open&&host.parentElement))return
-  const focus=document.activeElement
-  const focused=focus instanceof HTMLElement&&host.contains(focus)?focus:null
-  target.append(host)
-  focused?.focus({preventScroll:true})
- },[dock,open,host])
- useLayoutEffect(()=>()=>host.remove(),[host])
- return <><div ref={inline}/>{createPortal(children,host)}</>
-}
-
 export function InlineTransactionEditor(props:Props){
  const cached=useRef<Props|null>(null),[shown,setShown]=useState(false)
  if(props.snapshot)cached.current=props
@@ -55,7 +37,7 @@ export function InlineTransactionEditor(props:Props){
  const payer=row.splitOptions?.payerName??'You',partner=row.splitOptions?.partnerName??'Partner',incomeTarget=row.splitOptions?.incomePayerCents
  const editing=operation==='update'||operation==='move',title=editing?'Update purchase':operation==='split'?'Split purchase':operation==='delete'?'Delete purchase':operation==='undo'?'Undo change':'Remove split'
  const changes=review?transactionReviewChanges(review,row):[]
- const editor=<div className="bi-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open}><div className="bi-expansion-clip"><section className="bi-editor" data-operation={operation} data-review={Boolean(review)} data-design="levels" role="region" aria-label="Edit transaction">
+ return <div className="bi-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open}><div className="bi-expansion-clip"><section className="bi-editor" data-operation={operation} data-review={Boolean(review)} data-design="levels" role="region" aria-label="Edit transaction">
   <span className="bi-sr-only">{title}</span>
   <StepMotion review={Boolean(review)} open={open} mode="slide" duration={transactionMotion.duration} edit={<>
    <form className="bi-fields" onSubmit={event=>{event.preventDefault();if(canReview&&!locked)current.onReview()}}>
@@ -76,5 +58,4 @@ export function InlineTransactionEditor(props:Props){
   </>}/>
   {error&&<p role="alert" className="bs-error">{error}</p>}
  </section></div></div>
- return props.relocation?<EditorLocation dock={props.relocation.dock} open={open}>{editor}</EditorLocation>:editor
 }
