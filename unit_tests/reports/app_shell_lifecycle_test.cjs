@@ -16,16 +16,9 @@ class Element { focus() {} closest() { return this } matches() { return false } 
 let sharedFocuses = 0, sharedScrolls = 0, widgetFocuses = 0, widgetScrolls = 0
 const sharedTarget = { focus() { sharedFocuses++ }, scrollIntoView() { sharedScrolls++ } }
 const widgetTarget = { focus() { widgetFocuses++ }, scrollIntoView() { widgetScrolls++; win.scrollY = 480 } }
-const media = new Map()
 const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { onLine: true },
   scrollTo({ top }) { this.scrollY = top }, location: { hash: '', origin: 'https://bookiebot.example', reload() { reloads++ } },
-  visualViewport: { ...events('viewport'), height: 800 }, matchMedia(query) {
-    if (!media.has(query)) {
-      listeners[query] = new Map()
-      media.set(query, { ...events(query), matches: false })
-    }
-    return media.get(query)
-  },
+  visualViewport: { ...events('viewport'), height: 800 }, matchMedia: () => ({ matches: false }),
   localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
   setTimeout(cb, delay) { const id = ++timerId; timers.set(id, { cb, delay }); return id }, clearTimeout(id) { timers.delete(id) },
   setInterval(cb, delay) { const id = ++timerId; intervals.set(id, { cb, delay }); return id }, clearInterval(id) { intervals.delete(id) },
@@ -439,39 +432,6 @@ async function main() {
   assert.equal(intervals.size, 0)
   assert.ok([...listeners.window.values(), ...listeners.document.values(), ...listeners.viewport.values()].every(set => !set.size), 'Shell, guard, version, and controllers clean up every listener')
   assert.ok([...storage.values()].every(value => !value.includes('draft') && !value.includes('37.25')), 'Financial draft fields never enter persistent storage')
-  const { useDuoLayout } = load(src('duo-layout.ts'))
-  let duo
-  function DuoProbe({ name }) { duo = useDuoLayout(name); return null }
-  const display = win.matchMedia('(display-mode: standalone)')
-  const cover = [...media].find(([query]) => query.includes('min-width: 440px'))[1]
-  const inner = [...media].find(([query]) => query.includes('min-width: 850px'))[1]
-  const innerRail = win.matchMedia('(min-width: 880px)')
-  const setMedia = (query, value) => { query.matches = value; query.dispatchEvent(new Event('change')) }
-  await run(() => { tree = create(h(DuoProbe, { name: 'Brian' })) })
-  await run(() => setMedia(cover, true))
-  assert.equal(duo.installed, false)
-  assert.equal(duo.rail, undefined)
-  await run(() => setMedia(display, true))
-  assert.equal(duo.enabled, false)
-  await run(() => duo.toggle())
-  assert.equal(duo.rail, 'portrait')
-  assert.equal(duo.landscape, false)
-  await run(() => { setMedia(cover, false); setMedia(inner, true); setMedia(innerRail, true) })
-  assert.equal(duo.rail, 'landscape')
-  assert.equal(duo.landscape, true)
-  await run(() => setMedia(innerRail, false))
-  assert.equal(duo.rail, undefined)
-  assert.equal(duo.landscape, true, 'The workspace stays active when iOS excludes the system strip')
-  await run(() => setMedia(inner, false))
-  assert.equal(duo.rail, undefined)
-  assert.equal(duo.landscape, false)
-  assert.equal(duo.enabled, true)
-  await run(() => tree.update(h(DuoProbe, { name: 'Hannah' })))
-  assert.equal(duo.enabled, false)
-  await run(() => tree.update(h(DuoProbe, { name: 'Brian' })))
-  assert.equal(duo.enabled, true)
-  await run(() => tree.unmount())
-  assert.ok(Object.values(listeners).flatMap(events => [...events.values()]).every(set => !set.size))
   console.log('Real app shell lifecycle: all screens, monthly state retention, financial drafts/retry, source routing, Settings guards, and owner reset passed')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

@@ -7,7 +7,6 @@ import "./ask-bookiebot-panel.css"
 
 export interface AskBookieBotPanelProps {
   open: boolean
-  duoGutter?: boolean
   onClose: () => void
   month: string
   mode: QuestionMode
@@ -16,7 +15,7 @@ export interface AskBookieBotPanelProps {
 }
 
 /** The wrapper stays mounted: dismissing it never disposes the question client. */
-export function AskBookieBotPanel({ open, duoGutter, onClose, month, mode, onShowSource, openerRef }: AskBookieBotPanelProps) {
+export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource, openerRef }: AskBookieBotPanelProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
@@ -129,7 +128,7 @@ export function AskBookieBotPanel({ open, duoGutter, onClose, month, mode, onSho
 
   if (typeof document === "undefined") return null
   return createPortal(
-    <dialog ref={dialogRef} tabIndex={-1} className="bb-ask-dialog" data-open={visible ? "true" : "false"} data-duo-gutter={duoGutter || undefined}
+    <dialog ref={dialogRef} tabIndex={-1} className="bb-ask-dialog" data-open={visible ? "true" : "false"}
       aria-labelledby={titleId} aria-describedby={contextId}
       onCancel={(event) => { event.preventDefault(); onClose() }}
       onKeyDown={(event) => {

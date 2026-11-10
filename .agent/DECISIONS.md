@@ -1,12 +1,8 @@
 # Agent Decisions
 
-## 2026-11-10 - Opt in to the iPhone Duo layout
+## 2026-11-10 - Restore the standard Home Screen layout
 
-Offer an account-scoped appearance switch in the installed Home Screen app. Gate the vertical glass navigation on compatible layout viewport dimensions so inner portrait and windows that already exclude the gutter retain the bottom dock. Reuse the glass components, equal tab tracks and press/drag lifecycle on the vertical axis. A physical Duo pass verifies iOS hit testing in the gutter. Inner portrait provides the route back to the switch if iOS intercepts the taps.
-
-Open landscape adds a Category Mix breakdown from the existing ring data and moves the mounted transaction editor into a side pane. The same editor and selected row own the draft and review through a live viewport change. Existing request versions, financial confirmations, recovery, Undo and authorization remain authoritative.
-
-Physical screenshots showed the installed app ending at the iOS status strip in both poses, consistent with about 382 CSS px closed and 867 CSS px open. Enable the landscape workspace independently of the vertical rail. When iOS excludes the strip, use the full web viewport for content, keep the regular controls and give the sticky editor clearance above the bottom dock. A genuine system-strip placement on that setup needs native app support or a change in WebKit.
+Revert the iPhone Duo preview and landscape follow-up (PRs #142 and #143). Device screenshots showed the installed BookieBot viewport ending before the iOS status strip in both poses. [WebKit confirms Home Screen apps cannot draw arbitrary content under the status area](https://bugs.webkit.org/show_bug.cgi?id=317153#c2). Keep layout responsive to the window WebKit exposes. Any future proposal for native strip placement needs a supported platform API and a device tap test.
 
 ## 2026-11-04 - Include Elapsed Subscription Charges In Transactions
 

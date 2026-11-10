@@ -2,7 +2,6 @@ import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useSt
 import { ArrowLeft } from "lucide-react"
 import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationDock } from "./app-navigation-bar"
-import { useDuoLayout } from "./duo-layout"
 import { AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -38,7 +37,6 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const { theme, toggleTheme } = useExpenseReportTheme()
   const reconciliation = useReconciliation(Boolean(report))
   const owner = report?.ownerName ?? ownerName
-  const duo = useDuoLayout(owner)
   const reconciliationEnabled = reconciliation.snapshot?.enabled === true
   // Reserve the tab immediately; only a completed connection check can prove
   // it is unavailable. Slow or failed reads stay reachable through the tab.
@@ -197,8 +195,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
 
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
   return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource }}>
-    <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
-      data-duo-layout={duo.rail} data-duo-landscape={duo.landscape || undefined}>
+    <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
         <ReportBrand owner={owner} avatarUrl={avatarUrl} status={controls} statusHidden={!reportVisible} />
@@ -212,7 +209,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
         disabled={!report} hidden={!reportVisible} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
-        {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader duoLandscape={duo.landscape}
+        {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
       </div>
       {!monthlyReady && <main className="bb-shell-report-loading bb-main" hidden={!reportVisible && Boolean(report)} aria-busy={reportBusy}>
@@ -222,8 +219,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
-        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`}
-          duoEnabled={duo.enabled} duoLandscape={duo.landscape} />}
+        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}
@@ -239,10 +235,6 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
           <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
           <AmountAppearanceSettings />
-          {duo.installed && <>
-            <div className="bb-setting-row"><span>iPhone Duo layout</span><button type="button" className="bb-setting-switch" role="switch" aria-label="iPhone Duo layout" aria-checked={duo.enabled} onClick={duo.toggle}><span /></button></div>
-            <p className="bb-settings-note">Moves the glass controls to the right in closed portrait and open landscape. If gutter taps are blocked, unfold upright to get back to this switch.</p>
-          </>}
         </section>
         <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded /></div>
         <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} />
@@ -263,9 +255,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </main>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
-      <AppNavigationDock navigation={navigation} expanded={askOpen} vertical={Boolean(duo.rail)}
+      <AppNavigationDock navigation={navigation} expanded={askOpen}
         reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
-      {report && <AskBookieBotPanel open={askOpen && monthlyReady} duoGutter={Boolean(duo.rail)} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
+      {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
     </div>
   </AppNavigationContext.Provider>
