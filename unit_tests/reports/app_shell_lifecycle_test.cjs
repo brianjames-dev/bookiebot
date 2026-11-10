@@ -444,20 +444,27 @@ async function main() {
   function DuoProbe({ name }) { duo = useDuoLayout(name); return null }
   const display = win.matchMedia('(display-mode: standalone)')
   const cover = [...media].find(([query]) => query.includes('min-width: 440px'))[1]
-  const inner = [...media].find(([query]) => query.includes('min-width: 880px'))[1]
+  const inner = [...media].find(([query]) => query.includes('min-width: 850px'))[1]
+  const innerRail = win.matchMedia('(min-width: 880px)')
   const setMedia = (query, value) => { query.matches = value; query.dispatchEvent(new Event('change')) }
   await run(() => { tree = create(h(DuoProbe, { name: 'Brian' })) })
   await run(() => setMedia(cover, true))
   assert.equal(duo.installed, false)
-  assert.equal(duo.layout, undefined)
+  assert.equal(duo.rail, undefined)
   await run(() => setMedia(display, true))
   assert.equal(duo.enabled, false)
   await run(() => duo.toggle())
-  assert.equal(duo.layout, 'portrait')
-  await run(() => { setMedia(cover, false); setMedia(inner, true) })
-  assert.equal(duo.layout, 'landscape')
+  assert.equal(duo.rail, 'portrait')
+  assert.equal(duo.landscape, false)
+  await run(() => { setMedia(cover, false); setMedia(inner, true); setMedia(innerRail, true) })
+  assert.equal(duo.rail, 'landscape')
+  assert.equal(duo.landscape, true)
+  await run(() => setMedia(innerRail, false))
+  assert.equal(duo.rail, undefined)
+  assert.equal(duo.landscape, true, 'The workspace stays active when iOS excludes the system strip')
   await run(() => setMedia(inner, false))
-  assert.equal(duo.layout, undefined)
+  assert.equal(duo.rail, undefined)
+  assert.equal(duo.landscape, false)
   assert.equal(duo.enabled, true)
   await run(() => tree.update(h(DuoProbe, { name: 'Hannah' })))
   assert.equal(duo.enabled, false)

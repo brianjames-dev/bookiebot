@@ -79,13 +79,14 @@
 }
 
 /* Keep the same report and chart components in the expanded workspace. */
-.bb-app-shell[data-duo-layout="landscape"] .bb-report-header { padding-bottom: 12px; }
-.bb-app-shell[data-duo-layout="landscape"] .bb-report-screen { position: relative; }
-.bb-app-shell[data-duo-layout="landscape"] .bb-metrics-grid { margin-bottom: 15px; }
-.bb-app-shell[data-duo-layout="landscape"] .bb-metric-card { padding-block: 10px 12px; }
-.bb-app-shell[data-duo-layout="landscape"] .bb-left-categories { min-height: 44px; margin-top: 6px; }
-.bb-app-shell[data-duo-layout="landscape"] .bb-savings-progress { margin-top: 9px; }
-.bb-app-shell[data-duo-layout="landscape"] .bb-report-comparison:has(.bb-comparison-card[data-open="false"]) {
+.bb-app-shell[data-duo-landscape] .bb-shell-masthead { margin-bottom: 0; }
+.bb-app-shell[data-duo-landscape] .bb-report-header { padding-bottom: 12px; }
+.bb-app-shell[data-duo-landscape] .bb-report-screen { position: relative; }
+.bb-app-shell[data-duo-landscape] .bb-metrics-grid { margin-bottom: 15px; }
+.bb-app-shell[data-duo-landscape] .bb-metric-card { padding-block: 10px 12px; }
+.bb-app-shell[data-duo-landscape] .bb-left-categories { min-height: 44px; margin-top: 6px; }
+.bb-app-shell[data-duo-landscape] .bb-savings-progress { margin-top: 9px; }
+.bb-app-shell[data-duo-landscape] .bb-report-comparison:has(.bb-comparison-card[data-open="false"]) {
   position: absolute;
   top: -56px;
   left: 50%;
@@ -97,6 +98,9 @@
   --bb-chart-carousel-stage-height: 285px;
   --bb-chart-carousel-heading-height: 50px;
   --bb-chart-bottom-gap: 8px;
+}
+.bb-app-shell[data-duo-landscape]:not([data-duo-layout]) .bb-chart-carousel-band[data-duo-category] {
+  --bb-chart-carousel-stage-height: 264px;
 }
 .bb-app-shell [data-duo-category] .bb-category-mix-page {
   --bb-chart-page-block-gutter: 8px;
@@ -113,6 +117,11 @@
 .bb-app-shell [data-duo-category] .bb-chart-page-header-actions { margin-inline: 0; }
 .bb-app-shell [data-duo-category] .bb-category-mix-summary .bb-chart-budget-note { margin-top: 6px; }
 .bb-app-shell [data-duo-category] .bb-category-pie-center > span:last-child { white-space: nowrap; }
+.bb-app-shell[data-duo-landscape]:not([data-duo-layout]) [data-duo-category] .bb-category-pie-center > span:last-child {
+  justify-self: center;
+  font-size: 9px;
+  line-height: 1.25;
+}
 .bb-app-shell .bb-duo-category-breakdown {
   grid-column: 3;
   grid-row: 1;
@@ -137,11 +146,16 @@
 .bi-workspace-body[data-side-editor] > * { min-width: 0; }
 .bi-workspace-editor {
   --bb-duo-editor-top: max(16px, env(safe-area-inset-top, 0px));
+  --bb-duo-editor-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   position: sticky;
   top: var(--bb-duo-editor-top);
-  max-height: calc(100svh - var(--bb-duo-editor-top) - max(16px, env(safe-area-inset-bottom, 0px)));
+  max-height: calc(100svh - var(--bb-duo-editor-top) - var(--bb-duo-editor-bottom));
   overflow: auto;
   overscroll-behavior: contain;
+}
+.bb-app-shell[data-duo-landscape]:not([data-duo-layout]) .bi-workspace-editor {
+  --bb-duo-editor-top: calc(max(18px, env(safe-area-inset-top, 0px)) + 52px);
+  --bb-duo-editor-bottom: calc(var(--bb-nav-height) + env(safe-area-inset-bottom, 0px));
 }
 .bi-workspace-editor .bi-expansion::before { display: none; }
 .bi-workspace-editor .bi-editor { margin-inline-start: 0; padding-inline: 12px; }
