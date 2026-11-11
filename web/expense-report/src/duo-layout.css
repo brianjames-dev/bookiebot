@@ -1,9 +1,8 @@
 /* Closed phones keep main's component layout; opted-in docks follow the visible viewport. */
 .bb-overview-summary { display: contents; }
-.bb-app-shell[data-duo-enabled="true"] { position: relative; }
 .bb-app-shell[data-duo-enabled="true"] .bb-bottom-navigation {
-  position: absolute; top: var(--bb-nav-viewport-bottom, 100dvh); bottom: auto;
-  transform: translate(-50%, -100%);
+  position: fixed; top: auto; bottom: calc(100dvh - var(--bb-nav-viewport-bottom, 100dvh));
+  transform: translateX(-50%);
 }
 .bb-app-shell[data-duo-landscape="true"] {
   --bb-duo-inset: clamp(16px, 4vw, 35px);
@@ -25,13 +24,14 @@
 .bb-app-shell[data-duo-landscape="true"] .bb-bottom-navigation > div:last-child { height: var(--bb-duo-nav-height); }
 .bb-app-shell[data-duo-landscape="true"] .bb-navigation-pane { --bb-nav-padding: 8px; --bb-control-icon-size: 24px; }
 :root:has(.bb-app-shell[data-duo-overview="true"]),
-body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidden; overscroll-behavior: none; }
+body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-app-shell[data-duo-overview="true"] {
   display: grid;
   grid-template-columns: minmax(0, calc((100% + var(--bb-duo-right-rail)) / 2)) minmax(0, 1fr);
   grid-template-rows: 72px var(--bb-duo-heading) minmax(0, 1fr);
   min-height: 0;
   height: 100dvh;
+  overflow: clip;
   padding: 0 var(--bb-duo-overlay) 16px 0;
 }
 .bb-app-shell[data-duo-overview="true"] .bb-shell-masthead {
@@ -57,12 +57,12 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
   grid-column: 1; grid-row: 3;
   display: flex; flex-direction: column; gap: 14px;
   min-width: 0; min-height: 0; padding: 8px var(--bb-duo-inset) 0;
-  overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin;
+  overflow: hidden;
 }
 .bb-app-shell[data-duo-overview="true"] .bb-metrics-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: minmax(0, .8fr) minmax(0, 1.2fr);
-  flex: 0 0 300px; min-height: 0; height: 300px; width: 100%; margin: 0;
+  flex: 0 1 300px; min-height: 0; height: 300px; width: 100%; margin: 0;
 }
 .bb-app-shell[data-duo-overview="true"] .bb-metric-card { min-height: 0; padding-block: 10px; }
 .bb-app-shell[data-duo-overview="true"] .bb-metric-card:nth-child(odd) { border-left: 0; }
@@ -71,6 +71,16 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
 .bb-app-shell[data-duo-overview="true"] .bb-report-comparison {
   flex: 0 0 auto; min-width: 0; padding: 0; margin: 0;
 }
+/* Expanded comparison uses horizontal metric headings, preserving 44px controls. */
+.bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-metric-card {
+  display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  grid-template-rows: 44px auto; align-content: center; gap: 4px 6px; padding-block: 8px;
+}
+.bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) :is(.bb-metric-head, .bb-metric-label) { grid-column: 1; grid-row: 1; min-width: 0; }
+.bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-metric-value { grid-column: 2; grid-row: 1; align-self: center; margin-top: 0; font-size: 24px; text-align: right; }
+.bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) :is(.bb-left-categories, .bb-savings-progress) { grid-column: 1 / -1; grid-row: 2; margin-top: 0; }
+.bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-left-categories { min-height: 44px; }
+.bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-savings-progress-labels { margin-top: 6px; }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-band {
   --bb-chart-carousel-heading-height: var(--bb-duo-heading);
   --bb-chart-bottom-gap: 0px;
@@ -115,6 +125,18 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
   .bb-app-shell[data-duo-overview="true"] .bb-left-categories { min-height: 44px; margin-top: 6px; }
   .bb-app-shell[data-duo-overview="true"] .bb-savings-progress { margin-top: 8px; }
   .bb-app-shell[data-duo-overview="true"] .bb-chart-page { padding-top: 8px; gap: 10px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-content { padding: 12px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-hero { min-height: 0; padding-bottom: 6px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-difference { font-size: 32px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-direction { margin-top: 4px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-months { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 6px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head { grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-name,
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger { font-size: 14px; gap: 4px; padding-inline: 0; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger svg { flex-basis: 14px; width: 14px; height: 14px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger > span { overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-amount { font-size: 16px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-period { margin-top: 6px; }
   .bb-duo-category-list button { padding-block: 3px; line-height: 1.2; }
   .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
   .bb-duo-category-list:has(> li:nth-child(9)) button { padding-block: 2px; line-height: 1.1; }
@@ -128,4 +150,15 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
   .bb-app-shell[data-duo-overview="true"] .bb-category-overflow { padding-top: 6px; gap: 4px; }
   .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
   .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list button { padding-block: 2px; line-height: 1.1; }
+}
+@media (max-height: 520px) {
+  .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 40px; grid-template-rows: 66px var(--bb-duo-heading) minmax(0, 1fr); padding-bottom: 12px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-report-header h1 { font-size: 30px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { padding-top: 4px; gap: 8px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-chart-page { padding-top: 4px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-content { padding: 10px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-comparison-difference { font-size: 30px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-metric-card { padding-block: 6px; row-gap: 2px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-metric-value { font-size: 22px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary:has(.bb-report-comparison[data-open="true"]) .bb-savings-progress-labels { margin-top: 4px; }
 }
