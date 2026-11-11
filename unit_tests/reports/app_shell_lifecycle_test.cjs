@@ -23,7 +23,7 @@ const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { on
   setTimeout(cb, delay) { const id = ++timerId; timers.set(id, { cb, delay }); return id }, clearTimeout(id) { timers.delete(id) },
   setInterval(cb, delay) { const id = ++timerId; intervals.set(id, { cb, delay }); return id }, clearInterval(id) { intervals.delete(id) },
 }
-const doc = { ...events('document'), visibilityState: 'visible', activeElement: new Element(),
+const doc = { ...events('document'), body: {}, visibilityState: 'visible', activeElement: new Element(),
   documentElement: { dataset: {}, style: {}, scrollHeight: 6000, classList: {add(){},remove(){}} },
   querySelector: selector => selector === '.bb-shell-shared .bb-reimbursement-section' ? sharedTarget : selector === '.bb-widget-settings' ? widgetTarget : null,
 }
@@ -40,6 +40,7 @@ function load(file) {
   const requireModule = name => {
     if (name.endsWith('.css')) return {}
     if (name === 'konsta/react') return konsta.exports
+    if (name === 'react-dom') return {...req(name),createPortal:(children,target)=>{assert.equal(target,doc.body,'Duo dock portals to the viewport outside page content');return children}}
     if (name === 'react' && file.endsWith('/expense-app-shell.tsx')) return {...React,startTransition:action=>holdPageTransitions?pageTransitions.push(action):React.startTransition(action)}
     if (!name.startsWith('.')) return req(name)
     const base = path.resolve(path.dirname(file), name)

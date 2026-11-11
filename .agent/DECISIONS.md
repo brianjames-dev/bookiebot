@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-11 - Persistent viewport-owned Duo dock
+
+The user clarifies the remaining sequence: closed navigation is initially correct; unfold places it on the right, folding restores its initial bottom position, then scrolling makes it page-relative. Isolate the dock from the page DOM instead of recalculating a bottom offset. Portal a persistent, top-anchored `100dvh` surface directly to `document.body`; position the existing glass dock absolutely at that surface's bottom. Preserve the surface across folds and reset only the dock's transient contact state. Pass orientation/gutter geometry explicitly; React context, selected navigation store, keyboard hiding and styling remain intact. Standard devices retain their original DOM.
+
+Delete the JS viewport-height correction and its listeners. [WebKit documents unreliable installed-app viewport readings after rotation](https://bugs.webkit.org/show_bug.cgi?id=218983); this supports avoiding those readings, without establishing the exact device rendering cause. No intentional transformed ancestor was found in the normal page source. Regression fixtures separately model stale viewport readings and a viewport-sized page containing block after folding: the old bundle moves 645 → 445 → 245px with scrolling, while the body-level surface remains pinned. These model the failure family; native Home Screen acceptance remains required.
+
+This supersedes the preceding calculated fixed-bottom correction. Keep the approved static two-page/comparison layout and financial behavior unchanged.
+
 ## 2026-11-10 - Static Duo comparison and scroll-independent navigation
 
 The user requires the full expanded comparison and all metrics to fit the unfolded left half without scrolling. Let the metrics yield height and arrange each label/value horizontally while comparison is open, preserving existing financial components, 44px controls and the 14px gap. Short landscape views place both comparison months in one row and tighten spacing; the shortest supported height uses an 8px gap. Keep the right chart stationary and closed portrait unchanged. Verify content bounds rather than hiding overflow alone.
