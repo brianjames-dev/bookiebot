@@ -45,7 +45,7 @@ function harness(reducedMotion = false, options = {}) {
     matchMedia: () => ({ matches: reducedMotion }),
     setTimeout(fn, delay) { const id = ++serial; timers.set(id, { fn, delay }); return id },
     clearTimeout(id) { timers.delete(id) },
-    scrollTo(x, y) { calls.push(["scroll", x, y]); win.scrollY = y },
+    scrollTo(x, y) { const left = typeof x === "object" ? x.left : x, top = typeof x === "object" ? x.top : y; calls.push(["scroll", left, top]); win.scrollY = top },
   }
   const listeners = new Map()
   class Element {
@@ -58,7 +58,7 @@ function harness(reducedMotion = false, options = {}) {
     setAttribute(key, value) { this.attributes[key] = value },
     focus(options) { calls.push(["focus-title", options.preventScroll]); doc.activeElement = title },
   }
-  const doc = { body, documentElement: root, activeElement: trigger }
+  const doc = { querySelector: () => null, body, documentElement: root, activeElement: trigger }
   const dialog = {
     open: false,
     showModal() {
@@ -104,6 +104,10 @@ function harness(reducedMotion = false, options = {}) {
     useLayoutEffect: effect,
     useEffect: effect,
   })
+  const scrollModule = ts.transpileModule(fs.readFileSync(path.join(frontend, "src/page-scroll.ts"), "utf8"), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
+  }).outputText
+  vm.runInContext(scrollModule, runtime)
   vm.runInContext(outputText, runtime)
   function flush() {
     while (dirty) {

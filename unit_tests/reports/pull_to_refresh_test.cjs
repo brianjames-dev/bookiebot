@@ -6,7 +6,7 @@ const req = createRequire(path.join(frontend, 'package.json'))
 const React = req('react'), Renderer = req('react-test-renderer'), ts = req('typescript'), {act} = Renderer
 global.IS_REACT_ACT_ENVIRONMENT = true
 const h = React.createElement, listeners = new Map(), timers = new Map(), frames = new Map(), classes = new Set()
-let serial = 0, modal = false
+let serial = 0, modal = false, duoSurface = null
 class Element {
   constructor({tag = 'div', selector = '', scrollable = false} = {}) { this.tag = tag; this.selector = selector; this.scrollable = scrollable; this.scrollHeight = scrollable ? 200 : 0; this.clientHeight = 100; this.parentElement = null }
   closest(selectors) { return selectors.split(',').some(selector=>selector===this.tag||selector===this.selector) ? this : this.parentElement?.closest(selectors)??null }
@@ -18,7 +18,7 @@ const eventHost = name => ({
 const win = {...eventHost('window'), scrollY: 0, getComputedStyle: element => ({overflowY:element.scrollable ? 'auto' : 'visible'}),
   setTimeout(callback,delay) { const id = ++serial; timers.set(id,{callback,delay}); return id }, clearTimeout(id) { timers.delete(id) },
 }
-const doc = {...eventHost('document'), body: new Element(), querySelector: () => modal ? {} : null,
+const doc = {...eventHost('document'), body: new Element(), querySelector: selector => selector.includes('data-duo-enabled') ? duoSurface : modal ? {} : null,
   documentElement: Object.assign(new Element({scrollable:true}),{dataset:{}, classList:{add:name=>classes.add(name),remove:name=>classes.delete(name)}}),
 }
 const cache = new Map()
@@ -59,7 +59,7 @@ function fire(type,{y=20,x=30,target=new Element(),touches,changedTouches,cancel
 const start = options => act(()=>fire('touchstart',options))
 const paint = () => {for(const [id,callback] of [...frames]){frames.delete(id);callback()}}
 const move = options => {let event;act(()=>{event=fire('touchmove',options);paint()});return event}
-const scroll = y => act(()=>{win.scrollY=y;listeners.get('window:scroll').callback();paint()})
+const scroll = y => act(()=>{if(duoSurface)duoSurface.scrollTop=y;else win.scrollY=y;listeners.get('window:scroll').callback({target:duoSurface??doc});paint()})
 const release = async options => {await act(async()=>{fire('touchend',options);await Promise.resolve()})}
 const settle = async () => {await act(async()=>{await Promise.resolve();await Promise.resolve()})}
 
@@ -198,6 +198,20 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   failure=true;await act(async()=>renderer.root.findByType('button').props.onClick());await settle();assert.equal(phase(),'error')
   assert.ok(renderer.root.findByProps({role:'status'}).children.join('').includes('Couldn’t refresh Overview'))
   failure=false;await act(async()=>renderer.root.findByType('button').props.onClick());await settle();assert.equal(phase(),'done','Common keyboard/button path recovers from failure')
+  // The opted-in Duo page owns native scrolling; the document remains at 0.
+  duoSurface = Object.assign(new Element({scrollable:true}),{scrollTop:0,scrollLeft:0})
+  const content = new Element(); content.parentElement = duoSurface
+  const beforeDuo = calls.length
+  start({target:content});move({y:290});await release({y:290});await settle()
+  assert.equal(calls.length,beforeDuo+1,'Duo main content remains refreshable despite being a native overflow scroller')
+  scroll(120);start({target:content});move({y:290});await release({y:290})
+  assert.equal(calls.length,beforeDuo+1,'A scrolled Duo page cannot refresh just because window.scrollY is zero')
+  scroll(0);start({target:content});move({y:290});scroll(-32);await release({y:290});await settle()
+  assert.equal(calls.length,beforeDuo+2)
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-release-overscroll'],'32px','Duo bounce uses the native page offset')
+  const inner = new Element({scrollable:true});inner.parentElement=duoSurface
+  start({target:inner});move({y:290});await release({y:290});assert.equal(calls.length,beforeDuo+2,'Other nested scrollers keep their own gestures')
+  duoSurface=null
   act(()=>renderer.unmount());assert.equal(listeners.size,0);assert.equal(timers.size,0);assert.equal(frames.size,0);assert.equal(classes.size,0)
 
   const registry=new PageRefreshRegistry();let completed=false

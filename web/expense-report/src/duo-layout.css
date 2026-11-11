@@ -1,5 +1,13 @@
 /* Closed phones keep main's component layout. */
 .bb-overview-summary { display: contents; }
+/* Keep this ownership constant in both poses. iOS must never have to pin the
+   dock over a document that starts/stops scrolling when the phone folds. */
+:root:has(.bb-page[data-duo-enabled="true"]),
+body:has(.bb-page[data-duo-enabled="true"]) { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.bb-page[data-duo-enabled="true"] {
+  position: fixed; inset: 0; height: 100dvh; min-height: 0;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain;
+}
 .bb-app-shell[data-duo-landscape="true"] {
   --bb-duo-inset: clamp(16px, 4vw, 35px);
   --bb-duo-heading: 48px;
