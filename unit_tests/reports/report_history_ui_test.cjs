@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict")
+const chart = require("./load_frontend_module.cjs")("comparison-chart.ts")
 const fs = require("node:fs")
 const path = require("node:path")
 const vm = require("node:vm")
@@ -37,6 +38,7 @@ function harness() {
     init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
   })
   const require = name => name === "react" ? hooks : name.endsWith(".css") ? {}
+    : name === "./comparison-chart" ? chart
     : name === "./app-navigation" ? {useAppNavigation: () => null}
     : name.startsWith("./components") ? { SlidingSelection: "selection", FittedAmount: "amount", MonthPicker: "month-picker" } : req(name)
   const source = ts.transpileModule(fs.readFileSync("web/expense-report/src/report-history.tsx", "utf8"), {
@@ -125,6 +127,7 @@ async function main() {
       init.signal.addEventListener("abort", () => { if (!ignoreAbort) reject(new Error("aborted")) }, { once: true })
     }),
     require: name => name === "react" ? React : name.endsWith(".css") ? {}
+      : name === "./comparison-chart" ? chart
       : name === "./app-navigation" ? {useAppNavigation: () => ({preferences: {mode},duoLandscape})}
       : name.startsWith("./components") ? {
         FittedAmount: ({children, className}) => React.createElement("span", {className}, children),
@@ -337,19 +340,25 @@ async function main() {
   renderer.act(() => tree.update(component()))
   await finish(calls.at(-1), 200, {...result("2026-08", "Matching days"),selected:period(0),baseline:period(0),changeAmount:0,changePercent:null})
   assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$0.00 Same spending/)
-  const fills = () => tree.root.findAllByProps({className:"bb-comparison-fill"}).map(node => node.props.style.width)
-  assert.deepEqual(fills(), ["0%", "0%"], "Zero periods never create NaN or a full bar")
+  const fills = () => tree.root.findAllByProps({className:"bb-comparison-fill"}).map(node => node.props.width)
+  assert.deepEqual(fills(), [0, 0], "Zero periods never create NaN or a full bar")
   assert.equal(tree.root.findAllByProps({className:"bb-comparison-percent"}).length, 0, "A null percentage is not invented")
+  assert.equal(tree.root.findByProps({className:"bb-comparison-scale"}).findAllByType("p").length,0,"Dollar-axis labels contain no contextual caption")
+  assert.equal(tree.root.findByProps({className:"bb-comparison-period"}).parent.props.className,"bb-comparison-content","Period/coverage stays in a separate caption line")
   assert.equal(tree.root.findByProps({"aria-label":"Comparison month"}), pickerBefore)
   report = {...report}
   renderer.act(() => tree.update(component()))
   await finish(calls.at(-1), 200, {...result("2026-08", "No baseline spending"),selected:period(125),baseline:period(0),changeAmount:125,changePercent:null})
-  assert.deepEqual(fills(), ["100%", "0%"])
+  assert(fills()[0]>0&&fills()[0]<1000&&fills()[1]===0,"A positive month uses rounded headroom; an actual zero stays empty")
+  assert.equal(tree.root.findByProps({className:"bb-comparison-scale"}).props["aria-label"],"Shared dollar scale: $0 to $150")
   assert.equal(tree.root.findAllByProps({className:"bb-comparison-percent"}).length, 0, "A zero baseline has no infinite percentage")
   report = {...report}
   renderer.act(() => tree.update(component()))
   await finish(calls.at(-1), 200, {...result("2026-08", "Net refunds"),selected:period(-25.50),baseline:period(50),changeAmount:-75.50,changePercent:-151})
-  assert.deepEqual(fills(), ["0%", "100%"], "Net refunds preserve signed dollars without negative-width bars")
+  assert(fills().every(width=>width>0&&width<1000),"Net refunds and spending both have visible positive-width bars")
+  const starts=tree.root.findAllByProps({className:"bb-comparison-fill"}).map(node=>node.props.x)
+  assert(starts[0]<starts[1],"Refunds extend to the left of the shared zero origin")
+  assert.equal(tree.root.findAllByProps({className:"bb-comparison-zero"}).length,2)
   assert.match(read(), /-\$25.50/)
   assert.match(text(tree.root.findByProps({className:"bb-comparison-change"}).props.children), /\$75.50.*151.*less spending/)
   assert.equal(tree.root.findAllByType("table").length, 0, "The removed exclusions table stays absent for refunds")

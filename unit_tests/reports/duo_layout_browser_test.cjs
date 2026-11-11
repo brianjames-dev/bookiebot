@@ -1,5 +1,5 @@
 // Production-bundle read-only fixtures. A prior main asset directory enables
-// exact closed-phone geometry comparison during release verification.
+// released chrome/frame comparison and title-to-value gap checks.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),{createRequire}=require('node:module');
 const root=path.resolve(__dirname,'../..'),req=createRequire(path.join(root,'web/expense-report/package.json'));
 const {chromium,webkit}=process.env.BOOKIEBOT_PLAYWRIGHT_MODULE?require(process.env.BOOKIEBOT_PLAYWRIGHT_MODULE):req('playwright');
@@ -56,7 +56,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   let value;
   if(name==='/app/expenses/data')value=page.url().includes('pressure=1')?pressureReport:report;
   else if(name==='/app/expenses/months')value={currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
-  else if(name==='/app/expenses/comparison'){if(comparison.hold)await new Promise(resolve=>comparison.release=resolve);value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:4080,complete:false},baseline:{spending:4500,complete:false},changeAmount:-420,changePercent:-9.3,status:'partial',coverageNote:'Synthetic comparison'};}
+  else if(name==='/app/expenses/comparison'){if(comparison.hold)await new Promise(resolve=>comparison.release=resolve);value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:3043.37,complete:false},baseline:{spending:3149.82,complete:false},changeAmount:-106.45,changePercent:-3.4,status:'partial',coverageNote:'Synthetic comparison'};}
   else if(name==='/app/reconciliation')value={enabled:true,checkedAt:null,items:[]};
   else if(name==='/app/transactions')value={items:Array.from({length:24},(_,i)=>({id:'fixture-'+i,actionId:'fixture-'+i,version:'fixture-v1',month:'2026-10',date:'2026-10-'+String(i+1).padStart(2,'0'),title:'Fixture purchase '+i,location:'Fixture',person:'Brian',kind:'expense',category:'food',categoryLabel:'Food',amountCents:1000,split:'',fields:{},editableFields:[],capabilities:{},reasons:{}})),total:24,nextOffset:null,categories:[],persons:[],month:'2026-10'};
   else if(name==='/app/reimbursements')value={enabled:true,ownerKey:'brian',currency:'USD',allocations:[],events:[],resets:[],resetState:'fixture'};
@@ -75,6 +75,35 @@ async function geometry(page){return page.evaluate(()=>{
  const q=s=>document.querySelector(s),box=s=>{const r=q(s).getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,cx:r.x+r.width/2,cy:r.y+r.height/2};};
  return {scroll:[document.documentElement.scrollWidth,document.documentElement.scrollHeight],duo:q('.bb-app-shell').dataset.duoOverview,header:box('.bb-report-header'),month:box('.bb-report-header h1'),tools:box('.bb-shell-header-actions'),mode:box('.bb-projection-control'),metrics:box('.bb-metrics-grid'),compare:box('.bb-comparison-card'),band:box('.bb-chart-carousel-band'),title:box('.bb-chart-carousel-title'),dots:box('.bb-chart-carousel-indicators'),nav:box('.bb-navigation-pane'),summary:box('.bb-category-mix-summary'),chart:box('.bb-category-chart-box'),legend:q('.bb-duo-category-list')?box('.bb-duo-category-list'):null,cards:[...document.querySelectorAll('.bb-metric-card')].map(x=>({bottom:x.getBoundingClientRect().bottom,last:x.lastElementChild.getBoundingClientRect().bottom})),sectors:[...document.querySelectorAll('.bb-category-pie-surface path.recharts-sector')].map(x=>x.getBoundingClientRect().toJSON())};
  });}
+async function comparisonVisual(page){return page.locator('.bb-comparison-card').evaluate(card=>{
+ const box=el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,cy:r.y+r.height/2};};
+ const tracks=[...card.querySelectorAll('.bb-comparison-track')];
+ return {amount:box(card.querySelector('.bb-comparison-difference')),direction:box(card.querySelector('.bb-comparison-direction')),
+  rows:tracks.map(el=>({...box(el),fill:getComputedStyle(el.querySelector('.bb-comparison-fill')).fill,background:getComputedStyle(el.querySelector('.bb-comparison-track-background')??el).fill,widthUnits:Number(el.querySelector('.bb-comparison-fill').getAttribute('width'))})),
+  scale:card.querySelector('.bb-comparison-scale')?.getAttribute('aria-label'),scaleText:card.querySelector('.bb-comparison-scale')?.textContent,
+  axis:card.querySelector('.bb-comparison-scale')?box(card.querySelector('.bb-comparison-scale')):null,period:box(card.querySelector('.bb-comparison-period')),
+  fonts:['.bb-comparison-difference','.bb-comparison-direction','.bb-comparison-month-name','.bb-comparison-amount'].map(q=>getComputedStyle(card.querySelector(q)).fontSize),
+  height:card.getBoundingClientRect().height};
+ });}
+function checkComparisonVisual(v){
+ assert(v.direction.x>=v.amount.right&&Math.abs(v.direction.cy-v.amount.cy)<1,'description sits inline to the right of the difference');
+ assert.equal(v.rows.length,2);assert(v.rows[1].y>v.rows[0].bottom,'bars stack vertically');
+ assert.equal(v.rows[0].x,v.rows[1].x);assert.equal(v.rows[0].width,v.rows[1].width,'both rows have the same dollar scale and zero origin');
+ assert.equal(v.scale,'Shared dollar scale: $0 to $3,500');
+ assert(v.period.y>=v.axis.bottom,'period/coverage caption has its own line outside the dollar-axis labels');
+ assert.equal(v.scaleText,'$0$3,500','dollar-axis row contains only the visual scale values');
+ assert(v.rows.every(row=>row.widthUnits>850&&row.widthUnits<950&&row.fill!==row.background),'the screenshot amounts produce two nearly full, visible SVG fills, with rounded headroom');
+ assert.notEqual(v.rows[0].fill,v.rows[1].fill,'the two months have distinct filled colors');
+ assert(Math.abs(v.rows[0].widthUnits/v.rows[1].widthUnits-3043.37/3149.82)<1e-8,'visual lengths preserve the exact spending ratio');
+ assert(v.height<200,'comparison stays compact');
+}
+async function metricTitleGaps(page){return page.locator('.bb-metrics-grid').evaluate(grid=>[...grid.querySelectorAll('.bb-metric-card')].map(card=>{
+ const title=card.querySelector('.bb-metric-explain')??card.querySelector('.bb-metric-label');
+ const text=document.createRange();text.selectNodeContents(title.firstChild);
+ const amount=card.querySelector('.bb-metric-value .bb-amount-integer')??card.querySelector('.bb-metric-value .bb-fitted-amount-text');
+ const digits=document.createRange();digits.selectNodeContents(amount);
+ return digits.getBoundingClientRect().top-text.getBoundingClientRect().bottom;
+}));}
 async function metricSnapshot(page){return page.locator('.bb-metrics-grid').evaluate(grid=>{
  const selectors='.bb-metric-card,.bb-metric-head,.bb-metric-label,.bb-metric-value,.bb-left-categories,.bb-savings-progress,.bb-savings-progress-labels';
  return [grid,...grid.querySelectorAll(selectors)].map(el=>{
@@ -270,22 +299,42 @@ async function bottomScroll(page){
  await page.emulateMedia({reducedMotion:'reduce'});
 }
 ;(async()=>{
+ let checked=0;
  for(const engine of [chromium,webkit]){
   const browser=await engine.launch({headless:true});
   try{
    for(const dark of [false,true]){
-    for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58],[867,480]]){
+    for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58],[867,480]].filter(p=>!process.env.BOOKIEBOT_DUO_POSE||process.env.BOOKIEBOT_DUO_POSE===p[0]+'x'+p[1])){
      const {page,errors,unexpected,comparison}=await fixture(browser,width,height,dark,false,false,safeRight);
      if(safe){await page.evaluate(()=>document.querySelectorAll('.bb-app-shell').forEach(el=>el.style.setProperty('--bb-duo-nav-bottom','58px','important')));await page.waitForTimeout(100);}
-     const m=await geometry(page);console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
+     const m=await geometry(page);checked++;console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
      assert.equal(m.scroll[0],width,'horizontal overflow');
+     const titleGaps=await metricTitleGaps(page);assert(titleGaps.every(gap=>gap>=0&&gap<=10),'compact titles and numbers remain separated and close: '+JSON.stringify(titleGaps));
      if(width<800){
       assert.equal(m.duo,undefined);assert.equal(m.legend,null);
       assert.equal(m.compare.y-m.metrics.bottom,14,'main comparison gap');
-      if(baseline){const before=await fixture(browser,width,height,dark,true),b=await geometry(before.page);for(const key of ['header','month','tools','mode','metrics','compare','band','title','dots','nav','summary','chart'])assert.deepEqual(m[key],b[key],'closed main geometry '+key);await before.page.close();}
+      if(baseline){const before=await fixture(browser,width,height,dark,true),b=await geometry(before.page);
+       for(const key of ['header','month','tools','mode','nav'])assert.deepEqual(m[key],b[key],'closed chrome retains its geometry '+key);
+       for(const key of ['x','y','width'])assert.equal(m.metrics[key],b.metrics[key],'compact metrics preserve their location and width');
+       assert(m.metrics.height<=b.metrics.height,'tighter title/value spacing never enlarges the closed metric group');
+       for(const key of ['compare','band','title','dots','summary','chart']){
+        for(const dimension of ['x','width','height'])assert.equal(m[key][dimension],b[key][dimension],'component shape remains unchanged '+key+' '+dimension);
+        assert.equal(m[key].y-m.metrics.bottom,b[key].y-b.metrics.bottom,'only the compact metric height shifts later content '+key);
+       }
+       const oldGaps=await metricTitleGaps(before.page),gaps=await metricTitleGaps(page);
+       assert(gaps.every((gap,i)=>gap<oldGaps[i]*.6),'title/value whitespace is substantially reduced in all four closed cards: '+JSON.stringify({oldGaps,gaps}));
+       await before.page.close();}
+      await page.getByRole('button',{name:'Compare spending',exact:true}).click();
+      await page.locator('.bb-comparison-change').waitFor();
+      checkComparisonVisual(await comparisonVisual(page));
+      if(process.env.BOOKIEBOT_DUO_SHOTS){await page.locator('.bb-comparison-card').evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}-closed-${width}.png`),fullPage:true});}
+      await page.getByRole('button',{name:'Collapse comparison',exact:true}).click();
      }else{
       assert.equal(m.duo,'true');assert.equal(m.scroll[1],height,'static unfolded page');
-      if(baseline&&height>=648){const prior=await fixture(browser,width,height,dark,true,false,safeRight);assert.deepEqual(await metricSnapshot(page),await metricSnapshot(prior.page),'normal unfolded cards retain the released closed-comparison geometry and styling');await prior.page.close();}
+      if(baseline&&height>=648){const prior=await fixture(browser,width,height,dark,true,false,safeRight);
+       assert.deepEqual(m.metrics,(await geometry(prior.page)).metrics,'normal unfolded card frames retain their released geometry');
+       const oldGaps=await metricTitleGaps(prior.page),gaps=await metricTitleGaps(page);
+       assert(gaps.every((gap,i)=>gap<oldGaps[i]*.6),'all unfolded cards have a substantially tighter title/value gap: '+JSON.stringify({oldGaps,gaps}));await prior.page.close();}
       const usable=867,fold=475.5;
       assert(Math.abs(m.band.x-fold)<1,'physical fold, including an already-excluded safe area');
       assert(Math.abs(m.nav.cx-(fold+usable)/2)<1,'nav centered within the usable right half');assert.equal(m.nav.width,347.5);assert.equal(m.nav.height,54);
@@ -315,6 +364,7 @@ async function bottomScroll(page){
       await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
       await page.locator('.bb-comparison-change').waitFor();
       const after=await geometry(page);
+      checkComparisonVisual(await comparisonVisual(page));
       for(const key of ['x','y','width'])assert.equal(after.metrics[key],before.metrics[key],'expanded summary retains its position and width');
       assert.deepEqual(after.metrics,before.metrics,'comparison results leave the complete metric grid unchanged');
       assert.deepEqual(await metricSnapshot(page),beforeMetrics,'comparison results preserve every metric frame, heading, amount, target and progress row');
@@ -331,13 +381,17 @@ async function bottomScroll(page){
       assert.deepEqual(after.band,before.band,'comparison leaves the chart page in place');
       assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),true,'chart remains visible beside comparison');
       assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'the entire unfolded page stays static');
-      assert(await page.locator('.bb-overview-summary').evaluate(el=>{
+      const fit=await page.locator('.bb-overview-summary').evaluate(el=>{
        const limit=el.getBoundingClientRect(),metrics=el.querySelector('.bb-metrics-grid'),card=el.querySelector('.bb-comparison-card');
        el.scrollTop=9999;
-       return el.scrollTop===0&&el.scrollHeight<=el.clientHeight+1&&card.getBoundingClientRect().bottom<=limit.bottom+1&&metrics.scrollHeight<=metrics.clientHeight+1;
-      }),'expanded cards and complete comparison fit without scroll or clipping');
+       return {scrollTop:el.scrollTop,scrollHeight:el.scrollHeight,height:el.clientHeight,bottom:limit.bottom,comparisonBottom:card.getBoundingClientRect().bottom,metricScroll:metrics.scrollHeight,metricHeight:metrics.clientHeight,comparisonHeight:card.getBoundingClientRect().height,contentHeight:card.querySelector('.bb-comparison-content').offsetHeight};
+      });
+      assert(fit.scrollTop===0&&fit.scrollHeight<=fit.height+1&&fit.comparisonBottom<=fit.bottom+1&&fit.metricScroll<=fit.metricHeight+1,'expanded cards and complete comparison fit without scroll or clipping: '+JSON.stringify(fit));
       if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&!safeRight&&!safe)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}-${height}.png`),fullPage:true});
+      const openVisual=await comparisonVisual(page);
       await page.setViewportSize({width:382,height:657});await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
+      const closedVisual=await comparisonVisual(page);checkComparisonVisual(closedVisual);
+      if(height>520)assert.deepEqual(closedVisual.fonts,openVisual.fonts,'closed Duo uses the same comparison text scale as open Duo');
       await page.setViewportSize({width,height});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();
       await tap(page,page.getByRole('button',{name:'Collapse comparison',exact:true}));
       await page.locator('.bb-comparison-card[data-open="false"]').waitFor();
@@ -387,5 +441,6 @@ async function bottomScroll(page){
    }
   }finally{await browser.close();}
  }
- console.log('Duo production layout, exact closed/main parity, rotation and sample-data guards pass');
+ assert(checked>0,'the requested Duo pose must match a supported fixture');
+ console.log('Duo comparison, compact metrics, shared scale, separate caption and fold/scroll regressions pass');
 })().catch(e=>{console.error(e);process.exit(1)});

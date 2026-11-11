@@ -83,22 +83,27 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-app-shell[data-duo-overview="true"] .bb-report-comparison {
   min-width: 0; padding: 0; margin: 0;
 }
-/* Reserve the comparison slot in both states; opening it never reshapes cards. */
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-content { padding: 12px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-hero { min-height: 0; padding-bottom: 6px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-difference { font-size: 24px; line-height: 1.2; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-direction { margin-top: 3px; font-size: 11px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-percent { gap: 4px; padding: 4px 6px; font-size: 11px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-percent svg { width: 14px; height: 14px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-months { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 6px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head { grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-month-name,
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger { font-size: 13px; gap: 4px; padding-inline: 0; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger svg { flex-basis: 14px; width: 14px; height: 14px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger > span { overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-amount { font-size: 14px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-track { height: 6px; }
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-period { margin-top: 6px; }
+/* Compact comparison styling is shared by both Duo poses. */
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-content { padding: 10px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-hero { min-height: 0; padding-bottom: 4px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-change { display: grid; grid-template-columns: fit-content(45%) minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-hero-main { display: contents; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-difference { grid-column: 1; grid-row: 1; font-size: 24px; line-height: 1.2; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-direction { grid-column: 2; grid-row: 1; margin: 0; font-size: 11px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-percent { grid-column: 3; grid-row: 1; gap: 4px; padding: 4px 6px; font-size: 11px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-percent svg { width: 14px; height: 14px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-months { grid-template-columns: minmax(0, 1fr); gap: 4px; padding-top: 4px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-head { grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-name,
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-head .bb-month-trigger { font-size: 13px; gap: 6px; padding-inline: 0; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-row:first-child .bb-comparison-month-head { min-height: 30px; padding-bottom: 8px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-row:first-child .bb-comparison-month-name { min-height: 0; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-head .bb-month-trigger svg { flex-basis: 14px; width: 14px; height: 14px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-head .bb-month-trigger > span { overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-amount { font-size: 14px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-track { height: 6px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-scale { margin-top: 4px; font-size: 10px; line-height: 1.4; }
+.bb-app-shell[data-duo-enabled="true"] .bb-comparison-period { font-size: 10px; }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-band {
   --bb-chart-carousel-heading-height: var(--bb-duo-heading);
   --bb-chart-bottom-gap: 0px;
@@ -138,24 +143,17 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
 @media (max-height: 610px) {
   .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 44px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { --bb-duo-comparison-space: 140px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { --bb-duo-comparison-space: 160px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-card { padding-block: 8px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-value { font-size: 24px; margin-top: 4px; }
   .bb-app-shell[data-duo-overview="true"] .bb-left-categories { min-height: 44px; margin-top: 6px; }
   .bb-app-shell[data-duo-overview="true"] .bb-savings-progress { margin-top: 8px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-content { padding: 8px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-hero { padding-bottom: 2px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-row:first-child .bb-comparison-month-head { min-height: 24px; padding-bottom: 6px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-row:first-child .bb-comparison-month-name { line-height: 18px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-scale { margin-top: 2px; line-height: 1.3; }
   .bb-app-shell[data-duo-overview="true"] .bb-chart-page { padding-top: 8px; gap: 10px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-content { padding: 10px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-hero { padding-bottom: 4px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-change { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-hero-main { display: contents; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-difference { grid-column: 1; grid-row: 1; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-direction { grid-column: 2; grid-row: 1; margin: 0; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-percent { grid-column: 3; grid-row: 1; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-months { gap: 10px; padding-top: 4px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-name,
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-month-head .bb-month-trigger { font-size: 12px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-track { height: 4px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-period { margin-top: 4px; font-size: 10px; line-height: 1.4; }
   .bb-duo-category-list button { padding-block: 3px; line-height: 1.2; }
   .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
   .bb-duo-category-list:has(> li:nth-child(9)) button { padding-block: 2px; line-height: 1.1; }
@@ -173,14 +171,25 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 @media (max-height: 520px) {
   .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 40px; grid-template-rows: 66px var(--bb-duo-heading) minmax(0, 1fr); padding-bottom: 12px; }
   .bb-app-shell[data-duo-overview="true"] .bb-report-header h1 { font-size: 30px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { --bb-duo-comparison-space: 116px; padding-top: 4px; gap: 8px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-metric-card { padding-block: 6px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-left-categories { margin-top: 4px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-savings-progress { margin-top: 6px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-savings-progress-labels { margin-top: 8px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { --bb-duo-comparison-space: 142px; padding-top: 4px; gap: 8px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-metric-card { padding-block: 4px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-left-categories { margin-top: 0; }
+  .bb-app-shell[data-duo-overview="true"] .bb-savings-progress { margin-top: 4px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-savings-progress-labels { margin-top: 5px; }
   .bb-app-shell[data-duo-overview="true"] .bb-chart-page { padding-top: 4px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-content { padding: 8px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-hero { padding-bottom: 2px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-difference { font-size: 22px; line-height: 1.1; }
-  .bb-app-shell[data-duo-overview="true"] .bb-comparison-period { line-height: 1.3; }
+  .bb-app-shell[data-duo-overview="true"] .bb-metric-value { margin-top: 0; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-content { padding: 6px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-hero { padding-bottom: 1px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-difference { font-size: 22px; line-height: 1.1; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-name,
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-head .bb-month-trigger { font-size: 12px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-row:first-child .bb-comparison-month-head { min-height: 20px; padding-bottom: 4px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-month-row:first-child .bb-comparison-month-name { line-height: 16px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-track { height: 4px; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-scale { margin-top: 2px; line-height: 1.3; }
+  .bb-app-shell[data-duo-enabled="true"] .bb-comparison-period { margin-top: 0; line-height: 1.3; }
 }
+/* Keep titles visually close to values without shrinking their help targets. */
+.bb-app-shell[data-duo-enabled="true"] .bb-metric-label { min-height: 44px; align-items: flex-end; line-height: 20px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-metric-explain { min-height: 44px; align-items: flex-end; padding-bottom: 0; line-height: 20px; }
+.bb-app-shell[data-duo-enabled="true"] .bb-metric-value { margin-top: 0; }

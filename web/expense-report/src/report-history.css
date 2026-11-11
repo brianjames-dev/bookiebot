@@ -30,15 +30,21 @@
 .bb-comparison-percent { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 8px; background: color-mix(in srgb, var(--bb-comparison-change-color) 10%, hsl(var(--card))); font-size: 12px; line-height: 1.5; white-space: nowrap; }
 .bb-comparison-card[data-direction="more"] .bb-comparison-percent svg { transform: rotate(180deg); }
 .bb-comparison-months { display: grid; gap: 10px; border-top: 1px solid hsl(var(--border)); padding-top: 12px; }
-.bb-comparison-month-row { min-width: 0; }
+.bb-comparison-month-row { --bb-comparison-bar-color: hsl(var(--primary)); position: relative; min-width: 0; }
+.bb-comparison-month-row[data-baseline="true"] { --bb-comparison-bar-color: hsl(var(--chart-4)); }
 .bb-comparison-month-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: 0 8px; min-height: 44px; }
 .bb-comparison-month-name { display: flex; align-items: center; min-height: 44px; color: hsl(var(--muted-foreground)); font-size: 16px; line-height: 20px; }
 .bb-comparison-month-head .bb-month-trigger { min-width: 0; max-width: 100%; min-height: 44px; padding: 8px 8px 8px 0; gap: 12px; border: 0; border-radius: 6px; background: transparent; font-size: 16px; line-height: 20px; }
 .bb-comparison-amount { text-align: right; min-width: 0; max-width: 100%; font-size: 18px; line-height: 1.25; font-weight: 500; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
-.bb-comparison-track { height: 8px; overflow: hidden; border-radius: 6px; background: color-mix(in srgb, hsl(var(--foreground)) 10%, hsl(var(--card))); }
-.bb-comparison-fill { display: block; height: 100%; border-radius: inherit; background: hsl(var(--primary)); }
-.bb-comparison-month-row[data-baseline="true"] .bb-comparison-fill { background: color-mix(in srgb, hsl(var(--foreground)) 36%, hsl(var(--card))); }
-.bb-comparison-period { margin: 12px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.5; }
+.bb-comparison-month-name::before, .bb-comparison-month-head .bb-month-trigger::before { content: ""; flex: 0 0 6px; width: 6px; height: 6px; margin-right: 2px; border-radius: 50%; background: var(--bb-comparison-bar-color); }
+.bb-comparison-month-name { gap: 6px; }
+.bb-comparison-track { display: block; position: absolute; inset: auto 0 0; width: 100%; height: 6px; overflow: visible; pointer-events: none; }
+.bb-comparison-track-background { fill: color-mix(in srgb, hsl(var(--foreground)) 9%, hsl(var(--card))); }
+.bb-comparison-fill { fill: var(--bb-comparison-bar-color); }
+.bb-comparison-zero { stroke: hsl(var(--foreground) / .65); stroke-width: 2; }
+.bb-comparison-scale { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.bb-comparison-scale > span { white-space: nowrap; }
+.bb-comparison-period { min-width: 0; margin: 4px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.4; }
 @container (max-width: 300px) { .bb-comparison-amount { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { .bb-comparison-card, .bb-comparison-card * { transition: none !important; } }
 .bb-comparison-note { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.65; margin: 12px 0 0; }
