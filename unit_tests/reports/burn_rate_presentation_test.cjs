@@ -242,7 +242,8 @@ const names=new Set(['money','formatMoney','BurnRateChart','BurnRateMonthBalance
 const declarations=file.statements.filter(s=>ts.isFunctionDeclaration(s)?names.has(s.name?.text):ts.isVariableStatement(s)&&s.declarationList.declarations.some(d=>names.has(d.name.getText(file))))
 assert.equal(declarations.length,names.size)
 const surface=({children})=>React.createElement('div',null,children)
-const runtime={exports:{},require:req,useState:React.useState,useEffect:React.useEffect,useId:React.useId,useLayoutEffect:React.useLayoutEffect,useRef:React.useRef,useChartTooltipDismiss:()=>()=>{},X:()=>null,useMediaQuery:()=>true,burnRateBalance,positionBurnRateTooltip,
+let duoLandscape=false
+const runtime={exports:{},require:req,useState:React.useState,useEffect:React.useEffect,useId:React.useId,useLayoutEffect:React.useLayoutEffect,useRef:React.useRef,useAppNavigation:()=>({duoLandscape}),useChartTooltipDismiss:()=>()=>{},X:()=>null,useMediaQuery:()=>true,burnRateBalance,positionBurnRateTooltip,
   categoryMixPressure:()=>null,ChartContainer:surface,ResponsiveContainer:surface,ComposedChart:surface,Area:()=>null,CartesianGrid:()=>null,XAxis:()=>null,YAxis:()=>null,ReferenceLine:()=>null,Line:()=>null,ChartTooltip:()=>null}
 runtime.MetricAmount=({children,className})=>React.createElement('div',{className},children)
 vm.runInNewContext(compile(declarations.map(n=>n.getText(file)).join('\n')+'\nexports.Chart=BurnRateChart;exports.Tooltip=BurnRateTooltipContent;exports.Month=BurnRateMonthBalance;exports.Info=BurnRateInfoContent'),runtime)
@@ -251,6 +252,8 @@ const render=(Component,props)=>act(()=>{if(view)view.unmount();view=create(Reac
 const point={day:13,label:'13',dailySpend:400,actualSpend:1460,expectedSpend:1255.93,variance:204.07}
 const burn={budget:2994.92,spent:2029.32,remaining:965.60,daysInMonth:31,elapsedDays:26,expectedSpend:2511.87,totalDifference:-482.55,dailyDifference:-18.56,status:'under',series:[point]}
 render(runtime.exports.Chart,{burnRate:burn,categoryBalances:{},month:10})
+assert.equal(view.root.findByType(runtime.YAxis).props.width,58,'closed/ordinary chart keeps its axis width')
+assert.equal(view.root.findAllByType(surface).find(node=>node.props.data)?.props.margin.right,22,'closed/ordinary plot keeps its right margin')
 let text=JSON.stringify(view.toJSON())
 for(const expected of ['Available today','$482.55','Saving','$18.56','Through Oct 26','Month limit','$2,994.92','$2,029.32','$965.60'])assert.ok(text.includes(expected),expected)
 for(const removed of ['Details','Allowed/day','Actual/day','bb-burn-rate-pill','bb-burn-limit-row','bb-burn-legend'])assert.ok(!text.includes(removed),removed)
@@ -271,6 +274,11 @@ assert.equal(monthPanel.findByProps({className:'bb-burn-fraction'}).findByType('
 assert.equal(monthPanel.findByProps({className:'bb-burn-spent-label'}).children[0],'Spent')
 assert.ok(text.includes(' left'))
 let closes=0
+duoLandscape=true
+render(runtime.exports.Chart,{burnRate:burn,categoryBalances:{},month:10})
+assert.equal(view.root.findByType(runtime.YAxis).props.width,'auto','unfolded axis measures its labels')
+assert.equal(view.root.findAllByType(surface).find(node=>node.props.data)?.props.margin.right,8,'unfolded plot reclaims its extra right margin')
+duoLandscape=false
 render(runtime.exports.Info,{burnRate:burn,monthName:'Oct',onClose:()=>closes++})
 text=JSON.stringify(view.toJSON())
 for(const expected of ['Room to spend while staying on pace.','Allowance',' through Oct 26','$2,511.87','$2,029.32','$482.55','Food · Shopping · Wants subscriptions','Allowance reflects category coverage.'])assert.ok(text.includes(expected),expected)

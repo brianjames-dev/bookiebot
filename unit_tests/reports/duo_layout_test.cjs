@@ -6,12 +6,13 @@ for(const [width,height,inset,expected] of [[867,669,0,0],[951,648,0,84],[867,66
  assert.equal(geometry.landscape,true);assert.equal(geometry.overlay,expected);assert.equal(geometry.rail,84);
 }
 for(const [width,height] of [[382,657],[466,678],[669,951],[1280,800],[800,900],[867,400]])assert.equal(duoLandscapeGeometry(width,height,0).landscape,false);
-for(const [width,height] of [[320,219],[240,100],[0,0]]){
+for(const [width,height] of [[320,219],[360,280],[240,100],[0,0]]){
  const ring=duoRingGeometry({width,height});
  assert(ring.outerRadius>0);assert(ring.innerRadius>0);assert(ring.innerRadius<ring.outerRadius);
  if(height)assert(ring.outerRadius*2<=Math.min(width,height));
  assert(Math.abs(ring.innerRadius/ring.outerRadius-(1-52/219))<.00001);
 }
+assert.equal(duoRingGeometry({width:360,height:280}).outerRadius,138,'unfolded ring fills its available row without the former fixed-size cap');
 console.log('Duo viewport geometry, legacy preference identity and bounded ring geometry pass');
 
 // Execute the real preference/resize lifecycle without a browser or backend.

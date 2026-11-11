@@ -338,7 +338,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
             {ready && !amounts && <p className="bb-comparison-note">{ready.coverageNote}</p>}
             {change !== null && <div className="bb-comparison-change">
               <div className="bb-comparison-hero-main">
-                <FittedAmount className="bb-comparison-difference">{money(Math.abs(change))}</FittedAmount>
+                <FittedAmount intrinsic className="bb-comparison-difference">{money(Math.abs(change))}</FittedAmount>
                 {ready!.changePercent !== null && <span className="bb-comparison-percent">
                   {change !== 0 && <ArrowDownRight size={16} aria-hidden="true" />}{Math.abs(ready!.changePercent)}%
                 </span>}
@@ -352,7 +352,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
                 {index === 0 ? <span className="bb-comparison-month-name" aria-label={reportMonthLabel(month)}>{monthName(month)}</span>
                   : <MonthPicker label="Comparison month" value={baseline} options={options} onSelect={setChosenMonth}
                     triggerLabel={monthName(baseline)} triggerDescription={reportMonthLabel(baseline)} />}
-                {amounts && <FittedAmount className="bb-comparison-amount">{money(amounts[index])}</FittedAmount>}
+                {amounts && <FittedAmount intrinsic className="bb-comparison-amount">{money(amounts[index])}</FittedAmount>}
               </div>
               {chart && <svg className="bb-comparison-track" viewBox="0 0 1000 8" preserveAspectRatio="none" aria-hidden="true">
                 <rect className="bb-comparison-track-background" width="1000" height="8" rx="4" />
