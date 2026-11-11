@@ -10,6 +10,7 @@ body:has(.bb-page[data-duo-enabled="true"]) { height: 100%; overflow: hidden; ov
 }
 .bb-app-shell[data-duo-landscape="true"] {
   --bb-duo-inset: clamp(16px, 4vw, 35px);
+  --bb-duo-right-inset: 16px;
   --bb-duo-heading: 48px;
   --bb-duo-nav-height: 54px;
   --bb-duo-nav-bottom: max(12px, env(safe-area-inset-bottom, 0px));
@@ -25,7 +26,7 @@ body:has(.bb-page[data-duo-enabled="true"]) { height: 100%; overflow: hidden; ov
 }
 .bb-navigation-viewport .bb-bottom-navigation { position: absolute; top: auto; bottom: 0; }
 .bb-app-shell[data-duo-landscape="true"] .bb-shell-header-actions {
-  right: calc(var(--bb-duo-overlay) + var(--bb-duo-inset));
+  right: calc(var(--bb-duo-overlay) + var(--bb-duo-right-inset));
 }
 .bb-app-shell[data-duo-landscape="true"] .bb-bottom-navigation {
   left: calc(var(--bb-duo-fold) + var(--bb-duo-right-width) / 2);
@@ -58,7 +59,7 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-app-shell[data-duo-overview="true"] > .bb-report-header .bb-projection-control {
   position: fixed; z-index: 60;
   top: calc(max(18px, env(safe-area-inset-top, 0px)) - 1px);
-  right: calc(var(--bb-duo-overlay) + var(--bb-duo-inset) + 116px);
+  right: calc(var(--bb-duo-overlay) + var(--bb-duo-right-inset) + 116px);
 }
 .bb-app-shell[data-duo-overview="true"] .bb-shell-report,
 .bb-app-shell[data-duo-overview="true"] .bb-report-content,
@@ -114,14 +115,14 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-carousel {
   --bb-chart-carousel-viewport-width: 100%;
-  --bb-chart-carousel-gutter: var(--bb-duo-inset);
+  --bb-chart-carousel-gutter: var(--bb-duo-right-inset);
   width: 100%; margin: 0;
 }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-heading { padding-top: 0; }
-.bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-nav { padding-top: 0; padding-right: var(--bb-duo-inset); }
+.bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-nav { padding-top: 0; padding-right: var(--bb-duo-right-inset); }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-slide > .bb-card-content { flex: 1; min-height: 0; }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-page {
-  --bb-chart-page-gutter: var(--bb-duo-inset);
+  --bb-chart-page-gutter: var(--bb-duo-right-inset);
   padding-top: 8px; padding-bottom: 0; min-height: 0;
 }
 .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page { grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 16px; }

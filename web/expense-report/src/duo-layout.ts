@@ -18,7 +18,8 @@ export function duoLandscapeGeometry(width:number,height:number,safeRight=0) {
 
 export function duoRingGeometry(size:{width:number;height:number}) {
   const width=size.width||219,height=size.height||219
-  const radius=Math.max(1,Math.min(219,width,height))/2
+  // Fill the measured chart row, leaving room for the sector outline.
+  const radius=Math.max(1,Math.min(width,height)/2-2)
   return {cx:width/2,cy:height/2,outerRadius:radius,innerRadius:radius*(1-52/219)}
 }
 

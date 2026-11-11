@@ -1154,6 +1154,7 @@ function BurnRateChart({
   month: number
   collapseKey?: number
 }) {
+  const duoLandscape = useAppNavigation()?.duoLandscape === true
   const [tooltipPortal, setTooltipPortal] = useState<HTMLDivElement | null>(null)
   const touch = useMediaQuery("(pointer: coarse)")
   const monthName = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, month - 1, 1)))
@@ -1196,7 +1197,7 @@ function BurnRateChart({
         className="bb-chart-box bb-chart-box-wide bb-chart-page-body"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartSeries} margin={{ top: 20, right: 22, left: 0, bottom: 8 }}>
+          <ComposedChart data={chartSeries} margin={{ top: 20, right: duoLandscape ? 8 : 22, left: 0, bottom: 8 }}>
             <defs>
               <linearGradient id="burn-rate-variance-gradient" x1="0" y1="0" x2="0" y2="1">
                 {gradientStops.map((stop, index) => (
@@ -1206,7 +1207,7 @@ function BurnRateChart({
             </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={58} />
+            <YAxis domain={yAxisDomain} tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={duoLandscape ? "auto" : 58} />
             <Area type="monotone" dataKey="variance" baseValue={0} stroke="none" fill={lineColor} fillOpacity={0.1} tooltipType="none" activeDot={false} connectNulls={false} isAnimationActive={false} />
             <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={1} strokeWidth={1.5} />
             {tooltipPortal && <ChartTooltip portal={tooltipPortal} trigger={touch ? "click" : "hover"} isAnimationActive={false} fadeDuration={360} content={<BurnRateTooltipContent monthName={monthName} portal={tooltipPortal} />} />}
@@ -3078,6 +3079,7 @@ function BillsUtilitiesChart({
   highlighted?: string | null
   colors?: Record<string, string>
 }) {
+  const duoLandscape = useAppNavigation()?.duoLandscape === true
   const rows = utilityHistoryChartRows(items)
   const eventByLabel = billEventByLabel(billEvents)
   const focused = items.find(item => item.key === highlighted)
@@ -3086,10 +3088,10 @@ function BillsUtilitiesChart({
     <ChartContainer config={Object.fromEntries(items.map((item, index) => [item.key, {label: item.label, color: colors?.[item.key] ?? chartColor(index)}]))} className="bb-bills-chart-box bb-chart-page-body">
       {focused && !focused.history.some(point => point.amount !== null) && <span className="bb-bill-history-empty" role="status">No recorded history for {focused.label} yet.</span>}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={rows} margin={{ top: 12, right: 20, left: 0, bottom: 6 }}>
+        <LineChart data={rows} margin={{ top: 12, right: duoLandscape ? 8 : 20, left: 0, bottom: 6 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={24} />
-          <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={54} />
+          <YAxis tickFormatter={(value) => `$${value}`} tickLine={false} axisLine={false} width={duoLandscape ? "auto" : 54} />
           <ChartTooltip content={<BillsUtilitiesTooltipContent eventByLabel={eventByLabel} items={items} highlighted={highlighted} year={year} month={month} />} />
           {items.map((item, index) => (
             <Line

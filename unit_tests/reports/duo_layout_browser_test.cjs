@@ -15,6 +15,8 @@ for(const mode of ['current','projected']){
  view.categoryBudgets={needs:3600,wants:2160,savings:1440};
  view.categoryBalances={raw:{needs:1010,wants:670,savings:620},remaining:{needs:1010,wants:670,savings:620},deficits:{needs:0,wants:0,savings:0},transfers:[],totalOverspend:0};
  view.breakdown=expenses.map(([key,label,amount])=>({key,label,amount,percentage:amount/72,color:'hsl(var(--chart-1))'}));
+ view.utilityHistory=[{key:'power',label:'Power',currentAmount:100,history:[{month:8,label:'Aug',amount:70},{month:9,label:'Sep',amount:100},{month:10,label:'Oct',amount:100}]}];
+ view.billComparisonHistory=view.utilityHistory;
  view.savingsInvesting=undefined;
 }
 const pressureReport=structuredClone(report);
@@ -31,6 +33,15 @@ const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 const html=(dark,old)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
 async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0){
  const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[],comparison={hold:false,release:null};
+ // A disclosure/fold may first measure these auto-sized grid items at 1px.
+ // Verify real painted glyphs recover instead of leaving a zero-sized auto track.
+ if(!old)await page.addInitScript(()=>{
+  const native=Object.getOwnPropertyDescriptor(Element.prototype,'clientWidth'),seen=new WeakSet();
+  Object.defineProperty(Element.prototype,'clientWidth',{...native,get(){
+   if(this.matches('.bb-comparison-difference,.bb-comparison-amount')&&!seen.has(this)){seen.add(this);return 1;}
+   return native.get.call(this);
+  }});
+ });
  await page.addInitScript(()=>{
   const native=window.visualViewport;if(!native)return;
   const proxy=new EventTarget();let override={};
@@ -83,9 +94,12 @@ async function comparisonVisual(page){return page.locator('.bb-comparison-card')
   scale:card.querySelector('.bb-comparison-scale')?.getAttribute('aria-label'),scaleText:card.querySelector('.bb-comparison-scale')?.textContent,
   axis:card.querySelector('.bb-comparison-scale')?box(card.querySelector('.bb-comparison-scale')):null,period:box(card.querySelector('.bb-comparison-period')),
   fonts:['.bb-comparison-difference','.bb-comparison-direction','.bb-comparison-month-name','.bb-comparison-amount'].map(q=>getComputedStyle(card.querySelector(q)).fontSize),
+  glyphs:[...card.querySelectorAll('.bb-comparison-difference .bb-fitted-amount-text,.bb-comparison-amount .bb-fitted-amount-text')].map(el=>({...box(el),text:el.textContent,font:parseFloat(getComputedStyle(el).fontSize)})),
   height:card.getBoundingClientRect().height};
  });}
 function checkComparisonVisual(v){
+ assert.deepEqual(v.glyphs.map(g=>g.text),['$106.45','$3,043.37','$3,149.82'],'all three exact amounts are present');
+ assert(v.glyphs.every(g=>g.width>30&&g.height>10&&g.font>=12),'all three amounts stay painted at a readable size after an initially collapsed measurement: '+JSON.stringify(v.glyphs));
  assert(v.direction.x>=v.amount.right&&Math.abs(v.direction.cy-v.amount.cy)<1,'description sits inline to the right of the difference');
  assert.equal(v.rows.length,2);assert(v.rows[1].y>v.rows[0].bottom,'bars stack vertically');
  assert.equal(v.rows[0].x,v.rows[1].x);assert.equal(v.rows[0].width,v.rows[1].width,'both rows have the same dollar scale and zero origin');
@@ -96,6 +110,19 @@ function checkComparisonVisual(v){
  assert.notEqual(v.rows[0].fill,v.rows[1].fill,'the two months have distinct filled colors');
  assert(Math.abs(v.rows[0].widthUnits/v.rows[1].widthUnits-3043.37/3149.82)<1e-8,'visual lengths preserve the exact spending ratio');
  assert(v.height<200,'comparison stays compact');
+}
+async function checkCartesianPlot(page){
+ await page.locator('.bb-chart-carousel-slide[aria-hidden="false"] .recharts-cartesian-grid-horizontal line').first().waitFor({state:'attached'});
+ await page.waitForTimeout(50);
+ const g=await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').evaluate(slide=>{
+  const box=el=>{const r=el.getBoundingClientRect();return{x:r.x,right:r.right,width:r.width};};
+  return {body:box(slide.querySelector('.recharts-wrapper')),plot:box(slide.querySelector('.recharts-cartesian-grid-horizontal line')),
+   labels:[...slide.querySelectorAll('.recharts-yAxis-tick-labels text')].map(box)};
+ });
+ assert(Math.abs(g.body.right-851)<=1,'right chart uses the 16px drawable-edge inset (including responsive SVG rounding): '+JSON.stringify(g));
+ assert(Math.abs(g.body.right-g.plot.right-8)<1,'line graph has only 8px internal right space');
+ assert(g.plot.width>g.body.width*.75,'line graph uses the available width instead of two fixed axis gutters: '+JSON.stringify(g));
+ assert(g.labels.length>0&&g.labels.every(label=>label.x>=g.body.x-1&&label.right<=g.plot.x),'measured y-axis labels fit without clipping: '+JSON.stringify(g));
 }
 async function metricTitleGaps(page){return page.locator('.bb-metrics-grid').evaluate(grid=>[...grid.querySelectorAll('.bb-metric-card')].map(card=>{
  const title=card.querySelector('.bb-metric-explain')??card.querySelector('.bb-metric-label');
@@ -118,7 +145,9 @@ async function tap(page,button){
   return {x,y,hit:document.elementFromPoint(x,y)?.closest('button')===el};
  });
  assert(point.hit,'native touch point reaches the intended button');
- await page.touchscreen.tap(point.x,point.y);
+ // Keep native touch input, with the actionability/stability wait needed when
+ // a viewport change has updated DOM geometry before compositor hit testing.
+ await button.tap();
 }
 async function heldFold(page){
  await page.emulateMedia({reducedMotion:'no-preference'});
@@ -322,7 +351,7 @@ async function bottomScroll(page){
         assert.equal(m[key].y-m.metrics.bottom,b[key].y-b.metrics.bottom,'only the compact metric height shifts later content '+key);
        }
        const oldGaps=await metricTitleGaps(before.page),gaps=await metricTitleGaps(page);
-       assert(gaps.every((gap,i)=>gap<oldGaps[i]*.6),'title/value whitespace is substantially reduced in all four closed cards: '+JSON.stringify({oldGaps,gaps}));
+       assert.deepEqual(gaps,oldGaps,'closed metric title/value spacing remains unchanged');
        await before.page.close();}
       await page.getByRole('button',{name:'Compare spending',exact:true}).click();
       await page.locator('.bb-comparison-change').waitFor();
@@ -334,11 +363,11 @@ async function bottomScroll(page){
       if(baseline&&height>=648){const prior=await fixture(browser,width,height,dark,true,false,safeRight);
        assert.deepEqual(m.metrics,(await geometry(prior.page)).metrics,'normal unfolded card frames retain their released geometry');
        const oldGaps=await metricTitleGaps(prior.page),gaps=await metricTitleGaps(page);
-       assert(gaps.every((gap,i)=>gap<oldGaps[i]*.6),'all unfolded cards have a substantially tighter title/value gap: '+JSON.stringify({oldGaps,gaps}));await prior.page.close();}
+       assert.deepEqual(gaps,oldGaps,'unfolded metric title/value spacing remains unchanged');await prior.page.close();}
       const usable=867,fold=475.5;
       assert(Math.abs(m.band.x-fold)<1,'physical fold, including an already-excluded safe area');
       assert(Math.abs(m.nav.cx-(fold+usable)/2)<1,'nav centered within the usable right half');assert.equal(m.nav.width,347.5);assert.equal(m.nav.height,54);
-      assert(Math.abs(m.tools.right-(usable-35))<1,'one normal right inset, with no double native-strip reservation');
+      assert(Math.abs(m.tools.right-(usable-16))<1,'one 16px right inset, with no double native-strip reservation');
       assert(Math.abs(m.legend.right-m.tools.right)<1,'chart content aligns with header tools');
       assert.equal(height-m.nav.bottom,safe||12,'same bottom inset as the closed dock');
       assert(Math.abs(m.mode.right+14-m.tools.x)<1,'mode left of tools');assert(Math.abs(m.month.cy-m.title.cy)<1,'aligned headings');assert(Math.abs(m.title.cy-m.dots.cy)<1,'inline notches');
@@ -413,6 +442,8 @@ async function bottomScroll(page){
        await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor();
        assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').getAttribute('aria-label'),title);
        assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'all chart pages stay static');
+       if(title==='Burn Rate'||title==='Bills & Utilities')await checkCartesianPlot(page);
+       if(process.env.BOOKIEBOT_DUO_SHOTS)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`duo-${title.replaceAll(' ','-')}-${engine.name()}-${dark?'dark':'light'}.png`),fullPage:true});
       }
       await page.getByRole('button',{name:'Compare spending',exact:true}).click();
       await page.locator('.bb-comparison-card[data-open="true"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);

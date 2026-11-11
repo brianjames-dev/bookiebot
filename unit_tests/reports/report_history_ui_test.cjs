@@ -218,6 +218,9 @@ async function main() {
   assertNoFixture("August completed", "A superseded reply never displays for the new month")
   await finish(calls.at(-1), 200, result("2025-09", "September completed"))
   assertFixture("September completed")
+  const fittedAmounts=tree.root.findAll(node=>typeof node.type==='function'&&node.type.name==='FittedAmount')
+  assert.equal(fittedAmounts.length,3)
+  assert.ok(fittedAmounts.every(node=>node.props.intrinsic===true),"All three content-sized comparison amounts reserve their unscaled width, so a transient zero font cannot collapse their auto grid columns")
   const beforeDuoRequests=calls.length
   duoLandscape=true;renderer.act(()=>tree.update(component()))
   assert.equal(tree.root.findByProps({className:"bb-report-comparison"}).props["data-open"],true)
