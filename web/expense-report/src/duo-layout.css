@@ -3,16 +3,18 @@
   --bb-duo-inset: clamp(16px, 4vw, 35px);
   --bb-duo-heading: 90px;
   --bb-duo-nav-height: 54px;
-  --bb-duo-nav-bottom: max(18px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+  --bb-duo-nav-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  --bb-duo-fold: calc((100vw - var(--bb-duo-overlay) + var(--bb-duo-right-rail)) / 2);
+  --bb-duo-right-width: calc((100vw - var(--bb-duo-overlay) - var(--bb-duo-right-rail)) / 2);
   padding-right: calc(var(--bb-page-gutter) + var(--bb-duo-overlay));
 }
 .bb-app-shell[data-duo-landscape="true"] .bb-shell-header-actions {
   right: calc(var(--bb-duo-overlay) + var(--bb-duo-inset));
 }
 .bb-app-shell[data-duo-landscape="true"] .bb-bottom-navigation {
-  left: calc((100% - var(--bb-duo-overlay) + var(--bb-duo-right-rail)) / 2);
+  left: calc(var(--bb-duo-fold) + var(--bb-duo-right-width) / 2);
   bottom: 0;
-  width: min(404px, calc(100% - var(--bb-duo-overlay)));
+  width: min(404px, var(--bb-duo-right-width));
   padding-bottom: var(--bb-duo-nav-bottom);
 }
 .bb-app-shell[data-duo-landscape="true"] .bb-bottom-navigation > div:last-child { height: var(--bb-duo-nav-height); }
@@ -63,11 +65,31 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
   position: relative; min-width: 0; padding: 0; margin-inline: var(--bb-duo-inset);
   height: 48px !important;
 }
-/* The existing expanding comparison stays within its physical page. */
-.bb-app-shell[data-duo-overview="true"] .bb-comparison-card[data-open="true"] {
-  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); z-index: 5;
-  max-height: calc(100dvh - 88px - var(--bb-duo-nav-height) - var(--bb-duo-nav-bottom) - 32px);
-  overflow-y: auto;
+/* Comparison borrows the chart page; its left-page trigger never moves. */
+.bb-app-shell[data-duo-overview="true"] .bb-report-comparison[data-open="true"] .bb-comparison-card { overflow: visible; }
+.bb-app-shell[data-duo-overview="true"] .bb-report-comparison[data-open="true"] .bb-comparison-chevron { transform: rotate(180deg); }
+.bb-app-shell[data-duo-overview="true"] .bb-report-comparison[data-open="true"] .bb-comparison-viewport {
+  position: fixed; z-index: 5;
+  left: calc(var(--bb-duo-fold) + var(--bb-duo-inset));
+  right: calc(var(--bb-duo-overlay) + var(--bb-duo-inset));
+  top: 88px;
+  bottom: calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
+  display: flex; flex-direction: column;
+  opacity: 1; visibility: visible; transform: none; transition: none;
+}
+.bb-app-shell[data-duo-overview="true"] .bb-report-comparison[data-open="true"] .bb-comparison-content {
+  width: 100% !important; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+}
+.bb-duo-comparison-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 var(--bb-duo-heading); }
+.bb-duo-comparison-heading h2 { margin: 0; font-size: 24px; font-weight: 500; letter-spacing: -.035em; }
+.bb-duo-comparison-heading button { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.bb-duo-comparison-heading button:focus-visible { outline: 2px solid hsl(var(--primary)); }
+.bb-app-shell[data-duo-overview="true"]:has(.bb-report-comparison[data-open="true"]) .bb-chart-carousel-band {
+  opacity: 0; pointer-events: none;
+}
+.bb-app-shell[data-duo-overview="true"]:has(.bb-report-comparison[data-open="true"]) .bb-chart-carousel-band,
+.bb-app-shell[data-duo-overview="true"]:has(.bb-report-comparison[data-open="true"]) .bb-chart-carousel-band * {
+  visibility: hidden !important;
 }
 .bb-app-shell[data-duo-overview="true"] .bb-chart-carousel-band {
   --bb-chart-carousel-heading-height: var(--bb-duo-heading);
@@ -107,6 +129,7 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
 .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
 @media (max-height: 610px) {
   .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 44px; grid-template-rows: 72px var(--bb-duo-heading) minmax(0, 1fr) 48px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-report-comparison[data-open="true"] .bb-comparison-viewport { top: 72px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metrics-grid { height: min(300px, calc(100% - 20px)); margin-top: 10px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-card { padding-block: 8px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-value { font-size: 24px; margin-top: 4px; }

@@ -115,7 +115,7 @@ Each new month and annual Template copies the owner's full dated enrollment time
 
 For an illustrative actual-withholding upgrade, use `python scripts/configure_espp_withholding.py --env-file <path> --paycheck-date 2026-10-23 --deposit 3400 --withheld 300` with the real paycheck date/amounts substituted for a read-only preflight, then add `--apply --backup <new-private-backup-path>`. It updates only Brian's selected month and Template, requires a unique existing paycheck, refuses an occupied incompatible column/deduction, backs up the original grids and applies the formulas/input atomically. No row references or action logs move. Native readback verifies deductions/targets and preserves deposited income and actual cash savings. This CLI never deploys the app or live Apps Script; roll out the matching Apps Script source with the approved application release before creating the next monthly tab.
 
-The authenticated phone app also offers **Settings → Appearance → Duo landscape layout**: the approved two-page unfolded Overview with a centered horizontal glass dock and native right-strip clearance. Closed portrait retains the standard main layout and spacing. See [Phone app setup](docs/PHONE_APP_SETUP.md#duo-landscape-layout).
+The authenticated phone app also offers **Settings → Appearance → Duo landscape layout**: the approved two-page unfolded Overview with a horizontal glass dock centered in the usable right half and native right-strip clearance. Comparison uses the chart page while keeping the summary visible. Closed portrait retains the standard main layout and spacing. See [Phone app setup](docs/PHONE_APP_SETUP.md#duo-landscape-layout).
 
 ## 🎭 Daily Avatar Rotation
 
