@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-11 - Comparison disclosure preserves Duo metric cards
+
+After accepting the native fold/scroll fix, the user requests comparison text at the surrounding UI’s scale and no metric resizing/restyling when it opens. Remove the comparison-open selectors that previously rearranged metric labels/values and let the grid shrink. Reserve one responsive comparison row in both states; normal-height views retain the released 300px metrics, while shorter views choose the same card geometry whether the tool is closed, loading or expanded. Compact the unfolded comparison itself, using side-by-side months, 24px/22px headline, 12–13px month labels and 14px amounts, with existing 44px controls and exact financial values.
+
+Closed portrait and ordinary devices keep the released comparison styles. The stationary document/native scroll surface and outside glass dock are unchanged. Browser regression snapshots metric bounds and typography through loading/results/collapse, verifies released normal-height card parity, static fit and touch targets, and rejects the previous bundle. No data, financial or persistence changes. This supersedes the comparison-dependent metric layout described in the earlier static-fit decision.
+
 ## 2026-11-11 - Duo content owns scrolling in both poses
 
 Physical Home Screen testing of PR #149 still makes the dock move with document scroll after unfolding/refolding. A body-level fixed dock alone is insufficient on this device. With the existing Duo preference enabled, keep HTML/body stationary and make the existing page a viewport-sized native overflow scroller in **both** poses. The body-level glass-navigation surface remains outside that scroller. Ownership no longer switches between document scrolling and a static landscape page on every fold; no scroll-driven dock offsets, sizing, or DOM reparenting are introduced. Unfolded Overview still clips to its approved static two-page layout.
