@@ -4,6 +4,7 @@ import { FittedAmount } from "./components/ui/fitted-amount"
 import { MonthPicker } from "./components/ui/month-picker"
 import type { ExpenseReportData } from "./types"
 import { useAppNavigation } from "./app-navigation"
+import { comparisonAxisLabel, comparisonChart } from "./comparison-chart"
 import "./report-history.css"
 
 export interface ReportMonthCatalog {
@@ -313,7 +314,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   const amounts = ready?.selected && ready.baseline ? [ready.selected.spending, ready.baseline.spending] : null
   const change = amounts ? ready!.changeAmount : null
   const direction = change === null || change === 0 ? "same" : change < 0 ? "less" : "more"
-  const maximum = amounts ? Math.max(0, ...amounts) : 0
+  const chart = amounts ? comparisonChart(amounts) : null
   const monthName = (value: string) => value.startsWith(`${report.year}-`) ? reportMonthLabel(value).replace(/\s+\d{4}$/, "") : reportMonthLabel(value)
 
   return <section ref={frame.slot} className="bb-report-comparison" data-open={open} aria-label="Spending comparison">
@@ -353,11 +354,18 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
                     triggerLabel={monthName(baseline)} triggerDescription={reportMonthLabel(baseline)} />}
                 {amounts && <FittedAmount className="bb-comparison-amount">{money(amounts[index])}</FittedAmount>}
               </div>
-              {amounts && <div className="bb-comparison-track" aria-hidden="true"><span className="bb-comparison-fill"
-                style={{ width: `${maximum > 0 ? Math.max(0, amounts[index]) / maximum * 100 : 0}%` }} /></div>}
+              {chart && <svg className="bb-comparison-track" viewBox="0 0 1000 8" preserveAspectRatio="none" aria-hidden="true">
+                <rect className="bb-comparison-track-background" width="1000" height="8" rx="4" />
+                <rect className="bb-comparison-fill" x={chart.bars[index].start * 10} width={chart.bars[index].width * 10} height="8" rx="4" />
+                {chart.minimum < 0 && <line className="bb-comparison-zero" x1={chart.zero * 10} x2={chart.zero * 10} y1="0" y2="8" />}
+              </svg>}
             </div>)}
           </div>
-          {ready && amounts && <p className="bb-comparison-period">{mode === "projected" ? "Projected" : "Current"} Spent · days 1–{ready.throughDay}{ready.status === "partial" ? " · includes undated costs" : ""}</p>}
+          {ready && chart && <div className="bb-comparison-scale" aria-label={`Shared dollar scale: ${comparisonAxisLabel(chart.minimum)} to ${comparisonAxisLabel(chart.maximum)}`}>
+            <span>{comparisonAxisLabel(chart.minimum)}</span>
+            <span>{comparisonAxisLabel(chart.maximum)}</span>
+          </div>}
+          {ready && chart && <p className="bb-comparison-period">{mode === "projected" ? "Projected" : "Current"} Spent · days 1–{ready.throughDay}{ready.status === "partial" ? " · includes undated costs" : ""}</p>}
           {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
           {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
             {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"

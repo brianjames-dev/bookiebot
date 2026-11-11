@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-11 - Shared dollar axis and separate comparison context
+
+The user’s screenshots show confusing gray progress-like bars and oversized closed-Duo comparison styling. Stack the two month rows with distinct month/fill colors, exact values and one rounded dollar axis with visible endpoints and headroom. Native SVG rectangles encode the actual ratio directly; neither month defines a 100% goal. Existing net refunds use a signed axis/zero marker; zero and cent-sized amounts remain accurate. For the supplied $3,043.37 and $3,149.82 the common extent is $0–$3,500. Totals, matching-period selection, difference and percentage remain server-authoritative.
+
+Use the same compact comparison type in both opted-in Duo poses and place direction text immediately beside the difference. Following the user’s subsequent feedback, keep period/coverage in its own caption line beneath the dollar axis. Preserve the visible information without interleaving it with numeric endpoints. Existing controls and frame measurement remain; short-height spacing is constant across disclosure states. Normal-height metric geometry and accepted native scroll/navigation are unchanged. This supersedes the preceding side-by-side month layout and unfolded-only compact typography. Checklist 271 covers native acceptance.
+
 ## 2026-11-11 - Comparison disclosure preserves Duo metric cards
 
 After accepting the native fold/scroll fix, the user requests comparison text at the surrounding UI’s scale and no metric resizing/restyling when it opens. Remove the comparison-open selectors that previously rearranged metric labels/values and let the grid shrink. Reserve one responsive comparison row in both states; normal-height views retain the released 300px metrics, while shorter views choose the same card geometry whether the tool is closed, loading or expanded. Compact the unfolded comparison itself, using side-by-side months, 24px/22px headline, 12–13px month labels and 14px amounts, with existing 44px controls and exact financial values.
