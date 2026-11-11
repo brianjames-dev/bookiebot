@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-10 - Static Duo comparison and scroll-independent navigation
+
+The user requires the full expanded comparison and all metrics to fit the unfolded left half without scrolling. Let the metrics yield height and arrange each label/value horizontally while comparison is open, preserving existing financial components, 44px controls and the 14px gap. Short landscape views place both comparison months in one row and tighten spacing; the shortest supported height uses an 8px gap. Keep the right chart stationary and closed portrait unchanged. Verify content bounds rather than hiding overflow alone.
+
+PR #147's absolute dock followed document scroll, causing jank and allowing elastic overscroll to extend the document. Reproduce the old bundle growing 120px under a 120px overscroll. Restore native fixed-bottom positioning, with the visible-viewport correction updated only on resize/orientation/pageshow and visual viewport resize. Ordinary Y scrolling schedules no position work. Remove HTML/body height/overflow locking across folding; a fitted/clipped Overview root keeps the document finite without switching the document scroll container. Retain zoom/empty-viewport guards and transient contact reset. This supersedes the preceding document-coordinate and optional left-scroll design. No financial calculations, storage or writers change.
+
 ## 2026-11-10 - Restore inline Duo comparison and visible-viewport anchoring
 
 The user rejects the right-page comparison introduced in PR #146. Restore the original expanding comparison component in both poses. Group metrics and comparison in one persistent wrapper: it has no box in the normal layout, and is the left column in unfolded Overview. Comparison expands beneath unchanged cards with the normal 14px gap. That column handles optional overflow; the document and right chart remain static. Reduce unfolded masthead/heading rows to 72px/48px (44px heading in short views), aligning both content starts at 128px rather than 194px.

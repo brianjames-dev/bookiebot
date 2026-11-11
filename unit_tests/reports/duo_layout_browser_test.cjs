@@ -140,12 +140,52 @@ async function scrolledFold(page){
   assert(Math.abs(await bottom()-657)<1,'unfolded dock returns to its right-page bottom');
  }
 }
+async function bottomScroll(page){
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(200);
+ await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);
+ const height=await page.evaluate(()=>document.documentElement.scrollHeight);
+ await page.evaluate(()=>{
+  window.__dockPositionWrites=0;
+  window.__dockObserver=new MutationObserver(records=>window.__dockPositionWrites+=records.length);
+  window.__dockObserver.observe(document.querySelector('.bb-bottom-navigation'),{attributes:true,attributeFilter:['style']});
+ });
+ for(let i=0;i<8;i++){
+  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));await page.waitForTimeout(60);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'repeated bottom scrolling never grows blank document space');
+ }
+ // iOS rubber-band scrolling can briefly report a position beyond the real
+ // document end. Reproduce that coordinate pair without growing the fixture.
+ const elastic=await page.evaluate(async()=>{
+  const root=document.querySelector('.bb-app-shell'),rect=root.getBoundingClientRect.bind(root),descriptor=Object.getOwnPropertyDescriptor(window,'scrollY');
+  Object.defineProperty(window,'scrollY',{configurable:true,get:()=>window.pageYOffset+120});
+  root.getBoundingClientRect=()=>{const r=rect();return {...r.toJSON(),top:r.top-120,bottom:r.bottom-120};};
+  try{window.dispatchEvent(new Event('scroll'));await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));return document.documentElement.scrollHeight;}
+  finally{Object.defineProperty(window,'scrollY',descriptor);root.getBoundingClientRect=rect;window.dispatchEvent(new Event('scroll'));}
+ });
+ assert.equal(elastic,height,'elastic overscroll cannot extend the document through the dock');
+ await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(100);
+ await page.evaluate(()=>{
+  window.__dockFrames=[];window.__sampleDock=true;
+  const sample=()=>{window.__dockFrames.push(document.querySelector('.bb-navigation-pane').getBoundingClientRect().bottom);if(window.__sampleDock)requestAnimationFrame(sample)};requestAnimationFrame(sample);
+ });
+ if(page.context().browser().browserType().name()==='webkit')await page.evaluate(()=>window.scrollBy({top:450,behavior:'smooth'}));
+ else await page.mouse.wheel(0,450);
+ await page.waitForTimeout(550);
+ const result=await page.evaluate(()=>{window.__sampleDock=false;window.__dockObserver.disconnect();return {writes:window.__dockPositionWrites,frames:window.__dockFrames,height:document.documentElement.scrollHeight,y:scrollY};});
+ assert(result.y>0,'browser-native scrolling moves the closed report');
+ assert.equal(result.height,height,'native scrolling keeps a finite document');
+ assert.equal(result.writes,0,'ordinary Y scrolling performs no navbar position writes');
+ assert(result.frames.length>=5&&result.frames.every(y=>Math.abs(y-645)<1),'the dock stays at the viewport bottom throughout native scrolling and compact animation');
+ await page.setViewportSize({width:867,height:669});await page.waitForTimeout(100);
+ await page.emulateMedia({reducedMotion:'reduce'});
+}
 ;(async()=>{
  for(const engine of [chromium,webkit]){
   const browser=await engine.launch({headless:true});
   try{
    for(const dark of [false,true]){
-    for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58]]){
+    for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58],[867,480]]){
      const {page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,safeRight);
      if(safe){await page.evaluate(()=>document.querySelector('.bb-app-shell').style.setProperty('--bb-duo-nav-bottom','58px','important'));await page.waitForTimeout(100);}
      const m=await geometry(page);console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
@@ -163,7 +203,8 @@ async function scrolledFold(page){
       assert(Math.abs(m.legend.right-m.tools.right)<1,'chart content aligns with header tools');
       assert.equal(height-m.nav.bottom,safe||12,'same bottom inset as the closed dock');
       assert(Math.abs(m.mode.right+14-m.tools.x)<1,'mode left of tools');assert(Math.abs(m.month.cy-m.title.cy)<1,'aligned headings');assert(Math.abs(m.title.cy-m.dots.cy)<1,'inline notches');
-      assert.equal(m.compare.y-m.metrics.bottom,14,'normal comparison spacing');assert(Math.abs(m.nav.y-m.legend.bottom-16)<1,'chart clears the dock');
+      assert(m.dots.y>=m.mode.bottom,'header controls and chart markers have separate touch areas');
+      assert.equal(m.compare.y-m.metrics.bottom,height<=520?8:14,'comparison spacing');assert(Math.abs(m.nav.y-m.legend.bottom-(height<=520?12:16))<1,'chart clears the dock');
       assert(m.metrics.y<=130&&m.summary.y<=130,'both content columns close the former top gap');
       for(const card of m.cards)assert(card.last<=card.bottom+1,'metric content fits');
       assert(m.chart.height>=40,'visible ring space');assert(m.sectors.length>0,'native ring is rendered');
@@ -178,15 +219,22 @@ async function scrolledFold(page){
       await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
       await page.locator('.bb-comparison-change').waitFor();
       const after=await geometry(page);
-      assert.deepEqual(after.metrics,before.metrics,'inline expansion keeps the summary cards in place');
-      assert(Math.abs(after.compare.y-after.metrics.bottom-14)<1,'comparison expands below the four frames');
+      for(const key of ['x','y','width'])assert.equal(after.metrics[key],before.metrics[key],'expanded summary retains its position and width');
+      assert(after.metrics.height<=before.metrics.height,'summary yields height for comparison');
+      for(const card of after.cards)assert(card.last<=card.bottom+1,'every metric/progress row remains inside its frame');
+      assert(await page.locator('.bb-metrics-grid').evaluate(el=>[...el.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44;})),'expanded summary preserves 44px touch controls');
+      if(height<=610)assert(await page.locator('.bb-comparison-months .bb-month-trigger > span').evaluate(el=>el.getBoundingClientRect().height<=22),'compact month names never break mid-word');
+      assert(Math.abs(after.compare.y-after.metrics.bottom-(height<=520?8:14))<1,'comparison expands below the four frames');
       assert(after.compare.right<fold,'expanded comparison stays in the left half');
       assert(after.compare.height>48,'comparison uses its normal expanded height');
       assert.deepEqual(after.band,before.band,'comparison leaves the chart page in place');
       assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),true,'chart remains visible beside comparison');
-      assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'only the left column may scroll');
-      assert(await page.locator('.bb-overview-summary').evaluate(el=>{el.scrollTop=el.scrollHeight;return el.querySelector('.bb-comparison-card').getBoundingClientRect().bottom<=el.getBoundingClientRect().bottom+1;}),'the full expanded comparison is reachable inside the left half');
-      await page.locator('.bb-overview-summary').evaluate(el=>el.scrollTop=0);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'the entire unfolded page stays static');
+      assert(await page.locator('.bb-overview-summary').evaluate(el=>{
+       const limit=el.getBoundingClientRect(),metrics=el.querySelector('.bb-metrics-grid'),card=el.querySelector('.bb-comparison-card');
+       el.scrollTop=9999;
+       return el.scrollTop===0&&el.scrollHeight<=el.clientHeight+1&&card.getBoundingClientRect().bottom<=limit.bottom+1&&metrics.scrollHeight<=metrics.clientHeight+1;
+      }),'expanded cards and complete comparison fit without scroll or clipping');
       if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&height===669&&!safeRight)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}.png`),fullPage:true});
       await page.setViewportSize({width:382,height:657});await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
       await page.setViewportSize({width,height});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();
@@ -200,6 +248,7 @@ async function scrolledFold(page){
      if(width===867&&height===669&&!safeRight){
       await heldFold(page);
       await scrolledFold(page);
+      await bottomScroll(page);
       for(const title of ['Burn Rate','Calendar','Bills & Utilities','Category Mix']){
        const marker=page.getByRole('button',{name:'Show '+title,exact:true});
        await tap(page,marker);
