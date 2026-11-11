@@ -50,6 +50,14 @@ The icon-only Konsta navigation bar uses a neutral translucent surface, fine gla
 - **Raised cents:** open Settings → Appearance and use the Raised cents toggle. It is on by default for Overview and graph dollar headlines; turn it off for the original full-size cents. Your choice saves for your account on this device across month changes and reopening. Full amounts remain exact.
 - **Ask BookieBot:** tap the header chat icon to open a floating panel that slides in from the right. Its heading shows the selected report month and Current/Projected view, including when opened from Shared, Savings or Settings. Type a question or choose a suggestion, then tap **Ask BookieBot**; suggestions only fill the input. Close with **×**, outside the panel, or Escape. Closing and reopening keeps the question, answer and any ongoing request. **Cancel** stops a request; **Clear answer** removes the answer. Changing the report month or Current/Projected view clears the old question and answer and cancels its request. A source button closes the panel and opens the relevant screen and section. Answers use the existing read-only AI service; the app saves no conversation history and cannot change expenses or move money.
 
+## Duo landscape layout
+
+In **Settings → Appearance**, enable **Duo landscape layout** on the Duo. The choice is remembered for this account on this device; an earlier saved Duo choice is retained. Closed portrait keeps the standard app and its vertical spacing, including the 14px gaps around Compare spending.
+
+When unfolded in landscape, Overview uses two physical pages: metrics and comparison on the left, the existing graph carousel on the right. Current/Projected sits left of the fixed Message/Settings buttons. The smaller horizontal glass dock stays centered across the device, and Overview fits without page scrolling. The native right status strip stays outside the content area. Category Mix lists the actual filtered categories below its compact ring; tapping a row opens the existing inspection. Folding preserves the selected chart, mode and category scope. Comparison expands within the left page, and Message, Settings, chart selection and inspectors keep their existing actions. Other screens retain their existing content/workflows.
+
+Turn the preference off to use the standard responsive layout. After updating from the Home Screen icon, verify both poses and both themes using acceptance checklist 264.
+
 ## Optional phone notifications
 
 If Enable previously showed “Change notifications from BookieBot,” load the available app update first, then tap **Enable on this phone** again. Existing iPhone permission can be reused; the section must say **On** and confirm the save. Change one preference and refresh to confirm it persists. Reinstalling the Home Screen icon is unnecessary.

@@ -85,6 +85,7 @@ let report={ownerName:'Brian',year:2026,month:10,monthLabel:'October 2026',gener
 const appSession = {signOut:()=>{},signingOut:false}
 const swipeListeners={}
 const nativeViewport={clientWidth:390,scrollLeft:0,dataset:{},
+ getBoundingClientRect(){return {width:this.clientWidth}},
  addEventListener(name,fn){swipeListeners[name]=fn},removeEventListener(name){delete swipeListeners[name]},
  scrollTo({left,behavior}){if(behavior==='instant')this.scrollLeft=left}}
 let renderer

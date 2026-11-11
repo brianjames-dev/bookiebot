@@ -10,8 +10,8 @@ type Gesture = {
 
 // Native overflow owns every drag, inertia and snap frame. JS only requests a
 // page for external navigation and publishes the page after scrolling finishes.
-export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarget }: {
-  index: number; count: number; onSelect: (index: number) => void
+export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarget, layoutKey = false }: {
+  index: number; count: number; onSelect: (index: number) => void; layoutKey?: boolean
   onDragStart: () => void; ignoreTarget: (target: EventTarget | null) => boolean
 }) {
   const [indicatorIndex, setIndicatorIndex] = useState(index)
@@ -20,13 +20,16 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
   const gesture = useRef<Gesture | null>(null)
   const suppressClickUntil = useRef(0)
   const navigate = useRef<(next: number, immediate?: boolean) => void>(() => {})
+  const previousLayout = useRef(layoutKey)
+  const layoutRestore = useRef<number | null>(null)
   useLayoutEffect(() => { options.current = { index, count, onSelect, onDragStart, ignoreTarget } })
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) return
     const media = window.matchMedia("(prefers-reduced-motion: reduce)")
-    let size = viewport.clientWidth
+    const readSize = () => viewport.getBoundingClientRect().width
+    let size = readSize()
     let selected = -1
     let previewed = index
     let requested: number | null = null
@@ -51,8 +54,12 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
       clearIdle()
       // Native re-snapping during resize may finish before ResizeObserver.
       // Preserve the committed page using the new stride before publishing.
-      if (!viewport.clientWidth) return
-      if (viewport.clientWidth !== size) { resize(); return }
+      if (!readSize()) return
+      if (readSize() !== size) { resize(); return }
+      if (layoutRestore.current !== null && Math.abs(viewport.scrollLeft - layoutRestore.current * (size + GAP)) > 1) {
+        navigate.current(layoutRestore.current, true)
+        return
+      }
       // An aborted smooth scroll can emit scrollend for an older request. Never
       // publish that intermediate page over the latest marker/keyboard choice.
       if (touching || (requested !== null && Math.abs(viewport.scrollLeft - requested * (size + GAP)) > 1)) return
@@ -76,7 +83,7 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
       begin()
       // Change the dash at the majority crossing, even while the finger is
       // down. This never commits selection or writes a native scroll offset.
-      if (requested === null && viewport.clientWidth === size) preview(bounded(Math.round(viewport.scrollLeft / (size + GAP))))
+      if (layoutRestore.current === null && requested === null && readSize() === size) preview(bounded(Math.round(viewport.scrollLeft / (size + GAP))))
       scheduleIdle()
     }
     navigate.current = (next, immediate = false) => {
@@ -95,6 +102,7 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
       else scheduleIdle()
     }
     const start = (event: TouchEvent) => {
+      layoutRestore.current = null
       suppressClickUntil.current = 0
       touching = event.touches.length > 0
       // Re-grabbing is entirely native: do not read/rewrite the current offset
@@ -140,11 +148,11 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
         if (Math.abs(viewport.scrollLeft - selected * (size + GAP)) <= 1) finish()
       }
     }
-    const wheel = (event: WheelEvent) => { if (event.deltaX !== 0) requested = null }
+    const wheel = (event: WheelEvent) => { if (event.deltaX !== 0) { requested = null; layoutRestore.current = null } }
     const scrollEnd = (event: Event) => { if (event.target === viewport) finish() }
     const resize = () => {
-      if (!viewport.clientWidth || viewport.clientWidth === size) return
-      size = viewport.clientWidth
+      if (!readSize() || readSize() === size) return
+      size = readSize()
       navigate.current(options.current.index, true)
     }
     const reduce = () => { if (media.matches) navigate.current(options.current.index, true) }
@@ -174,7 +182,14 @@ export function useChartSwipe({ index, count, onSelect, onDragStart, ignoreTarge
       navigate.current = () => {}
     }
   }, [])
-  useLayoutEffect(() => { navigate.current(index) }, [index, count])
+  useLayoutEffect(() => {
+    const changed = previousLayout.current !== layoutKey
+    previousLayout.current = layoutKey
+    layoutRestore.current = changed ? index : null
+    // Folding changes the carousel's containing page as well as its viewport.
+    // Restore the committed page before native resize/focus snapping can publish.
+    navigate.current(index, changed)
+  }, [index, count, layoutKey])
 
   const onClickCapture = (event: MouseEvent<HTMLDivElement>) => {
     if (event.detail === 0 || (gesture.current?.axis !== "horizontal" && performance.now() >= suppressClickUntil.current)) return

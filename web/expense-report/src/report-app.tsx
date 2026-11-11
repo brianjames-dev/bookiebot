@@ -26,6 +26,7 @@ import { useChartSwipe } from "./chart-swipe"
 import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportBrand, ReportHeader } from "./report-header"
+import { duoRingGeometry } from "./duo-layout"
 import {
   Area,
   Bar,
@@ -855,6 +856,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
   }, [navigation?.sourceRequest?.id, navigation?.screen, sourceRequest?.id])
 
   const swipe = useChartSwipe({ index: activeChartIndex, count: chartPanels.length,
+    layoutKey: navigation?.duoLandscape,
     onSelect: switchChart, onDragStart: dismissChartTooltips, ignoreTarget: isInteractiveTouchTarget })
 
   return <>
@@ -1703,6 +1705,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   onFilterChange,
   projected,
 }: CategoryMixChartProps) {
+  const duo = useAppNavigation()?.duoLandscape === true
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
   const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)
@@ -1713,11 +1716,17 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const [ringCompact, setRingCompact] = useState(false)
   const finishCalloutExit = useCallback(() => setRingCompact(false), [])
   const toggleCallouts = () => {
+    if (duo) {
+      pieHostRef.current?.closest(".bb-category-mix-page")?.querySelector<HTMLButtonElement>(".bb-duo-category-list button")?.focus({preventScroll: true})
+      return
+    }
     if (!showCallouts) setRingCompact(true)
     setShowCallouts(shown => !shown)
   }
   const centerRef = useRef<HTMLButtonElement>(null)
-  const pieLayout = useExpensePieLayout(ringData, pieHostSize, ringCompact)
+  const nativeLayout = useExpensePieLayout(ringData, pieHostSize, ringCompact && !duo)
+  const pieLayout = useMemo(() => duo ? {...nativeLayout, ...duoRingGeometry(pieHostSize), containerPadding: 0} : nativeLayout,
+    [duo, nativeLayout, pieHostSize.width, pieHostSize.height])
   // After mounting, the painted sector owns these styles. A new React target
   // must not overwrite the current label before the next native ring frame.
   const initialCenterStyle = useRef(categoryCenterStyle(pieLayout)).current
@@ -1751,18 +1760,25 @@ const CategoryMixChart = memo(function CategoryMixChart({
           <CategoryMixPieMotionHost
             hostRef={pieHostRef}
             layout={pieLayout}
-            showCallouts={showCallouts}
+            showCallouts={showCallouts && !duo}
             onToggle={toggleCallouts}
           >
             <CategoryMixPieSurface data={ringData} layout={pieLayout} centerRef={centerRef} onInspect={onInspect} />
-            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts} onInspect={onInspect} onExitComplete={showCallouts ? undefined : finishCalloutExit} />
-            <button ref={centerRef} type="button" className="bb-category-pie-center" aria-label={showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={showCallouts} onClick={toggleCallouts} style={ringData.some(item => item.amount > 0) ? initialCenterStyle : categoryCenterStyle(pieLayout)} aria-live="polite">
+            <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts && !duo} onInspect={onInspect} onExitComplete={showCallouts ? undefined : finishCalloutExit} />
+            <button ref={centerRef} type="button" className="bb-category-pie-center" aria-label={duo ? "Show category breakdown" : showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={duo ? undefined : showCallouts} onClick={toggleCallouts} style={ringData.some(item => item.amount > 0) ? initialCenterStyle : categoryCenterStyle(pieLayout)} aria-live="polite">
               <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(1))}%` : "—"}</FittedAmount>
               <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
             </button>
           </CategoryMixPieMotionHost>
         </ChartContainer>
       </div>
+      {duo && <ul className="bb-duo-category-list" aria-label="Category breakdown">
+        {chartData.filter(item => item.key !== "left" && item.amount > 0).map(item => <li key={item.key}>
+          <button type="button" onClick={() => onInspect(item)} aria-label={`Inspect ${item.label}, ${formatMoney(item.amount)}`}>
+            <i aria-hidden="true" style={{background: item.color}} /><span>{item.label}</span><span>{wholeMoney.format(item.amount)}</span>
+          </button>
+        </li>)}
+      </ul>}
       {pressure ? <CategoryMixOverflowFooter pressure={pressure} balances={categoryBalances} filter={filter} usedTotal={usedTotal} /> : null}
     </div>
   )

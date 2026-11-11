@@ -5,6 +5,7 @@ let now=0,size=390,reduced=false,renders=0,starts=0,selections=[],serial=0,datas
 const listeners=new Map(),timers=new Map(),observers=[],mediaListeners=new Set(),writes=[]
 const media={get matches(){return reduced},addEventListener:(_,fn)=>mediaListeners.add(fn),removeEventListener:(_,fn)=>mediaListeners.delete(fn)}
 const viewport={onscrollend:null,dataset:new Proxy({},{set(object,key,value){datasetWrites++;object[key]=value;return true}}),scrollLeft:0,get clientWidth(){return size},
+ getBoundingClientRect(){return {width:size}},
  addEventListener(name,fn,options){listeners.set(name,{fn,options})},removeEventListener(name){listeners.delete(name)},
  scrollTo(options){writes.push(options);if(options.behavior==='instant')this.scrollLeft=options.left}}
 const win={matchMedia:()=>media,setTimeout:fn=>{timers.set(++serial,fn);return serial},clearTimeout:id=>timers.delete(id)}
@@ -12,9 +13,9 @@ const runtime={exports:{},require:req,window:win,performance:{now:()=>now},Resiz
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/chart-swipe.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,runtime)
 const {useChartSwipe}=runtime.exports
 let tree
-function Harness({index=0,count=4}){renders++;const swipe=useChartSwipe({index,count,onSelect:next=>selections.push(next),onDragStart:()=>starts++,ignoreTarget:target=>target?.form});return React.createElement('div',{ref:swipe.viewportRef,onClickCapture:swipe.onClickCapture,'data-indicator':swipe.indicatorIndex})}
+function Harness({index=0,count=4,layoutKey=false}){renders++;const swipe=useChartSwipe({index,count,layoutKey,onSelect:next=>selections.push(next),onDragStart:()=>starts++,ignoreTarget:target=>target?.form});return React.createElement('div',{ref:swipe.viewportRef,onClickCapture:swipe.onClickCapture,'data-indicator':swipe.indicatorIndex})}
 const mount=(index=0,count=4)=>act(()=>{if(tree)tree.unmount();tree=create(React.createElement(Harness,{index,count}),{createNodeMock:()=>viewport})})
-const update=(index,count=4)=>act(()=>tree.update(React.createElement(Harness,{index,count})))
+const update=(index,count=4,layoutKey=false)=>act(()=>tree.update(React.createElement(Harness,{index,count,layoutKey})))
 const event=(clientX=300,clientY=100,extra={})=>{const touch={clientX,clientY,identifier:1};return {target:viewport,touches:[touch],changedTouches:[touch],stopped:0,prevented:0,stopPropagation(){this.stopped++},preventDefault(){this.prevented++},...extra}}
 const fire=(name,x,y,extra)=>{const e=event(x,y,extra);act(()=>listeners.get(name).fn(e));return e}
 const click=detail=>{const e=event(0,0,{detail});act(()=>tree.root.findByType('div').props.onClickCapture(e));return e}
@@ -46,6 +47,8 @@ try{
  fire('touchstart',250);fire('touchmove',80);const multiWrites=writes.length
  fire('touchmove',80,100,{touches:[{},{}]});fire('touchcancel',80,100,{touches:[]});assert.equal(viewport.dataset.dragging,'false');assert.equal(writes.length,multiWrites,'Multi-touch/cancellation never competes with native bounce/snap')
  mount(2);size=320;scroll(0);fire('scrollend');assert.equal(viewport.scrollLeft,672,'A resize scrollend before ResizeObserver preserves the selected graph at its new stride');act(()=>observers.at(-1).fn());assert.equal(viewport.scrollLeft,672)
+ viewport.scrollLeft=0;update(2,4,true);assert.equal(viewport.scrollLeft,672,'A fold layout change restores the committed chart even before a new scroll/resize event')
+ scroll(0);fire('scrollend');assert.equal(viewport.scrollLeft,672,'Late native focus snapping cannot replace the chart restored after folding')
  reduced=true;act(()=>{for(const fn of mediaListeners)fn()});update(1);assert.equal(viewport.scrollLeft,336);assert.equal(writes.at(-1).behavior,'instant')
  // Fallback observes idle only on browsers without scrollend, and waits for release.
  delete viewport.onscrollend;mount();const fallbackRenders=renders,fallbackWrites=writes.length
@@ -53,6 +56,7 @@ try{
  fire('touchend',40,100,{touches:[]});flush();assert.equal(selections.at(-1),1);assert.equal(viewport.dataset.settling,'false');assert.equal(renders,fallbackRenders+1,'Only the indicator crossing renders while waiting for native completion');assert.equal(writes.length,fallbackWrites)
  update(1);fire('wheel',0,0,{deltaX:100,deltaY:0});scroll(672);flush();assert.equal(selections.at(-1),2,'Horizontal trackpad scroll selects its native snapped page')
  scroll(700);assert.ok(timers.size);mount();assert.equal(timers.size,0,'Unmount cancels idle fallback timers')
+ mount(3);size=391.5;act(()=>observers.at(-1).fn());assert.equal(viewport.scrollLeft,1222.5,'Fractional Duo page widths preserve the real native snap stride')
 }finally{if(tree)act(()=>tree.unmount())}
 assert.equal(listeners.size,0);assert.equal(mediaListeners.size,0);assert.equal(timers.size,0);assert.ok(observers.every(o=>o.disconnected))
 console.log('PASS: native scroll ownership, passive input, no per-drag position writes/renders, settled selection, smooth marker navigation, re-grab, stale scrollend, vertical/tap/form arbitration, cancellation, fallback, resize, reduced motion and cleanup')

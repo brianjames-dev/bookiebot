@@ -3,13 +3,17 @@ const req=createRequire(require('node:path').resolve('web/expense-report/package
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const ast=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
 const React=req('react'),{renderToStaticMarkup}=req('react-dom/server')
-const names=new Set(['money','formatMoney','formatPct','roundCurrency','clamp','amountRowsTotal','reportSpentTotal','categoryMixRows','categoryMixRollover','categoryMixTransferRows','categoryMixPressure','CategoryMixOverflowFooter','categoryBudgetTotal','CategoryMixChart','areCategoryMixChartPropsEqual','categoryBalancesEqual','breakdownRowsEqual'])
+const names=new Set(['money','wholeMoney','formatMoney','formatPct','roundCurrency','clamp','amountRowsTotal','reportSpentTotal','categoryMixRows','categoryMixRollover','categoryMixTransferRows','categoryMixPressure','CategoryMixOverflowFooter','categoryBudgetTotal','CategoryMixChart','areCategoryMixChartPropsEqual','categoryBalancesEqual','breakdownRowsEqual'])
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))
 assert.equal(declarations.length,names.size)
 const passthrough=({children})=>React.createElement('div',null,children)
 let renderedRows=[]
+let duoLandscape=false
 const runtime={exports:{},memo:React.memo,useState:React.useState,useRef:React.useRef,useCallback:React.useCallback,categoryCenterStyle:()=>({}),require:req,FittedAmount:({children,className})=>React.createElement('div',{className},children),useElementSize:()=>[null,{width:300,height:300}],useExpensePieLayout:()=>({cx:150,cy:150,innerRadius:100}),chartConfig:()=>({}),ChartContainer:passthrough,CategoryMixPieMotionHost:passthrough,CategoryMixPieSurface:({data})=>{renderedRows=data;return null},CategoryContourCallouts:()=>null,CategoryMixFilterControl:()=>null,ModalDetails:passthrough,CATEGORY_BALANCE_LABELS:{needs:'Needs',wants:'Wants',savings:'Savings'},NEEDS_BAR_COLOR:'needs',WANTS_BAR_COLOR:'wants',CATEGORY_NEEDS_KEYS:new Set(['rent']),CATEGORY_WANTS_KEYS:new Set(['food']),SAVINGS_CATEGORY_COLOR:'cash',LEFT_CATEGORY_COLOR:'left'}
 runtime.MetricAmount=runtime.FittedAmount
+runtime.useAppNavigation=()=>({duoLandscape})
+runtime.useMemo=React.useMemo
+runtime.duoRingGeometry=require('./load_frontend_module.cjs')('duo-layout.ts').duoRingGeometry
 vm.runInNewContext(ts.transpileModule(declarations.map(node=>node.getText(ast)).join('\n')+'\nexports.rows=categoryMixRows;exports.Chart=CategoryMixChart;exports.headline=reportSpentTotal;exports.equal=areCategoryMixChartPropsEqual',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,runtime)
 const rows=(...args)=>JSON.parse(JSON.stringify(runtime.exports.rows(...args)))
 const data=[{key:'rent',label:'Rent',amount:500},{key:'food',label:'Eating out',amount:150}]
@@ -98,3 +102,13 @@ assert.match(wantsCoverage,/\$1,701\.60 within this budget, \$218\.40 in categor
 assert.doesNotMatch(wantsCoverage,/bb-category-overflow-excess/)
 assert.doesNotMatch(chart(savingsOnly),/bb-category-overflow/,'No footer or placeholder in the absence of pressure')
 console.log('Category Mix places overflow below the ring and separates exact covered and uncovered amounts.')
+
+// The expanded layout adds only a view over the exact existing chart rows.
+const duoProps={...base,filter:'all',amountSaved:1200,espp:400,allSpentTotal:712.34,projected:true};
+const normalHeadline=displayed(duoProps);renderToStaticMarkup(React.createElement(Chart,duoProps));const normalRows=JSON.stringify(renderedRows);
+duoLandscape=true;
+const expandedMarkup=renderToStaticMarkup(React.createElement(Chart,duoProps));
+assert.equal(displayed(duoProps),normalHeadline,'Expanded All retains the canonical expense-only headline');assert.equal(JSON.stringify(renderedRows),normalRows,'Expanded All retains exact cash/ESPP allocation and coverage rows');
+assert.match(expandedMarkup,/bb-duo-category-list/);assert.match(expandedMarkup,/Inspect SpaceX ESPP/);
+duoLandscape=false;
+assert.doesNotMatch(renderToStaticMarkup(React.createElement(Chart,duoProps)),/bb-duo-category-list/,'The collapsed main chart has no added itemized list');

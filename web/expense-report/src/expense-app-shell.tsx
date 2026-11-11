@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationDock } from "./app-navigation-bar"
@@ -22,6 +22,7 @@ import { TransactionsScreen } from "./transactions-screen"
 import { PageRefreshProvider, usePageRefresh } from "./page-refresh"
 import { PullToRefresh } from "./pull-to-refresh"
 import { ReportBrand, ReportHeader } from "./report-header"
+import { useDuoLayout } from "./duo-layout"
 import type { ExpenseReportData } from "./types"
 
 interface ExpenseAppShellProps {
@@ -37,6 +38,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const { theme, toggleTheme } = useExpenseReportTheme()
   const reconciliation = useReconciliation(Boolean(report))
   const owner = report?.ownerName ?? ownerName
+  const duo = useDuoLayout(owner)
   const reconciliationEnabled = reconciliation.snapshot?.enabled === true
   // Reserve the tab immediately; only a completed connection check can prove
   // it is unavailable. Slow or failed reads stay reachable through the tab.
@@ -194,8 +196,10 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
-  return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource }}>
-    <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}>
+  return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape }}>
+    <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
+      data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
+      style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
         <ReportBrand owner={owner} avatarUrl={avatarUrl} status={controls} statusHidden={!reportVisible} />
@@ -233,6 +237,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen}>
         {report && <><div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>
         <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
+          <div className="bb-setting-row"><span>Duo landscape layout</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Duo landscape layout" aria-checked={duo.enabled} onClick={duo.toggle}><span /></button></div>
           <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
           <AmountAppearanceSettings />
         </section>
