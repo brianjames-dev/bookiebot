@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-10 - Approved two-page Duo Overview
+
+Implement the user-approved source-styled preview in the existing authenticated app. Preserve the complete main layout and vertical spacing in closed portrait; all two-page rules require an enabled owner/device-local Duo preference and a supported unfolded landscape viewport. Reuse the existing `bookiebot:duo-layout:<owner>` boolean, including choices saved before the rollback. Settings exposes **Duo landscape layout**. Disabling it restores standard responsive behavior.
+
+Place Overview metrics/comparison in the left physical half and the existing chart carousel in the right. Keep equal internal page insets, aligned titles/position markers, a centered smaller horizontal glass dock, Current/Projected left of Ask/Settings, and a static page. Only reserve the part of the native right strip still inside the drawable viewport; never place components in it. Use existing components, financial views, amount formatting, chart sectors, inspectors and category rows. Expanded Category Mix shows its exact scoped rows beneath the compact ring; closed mode retains the original ring/callout presentation. The existing expanding comparison opens above its left-page anchor without increasing page height.
+
+Keep chart selection through fold/layout changes, including fractional page widths and late native focus snapping; genuine touch, trackpad and marker navigation remain native. No financial calculations, API/writer, bank state or transaction-edit workflow changes. This replaces the earlier rail-placement design while retaining its rollback’s native-strip boundary.
+
 ## 2026-11-10 - Restore the standard Home Screen layout
 
 Revert the iPhone Duo preview and landscape follow-up (PRs #142 and #143). Device screenshots showed the installed BookieBot viewport ending before the iOS status strip in both poses. [WebKit confirms Home Screen apps cannot draw arbitrary content under the status area](https://bugs.webkit.org/show_bug.cgi?id=317153#c2). Keep layout responsive to the window WebKit exposes. Any future proposal for native strip placement needs a supported platform API and a device tap test.
