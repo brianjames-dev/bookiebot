@@ -19,7 +19,8 @@ for(const mode of ['current','projected']){
 }
 const pressureReport=structuredClone(report);
 for(const view of Object.values(pressureReport.modeViews)){
- view.metrics.totalExpenses=7080;view.metrics.incomeAfterExpenses=-700;
+ view.metrics.totalExpenses=7080;view.metrics.incomeAfterExpenses=-700;view.metrics.monthlyIncome=7600;view.metrics.amountSaved=1220;
+ view.savingsInvesting={cashSaved:820,esppContribution:400,estimatedEsppContribution:200};
  view.breakdown.find(row=>row.key==='rent').amount=4450;
  view.categoryBalances={raw:{needs:-1990,wants:670,savings:620},remaining:{needs:-700,wants:0,savings:0},deficits:{needs:1990,wants:0,savings:0},totalOverspend:700,transfers:[{from:'wants',to:'needs',amount:670},{from:'savings',to:'needs',amount:620}]};
 }
@@ -88,7 +89,9 @@ async function geometry(page){return page.evaluate(()=>{
      if(process.env.BOOKIEBOT_DUO_SHOTS&&(width===867&&height===669||width===382))await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`duo-${engine.name()}-${dark?'dark':'light'}-${width}.png`),fullPage:true});
      if(width===867&&height===669){
       for(const title of ['Burn Rate','Calendar','Bills & Utilities','Category Mix']){
-       await page.getByRole('button',{name:'Show '+title,exact:true}).click();
+       const marker=page.getByRole('button',{name:'Show '+title,exact:true});
+       const point=await marker.evaluate(el=>{const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
+       await page.touchscreen.tap(point.x,point.y);
        await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor();
        assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').getAttribute('aria-label'),title);
        assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'all chart pages stay static');
@@ -103,6 +106,11 @@ async function geometry(page){return page.evaluate(()=>{
       const pressureCase=await fixture(browser,width,height,dark,false,true),pressurePage=pressureCase.page;await pressurePage.locator('.bb-category-overflow').waitFor();await pressurePage.waitForTimeout(200);
       const over=await geometry(pressurePage);assert.equal(over.scroll[1],height,'pressure page stays static');assert(over.chart.height>=40,'pressure ring retains space');
       const overlap=await pressurePage.evaluate(()=>{const plot=document.querySelector('.bb-category-chart-box').getBoundingClientRect(),legend=document.querySelector('.bb-duo-category-list').getBoundingClientRect(),footer=document.querySelector('.bb-category-overflow').getBoundingClientRect();return plot.bottom<=legend.top+1&&legend.bottom<=footer.top+1;});assert(overlap,'ring, complete category list and pressure footer have separate rows');
+      await pressurePage.setViewportSize({width:867,height:553});
+      await pressurePage.evaluate(()=>document.querySelector('.bb-app-shell').style.setProperty('--bb-duo-nav-bottom','58px','important'));await pressurePage.waitForTimeout(200);
+      const compactOver=await geometry(pressurePage);assert.equal(compactOver.scroll[1],553);assert(compactOver.chart.height>=60,'Dense cash/ESPP and pressure keep a readable ring above the home indicator: '+compactOver.chart.height);
+      for(const card of compactOver.cards)assert(card.last<=card.bottom+1,'Dense compact metrics remain visible');
+      for(const scope of ['needs','wants','savings']){await pressurePage.getByRole('combobox',{name:'Category mix filter'}).selectOption(scope);await pressurePage.waitForTimeout(100);const scoped=await geometry(pressurePage);assert.equal(scoped.scroll[1],553);assert(scoped.chart.height>=60,'Dense scoped ring remains readable: '+scope+' '+scoped.chart.height);}
       assert.deepEqual(pressureCase.errors,[]);assert.deepEqual(pressureCase.unexpected,[]);await pressurePage.close();
       console.log('PASS dialogs, navigation, preference and pressure',engine.name(),dark?'dark':'light');
      }

@@ -102,6 +102,9 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
 .bb-duo-category-list button > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bb-duo-category-list button > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bb-duo-category-list button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; border-radius: 4px; }
+/* Dense scopes keep every cash/ESPP/coverage row without squeezing out the ring. */
+.bb-duo-category-list:has(> li:nth-child(9)) button { padding-block: 3px; line-height: 1.2; }
+.bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
 @media (max-height: 610px) {
   .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 44px; grid-template-rows: 72px var(--bb-duo-heading) minmax(0, 1fr) 48px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metrics-grid { height: min(300px, calc(100% - 20px)); margin-top: 10px; }
@@ -111,4 +114,16 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { height: 100%; overflow: hidd
   .bb-app-shell[data-duo-overview="true"] .bb-savings-progress { margin-top: 8px; }
   .bb-app-shell[data-duo-overview="true"] .bb-chart-page { padding-top: 10px; gap: 10px; }
   .bb-duo-category-list button { padding-block: 3px; line-height: 1.2; }
+  .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
+  .bb-duo-category-list:has(> li:nth-child(9)) button { padding-block: 2px; line-height: 1.1; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) { gap: 8px; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) .bb-category-mix-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; align-items: center; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) .bb-category-summary-label { grid-column: 1; grid-row: 1; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) .bb-category-amount-row { display: contents; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) .bb-chart-total { grid-column: 1; grid-row: 2; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) .bb-chart-page-header-actions { grid-column: 2; grid-row: 2; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-mix-page:has(> .bb-category-overflow) .bb-chart-budget-note { grid-column: 2; grid-row: 1; text-align: right; }
+  .bb-app-shell[data-duo-overview="true"] .bb-category-overflow { padding-top: 6px; gap: 4px; }
+  .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
+  .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list button { padding-block: 2px; line-height: 1.1; }
 }
