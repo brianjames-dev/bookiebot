@@ -115,7 +115,7 @@ async function main() {
   const React = req("react")
   const renderer = req("react-test-renderer")
   const calls = [], timers = new Map()
-  let mode = "current"
+  let mode = "current", duoLandscape = false
   let timerId = 0, ignoreAbort = false
   const runtime = { exports: {}, AbortController, Intl, Date,
     setTimeout(fn, delay) { const id = ++timerId; timers.set(id, { fn, delay }); return id },
@@ -125,7 +125,7 @@ async function main() {
       init.signal.addEventListener("abort", () => { if (!ignoreAbort) reject(new Error("aborted")) }, { once: true })
     }),
     require: name => name === "react" ? React : name.endsWith(".css") ? {}
-      : name === "./app-navigation" ? {useAppNavigation: () => ({preferences: {mode}})}
+      : name === "./app-navigation" ? {useAppNavigation: () => ({preferences: {mode},duoLandscape})}
       : name.startsWith("./components") ? {
         FittedAmount: ({children, className}) => React.createElement("span", {className}, children),
         MonthPicker: ({ label, ...props }) => React.createElement("test-month-picker", { "aria-label":label, ...props }),
@@ -215,6 +215,18 @@ async function main() {
   assertNoFixture("August completed", "A superseded reply never displays for the new month")
   await finish(calls.at(-1), 200, result("2025-09", "September completed"))
   assertFixture("September completed")
+  const beforeDuoRequests=calls.length
+  duoLandscape=true;renderer.act(()=>tree.update(component()))
+  assert.equal(tree.root.findByProps({className:"bb-report-comparison"}).props["data-open"],true)
+  assert.equal(comparisonCard.props["data-open"],false,'Unfolded comparison keeps its compact left-page anchor')
+  assert.equal(comparisonCard.findByProps({className:"bb-comparison-toggle-group"}).props["aria-hidden"],false)
+  renderer.act(()=>tree.root.findByProps({"aria-label":"Close comparison"}).props.onClick())
+  assert.equal(findButton("Compare spending").props["aria-expanded"],false)
+  click("Compare spending")
+  duoLandscape=false;renderer.act(()=>tree.update(component()))
+  assert.equal(comparisonCard.props["data-open"],true,'Folding restores the standard inline expansion')
+  assertFixture("September completed",'Folding keeps the chosen comparison and its result')
+  assert.equal(calls.length,beforeDuoRequests,'Layout changes do not refetch financial reports')
   assertNoDetails()
   assert.ok(!read().includes("September completed"), "Removed calculation notes are not mounted")
   selectMonth("2026-08")

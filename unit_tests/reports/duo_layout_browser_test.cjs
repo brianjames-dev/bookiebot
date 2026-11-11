@@ -28,8 +28,16 @@ const assets=path.join(root,'src/bookiebot/reports/assets');
 const css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(assets,'expense-report-app.js'),'utf8');
 const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 const html=(dark,old)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
-async function fixture(browser,width,height,dark,old=false,pressure=false){
+async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0){
  const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[];
+ if(safeRight)await page.addInitScript(inset=>{
+  const native=window.getComputedStyle;
+  window.getComputedStyle=function(el,...args){
+   const style=native.call(this,el,...args);
+   return el.tagName==='SPAN'&&el.style.paddingRight.includes('safe-area-inset-right')
+    ?new Proxy(style,{get:(target,key)=>key==='paddingRight'?inset+'px':typeof target[key]==='function'?target[key].bind(target):target[key]}) :style;
+  };
+ },safeRight);
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url()),name=url.pathname;
@@ -41,6 +49,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false){
   else if(name==='/app/expenses/months')value={currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
   else if(name==='/app/expenses/comparison')value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:4080,complete:false},baseline:{spending:4500,complete:false},changeAmount:-420,changePercent:-9.3,status:'partial',coverageNote:'Synthetic comparison'};
   else if(name==='/app/reconciliation')value={enabled:true,checkedAt:null,items:[]};
+  else if(name==='/app/transactions')value={items:[],total:0,nextOffset:null,categories:[],persons:[],month:'2026-10'};
   else if(name==='/app/reimbursements')value={enabled:true,ownerKey:'brian',currency:'USD',allocations:[],events:[],resets:[],resetState:'fixture'};
   else if(name==='/app/goals')value={goals:[]};
   else if(name==='/app/notifications')value={enabled:false,preferences:{weekly:true,upcoming:false,showAmounts:false,hour:10}};
@@ -57,13 +66,49 @@ async function geometry(page){return page.evaluate(()=>{
  const q=s=>document.querySelector(s),box=s=>{const r=q(s).getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,cx:r.x+r.width/2,cy:r.y+r.height/2};};
  return {scroll:[document.documentElement.scrollWidth,document.documentElement.scrollHeight],duo:q('.bb-app-shell').dataset.duoOverview,header:box('.bb-report-header'),month:box('.bb-report-header h1'),tools:box('.bb-shell-header-actions'),mode:box('.bb-projection-control'),metrics:box('.bb-metrics-grid'),compare:box('.bb-comparison-card'),band:box('.bb-chart-carousel-band'),title:box('.bb-chart-carousel-title'),dots:box('.bb-chart-carousel-indicators'),nav:box('.bb-navigation-pane'),summary:box('.bb-category-mix-summary'),chart:box('.bb-category-chart-box'),legend:q('.bb-duo-category-list')?box('.bb-duo-category-list'):null,cards:[...document.querySelectorAll('.bb-metric-card')].map(x=>({bottom:x.getBoundingClientRect().bottom,last:x.lastElementChild.getBoundingClientRect().bottom})),sectors:[...document.querySelectorAll('.bb-category-pie-surface path.recharts-sector')].map(x=>x.getBoundingClientRect().toJSON())};
  });}
+async function tap(page,button){
+ await button.waitFor({state:'visible'});
+ const point=await button.evaluate(el=>{
+  const r=el.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2;
+  return {x,y,hit:document.elementFromPoint(x,y)?.closest('button')===el};
+ });
+ assert(point.hit,'native touch point reaches the intended button');
+ await page.touchscreen.tap(point.x,point.y);
+}
+async function heldFold(page){
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ // Reproduce a native layout transition that never delivers pointercancel.
+ await page.evaluate(()=>{
+  const pane=document.querySelector('.bb-navigation-pane'),button=pane.querySelector('[data-nav-screen="transactions"]'),r=button.getBoundingClientRect();
+  window.__heldNav=pane;pane.setPointerCapture=()=>{};
+  button.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:91,pointerType:'touch',clientX:r.x+r.width/2,clientY:r.y+r.height/2}));
+ });
+ await page.waitForTimeout(160);
+ assert.equal(await page.locator('.bb-navigation-pane').getAttribute('data-glass-contact'),'true','held finger activates the glass');
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(550);
+ assert.equal(await page.evaluate(()=>window.__heldNav.isConnected),false,'fold rebuilds the fixed glass layer');
+ assert.notEqual(await page.locator('.bb-navigation-pane').getAttribute('data-glass-contact'),'true','fold cancels the held contact');
+ assert.equal(await page.locator('[data-nav-screen="overview"]').getAttribute('data-state'),'active','fold restores the committed selection, not the drag preview');
+ for(const [label,screen] of [['Transactions','transactions'],['Shared','shared'],['Savings','savings'],['Reconcile','reconcile'],['Overview','overview']]){
+  await tap(page,page.getByRole('button',{name:label,exact:true}));
+  await page.locator(`.bb-app-shell[data-screen="${screen}"]`).waitFor();
+  assert.equal(await page.locator(`[data-nav-screen="${screen}"]`).getAttribute('aria-current'),'page','folded navigation remains interactive');
+ }
+ await page.setViewportSize({width:867,height:669});await page.waitForTimeout(550);
+ await tap(page,page.getByRole('button',{name:'Transactions',exact:true}));await page.locator('.bb-app-shell[data-screen="transactions"]').waitFor();
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(550);
+ assert.equal(await page.locator('[data-nav-screen="transactions"]').getAttribute('aria-current'),'page','folding retains the selected tab');
+ await tap(page,page.getByRole('button',{name:'Overview',exact:true}));await page.locator('.bb-app-shell[data-screen="overview"]').waitFor();
+ await page.setViewportSize({width:867,height:669});await page.waitForTimeout(550);
+ await page.emulateMedia({reducedMotion:'reduce'});
+}
 ;(async()=>{
  for(const engine of [chromium,webkit]){
   const browser=await engine.launch({headless:true});
   try{
    for(const dark of [false,true]){
-    for(const [width,height,safe] of [[382,657],[466,678],[867,669],[951,648],[867,553],[867,553,58]]){
-     const {page,errors,unexpected}=await fixture(browser,width,height,dark);
+    for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58]]){
+     const {page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,safeRight);
      if(safe){await page.evaluate(()=>document.querySelector('.bb-app-shell').style.setProperty('--bb-duo-nav-bottom','58px','important'));await page.waitForTimeout(100);}
      const m=await geometry(page);console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
      assert.equal(m.scroll[0],width,'horizontal overflow');
@@ -73,7 +118,12 @@ async function geometry(page){return page.evaluate(()=>{
       if(baseline){const before=await fixture(browser,width,height,dark,true),b=await geometry(before.page);for(const key of ['header','month','tools','mode','metrics','compare','band','title','dots','nav','summary','chart'])assert.deepEqual(m[key],b[key],'closed main geometry '+key);await before.page.close();}
      }else{
       assert.equal(m.duo,'true');assert.equal(m.scroll[1],height,'static unfolded page');
-      assert(Math.abs(m.band.x-475.5)<1,'physical fold');assert(Math.abs(m.nav.cx-475.5)<1,'physical nav center');assert.equal(m.nav.width,360);assert.equal(m.nav.height,54);
+      const usable=867,fold=475.5;
+      assert(Math.abs(m.band.x-fold)<1,'physical fold, including an already-excluded safe area');
+      assert(Math.abs(m.nav.cx-(fold+usable)/2)<1,'nav centered within the usable right half');assert.equal(m.nav.width,347.5);assert.equal(m.nav.height,54);
+      assert(Math.abs(m.tools.right-(usable-35))<1,'one normal right inset, with no double native-strip reservation');
+      assert(Math.abs(m.legend.right-m.tools.right)<1,'chart content aligns with header tools');
+      assert.equal(height-m.nav.bottom,safe||12,'same bottom inset as the closed dock');
       assert(Math.abs(m.mode.right+14-m.tools.x)<1,'mode left of tools');assert(Math.abs(m.month.cy-m.title.cy)<1,'aligned headings');assert(Math.abs(m.title.cy-m.dots.cy)<1,'inline notches');
       assert(Math.abs(m.legend.bottom-m.compare.bottom)<1,'matched content bottoms');assert.equal(m.nav.y-m.compare.bottom,16,'nav clearance');assert(m.compare.y-m.metrics.bottom>=10,'comparison keeps its vertical breathing room');
       for(const card of m.cards)assert(card.last<=card.bottom+1,'metric content fits');
@@ -84,10 +134,30 @@ async function geometry(page){return page.evaluate(()=>{
       await page.setViewportSize({width:382,height:657});assert.equal(await page.getByRole('button',{name:'Current',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.getByRole('combobox',{name:'Category mix filter'}).inputValue(),'needs');
       await page.setViewportSize({width,height});await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').getAttribute('aria-label'),'Category Mix','folding preserves the selected chart');
+      const metrics=(await geometry(page)).metrics;
+      await page.getByRole('button',{name:'Compare spending',exact:true}).click();
+      await page.getByRole('button',{name:'Close comparison',exact:true}).waitFor();
+      await page.locator('.bb-comparison-change').waitFor();
+      const expanded=await page.locator('.bb-comparison-viewport').boundingBox();
+      assert(expanded.x>=fold,'expanded comparison stays on the right page');
+      assert(expanded.x+expanded.width<=usable-34,'comparison respects the usable right edge');
+      assert.deepEqual((await geometry(page)).metrics,metrics,'comparison leaves all four frames unchanged');
+      assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),false,'comparison replaces the chart page');
+      assert(await page.locator('.bb-chart-carousel-band').evaluate(el=>getComputedStyle(el).opacity==='0'&&[...el.querySelectorAll('*')].every(child=>getComputedStyle(child).visibility==='hidden')),'comparison hides descendant chart layers and focus targets');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'expanded comparison keeps the page static');
+      if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&height===669&&!safeRight)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}.png`),fullPage:true});
+      await page.setViewportSize({width:382,height:657});
+      await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
+      await page.setViewportSize({width,height});await page.getByRole('button',{name:'Close comparison',exact:true}).waitFor();
+      await tap(page,page.getByRole('button',{name:'Close comparison',exact:true}));
+      assert.equal(await page.getByRole('button',{name:'Compare spending',exact:true}).evaluate(el=>el===document.activeElement),true,'comparison returns focus to its unchanged trigger');
+      await page.locator('.bb-chart-carousel-band').waitFor({state:'visible'});
+      assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),true,'closing restores the chart');
      }
      if(width>=800)await page.getByRole('combobox',{name:'Category mix filter'}).selectOption('all');
      if(process.env.BOOKIEBOT_DUO_SHOTS&&(width===867&&height===669||width===382))await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`duo-${engine.name()}-${dark?'dark':'light'}-${width}.png`),fullPage:true});
-     if(width===867&&height===669){
+     if(width===867&&height===669&&!safeRight){
+      await heldFold(page);
       for(const title of ['Burn Rate','Calendar','Bills & Utilities','Category Mix']){
        const marker=page.getByRole('button',{name:'Show '+title,exact:true});
        const point=await marker.evaluate(el=>{const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
@@ -97,7 +167,7 @@ async function geometry(page){return page.evaluate(()=>{
        assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'all chart pages stay static');
       }
       await page.getByRole('button',{name:'Compare spending',exact:true}).click();
-      await page.locator('.bb-comparison-card[data-open="true"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
+      await page.getByRole('button',{name:'Close comparison',exact:true}).waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       await page.getByRole('button',{name:'Collapse comparison',exact:true}).click();
       await page.getByRole('button',{name:'Ask BookieBot',exact:true}).click();await page.getByRole('button',{name:'Close Ask BookieBot',exact:true}).click();
       await page.getByRole('button',{name:'Settings',exact:true}).click();

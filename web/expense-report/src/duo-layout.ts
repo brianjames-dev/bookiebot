@@ -13,7 +13,7 @@ export function duoLandscapeGeometry(width:number,height:number,safeRight=0) {
   // Some installed viewports already end before the native 84px status strip.
   // Only reserve the part still inside the drawable viewport.
   const excluded=Math.min(rail,Math.max(0,951-width))
-  return {landscape,rail,overlay:landscape?Math.max(safeRight,rail-excluded):0}
+  return {landscape,rail,overlay:landscape?rail-excluded:0}
 }
 
 export function duoRingGeometry(size:{width:number;height:number}) {

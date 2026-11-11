@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const {duoLandscapeGeometry,duoRingGeometry,duoPreferenceKey}=require('./load_frontend_module.cjs')('duo-layout.ts');
 assert.equal(duoPreferenceKey(' Brian '),'bookiebot:duo-layout:brian');
-for(const [width,height,inset,expected] of [[867,669,0,0],[951,648,0,84],[867,669,84,84]]){
+for(const [width,height,inset,expected] of [[867,669,0,0],[951,648,0,84],[867,669,84,0],[951,648,84,84]]){
  const geometry=duoLandscapeGeometry(width,height,inset);
  assert.equal(geometry.landscape,true);assert.equal(geometry.overlay,expected);assert.equal(geometry.rail,84);
 }

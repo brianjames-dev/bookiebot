@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-10 - Duo right-page navigation and comparison follow-up
+
+The user's installed-device screenshot showed the 84px native safe area being reserved twice. Intersect that inset with the drawable viewport instead of always adding it: a 867px viewport with an 84px right safe area has already excluded the strip. Keep the physical fold at 475.5px and ordinary internal page insets. Center the horizontal dock within the usable right half, with the same bottom safe-area inset as closed portrait; constrain its width to that half.
+
+The user rejected the left-page comparison overlap. Keep its trigger below the metrics and temporarily use the right chart page for the same comparison body/results. Closing restores the chart; long results scroll internally and the Overview remains static. Folding retains comparison state and returns to the normal inline expansion. This supersedes the preceding decision's device-centered dock and upward comparison expansion.
+
+Recreate only the navigation dock when entering/leaving Duo landscape. Its independent store retains the selected tab and compact choice; fresh pointer/preview/lens state and fixed glass layers prevent an interrupted native press from surviving the fold. Keep report panels, drafts and financial request/cache state mounted. No financial calculations, persistence or writers change.
+
 ## 2026-11-10 - Approved two-page Duo Overview
 
 Implement the user-approved source-styled preview in the existing authenticated app. Preserve the complete main layout and vertical spacing in closed portrait; all two-page rules require an enabled owner/device-local Duo preference and a supported unfolded landscape viewport. Reuse the existing `bookiebot:duo-layout:<owner>` boolean, including choices saved before the rollback. Settings exposes **Duo landscape layout**. Disabling it restores standard responsive behavior.

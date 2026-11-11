@@ -31,7 +31,7 @@ const konsta = new Module(path.join(frontend, '__shell_konsta.cjs'), module)
 konsta.filename = path.join(frontend, '__shell_konsta.cjs'); konsta.require = req
 konsta._compile(req('esbuild').buildSync({ stdin: { contents: 'export * from "konsta/react"', resolveDir: frontend }, bundle: true, platform: 'node', format: 'cjs', write: false, external: ['react', 'react-dom'], logLevel: 'silent' }).outputFiles[0].text, konsta.filename)
 const cache = new Map(), mocks = new Map()
-let holdPageTransitions=false,navRenders=0
+let holdPageTransitions=false,navRenders=0,navMounts=0,duoLandscape=false
 const pageTransitions=[]
 function load(file) {
   if (mocks.has(file)) return mocks.get(file)
@@ -75,7 +75,8 @@ mocks.set(src('report-app.tsx'), { ExpenseReportApp: ReportLeaf, useExpenseRepor
 mocks.set(src('ask-bookiebot-panel.tsx'), { AskBookieBotPanel: AskLeaf })
 mocks.set(src('phone-notifications.tsx'), { PhoneNotifications: NotificationsLeaf })
 mocks.set(src('shared-reimbursements.tsx'), { SharedReimbursementsCard: () => h('p', null, 'Legacy fallback') })
-mocks.set(src('navigation-lens.ts'), {useNavigationLens:()=>{navRenders++;return {start(){},move(){},release(){}}}})
+mocks.set(src('duo-layout.ts'), {useDuoLayout:()=>({enabled:true,landscape:duoLandscape,overlay:0,rail:84,toggle(){}})})
+mocks.set(src('navigation-lens.ts'), {useNavigationLens:()=>{navRenders++;React.useEffect(()=>{navMounts++},[]);return {start(){},move(){},release(){}}}})
 const { ExpenseAppShell } = load(src('expense-app-shell.tsx'))
 let guard
 function Observe() { guard = useAppWorkGuard(); return null }
@@ -136,6 +137,13 @@ async function main() {
   }
   const askTrigger = button(tree, 'Ask BookieBot')
   const dock=tree.root.findAll(node=>node.props.navigation instanceof navigation.AppNavigationStore)[0].props.navigation
+  const mountedNavs=navMounts, mountedReport=reportMounts
+  duoLandscape=true;await run(()=>tree.update(shell(report)))
+  assert.equal(navMounts,mountedNavs+1,'Unfolding rebuilds transient glass contact and fixed compositor layers')
+  duoLandscape=false;await run(()=>tree.update(shell(report)))
+  assert.equal(navMounts,mountedNavs+2,'Folding rebuilds the dock even if native pointercancel never arrives')
+  assert.equal(tree.root.findAll(node=>node.props.navigation instanceof navigation.AppNavigationStore)[0].props.navigation,dock,'Folding preserves the committed navigation store')
+  assert.equal(reportMounts,mountedReport,'Folding never remounts report state')
   const beforeScroll=reportRenders
   await run(()=>dock.setCompact(true))
   assert.equal(reportRenders,beforeScroll,'Scroll compaction updates chrome without rerendering the report')

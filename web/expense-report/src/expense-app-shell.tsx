@@ -260,7 +260,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </main>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
-      <AppNavigationDock navigation={navigation} expanded={askOpen}
+      {/* Folding invalidates captured touch coordinates and WebKit's fixed glass layers. */}
+      <AppNavigationDock key={duo.landscape ? "unfolded" : "standard"} navigation={navigation} expanded={askOpen}
         reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
