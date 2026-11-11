@@ -30,7 +30,7 @@ const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 // Hold mobile emulation at 1× during pose changes; explicit viewport cases below exercise zoom-coordinate guards.
 const html=(dark,old)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
 async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0){
- const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[];
+ const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[],comparison={hold:false,release:null};
  await page.addInitScript(()=>{
   const native=window.visualViewport;if(!native)return;
   const proxy=new EventTarget();let override={};
@@ -56,7 +56,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   let value;
   if(name==='/app/expenses/data')value=page.url().includes('pressure=1')?pressureReport:report;
   else if(name==='/app/expenses/months')value={currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
-  else if(name==='/app/expenses/comparison')value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:4080,complete:false},baseline:{spending:4500,complete:false},changeAmount:-420,changePercent:-9.3,status:'partial',coverageNote:'Synthetic comparison'};
+  else if(name==='/app/expenses/comparison'){if(comparison.hold)await new Promise(resolve=>comparison.release=resolve);value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:4080,complete:false},baseline:{spending:4500,complete:false},changeAmount:-420,changePercent:-9.3,status:'partial',coverageNote:'Synthetic comparison'};}
   else if(name==='/app/reconciliation')value={enabled:true,checkedAt:null,items:[]};
   else if(name==='/app/transactions')value={items:Array.from({length:24},(_,i)=>({id:'fixture-'+i,actionId:'fixture-'+i,version:'fixture-v1',month:'2026-10',date:'2026-10-'+String(i+1).padStart(2,'0'),title:'Fixture purchase '+i,location:'Fixture',person:'Brian',kind:'expense',category:'food',categoryLabel:'Food',amountCents:1000,split:'',fields:{},editableFields:[],capabilities:{},reasons:{}})),total:24,nextOffset:null,categories:[],persons:[],month:'2026-10'};
   else if(name==='/app/reimbursements')value={enabled:true,ownerKey:'brian',currency:'USD',allocations:[],events:[],resets:[],resetState:'fixture'};
@@ -69,12 +69,19 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   return route.fulfill({json:value});
  });
  await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':''));await page.locator('.bb-metrics-grid').waitFor();await page.waitForTimeout(200);
- return {page,errors,unexpected};
+ return {page,errors,unexpected,comparison};
 }
 async function geometry(page){return page.evaluate(()=>{
  const q=s=>document.querySelector(s),box=s=>{const r=q(s).getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,cx:r.x+r.width/2,cy:r.y+r.height/2};};
  return {scroll:[document.documentElement.scrollWidth,document.documentElement.scrollHeight],duo:q('.bb-app-shell').dataset.duoOverview,header:box('.bb-report-header'),month:box('.bb-report-header h1'),tools:box('.bb-shell-header-actions'),mode:box('.bb-projection-control'),metrics:box('.bb-metrics-grid'),compare:box('.bb-comparison-card'),band:box('.bb-chart-carousel-band'),title:box('.bb-chart-carousel-title'),dots:box('.bb-chart-carousel-indicators'),nav:box('.bb-navigation-pane'),summary:box('.bb-category-mix-summary'),chart:box('.bb-category-chart-box'),legend:q('.bb-duo-category-list')?box('.bb-duo-category-list'):null,cards:[...document.querySelectorAll('.bb-metric-card')].map(x=>({bottom:x.getBoundingClientRect().bottom,last:x.lastElementChild.getBoundingClientRect().bottom})),sectors:[...document.querySelectorAll('.bb-category-pie-surface path.recharts-sector')].map(x=>x.getBoundingClientRect().toJSON())};
  });}
+async function metricSnapshot(page){return page.locator('.bb-metrics-grid').evaluate(grid=>{
+ const selectors='.bb-metric-card,.bb-metric-head,.bb-metric-label,.bb-metric-value,.bb-left-categories,.bb-savings-progress,.bb-savings-progress-labels';
+ return [grid,...grid.querySelectorAll(selectors)].map(el=>{
+  const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+  return {box:[r.x,r.y,r.width,r.height],style:Object.fromEntries(['display','gridTemplateColumns','gridTemplateRows','fontSize','lineHeight','textAlign','paddingTop','paddingBottom','marginTop'].map(key=>[key,s[key]]))};
+ });
+});}
 async function tap(page,button){
  await button.waitFor({state:'visible'});
  const point=await button.evaluate(el=>{
@@ -268,7 +275,7 @@ async function bottomScroll(page){
   try{
    for(const dark of [false,true]){
     for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58],[867,480]]){
-     const {page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,safeRight);
+     const {page,errors,unexpected,comparison}=await fixture(browser,width,height,dark,false,false,safeRight);
      if(safe){await page.evaluate(()=>document.querySelectorAll('.bb-app-shell').forEach(el=>el.style.setProperty('--bb-duo-nav-bottom','58px','important')));await page.waitForTimeout(100);}
      const m=await geometry(page);console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
      assert.equal(m.scroll[0],width,'horizontal overflow');
@@ -278,6 +285,7 @@ async function bottomScroll(page){
       if(baseline){const before=await fixture(browser,width,height,dark,true),b=await geometry(before.page);for(const key of ['header','month','tools','mode','metrics','compare','band','title','dots','nav','summary','chart'])assert.deepEqual(m[key],b[key],'closed main geometry '+key);await before.page.close();}
      }else{
       assert.equal(m.duo,'true');assert.equal(m.scroll[1],height,'static unfolded page');
+      if(baseline&&height>=648){const prior=await fixture(browser,width,height,dark,true,false,safeRight);assert.deepEqual(await metricSnapshot(page),await metricSnapshot(prior.page),'normal unfolded cards retain the released closed-comparison geometry and styling');await prior.page.close();}
       const usable=867,fold=475.5;
       assert(Math.abs(m.band.x-fold)<1,'physical fold, including an already-excluded safe area');
       assert(Math.abs(m.nav.cx-(fold+usable)/2)<1,'nav centered within the usable right half');assert.equal(m.nav.width,347.5);assert.equal(m.nav.height,54);
@@ -296,13 +304,24 @@ async function bottomScroll(page){
       await page.setViewportSize({width:382,height:657});assert.equal(await page.getByRole('button',{name:'Current',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.getByRole('combobox',{name:'Category mix filter'}).inputValue(),'needs');
       await page.setViewportSize({width,height});await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').getAttribute('aria-label'),'Category Mix','folding preserves the selected chart');
-      const before=await geometry(page);
+      const before=await geometry(page),beforeMetrics=await metricSnapshot(page);
+      comparison.hold=true;
       await tap(page,page.getByRole('button',{name:'Compare spending',exact:true}));
+      await page.locator('.bb-comparison-hero[aria-busy="true"]').waitFor();
+      const loadingMetrics=await metricSnapshot(page);
+      const deadline=Date.now()+2000;while(!comparison.release&&Date.now()<deadline)await page.waitForTimeout(10);
+      assert(comparison.release,'comparison fixture received its held read');comparison.hold=false;comparison.release();
+      assert.deepEqual(loadingMetrics,beforeMetrics,'opening/loading comparison never resizes or restyles any of the four cards');
       await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
       await page.locator('.bb-comparison-change').waitFor();
       const after=await geometry(page);
       for(const key of ['x','y','width'])assert.equal(after.metrics[key],before.metrics[key],'expanded summary retains its position and width');
-      assert(after.metrics.height<=before.metrics.height,'summary yields height for comparison');
+      assert.deepEqual(after.metrics,before.metrics,'comparison results leave the complete metric grid unchanged');
+      assert.deepEqual(await metricSnapshot(page),beforeMetrics,'comparison results preserve every metric frame, heading, amount, target and progress row');
+      const scale=await page.evaluate(()=>{const size=s=>parseFloat(getComputedStyle(document.querySelector(s)).fontSize);return{difference:size('.bb-comparison-difference'),metric:size('.bb-metric-value'),month:size('.bb-comparison-month-name'),amount:size('.bb-comparison-amount')};});
+      assert(scale.difference<=scale.metric,'comparison headline matches the existing metric scale');
+      assert(scale.month<=14&&scale.amount<=14,'comparison month text matches other secondary values');
+      assert(await page.locator('.bb-comparison-card').evaluate(el=>[...el.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44;})),'comparison month and collapse controls retain 44px touch targets');
       for(const card of after.cards)assert(card.last<=card.bottom+1,'every metric/progress row remains inside its frame');
       assert(await page.locator('.bb-metrics-grid').evaluate(el=>[...el.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return r.width>=44&&r.height>=44;})),'expanded summary preserves 44px touch controls');
       if(height<=610)assert(await page.locator('.bb-comparison-months .bb-month-trigger > span').evaluate(el=>el.getBoundingClientRect().height<=22),'compact month names never break mid-word');
@@ -317,13 +336,14 @@ async function bottomScroll(page){
        el.scrollTop=9999;
        return el.scrollTop===0&&el.scrollHeight<=el.clientHeight+1&&card.getBoundingClientRect().bottom<=limit.bottom+1&&metrics.scrollHeight<=metrics.clientHeight+1;
       }),'expanded cards and complete comparison fit without scroll or clipping');
-      if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&height===669&&!safeRight)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}.png`),fullPage:true});
+      if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&!safeRight&&!safe)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}-${height}.png`),fullPage:true});
       await page.setViewportSize({width:382,height:657});await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
       await page.setViewportSize({width,height});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();
       await tap(page,page.getByRole('button',{name:'Collapse comparison',exact:true}));
       await page.locator('.bb-comparison-card[data-open="false"]').waitFor();
       await page.waitForTimeout(50);
       assert.equal(await page.locator('.bb-overview-summary').evaluate(el=>el.scrollTop),0,'collapse returns the short left column to its resting position');
+      assert.deepEqual(await metricSnapshot(page),beforeMetrics,'collapsing comparison also leaves all four cards unchanged');
      }
      if(width>=800)await page.getByRole('combobox',{name:'Category mix filter'}).selectOption('all');
      if(process.env.BOOKIEBOT_DUO_SHOTS&&(width===867&&height===669||width===382))await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`duo-${engine.name()}-${dark?'dark':'light'}-${width}.png`),fullPage:true});
