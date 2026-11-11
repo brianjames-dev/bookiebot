@@ -2,6 +2,7 @@ import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useSt
 import { ArrowLeft } from "lucide-react"
 import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationDock } from "./app-navigation-bar"
+import { NavigationViewport } from "./navigation-viewport"
 import { AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -261,10 +262,11 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </main>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
-      {/* Folding invalidates captured touch coordinates and WebKit's fixed glass layers. */}
-      <AppNavigationDock key={duo.landscape ? "unfolded" : "standard"} navigation={navigation} expanded={askOpen}
-        viewportAnchored={duo.enabled}
+      {/* Keep the viewport surface stable while resetting fold-specific contact state. */}
+      <NavigationViewport enabled={duo.enabled} landscape={duo.landscape} overlay={duo.overlay} rail={duo.rail}>
+        <AppNavigationDock key={duo.landscape ? "unfolded" : "standard"} navigation={navigation} expanded={askOpen}
         reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
+      </NavigationViewport>
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
     </div>

@@ -20,7 +20,7 @@ def test_navigation_lens_tracks_finger_without_rendering_and_cleans_up():
                    cwd=root, check=True, capture_output=True, text=True)
 
 
-def test_duo_navigation_follows_visible_viewport_after_scrolled_folds():
+def test_duo_navigation_keeps_a_body_level_viewport_surface_across_folds():
     root = Path(__file__).resolve().parents[2]
     if not (root / "web/expense-report/node_modules/typescript").exists():
         pytest.skip("Install frontend dependencies to run viewport checks")

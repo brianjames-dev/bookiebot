@@ -126,8 +126,8 @@ async function scrolledFold(page){
   // Native visual geometry can settle later than the layout viewport. Send
   // only visualViewport events, with no window resize or pointer cancellation.
   await page.evaluate(()=>window.__testVisualViewport({height:360,offsetTop:20,scale:1}));await page.waitForTimeout(100);
-  await atBottom(368);
-  assert(Math.abs(await bottom()-368)<1,'dock follows the visible viewport independently of the layout viewport');
+  await atBottom(645);
+  assert(Math.abs(await bottom()-645)<1,'stale visual viewport readings cannot move the dock off the screen bottom');
   await page.evaluate(()=>window.__testVisualViewport(null));await page.waitForTimeout(100);
   await atBottom(645);
   assert(Math.abs(await bottom()-645)<1,'late visual viewport restoration cannot strand the dock mid-screen');
@@ -139,6 +139,24 @@ async function scrolledFold(page){
   await atBottom(657);
   assert(Math.abs(await bottom()-657)<1,'unfolded dock returns to its right-page bottom');
  }
+}
+async function isolatedViewport(page){
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
+ await page.evaluate(()=>{window.scrollTo(0,0);window.__dockViewport=document.querySelector('.bb-navigation-viewport');});
+ assert(await page.locator('.bb-navigation-viewport').evaluate(el=>el.parentElement===document.body),'dock viewport is outside the scrollable page');
+ await page.setViewportSize({width:867,height:669});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
+ assert(await page.locator('.bb-navigation-viewport').evaluate(el=>el===window.__dockViewport),'fold/unfold keeps the same viewport surface');
+ // Model the page-local containing block that a post-fold rendering layer can
+ // retain. The toolbar must remain viewport-owned despite page transforms.
+ await page.locator('.bb-page.bb-app-shell').evaluate(el=>{el.style.transform='translateZ(0)';el.style.height='100dvh';});
+ for(const y of [0,200,420,100,0]){
+  await page.evaluate(y=>window.scrollTo(0,y),y);await page.waitForTimeout(100);
+  await page.waitForFunction(()=>Math.abs(document.querySelector('.bb-navigation-pane').getBoundingClientRect().bottom-645)<1,null,{timeout:2000});
+ }
+ await page.locator('.bb-page.bb-app-shell').evaluate(el=>{el.style.removeProperty('transform');el.style.removeProperty('height');});
+ assert.equal(await page.locator('.bb-navigation-pane').evaluate(el=>el.closest('.bb-page')),null,'page layout cannot become the dock ancestor');
+ await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(100);
 }
 async function bottomScroll(page){
  await page.emulateMedia({reducedMotion:'no-preference'});
@@ -187,7 +205,7 @@ async function bottomScroll(page){
    for(const dark of [false,true]){
     for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58],[867,480]]){
      const {page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,safeRight);
-     if(safe){await page.evaluate(()=>document.querySelector('.bb-app-shell').style.setProperty('--bb-duo-nav-bottom','58px','important'));await page.waitForTimeout(100);}
+     if(safe){await page.evaluate(()=>document.querySelectorAll('.bb-app-shell').forEach(el=>el.style.setProperty('--bb-duo-nav-bottom','58px','important')));await page.waitForTimeout(100);}
      const m=await geometry(page);console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
      assert.equal(m.scroll[0],width,'horizontal overflow');
      if(width<800){
@@ -268,13 +286,14 @@ async function bottomScroll(page){
       const over=await geometry(pressurePage);assert.equal(over.scroll[1],height,'pressure page stays static');assert(over.chart.height>=40,'pressure ring retains space');
       const overlap=await pressurePage.evaluate(()=>{const plot=document.querySelector('.bb-category-chart-box').getBoundingClientRect(),legend=document.querySelector('.bb-duo-category-list').getBoundingClientRect(),footer=document.querySelector('.bb-category-overflow').getBoundingClientRect();return plot.bottom<=legend.top+1&&legend.bottom<=footer.top+1;});assert(overlap,'ring, complete category list and pressure footer have separate rows');
       await pressurePage.setViewportSize({width:867,height:553});
-      await pressurePage.evaluate(()=>document.querySelector('.bb-app-shell').style.setProperty('--bb-duo-nav-bottom','58px','important'));await pressurePage.waitForTimeout(200);
+      await pressurePage.evaluate(()=>document.querySelectorAll('.bb-app-shell').forEach(el=>el.style.setProperty('--bb-duo-nav-bottom','58px','important')));await pressurePage.waitForTimeout(200);
       const compactOver=await geometry(pressurePage);assert.equal(compactOver.scroll[1],553);assert(compactOver.chart.height>=60,'Dense cash/ESPP and pressure keep a readable ring above the home indicator: '+compactOver.chart.height);
       for(const card of compactOver.cards)assert(card.last<=card.bottom+1,'Dense compact metrics remain visible');
       for(const scope of ['needs','wants','savings']){await pressurePage.getByRole('combobox',{name:'Category mix filter'}).selectOption(scope);await pressurePage.waitForTimeout(100);const scoped=await geometry(pressurePage);assert.equal(scoped.scroll[1],553);assert(scoped.chart.height>=60,'Dense scoped ring remains readable: '+scope+' '+scoped.chart.height);}
       assert.deepEqual(pressureCase.errors,[]);assert.deepEqual(pressureCase.unexpected,[]);await pressurePage.close();
       console.log('PASS dialogs, navigation, preference and pressure',engine.name(),dark?'dark':'light');
      }
+     if(width===382)await isolatedViewport(page);
      assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);await page.close();
     }
    }

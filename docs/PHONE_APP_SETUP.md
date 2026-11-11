@@ -58,9 +58,9 @@ When unfolded in landscape, Overview uses two physical pages: metrics and the Co
 
 The month/chart headings and content sit closer to the header in unfolded landscape. Compare spending expands below the four cards on the left with a 14px gap, while the right chart stays visible. While open, metric labels and amounts sit side by side to give the full comparison room; values, progress rows and 44px controls remain visible. Short views show the two comparison months beside one another, and the shortest view uses an 8px gap. Collapse using the original chevron. Both halves fit without scrolling, including expanded comparison.
 
-Category Mix lists the actual filtered categories below its compact ring; dense scopes use extra columns to keep the ring and any overage footer visible. Tapping a row opens the existing inspection. Folding preserves the selected tab, chart, mode, category scope and comparison month/results, while clearing any interrupted glass-navigation press. The glass dock stays fixed during ordinary scrolling and corrects its viewport position on resizing/folding; it does not extend page height. Keyboard hiding and glass styling remain. Message, Settings and inspectors keep their existing actions. Other screens retain their existing content/workflows.
+Category Mix lists the actual filtered categories below its compact ring; dense scopes use extra columns to keep the ring and any overage footer visible. Tapping a row opens the existing inspection. Folding preserves the selected tab, chart, mode, category scope and comparison month/results, while clearing any interrupted glass-navigation press. The glass dock uses a separate screen-sized layer outside the scrolling page, with no calculated viewport-height offset. It stays at the screen bottom after folding back and does not extend page height. Keyboard hiding and glass styling remain. Message, Settings and inspectors keep their existing actions. Other screens retain their existing content/workflows.
 
-Turn the preference off to use the standard responsive layout. After updating from the Home Screen icon, verify both poses and both themes using acceptance checklist 267.
+Turn the preference off to use the standard responsive layout. After updating from the Home Screen icon, verify both poses and both themes using acceptance checklist 268.
 
 ## Optional phone notifications
 

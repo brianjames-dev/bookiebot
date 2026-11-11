@@ -1,9 +1,5 @@
-/* Closed phones keep main's component layout; opted-in docks follow the visible viewport. */
+/* Closed phones keep main's component layout. */
 .bb-overview-summary { display: contents; }
-.bb-app-shell[data-duo-enabled="true"] .bb-bottom-navigation {
-  position: fixed; top: auto; bottom: calc(100dvh - var(--bb-nav-viewport-bottom, 100dvh));
-  transform: translateX(-50%);
-}
 .bb-app-shell[data-duo-landscape="true"] {
   --bb-duo-inset: clamp(16px, 4vw, 35px);
   --bb-duo-heading: 48px;
@@ -13,6 +9,13 @@
   --bb-duo-right-width: calc((100vw - var(--bb-duo-overlay) - var(--bb-duo-right-rail)) / 2);
   padding-right: calc(var(--bb-page-gutter) + var(--bb-duo-overlay));
 }
+/* Body-level, top-anchored viewport surface: page scroll and fold clipping never
+   become the dock's containing block. No JS height or scroll offsets. */
+.bb-app-shell.bb-navigation-viewport {
+  position: fixed; z-index: 50; top: 0; left: 0; width: 100%; height: 100dvh;
+  min-height: 0; margin: 0; padding: 0; pointer-events: none;
+}
+.bb-navigation-viewport .bb-bottom-navigation { position: absolute; top: auto; bottom: 0; }
 .bb-app-shell[data-duo-landscape="true"] .bb-shell-header-actions {
   right: calc(var(--bb-duo-overlay) + var(--bb-duo-inset));
 }
