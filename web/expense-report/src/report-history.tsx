@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { ArrowDownRight, ArrowLeftRight, ChevronDown, X } from "lucide-react"
+import { ArrowDownRight, ArrowLeftRight, ChevronDown } from "lucide-react"
 import { FittedAmount } from "./components/ui/fitted-amount"
 import { MonthPicker } from "./components/ui/month-picker"
 import type { ExpenseReportData } from "./types"
@@ -237,7 +237,6 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
 }) {
   const navigation = useAppNavigation()
   const mode = navigation?.preferences.mode ?? "current"
-  const duo = navigation?.duoLandscape === true
   const [open, setOpen] = useState(false)
   const [chosenMonth, setChosenMonth] = useState<string | null>(null)
   const [comparison, setComparison] = useState<ReportPeriodComparison | null>(null)
@@ -309,8 +308,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
     })
   }, [open, baseline, mode, resultKey, requests, selectedMonth, revision, refreshing])
 
-  const frame = useComparisonFrame(open && !duo)
-  const close = () => { setOpen(false); frame.toggle.current?.focus({ preventScroll: true }) }
+  const frame = useComparisonFrame(open)
   const ready = !loading && !error && comparison?.selectedMonth === selectedMonth && comparison.baselineMonth === baseline && comparison.mode === mode ? comparison : null
   const amounts = ready?.selected && ready.baseline ? [ready.selected.spending, ready.baseline.spending] : null
   const change = amounts ? ready!.changeAmount : null
@@ -319,10 +317,10 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
   const monthName = (value: string) => value.startsWith(`${report.year}-`) ? reportMonthLabel(value).replace(/\s+\d{4}$/, "") : reportMonthLabel(value)
 
   return <section ref={frame.slot} className="bb-report-comparison" data-open={open} aria-label="Spending comparison">
-    <div ref={frame.card} className="bb-comparison-card" data-open={open && !duo} data-direction={direction}>
+    <div ref={frame.card} className="bb-comparison-card" data-open={open} data-direction={direction}>
       <button ref={frame.toggle} type="button" className="bb-comparison-toggle" aria-label={open ? "Collapse comparison" : "Compare spending"}
         aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-        <span className="bb-comparison-toggle-group" aria-hidden={open && !duo}>
+        <span className="bb-comparison-toggle-group" aria-hidden={open}>
           <span className="bb-comparison-icon" aria-hidden="true"><ArrowLeftRight size={18} /></span>
           <span className="bb-comparison-copy">
             <span className="bb-comparison-title">Compare spending</span>
@@ -332,10 +330,6 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
         <span className="bb-comparison-chevron" aria-hidden="true"><ChevronDown size={18} /></span>
       </button>
       <div className="bb-comparison-viewport" id={id} aria-hidden={!open} inert={!open}>
-        {duo && open && <div className="bb-duo-comparison-heading">
-          <h2>Spending comparison</h2>
-          <button type="button" aria-label="Close comparison" onClick={close}><X size={22} /></button>
-        </div>}
         <div ref={frame.body} className="bb-comparison-content">
           <div className="bb-comparison-hero" role="status" aria-live="polite" aria-busy={loading}>
             {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}

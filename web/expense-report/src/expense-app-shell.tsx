@@ -198,6 +198,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
   return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape }}>
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
+      data-duo-enabled={duo.enabled || undefined}
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
@@ -262,6 +263,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
       {/* Folding invalidates captured touch coordinates and WebKit's fixed glass layers. */}
       <AppNavigationDock key={duo.landscape ? "unfolded" : "standard"} navigation={navigation} expanded={askOpen}
+        viewportAnchored={duo.enabled}
         reconciliationVisible={reconciliationVisible} hidden={keyboardOpen} disabled={!report} onSelect={selectScreen} />
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />

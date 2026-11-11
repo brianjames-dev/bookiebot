@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-10 - Restore inline Duo comparison and visible-viewport anchoring
+
+The user rejects the right-page comparison introduced in PR #146. Restore the original expanding comparison component in both poses. Group metrics and comparison in one persistent wrapper: it has no box in the normal layout, and is the left column in unfolded Overview. Comparison expands beneath unchanged cards with the normal 14px gap. That column handles optional overflow; the document and right chart remain static. Reduce unfolded masthead/heading rows to 72px/48px (44px heading in short views), aligning both content starts at 128px rather than 194px.
+
+The user's next device capture shows the closed navbar stranded mid-screen; remounting touch state alone was insufficient. For opted-in Duo devices, position the dock in document coordinates at the current visible viewport bottom, tracking window and visualViewport resize/scroll/orientation/pageshow events. Use positive visual geometry at scale one; fall back to the window height while zoom/rotation uses another coordinate scale or an empty intermediate viewport. Coalesce updates in one animation frame, write only changed positions, and retain existing glass rendering, keyboard hiding and committed selection. Standard devices retain fixed CSS positioning. Continue resetting transient contact across the fold; report panels and drafts remain mounted. This supersedes PR #146's comparison workflow and its reliance on fixed-bottom positioning.
+
 ## 2026-11-10 - Duo right-page navigation and comparison follow-up
 
 The user's installed-device screenshot showed the 84px native safe area being reserved twice. Intersect that inset with the drawable viewport instead of always adding it: a 867px viewport with an 84px right safe area has already excluded the strip. Keep the physical fold at 475.5px and ordinary internal page insets. Center the horizontal dock within the usable right half, with the same bottom safe-area inset as closed portrait; constrain its width to that half.
