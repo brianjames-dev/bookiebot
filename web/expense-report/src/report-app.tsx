@@ -633,6 +633,7 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
       <ChartTooltipDismissProvider revision={chartTooltipDismissRevision}>
         <main className="bb-main" data-bb-tooltip-dismiss-revision={chartTooltipDismissRevision}>
         <ReportScreen name="overview">
+        <div className="bb-overview-summary">
         <section className="bb-metrics-grid" aria-label="Budget metrics">
           <MetricCard
             label="Income"
@@ -659,6 +660,7 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
         </section>
 
         {appComparison}
+        </div>
         <OverviewCharts report={report} activeReport={activeReport} chartBreakdown={chartBreakdown}
           projected={projectionActive} preferredChart={viewPreferences.chartId} onChartChange={selectChart}
           onInspectCategory={inspectCategory} collapseKey={chartCollapseKey}

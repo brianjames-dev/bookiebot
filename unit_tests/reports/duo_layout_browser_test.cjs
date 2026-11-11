@@ -27,9 +27,18 @@ for(const view of Object.values(pressureReport.modeViews)){
 const assets=path.join(root,'src/bookiebot/reports/assets');
 const css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(assets,'expense-report-app.js'),'utf8');
 const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
-const html=(dark,old)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
+// Hold mobile emulation at 1× during pose changes; explicit viewport cases below exercise zoom-coordinate guards.
+const html=(dark,old)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
 async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0){
  const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[];
+ await page.addInitScript(()=>{
+  const native=window.visualViewport;if(!native)return;
+  const proxy=new EventTarget();let override={};
+  for(const key of ['height','width','offsetTop','offsetLeft','pageTop','pageLeft','scale'])Object.defineProperty(proxy,key,{get:()=>override[key]??native[key]});
+  for(const name of ['resize','scroll'])native.addEventListener(name,()=>proxy.dispatchEvent(new Event(name)));
+  Object.defineProperty(window,'visualViewport',{get:()=>proxy});
+  window.__testVisualViewport=values=>{override=values||{};proxy.dispatchEvent(new Event('resize'));proxy.dispatchEvent(new Event('scroll'));};
+ });
  if(safeRight)await page.addInitScript(inset=>{
   const native=window.getComputedStyle;
   window.getComputedStyle=function(el,...args){
@@ -102,6 +111,35 @@ async function heldFold(page){
  await page.setViewportSize({width:867,height:669});await page.waitForTimeout(550);
  await page.emulateMedia({reducedMotion:'reduce'});
 }
+async function scrolledFold(page){
+ const atBottom=async expected=>{
+  try {await page.waitForFunction(y=>Math.abs(document.querySelector('.bb-navigation-pane').getBoundingClientRect().bottom-y)<1,expected,{timeout:2000});}
+  catch(error){console.error('Viewport anchor mismatch',expected,await page.evaluate(()=>({scrollY,innerHeight,visual:[visualViewport.height,visualViewport.offsetTop],bottom:document.querySelector('.bb-navigation-pane').getBoundingClientRect().bottom,anchor:document.querySelector('.bb-bottom-navigation').getAttribute('style'),body:document.body.getAttribute('style')})));throw error;}
+ };
+ for(let cycle=0;cycle<2;cycle++){
+  await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
+  await page.evaluate(()=>window.scrollTo(0,420));await page.waitForTimeout(100);
+  assert(await page.evaluate(()=>window.scrollY>200),'exercise a scrolled closed report');
+  const bottom=()=>page.locator('.bb-navigation-pane').evaluate(el=>el.getBoundingClientRect().bottom);
+  await atBottom(645);
+  assert(Math.abs(await bottom()-645)<1,'closed dock follows the viewport after folding a scrolled page');
+  // Native visual geometry can settle later than the layout viewport. Send
+  // only visualViewport events, with no window resize or pointer cancellation.
+  await page.evaluate(()=>window.__testVisualViewport({height:360,offsetTop:20,scale:1}));await page.waitForTimeout(100);
+  await atBottom(368);
+  assert(Math.abs(await bottom()-368)<1,'dock follows the visible viewport independently of the layout viewport');
+  await page.evaluate(()=>window.__testVisualViewport(null));await page.waitForTimeout(100);
+  await atBottom(645);
+  assert(Math.abs(await bottom()-645)<1,'late visual viewport restoration cannot strand the dock mid-screen');
+  await page.evaluate(()=>window.__testVisualViewport({height:156,offsetTop:0,scale:4.2}));await atBottom(645);
+  await page.evaluate(()=>window.__testVisualViewport(null));await atBottom(645);
+  await tap(page,page.getByRole('button',{name:'Transactions',exact:true}));await page.locator('.bb-app-shell[data-screen="transactions"]').waitFor();
+  await tap(page,page.getByRole('button',{name:'Overview',exact:true}));await page.locator('.bb-app-shell[data-screen="overview"]').waitFor();
+  await page.setViewportSize({width:867,height:669});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();await page.waitForTimeout(100);
+  await atBottom(657);
+  assert(Math.abs(await bottom()-657)<1,'unfolded dock returns to its right-page bottom');
+ }
+}
 ;(async()=>{
  for(const engine of [chromium,webkit]){
   const browser=await engine.launch({headless:true});
@@ -125,7 +163,8 @@ async function heldFold(page){
       assert(Math.abs(m.legend.right-m.tools.right)<1,'chart content aligns with header tools');
       assert.equal(height-m.nav.bottom,safe||12,'same bottom inset as the closed dock');
       assert(Math.abs(m.mode.right+14-m.tools.x)<1,'mode left of tools');assert(Math.abs(m.month.cy-m.title.cy)<1,'aligned headings');assert(Math.abs(m.title.cy-m.dots.cy)<1,'inline notches');
-      assert(Math.abs(m.legend.bottom-m.compare.bottom)<1,'matched content bottoms');assert.equal(m.nav.y-m.compare.bottom,16,'nav clearance');assert(m.compare.y-m.metrics.bottom>=10,'comparison keeps its vertical breathing room');
+      assert.equal(m.compare.y-m.metrics.bottom,14,'normal comparison spacing');assert(Math.abs(m.nav.y-m.legend.bottom-16)<1,'chart clears the dock');
+      assert(m.metrics.y<=130&&m.summary.y<=130,'both content columns close the former top gap');
       for(const card of m.cards)assert(card.last<=card.bottom+1,'metric content fits');
       assert(m.chart.height>=40,'visible ring space');assert(m.sectors.length>0,'native ring is rendered');
       for(const sector of m.sectors)assert(sector.top>=m.chart.y-1&&sector.bottom<=m.chart.bottom+1,'ring fits');
@@ -134,40 +173,43 @@ async function heldFold(page){
       await page.setViewportSize({width:382,height:657});assert.equal(await page.getByRole('button',{name:'Current',exact:true}).getAttribute('aria-pressed'),'true');assert.equal(await page.getByRole('combobox',{name:'Category mix filter'}).inputValue(),'needs');
       await page.setViewportSize({width,height});await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').getAttribute('aria-label'),'Category Mix','folding preserves the selected chart');
-      const metrics=(await geometry(page)).metrics;
-      await page.getByRole('button',{name:'Compare spending',exact:true}).click();
-      await page.getByRole('button',{name:'Close comparison',exact:true}).waitFor();
-      await page.locator('.bb-comparison-change').waitFor();
-      const expanded=await page.locator('.bb-comparison-viewport').boundingBox();
-      assert(expanded.x>=fold,'expanded comparison stays on the right page');
-      assert(expanded.x+expanded.width<=usable-34,'comparison respects the usable right edge');
-      assert.deepEqual((await geometry(page)).metrics,metrics,'comparison leaves all four frames unchanged');
-      assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),false,'comparison replaces the chart page');
-      assert(await page.locator('.bb-chart-carousel-band').evaluate(el=>getComputedStyle(el).opacity==='0'&&[...el.querySelectorAll('*')].every(child=>getComputedStyle(child).visibility==='hidden')),'comparison hides descendant chart layers and focus targets');
-      assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'expanded comparison keeps the page static');
-      if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&height===669&&!safeRight)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}.png`),fullPage:true});
-      await page.setViewportSize({width:382,height:657});
+      const before=await geometry(page);
+      await tap(page,page.getByRole('button',{name:'Compare spending',exact:true}));
       await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
-      await page.setViewportSize({width,height});await page.getByRole('button',{name:'Close comparison',exact:true}).waitFor();
-      await tap(page,page.getByRole('button',{name:'Close comparison',exact:true}));
-      assert.equal(await page.getByRole('button',{name:'Compare spending',exact:true}).evaluate(el=>el===document.activeElement),true,'comparison returns focus to its unchanged trigger');
-      await page.locator('.bb-chart-carousel-band').waitFor({state:'visible'});
-      assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),true,'closing restores the chart');
+      await page.locator('.bb-comparison-change').waitFor();
+      const after=await geometry(page);
+      assert.deepEqual(after.metrics,before.metrics,'inline expansion keeps the summary cards in place');
+      assert(Math.abs(after.compare.y-after.metrics.bottom-14)<1,'comparison expands below the four frames');
+      assert(after.compare.right<fold,'expanded comparison stays in the left half');
+      assert(after.compare.height>48,'comparison uses its normal expanded height');
+      assert.deepEqual(after.band,before.band,'comparison leaves the chart page in place');
+      assert.equal(await page.locator('.bb-chart-carousel-band').isVisible(),true,'chart remains visible beside comparison');
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'only the left column may scroll');
+      assert(await page.locator('.bb-overview-summary').evaluate(el=>{el.scrollTop=el.scrollHeight;return el.querySelector('.bb-comparison-card').getBoundingClientRect().bottom<=el.getBoundingClientRect().bottom+1;}),'the full expanded comparison is reachable inside the left half');
+      await page.locator('.bb-overview-summary').evaluate(el=>el.scrollTop=0);
+      if(process.env.BOOKIEBOT_DUO_SHOTS&&width===867&&height===669&&!safeRight)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`comparison-${engine.name()}-${dark?'dark':'light'}.png`),fullPage:true});
+      await page.setViewportSize({width:382,height:657});await page.locator('.bb-comparison-card[data-open="true"]').waitFor();
+      await page.setViewportSize({width,height});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();
+      await tap(page,page.getByRole('button',{name:'Collapse comparison',exact:true}));
+      await page.locator('.bb-comparison-card[data-open="false"]').waitFor();
+      await page.waitForTimeout(50);
+      assert.equal(await page.locator('.bb-overview-summary').evaluate(el=>el.scrollTop),0,'collapse returns the short left column to its resting position');
      }
      if(width>=800)await page.getByRole('combobox',{name:'Category mix filter'}).selectOption('all');
      if(process.env.BOOKIEBOT_DUO_SHOTS&&(width===867&&height===669||width===382))await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`duo-${engine.name()}-${dark?'dark':'light'}-${width}.png`),fullPage:true});
      if(width===867&&height===669&&!safeRight){
       await heldFold(page);
+      await scrolledFold(page);
       for(const title of ['Burn Rate','Calendar','Bills & Utilities','Category Mix']){
        const marker=page.getByRole('button',{name:'Show '+title,exact:true});
-       const point=await marker.evaluate(el=>{const r=el.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};});
-       await page.touchscreen.tap(point.x,point.y);
+       await tap(page,marker);
+       await page.locator(`.bb-chart-carousel-slide[aria-hidden="false"][aria-label="${title}"]`).waitFor();
        await page.locator('.bb-chart-carousel[data-settling="false"]').waitFor();
        assert.equal(await page.locator('.bb-chart-carousel-slide[aria-hidden="false"]').getAttribute('aria-label'),title);
        assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'all chart pages stay static');
       }
       await page.getByRole('button',{name:'Compare spending',exact:true}).click();
-      await page.getByRole('button',{name:'Close comparison',exact:true}).waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
+      await page.locator('.bb-comparison-card[data-open="true"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       await page.getByRole('button',{name:'Collapse comparison',exact:true}).click();
       await page.getByRole('button',{name:'Ask BookieBot',exact:true}).click();await page.getByRole('button',{name:'Close Ask BookieBot',exact:true}).click();
       await page.getByRole('button',{name:'Settings',exact:true}).click();

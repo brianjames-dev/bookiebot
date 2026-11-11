@@ -4,6 +4,7 @@ import { ClipboardCheck, House, PiggyBank, ReceiptText, Users } from "lucide-rea
 import { screenTitles, type AppNavigationStore, type MainScreen } from "./app-navigation"
 import { useNavigationLens } from "./navigation-lens"
 import { GlassIcon } from "./glass-icon"
+import { useNavigationViewport } from "./navigation-viewport"
 
 const screens = [
   { id: "overview", Icon: House }, { id: "transactions", Icon: ReceiptText },
@@ -38,6 +39,7 @@ function NavigationButton(props: ComponentProps<"button">) {
 export const AppNavigationDock = memo(function AppNavigationDock({ navigation, expanded, ...props }: {
   navigation: AppNavigationStore
   expanded: boolean
+  viewportAnchored?: boolean
   reconciliationVisible: boolean
   hidden: boolean
   disabled: boolean
@@ -48,16 +50,19 @@ export const AppNavigationDock = memo(function AppNavigationDock({ navigation, e
     compact={selected.compact && !expanded} />
 })
 
-export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, onSelect }: {
+export function AppNavigationBar({ active, current = active, compact, reconciliationVisible, hidden, disabled = false, viewportAnchored = false, onSelect }: {
   active: MainScreen
   current?: MainScreen | null
   compact: boolean
   reconciliationVisible: boolean
   hidden?: boolean
   disabled?: boolean
+  viewportAnchored?: boolean
   onSelect: (screen: MainScreen) => void
 }) {
   const [preview, setPreview] = useState<MainScreen | null>(null)
+  const dockRef = useRef<HTMLElement>(null)
+  useNavigationViewport(dockRef, viewportAnchored)
   const paneRef = useRef<HTMLDivElement>(null)
   const lens = useNavigationLens(paneRef, preview ?? active)
   const pointer = useRef<{ id: number; x: number; y: number; selected: MainScreen | null } | null>(null)
@@ -86,7 +91,7 @@ export function AppNavigationBar({ active, current = active, compact, reconcilia
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  return <Tabbar top component="nav" icons className="bb-bottom-navigation" aria-label="Main navigation"
+  return <Tabbar ref={dockRef} top component="nav" icons className="bb-bottom-navigation" aria-label="Main navigation"
     data-compact={compact} data-tab-count={tabs.length} hidden={hidden}>
     <Glass ref={paneRef} highlight={false} className="bb-navigation-pane bb-glass-control"
       style={{ "--bb-nav-count": tabs.length, "--bb-nav-position": Math.max(0, tabs.findIndex(tab => tab.id === (preview ?? active))) / tabs.length } as CSSProperties}

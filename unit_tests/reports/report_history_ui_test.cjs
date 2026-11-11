@@ -218,9 +218,10 @@ async function main() {
   const beforeDuoRequests=calls.length
   duoLandscape=true;renderer.act(()=>tree.update(component()))
   assert.equal(tree.root.findByProps({className:"bb-report-comparison"}).props["data-open"],true)
-  assert.equal(comparisonCard.props["data-open"],false,'Unfolded comparison keeps its compact left-page anchor')
-  assert.equal(comparisonCard.findByProps({className:"bb-comparison-toggle-group"}).props["aria-hidden"],false)
-  renderer.act(()=>tree.root.findByProps({"aria-label":"Close comparison"}).props.onClick())
+  assert.equal(comparisonCard.props["data-open"],true,'Unfolded comparison retains normal inline expansion')
+  assert.equal(comparisonCard.findByProps({className:"bb-comparison-toggle-group"}).props["aria-hidden"],true)
+  assert.equal(tree.root.findAllByProps({className:"bb-duo-comparison-heading"}).length,0,'Comparison never moves into the chart page')
+  click("Compare spending")
   assert.equal(findButton("Compare spending").props["aria-expanded"],false)
   click("Compare spending")
   duoLandscape=false;renderer.act(()=>tree.update(component()))
