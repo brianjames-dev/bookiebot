@@ -128,7 +128,8 @@ async function waitReady(page,label) {
           const loading=await page.locator('.bb-navigation-pane').evaluate(pane=>{const cursor=pane.querySelector('.bb-navigation-cursor');window.__loadingSlide=cursor.getAnimations().find(a=>a.transitionProperty==='transform');return {animation:!!window.__loadingSlide,width:pane.getBoundingClientRect().width}})
           assert.equal(loading.animation,true,'The pill is already moving while the response is pending')
           holdTransactions=false;releaseTransactions()
-          await page.getByText('Fixture purchase 39',{exact:true}).waitFor()
+          // The current list paints a collapsed day summary before individual rows.
+          await page.getByText('40 entries',{exact:true}).waitFor()
           await page.waitForTimeout(500)
           const loaded=await page.evaluate(()=>{window.__samplingLoad=false;const pane=document.querySelector('.bb-navigation-pane');return {runs:window.__loadingRuns,same:pane===window.__loadingPane,width:pane.getBoundingClientRect().width,positions:window.__loadingFrames,finished:window.__loadingSlide.playState==='finished'}})
           assert.equal(loaded.runs,1,'Page paint never restarts the selection transition')

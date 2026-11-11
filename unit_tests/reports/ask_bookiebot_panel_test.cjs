@@ -22,11 +22,11 @@ class Element {
   closest() { return null }
 }
 const opener = new Element()
-const document = { activeElement: opener, body: new Element(), documentElement: new Element() }
+const document = { querySelector: () => null, activeElement: opener, body: new Element(), documentElement: new Element() }
 const viewport = { height: 800, offsetTop: 0, addEventListener() {}, removeEventListener() {} }
 const window = { innerWidth: 390, innerHeight: 800, scrollX: 0, scrollY: 240, visualViewport: viewport,
   addEventListener() {}, removeEventListener() {}, getComputedStyle: () => ({ paddingRight: "0px" }),
-  scrollTo(x, y) { this.scrollX = x; this.scrollY = y }, matchMedia: () => ({ matches: false }),
+  scrollTo(x, y) { this.scrollX = typeof x === "object" ? x.left ?? this.scrollX : x; this.scrollY = typeof x === "object" ? x.top ?? this.scrollY : y }, matchMedia: () => ({ matches: false }),
   setTimeout(fn, delay) { const id = ++sequence; timers.set(id, { fn, delay }); return id }, clearTimeout: id => timers.delete(id) }
 const exported = { exports: {} }
 const output = localRequire("esbuild").buildSync({

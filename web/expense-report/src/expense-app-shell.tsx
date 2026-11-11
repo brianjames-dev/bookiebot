@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react"
 import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationDock } from "./app-navigation-bar"
 import { NavigationViewport } from "./navigation-viewport"
+import { observePageScroll, readPageScroll, scrollPageTo } from "./page-scroll"
 import { AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -83,7 +84,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     }
     // The guide is a temporary Settings view; its scroll must not replace the
     // form/code position that Back, the gear and later tab visits restore.
-    if (!widgetGuideRef.current) positions.current[displayedScreen.current] = window.scrollY
+    if (!widgetGuideRef.current) positions.current[displayedScreen.current] = readPageScroll().y
     widgetGuideRef.current = false
     widgetFocusRequested.current = false
     screenRef.current = next
@@ -97,7 +98,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     })
   }, [ready, navigation])
   const openWidgetGuide = () => {
-    positions.current.settings = window.scrollY
+    positions.current.settings = readPageScroll().y
     widgetGuideRef.current = true
     setWidgetGuideOpen(true)
     window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
@@ -131,7 +132,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   useLayoutEffect(() => {
     displayedScreen.current = screen
     const y = widgetGuideOpen ? 0 : positions.current[screen] ?? 0
-    window.scrollTo({ top: y, behavior: "instant" })
+    scrollPageTo({ top: y, behavior: "instant" })
     if (screen === "settings" && !widgetGuideOpen && widgetFocusRequested.current) {
       widgetFocusRequested.current = false
       const target = document.querySelector<HTMLElement>(".bb-widget-settings")
@@ -142,7 +143,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       }
     }
     // Restoring a page's position must not resize/restart the independent dock.
-    scrollState.current = { lastY: window.scrollY, travel: 0, compact: navigation.getSnapshot().compact }
+    scrollState.current = { lastY: readPageScroll().y, travel: 0, compact: navigation.getSnapshot().compact }
   }, [screen, widgetGuideOpen])
 
   useEffect(() => {
@@ -151,7 +152,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       frame = 0
       if (document.querySelector("dialog[open]") || document.documentElement.dataset.bbModalScrollLock === "true") return
       const previous = scrollState.current
-      const state = nextScrollNavigation(previous, window.scrollY, document.documentElement.scrollHeight - window.innerHeight)
+      const position = readPageScroll()
+      const state = nextScrollNavigation(previous, position.y, position.maxY)
       scrollState.current = state
       if (previous.compact !== state.compact) navigation.setCompact(state.compact)
     }
@@ -161,13 +163,13 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       const editing = document.activeElement?.matches("input,textarea,[contenteditable=true]")
       setKeyboardOpen(Boolean(editing && visual && window.innerHeight - visual.height > 140))
     }
-    window.addEventListener("scroll", scroll, { passive: true })
+    const stopScroll = observePageScroll(scroll)
     window.visualViewport?.addEventListener("resize", viewport)
     document.addEventListener("focusin", viewport)
     document.addEventListener("focusout", viewport)
     return () => {
       cancelAnimationFrame(frame)
-      window.removeEventListener("scroll", scroll)
+      stopScroll()
       window.visualViewport?.removeEventListener("resize", viewport)
       document.removeEventListener("focusin", viewport)
       document.removeEventListener("focusout", viewport)

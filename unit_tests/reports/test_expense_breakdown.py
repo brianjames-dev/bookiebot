@@ -167,9 +167,11 @@ def test_top_chart_pages_share_regions_lock_modals_and_show_complete_details():
     assert "panel.headerControl" not in carousel_source
     assert "useModalPageScrollLock(open)" in source
     assert 'body.style.position = "fixed"' not in source
-    assert "window.scrollTo(scrollX, scrollY)" in source
+    scroll_source = (Path(__file__).resolve().parents[2] / "web/expense-report/src/page-scroll.ts").read_text()
+    assert "scrollPageTo({ left: position.x, top: position.y" in scroll_source
     modal_lock_source = source.split("function useModalPageScrollLock", 1)[1].split("function ModalDetails", 1)[0]
-    assert 'root.style.setProperty("--bb-viewport-scrollbar-width"' in modal_lock_source
+    assert "return lockPageScroll()" in modal_lock_source
+    assert 'root.style.setProperty("--bb-viewport-scrollbar-width"' in scroll_source
     assert "onTouchStart={(event) => event.stopPropagation()}" in source
     assert "onTouchMove={(event) => event.stopPropagation()}" in source
     assert "onTouchEnd={(event) => event.stopPropagation()}" in source

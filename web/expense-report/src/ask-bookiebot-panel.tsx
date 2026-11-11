@@ -1,3 +1,4 @@
+import { lockPageScroll } from "./page-scroll"
 import { useId, useLayoutEffect, useRef, useState, type RefObject } from "react"
 import { createPortal } from "react-dom"
 import { Panel } from "konsta/react"
@@ -78,18 +79,7 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource, op
     if (!present) return
     const dialog = dialogRef.current
     if (!dialog) return
-    const root = document.documentElement
-    const body = document.body
-    const previous = { overflow: root.style.overflow, padding: body.style.paddingRight,
-      lock: root.dataset.bbModalScrollLock }
-    const scrollX = window.scrollX, scrollY = window.scrollY
-    const scrollbar = Math.max(window.innerWidth - root.clientWidth, 0)
-    const padding = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0
-    // Lock the root without fixing/repositioning the page or its chart layers.
-    root.dataset.bbModalScrollLock = "true"
-    root.style.setProperty("--bb-viewport-scrollbar-width", `${scrollbar}px`)
-    if (scrollbar) body.style.paddingRight = `${padding + scrollbar}px`
-    root.style.overflow = "hidden"
+    const unlock = lockPageScroll()
     const viewport = window.visualViewport
     const resize = () => {
       dialog.style.setProperty("--bb-ask-viewport-height", `${viewport?.height ?? window.innerHeight}px`)
@@ -108,12 +98,7 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource, op
       viewport?.removeEventListener("scroll", resize)
       window.removeEventListener("resize", resize)
       dialog.removeEventListener("touchmove", containTouch)
-      body.style.paddingRight = previous.padding
-      root.style.overflow = previous.overflow
-      if (previous.lock === undefined) delete root.dataset.bbModalScrollLock
-      else root.dataset.bbModalScrollLock = previous.lock
-      root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
-      if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo(scrollX, scrollY)
+      unlock()
     }
   }, [present])
 

@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-11 - Duo content owns scrolling in both poses
+
+Physical Home Screen testing of PR #149 still makes the dock move with document scroll after unfolding/refolding. A body-level fixed dock alone is insufficient on this device. With the existing Duo preference enabled, keep HTML/body stationary and make the existing page a viewport-sized native overflow scroller in **both** poses. The body-level glass-navigation surface remains outside that scroller. Ownership no longer switches between document scrolling and a static landscape page on every fold; no scroll-driven dock offsets, sizing, or DOM reparenting are introduced. Unfolded Overview still clips to its approved static two-page layout.
+
+A shared page-scroll helper selects the active surface for per-tab/widget restoration, navigation compaction, passive pull-to-refresh/bounce snapshots, and Message/inspector locks. Ordinary devices retain document scrolling and the existing component geometry. The page and financial controllers stay mounted; no preference, financial writer, event, reconciliation or persistence semantics change.
+
+Browser regression now requires the content to move while document scroll remains zero and document height stays one viewport, including native touch panning and long Transactions fold cycles. The old release fails that ownership assertion. Geometry/painting emulation cannot establish physical iOS acceptance; checklist 269 replaces failed checklist 268. This supersedes the prior assumption that isolating only the dock would suffice.
+
 ## 2026-11-11 - Persistent viewport-owned Duo dock
 
 The user clarifies the remaining sequence: closed navigation is initially correct; unfold places it on the right, folding restores its initial bottom position, then scrolling makes it page-relative. Isolate the dock from the page DOM instead of recalculating a bottom offset. Portal a persistent, top-anchored `100dvh` surface directly to `document.body`; position the existing glass dock absolutely at that surface's bottom. Preserve the surface across folds and reset only the dock's transient contact state. Pass orientation/gutter geometry explicitly; React context, selected navigation store, keyboard hiding and styling remain intact. Standard devices retain their original DOM.

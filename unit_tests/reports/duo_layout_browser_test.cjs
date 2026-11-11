@@ -24,7 +24,7 @@ for(const view of Object.values(pressureReport.modeViews)){
  view.breakdown.find(row=>row.key==='rent').amount=4450;
  view.categoryBalances={raw:{needs:-1990,wants:670,savings:620},remaining:{needs:-700,wants:0,savings:0},deficits:{needs:1990,wants:0,savings:0},totalOverspend:700,transfers:[{from:'wants',to:'needs',amount:670},{from:'savings',to:'needs',amount:620}]};
 }
-const assets=path.join(root,'src/bookiebot/reports/assets');
+const assets=process.env.BOOKIEBOT_DUO_ASSETS||path.join(root,'src/bookiebot/reports/assets');
 const css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=fs.readFileSync(path.join(assets,'expense-report-app.js'),'utf8');
 const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 // Hold mobile emulation at 1× during pose changes; explicit viewport cases below exercise zoom-coordinate guards.
@@ -58,7 +58,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   else if(name==='/app/expenses/months')value={currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
   else if(name==='/app/expenses/comparison')value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:4080,complete:false},baseline:{spending:4500,complete:false},changeAmount:-420,changePercent:-9.3,status:'partial',coverageNote:'Synthetic comparison'};
   else if(name==='/app/reconciliation')value={enabled:true,checkedAt:null,items:[]};
-  else if(name==='/app/transactions')value={items:[],total:0,nextOffset:null,categories:[],persons:[],month:'2026-10'};
+  else if(name==='/app/transactions')value={items:Array.from({length:24},(_,i)=>({id:'fixture-'+i,actionId:'fixture-'+i,version:'fixture-v1',month:'2026-10',date:'2026-10-'+String(i+1).padStart(2,'0'),title:'Fixture purchase '+i,location:'Fixture',person:'Brian',kind:'expense',category:'food',categoryLabel:'Food',amountCents:1000,split:'',fields:{},editableFields:[],capabilities:{},reasons:{}})),total:24,nextOffset:null,categories:[],persons:[],month:'2026-10'};
   else if(name==='/app/reimbursements')value={enabled:true,ownerKey:'brian',currency:'USD',allocations:[],events:[],resets:[],resetState:'fixture'};
   else if(name==='/app/goals')value={goals:[]};
   else if(name==='/app/notifications')value={enabled:false,preferences:{weekly:true,upcoming:false,showAmounts:false,hour:10}};
@@ -118,8 +118,8 @@ async function scrolledFold(page){
  };
  for(let cycle=0;cycle<2;cycle++){
   await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
-  await page.evaluate(()=>window.scrollTo(0,420));await page.waitForTimeout(100);
-  assert(await page.evaluate(()=>window.scrollY>200),'exercise a scrolled closed report');
+  await page.evaluate(()=>document.querySelector('.bb-page').scrollTo(0,420));await page.waitForTimeout(100);
+  assert(await page.evaluate(()=>document.querySelector('.bb-page').scrollTop>200 && window.scrollY===0),'exercise a scrolled closed report');
   const bottom=()=>page.locator('.bb-navigation-pane').evaluate(el=>el.getBoundingClientRect().bottom);
   await atBottom(645);
   assert(Math.abs(await bottom()-645)<1,'closed dock follows the viewport after folding a scrolled page');
@@ -142,7 +142,7 @@ async function scrolledFold(page){
 }
 async function isolatedViewport(page){
  await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
- await page.evaluate(()=>{window.scrollTo(0,0);window.__dockViewport=document.querySelector('.bb-navigation-viewport');});
+ await page.evaluate(()=>{document.querySelector('.bb-page').scrollTo(0,0);window.__dockViewport=document.querySelector('.bb-navigation-viewport');});
  assert(await page.locator('.bb-navigation-viewport').evaluate(el=>el.parentElement===document.body),'dock viewport is outside the scrollable page');
  await page.setViewportSize({width:867,height:669});await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();
  await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
@@ -151,26 +151,88 @@ async function isolatedViewport(page){
  // retain. The toolbar must remain viewport-owned despite page transforms.
  await page.locator('.bb-page.bb-app-shell').evaluate(el=>{el.style.transform='translateZ(0)';el.style.height='100dvh';});
  for(const y of [0,200,420,100,0]){
-  await page.evaluate(y=>window.scrollTo(0,y),y);await page.waitForTimeout(100);
+  await page.evaluate(y=>document.querySelector('.bb-page').scrollTo(0,y),y);await page.waitForTimeout(100);
   await page.waitForFunction(()=>Math.abs(document.querySelector('.bb-navigation-pane').getBoundingClientRect().bottom-645)<1,null,{timeout:2000});
  }
  await page.locator('.bb-page.bb-app-shell').evaluate(el=>{el.style.removeProperty('transform');el.style.removeProperty('height');});
  assert.equal(await page.locator('.bb-navigation-pane').evaluate(el=>el.closest('.bb-page')),null,'page layout cannot become the dock ancestor');
- await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(100);
+ await page.evaluate(()=>document.querySelector('.bb-page').scrollTo(0,0));await page.waitForTimeout(100);
+}
+async function pageScrollLifecycle(page){
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
+ const surface=page.locator('.bb-page');
+ await surface.evaluate(el=>el.scrollTo(0,240));await page.waitForTimeout(100);
+ await page.evaluate(()=>window.scrollTo(0,500));
+ assert.equal(await page.evaluate(()=>window.scrollY),0,'Duo document cannot become the content scroll owner');
+ assert.equal(await surface.evaluate(el=>el.scrollTop),240);
+ await tap(page,page.getByRole('button',{name:'Transactions',exact:true}));
+ await page.locator('.bb-app-shell[data-screen="transactions"]').waitFor();
+ assert.equal(await surface.evaluate(el=>el.scrollTop),0,'new tab starts at its own position');
+ await tap(page,page.getByRole('button',{name:'Overview',exact:true}));
+ await page.locator('.bb-app-shell[data-screen="overview"]').waitFor();
+ assert.equal(await surface.evaluate(el=>el.scrollTop),240,'returning restores the content scroll position');
+ await page.getByRole('button',{name:'Ask BookieBot',exact:true}).click();
+ await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock==='true');
+ assert.equal(await surface.evaluate(el=>getComputedStyle(el).overflowY),'hidden','Message locks the content surface');
+ // Model native focus scrolling while the dialog owns the keyboard.
+ await surface.evaluate(el=>el.scrollTop=0);
+ await page.getByRole('button',{name:'Close Ask BookieBot',exact:true}).click();
+ await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock!=='true');
+ assert.equal(await surface.evaluate(el=>el.scrollTop),240,'closing Message restores the actual content position');
+ await surface.evaluate(el=>el.scrollTo(0,0));
+ await page.getByRole('button',{name:'Explain Income',exact:true}).click();
+ await page.locator('.bb-details-dialog[open]').waitFor();
+ assert.equal(await surface.evaluate(el=>getComputedStyle(el).overflowY),'hidden','metric inspection locks the same content surface');
+ await page.locator('.bb-details-dialog[open] .bb-details-dialog-close').click();
+ await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock!=='true');
+ assert.equal(await surface.evaluate(el=>el.scrollTop),0);
+ if(page.context().browser().browserType().name()==='chromium'){
+  const cdp=await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:20,y:520}]});
+  for(const y of [470,400,320,230,130]){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:20,y}]});await page.waitForTimeout(25);}
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(500);
+  assert(await surface.evaluate(el=>el.scrollTop>100),'native touch panning moves the Duo content');
+  assert.equal(await page.evaluate(()=>scrollY),0,'native touch panning never scrolls the document');
+  assert(Math.abs(await page.locator('.bb-navigation-pane').evaluate(el=>el.getBoundingClientRect().bottom)-645)<1,'dock stays pinned after native touch momentum');
+  await cdp.detach();
+ }
+ await surface.evaluate(el=>el.scrollTo(0,0));
+ await page.setViewportSize({width:867,height:669});await page.waitForTimeout(100);
+ await tap(page,page.getByRole('button',{name:'Transactions',exact:true}));
+ await page.locator('.bb-app-shell[data-screen="transactions"]').waitFor();
+ await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
+ assert(await surface.evaluate(el=>el.scrollHeight>el.clientHeight+500),'Transactions has a real long content surface');
+ for(let cycle=0;cycle<2;cycle++){
+  await surface.evaluate(el=>el.scrollTo(0,300));
+  await page.setViewportSize({width:867,height:669});await page.waitForTimeout(100);
+  await page.setViewportSize({width:382,height:657});await page.waitForTimeout(100);
+  const beforeScroll=await surface.evaluate(el=>el.scrollTop);
+  await surface.evaluate(el=>el.scrollBy({top:200,behavior:'instant'}));await page.waitForTimeout(100);
+  const afterScroll=await surface.evaluate(el=>el.scrollTop);
+  assert(afterScroll-beforeScroll>150,'Transactions keeps scrolling after the fold: '+beforeScroll+' -> '+afterScroll);
+  assert.equal(await page.evaluate(()=>scrollY),0);
+  assert(Math.abs(await page.locator('.bb-navigation-pane').evaluate(el=>el.getBoundingClientRect().bottom)-645)<1,'Transactions dock stays pinned after folding and scrolling');
+ }
+ await tap(page,page.getByRole('button',{name:'Overview',exact:true}));
+ await page.setViewportSize({width:867,height:669});await page.waitForTimeout(100);
+ console.log('PASS content scroll restoration, Message/metric locks, native pan and long Transactions folds');
 }
 async function bottomScroll(page){
  await page.emulateMedia({reducedMotion:'no-preference'});
  await page.setViewportSize({width:382,height:657});await page.waitForTimeout(200);
- await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(200);
+ await page.evaluate(()=>document.querySelector('.bb-page').scrollTo(0,0));await page.waitForTimeout(200);
  const height=await page.evaluate(()=>document.documentElement.scrollHeight);
+ const contentHeight=await page.locator('.bb-page').evaluate(el=>el.scrollHeight);
+ assert(contentHeight>657,'the native page scroller contains the entire closed report');
  await page.evaluate(()=>{
   window.__dockPositionWrites=0;
   window.__dockObserver=new MutationObserver(records=>window.__dockPositionWrites+=records.length);
   window.__dockObserver.observe(document.querySelector('.bb-bottom-navigation'),{attributes:true,attributeFilter:['style']});
  });
  for(let i=0;i<8;i++){
-  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));await page.waitForTimeout(60);
+  await page.evaluate(()=>document.querySelector('.bb-page').scrollTo(0,document.querySelector('.bb-page').scrollHeight));await page.waitForTimeout(60);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height,'repeated bottom scrolling never grows blank document space');
+  assert.equal(await page.locator('.bb-page').evaluate(el=>el.scrollHeight),contentHeight,'repeated bottom scrolling never grows blank content space');
  }
  // iOS rubber-band scrolling can briefly report a position beyond the real
  // document end. Reproduce that coordinate pair without growing the fixture.
@@ -182,16 +244,18 @@ async function bottomScroll(page){
   finally{Object.defineProperty(window,'scrollY',descriptor);root.getBoundingClientRect=rect;window.dispatchEvent(new Event('scroll'));}
  });
  assert.equal(elastic,height,'elastic overscroll cannot extend the document through the dock');
- await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(100);
+ await page.evaluate(()=>document.querySelector('.bb-page').scrollTo(0,0));await page.waitForTimeout(100);
  await page.evaluate(()=>{
   window.__dockFrames=[];window.__sampleDock=true;
   const sample=()=>{window.__dockFrames.push(document.querySelector('.bb-navigation-pane').getBoundingClientRect().bottom);if(window.__sampleDock)requestAnimationFrame(sample)};requestAnimationFrame(sample);
  });
- if(page.context().browser().browserType().name()==='webkit')await page.evaluate(()=>window.scrollBy({top:450,behavior:'smooth'}));
- else await page.mouse.wheel(0,450);
+ if(page.context().browser().browserType().name()==='webkit')await page.evaluate(()=>document.querySelector('.bb-page').scrollBy({top:450,behavior:'smooth'}));
+ else {await page.mouse.move(100,300);await page.mouse.wheel(0,450);}
  await page.waitForTimeout(550);
- const result=await page.evaluate(()=>{window.__sampleDock=false;window.__dockObserver.disconnect();return {writes:window.__dockPositionWrites,frames:window.__dockFrames,height:document.documentElement.scrollHeight,y:scrollY};});
+ const result=await page.evaluate(()=>{window.__sampleDock=false;window.__dockObserver.disconnect();return {writes:window.__dockPositionWrites,frames:window.__dockFrames,height:document.documentElement.scrollHeight,y:document.querySelector('.bb-page').scrollTop,documentY:scrollY};});
  assert(result.y>0,'browser-native scrolling moves the closed report');
+ assert.equal(result.documentY,0,'folded content scrolling never moves the document');
+ assert.equal(result.height,657,'the document stays one viewport tall despite long content');
  assert.equal(result.height,height,'native scrolling keeps a finite document');
  assert.equal(result.writes,0,'ordinary Y scrolling performs no navbar position writes');
  assert(result.frames.length>=5&&result.frames.every(y=>Math.abs(y-645)<1),'the dock stays at the viewport bottom throughout native scrolling and compact animation');
@@ -267,6 +331,7 @@ async function bottomScroll(page){
       await heldFold(page);
       await scrolledFold(page);
       await bottomScroll(page);
+      await pageScrollLifecycle(page);
       for(const title of ['Burn Rate','Calendar','Bills & Utilities','Category Mix']){
        const marker=page.getByRole('button',{name:'Show '+title,exact:true});
        await tap(page,marker);
@@ -280,7 +345,10 @@ async function bottomScroll(page){
       await page.getByRole('button',{name:'Collapse comparison',exact:true}).click();
       await page.getByRole('button',{name:'Ask BookieBot',exact:true}).click();await page.getByRole('button',{name:'Close Ask BookieBot',exact:true}).click();
       await page.getByRole('button',{name:'Settings',exact:true}).click();
-      const preference=page.getByRole('switch',{name:'Duo landscape layout',exact:true});await preference.click();assert.equal(await preference.getAttribute('aria-checked'),'false');await preference.click();
+      const preference=page.getByRole('switch',{name:'Duo landscape layout',exact:true});await preference.click();assert.equal(await preference.getAttribute('aria-checked'),'false');
+      assert.notEqual(await page.evaluate(()=>getComputedStyle(document.documentElement).overflowY),'hidden','preference off restores ordinary document scrolling');
+      await page.evaluate(()=>window.scrollTo(0,200));assert(await page.evaluate(()=>scrollY>0),'ordinary document can scroll again');
+      await preference.click();assert.equal(await page.evaluate(()=>scrollY),0,'enabling Duo returns ownership to the content surface');
       await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       const pressureCase=await fixture(browser,width,height,dark,false,true),pressurePage=pressureCase.page;await pressurePage.locator('.bb-category-overflow').waitFor();await pressurePage.waitForTimeout(200);
       const over=await geometry(pressurePage);assert.equal(over.scroll[1],height,'pressure page stays static');assert(over.chart.height>=40,'pressure ring retains space');

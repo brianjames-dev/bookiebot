@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties }
 import { screenTitles, type AppScreen } from "./app-navigation"
 import { usePageRefreshRegistry } from "./page-refresh"
 import "./pull-to-refresh.css"
+import { observePageScroll, pageScrollSurface, readPageScroll } from "./page-scroll"
 
 // Finger travel is resisted; 270px of downward travel fills the 72px indicator.
 export const PULL_REFRESH_THRESHOLD = 72
@@ -23,6 +24,7 @@ function excludedTarget(target: EventTarget | null) {
   if (target.closest("input,textarea,select,[contenteditable=true],[role=slider],.bb-bottom-navigation,.bb-shell-header-actions")) return true
   // An inner scroller owns its own gesture, even when it has reached its edge.
   for (let element: Element | null = target; element && element !== document.body && element !== document.documentElement; element = element.parentElement) {
+    if (element === pageScrollSurface()) continue
     const style = window.getComputedStyle(element)
     if (/(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1) return true
   }
@@ -55,7 +57,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     running.current = true; refreshScreen.current = selected; window.clearTimeout(timer.current)
     // Snapshot the bounce once for the icon's CSS handoff. Never feed later
     // scroll positions back into layout while the browser releases its spring.
-    gesture.current = null; pulled.current = 0; setReleaseOverscroll(Math.max(0, -window.scrollY)); setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
+    gesture.current = null; pulled.current = 0; setReleaseOverscroll(Math.max(0, -readPageScroll().y)); setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
     const success = await registry.refresh(selected)
     running.current = false
     if (!mounted.current) return
@@ -89,7 +91,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
         || pageIsBlocked() || excludedTarget(event.target)) return
       window.clearTimeout(timer.current)
       const touch = event.touches[0]
-      gesture.current = { x: touch.clientX, y: touch.clientY, lastY: touch.clientY, scrollY: Math.max(0, window.scrollY), identifier: touch.identifier, captured: false }
+      gesture.current = { x: touch.clientX, y: touch.clientY, lastY: touch.clientY, scrollY: Math.max(0, readPageScroll().y), identifier: touch.identifier, captured: false }
       pulled.current = 0
     }
     const move = (event: TouchEvent) => {
@@ -99,10 +101,10 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       const touch = event.touches[0]
       if (touch.identifier !== current.identifier) { actions.current.reset(); return }
       current.lastY = touch.clientY
-      if (window.scrollY > 1) {
+      if (readPageScroll().y > 1) {
         // Observe normal scrolling without claiming it. The same finger may
         // continue past the top; no lift/retry is required at the boundary.
-        current.x = touch.clientX; current.y = touch.clientY; current.scrollY = window.scrollY; current.captured = false
+        current.x = touch.clientX; current.y = touch.clientY; current.scrollY = readPageScroll().y; current.captured = false
         pulled.current = 0; schedule(); return
       }
       if (current.scrollY > 1) {
@@ -124,7 +126,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     const scroll = () => {
       const current = gesture.current
       if (!current) return
-      if (current && !current.captured && current.scrollY > 1 && window.scrollY <= 1) {
+      if (current && !current.captured && current.scrollY > 1 && readPageScroll().y <= 1) {
         current.y = current.lastY; current.scrollY = 0
       }
       schedule()
@@ -135,7 +137,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       if (!release || event.touches.length) { actions.current.reset(); return }
       // Recheck the release position: retreating below the threshold cancels.
       const distance = gesture.current.captured ? pullRefreshDistance(release.clientY - gesture.current.y) : 0
-      if (distance >= PULL_REFRESH_THRESHOLD && window.scrollY <= 1) void actions.current.refresh()
+      if (distance >= PULL_REFRESH_THRESHOLD && readPageScroll().y <= 1) void actions.current.refresh()
       else actions.current.cancelPull()
     }
     const cancel = () => { if (gesture.current) actions.current.cancelPull() }
@@ -143,7 +145,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     document.addEventListener("touchmove", move, { passive: true })
     document.addEventListener("touchend", end, { passive: true })
     document.addEventListener("touchcancel", cancel, { passive: true })
-    window.addEventListener("scroll", scroll, { passive: true })
+    const stopScroll = observePageScroll(scroll)
     window.addEventListener("pagehide", cancel)
     return () => {
       mounted.current = false; window.clearTimeout(timer.current); gesture.current = null
@@ -151,7 +153,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       document.documentElement.classList.remove("bb-pull-refresh-enabled")
       document.removeEventListener("touchstart", start); document.removeEventListener("touchmove", move)
       document.removeEventListener("touchend", end); document.removeEventListener("touchcancel", cancel); window.removeEventListener("pagehide", cancel)
-      window.removeEventListener("scroll", scroll)
+      stopScroll()
     }
   }, [registry])
   useEffect(() => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); setMessage(""); if (!running.current) setPhase("idle") }, [screen, blocked])

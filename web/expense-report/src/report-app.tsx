@@ -1,3 +1,4 @@
+import { lockPageScroll } from "./page-scroll"
 import {
   memo,
   useCallback,
@@ -2604,34 +2605,7 @@ function useModalPageScrollLock(locked: boolean) {
     if (!locked) {
       return undefined
     }
-    const body = document.body
-    const root = document.documentElement
-    const scrollX = window.scrollX
-    const scrollY = window.scrollY
-    const previous = {
-      bodyPaddingRight: body.style.paddingRight,
-      rootOverflow: root.style.overflow,
-      scrollLock: root.dataset.bbModalScrollLock,
-    }
-    const scrollbarWidth = Math.max(window.innerWidth - root.clientWidth, 0)
-    // Keep the page in normal flow. Fixing/repositioning the whole body changes
-    // chart geometry and compositor layers on both edges of every dialog.
-    const paddingRight = Number.parseFloat(window.getComputedStyle(body).paddingRight) || 0
-    root.dataset.bbModalScrollLock = "true"
-    root.style.setProperty("--bb-viewport-scrollbar-width", `${scrollbarWidth}px`)
-    if (scrollbarWidth > 0) body.style.paddingRight = `${paddingRight + scrollbarWidth}px`
-    root.style.overflow = "hidden"
-
-    return () => {
-      body.style.paddingRight = previous.bodyPaddingRight
-      root.style.overflow = previous.rootOverflow
-      if (previous.scrollLock === undefined) delete root.dataset.bbModalScrollLock
-      else root.dataset.bbModalScrollLock = previous.scrollLock
-      root.style.setProperty("--bb-viewport-scrollbar-width", `${Math.max(window.innerWidth - root.clientWidth, 0)}px`)
-      // Native focus restoration may scroll in some browsers. Correct only an
-      // actual change, avoiding another scroll event/repaint on normal exits.
-      if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo(scrollX, scrollY)
-    }
+    return lockPageScroll()
   }, [locked])
 }
 
