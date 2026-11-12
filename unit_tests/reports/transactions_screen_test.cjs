@@ -2,7 +2,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {createRequire}=require('node:module'),req=createRequire(path.resolve('web/expense-report/package.json'))
 const React=req('react'),Renderer=req('react-test-renderer'),ts=req('typescript'),{act}=Renderer
 const plans=[],requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map()
-let serial=0,tree,work,duoWide=false
+let serial=0,tree,work,duoWide=false,now=Date.UTC(2026,10,11,12)
+const updates=[],onUpdated=time=>updates.push(time)
+class TestDate extends Date { constructor(...args){super(...(args.length?args:[now]))} static now(){return now} }
 const SwipeContext=React.createContext(null)
 function ActionFixture({entry}){const ctx=React.useContext(SwipeContext),row=ctx.rows.get(entry.id);return ctx.onManage?React.createElement('button',{'aria-label':'Manage '+entry.id,disabled:ctx.locked,onClick:()=>ctx.onManage(row)},'Manage entry'):React.createElement('div',null,entry.item,['update','split','delete'].filter(op=>row.capabilities[op]).map(op=>React.createElement('button',{key:op,disabled:ctx.locked,onClick:()=>ctx.onAction(row,op)},op==='split'&&row.split?'Edit split':op[0].toUpperCase()+op.slice(1))))}
 const presentation={
@@ -20,12 +22,12 @@ function load(file){
  if(cache.has(file))return cache.get(file)
  const exports={};cache.set(file,exports)
  const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
- vm.runInNewContext(code,{exports,AbortController,URLSearchParams,Intl,Date,Error,Event:class{constructor(type){this.type=type}},window:win,matchMedia:win.matchMedia,requestAnimationFrame:fn=>{queueMicrotask(fn);return 1},cancelAnimationFrame(){},crypto:{randomUUID:()=>`isolated-request-${++serial}-command`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>presentation[name]??(name.endsWith('.css')?{}:name==='./app-work-guard'?{useAppWorkStatus(value){const id=React.useId();statuses.set(id,value);update();React.useEffect(()=>()=>{statuses.delete(id);update()},[id]);return React.useCallback(next=>{statuses.set(id,next);update()},[id])}}:name.startsWith('.')?(name.endsWith('.json')?JSON.parse(fs.readFileSync(path.resolve(path.dirname(file),name),'utf8')):load(['.tsx','.ts'].map(ext=>path.resolve(path.dirname(file),name)+ext).find(fs.existsSync))):req(name))})
+ vm.runInNewContext(code,{exports,AbortController,URLSearchParams,Intl,Date:TestDate,Error,Event:class{constructor(type){this.type=type}},window:win,matchMedia:win.matchMedia,requestAnimationFrame:fn=>{queueMicrotask(fn);return 1},cancelAnimationFrame(){},crypto:{randomUUID:()=>`isolated-request-${++serial}-command`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>presentation[name]??(name.endsWith('.css')?{}:name==='./app-work-guard'?{useAppWorkStatus(value){const id=React.useId();statuses.set(id,value);update();React.useEffect(()=>()=>{statuses.delete(id);update()},[id]);return React.useCallback(next=>{statuses.set(id,next);update()},[id])}}:name.startsWith('.')?(name.endsWith('.json')?JSON.parse(fs.readFileSync(path.resolve(path.dirname(file),name),'utf8')):load(['.tsx','.ts'].map(ext=>path.resolve(path.dirname(file),name)+ext).find(fs.existsSync))):req(name))})
  if(file.endsWith('/transaction-feedback.ts'))exports.settledTransactionRow=async()=>{}
  return exports
 }
 const {TransactionsScreen}=load(path.resolve('web/expense-report/src/transactions-screen.tsx'))
-const fixture=(active=true)=>React.createElement(TransactionsScreen,{active,ownerName:'Brian',initialMonth:'2026-10'})
+const fixture=(active=true)=>React.createElement(TransactionsScreen,{active,ownerName:'Brian',initialMonth:'2026-10',onUpdated})
 const flush=async()=>{for(let i=0;i<24;i++)await Promise.resolve()}
 const run=async fn=>act(async()=>{fn();await flush()})
 const tick=async()=>run(()=>{for(const [id,timer] of [...timers])if(timer.ms<1000){timers.delete(id);timer.fn()}})
@@ -34,7 +36,7 @@ const visible=node=>{for(let n=node;n;n=n.parent)if(n.props.hidden||n.props.iner
 const button=label=>tree.root.findAllByType('button').filter(visible).find(n=>text(n)===label||n.props['aria-label']===label)
 const click=async label=>run(()=>{const n=button(label);assert.ok(n,`Missing ${label}`);assert.ok(!n.props.disabled,`Disabled ${label}`);n.props.onClick()})
 const latest=()=>requests.at(-1)
-const respond=async(data,status=200,target=latest())=>run(()=>target.resolve({ok:status<400,status,json:async()=>data}))
+const respond=async(data,status=200,target=latest())=>run(()=>{now+=60_000;target.resolve({ok:status<400,status,json:async()=>data})})
 const reject=async(target=latest())=>run(()=>target.reject(Error('Lost connection')))
 const body=()=>JSON.parse(latest().options.body)
 const row={id:'2026-10:source-1',actionId:'source-1',month:'2026-10',version:'version-1',date:'2026-10-20',title:'Fixture cable',location:'Fixture shop',person:'Brian (BofA)',kind:'expense',category:'shopping',categoryLabel:'Shopping',amountCents:1234,split:'',fields:{date:'2026-10-20',item:'Fixture cable',amount:'12.34',location:'Fixture shop',person:'Brian (BofA)'},editableFields:['item','amount','location','person'],capabilities:{update:true,move:true,delete:true,split:true,cancel_split:false,undo:true},reasons:{}}
@@ -48,7 +50,12 @@ const change=async(label,value)=>run(()=>input(label).props.onChange({target:{va
 const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel')}
 ;(async()=>{
  await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0)
+ assert.equal(updates.at(-1),null,'No transaction update time before a successful listing')
  await run(()=>tree.update(fixture(true)));await tick();await respond(listing())
+ assert.equal(updates.at(-1),now,'Transactions reports its own successful listing time')
+ const loadedAt=updates.at(-1);await click('Refresh transactions');await respond({error:'Offline fixture'},503)
+ assert.equal(updates.at(-1),loadedAt,'A failed refresh retains the last successful update time')
+ await click('Refresh transactions');await respond(listing());assert.equal(updates.at(-1),now)
  assert.equal(tree.root.findByProps({'data-graph-open':false}).props['data-graph-open'],false)
  const beforeGraph=requests.length;await click('Show spending graph');assert.equal(button('Hide spending graph').props['aria-expanded'],true);assert.equal(tree.root.findByProps({'data-graph-open':true}).props['data-graph-open'],true);await click('Hide spending graph');assert.equal(requests.length,beforeGraph,'Graph disclosure is presentation-only and cannot request or mutate financial data')
  await change('Search transactions','cable');await tick();await respond(listing())
@@ -79,11 +86,13 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  const beforeUndoPlans=plans.length
  await respond({state:'done',success:true,summary:{...summary,operation:'undo',after:row.fields}});assert.equal(work.pending,true,'Undo remains guarded while its saved presentation is read')
  await respond(listing());assert.ok(!button('Undo'))
+ assert.equal(updates.at(-1),now,'Canonical Undo readback advances the transaction update time')
  assert.ok(plans.length>beforeUndoPlans,'Timed Undo must enter the shared animation pipeline')
  assert.equal(plans.at(-1).from['row:'+row.month+':update-1:amount'],'$22.00')
  assert.equal(plans.at(-1).to['row:'+row.month+':update-1:amount'],'$12.34','Undo animates canonical readback across action IDs')
  await change('Search transactions','cable');await tick();const old=latest();await change('Search transactions','payroll');await tick();const current=latest()
- await respond(listing([{...row,title:'Payroll fixture',fields:{...row.fields,item:'Payroll fixture'},id:'payroll'}]),200,current);await respond(listing(),200,old)
+ await respond(listing([{...row,title:'Payroll fixture',fields:{...row.fields,item:'Payroll fixture'},id:'payroll'}]),200,current);const currentUpdatedAt=updates.at(-1);assert.equal(currentUpdatedAt,now);await respond(listing(),200,old)
+ assert.equal(updates.at(-1),currentUpdatedAt,'A superseded response cannot advance the update time')
  const listText=text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'}));assert.match(listText,/Payroll fixture/);assert.ok(!listText.includes('Fixture cable'))
  await run(()=>tree.root.findByProps({'aria-label':'Filter transactions'}).props.onChange({target:{value:'income'}}));await tick();assert.match(latest().url,/kind=income/);await respond(listing([]));assert.match(text(tree.toJSON()),/No transactions match/)
  await click('Clear search and filters');await tick();await respond(listing())
@@ -156,6 +165,12 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  await run(()=>tree.update(React.createElement(TransactionsScreen,{active:true,ownerName:'Brian',initialMonth:'2026-09'})));await tick()
  assert.match(latest().url,/month=2026-09/,'The shared report month must update the already-mounted Transactions controller')
  await respond(listing([],{month:'2026-09'}));await run(()=>tree.unmount())
+ await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing())
+ const beforeInactive=updates.at(-1);await click('Refresh transactions');const inactiveRequest=latest()
+ await run(()=>tree.update(fixture(false)));await respond(listing(),200,inactiveRequest)
+ assert.equal(updates.at(-1),beforeInactive,'A cancelled inactive read cannot advance freshness')
+ await run(()=>tree.update(fixture(true)));await tick();await respond({error:'Reconnect fixture'},401)
+ assert.equal(updates.at(-1),null,'Cleared access removes the previous transaction update time');await run(()=>tree.unmount())
  const {undoPresentationTarget}=load(path.resolve('web/expense-report/src/transaction-feedback.ts'))
  const prior={...row,id:'latest-action'},restored={...row,id:'restored-parent'}
  assert.equal(undoPresentationTarget([prior],[restored],prior.id,{...summary,operation:'undo',after:row.fields}),restored.id)

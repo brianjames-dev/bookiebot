@@ -1,14 +1,21 @@
 import type { ExpenseAppState } from "./expense-app-session"
 
-export function AppRefreshControl({ state, refresh, showButton = true }: { state: ExpenseAppState; refresh: () => void; showButton?: boolean }) {
-  const busy = state.phase === "loading" || state.phase === "refreshing"
-  const stale = state.phase === "stale" || state.phase === "error"
-  const updated = state.updatedAt === null ? null : new Date(state.updatedAt)
-  const sameDay = updated?.toDateString() === new Date().toDateString()
-  const time = updated?.toLocaleString(undefined, {
+export function AppUpdatedTime({ updatedAt, stale = false }: { updatedAt: number | null; stale?: boolean }) {
+  if (updatedAt === null) return null
+  const updated = new Date(updatedAt)
+  const sameDay = updated.toDateString() === new Date().toDateString()
+  const time = updated.toLocaleString(undefined, {
     ...(sameDay ? {} : { month: "short" as const, day: "numeric" as const }),
     hour: "numeric", minute: "2-digit",
   })
+  return <time className="bb-app-updated" dateTime={updated.toISOString()} title={updated.toLocaleString()}>
+    {stale ? "Showing" : "Updated"} {time}
+  </time>
+}
+
+export function AppRefreshControl({ state, refresh, showButton = true }: { state: ExpenseAppState; refresh: () => void; showButton?: boolean }) {
+  const busy = state.phase === "loading" || state.phase === "refreshing"
+  const stale = state.phase === "stale" || state.phase === "error"
   const status = state.signingOut ? "Signing out…" : busy ? "Refreshing…" : stale ? state.message : null
 
   return (
@@ -21,9 +28,7 @@ export function AppRefreshControl({ state, refresh, showButton = true }: { state
       </button>}
       <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
         {status && <span className={busy && !state.signingOut && !showButton ? "sr-only" : undefined}>{status}</span>}
-        {updated && <time className="bb-app-updated" dateTime={updated.toISOString()} title={updated.toLocaleString()}>
-          {stale ? "Showing" : "Updated"} {time}
-        </time>}
+        <AppUpdatedTime updatedAt={state.updatedAt} stale={stale} />
       </div>
     </div>
   )

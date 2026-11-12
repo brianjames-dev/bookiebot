@@ -4,6 +4,10 @@ Last updated: 2026-11-11
 
 ## Goal
 
+### Transactions header and independent update time — 2026-11-11
+
+Completed the requested presentation refinement: remove the unfolded graph heading, tighten the month caption and place the existing All months control on the shared title row in both poses. The controller publishes its last successful listing time beneath BookieBot separately from Overview; failed/stale/cancelled reads cannot advance it. Preserve common header geometry so saved native tab scroll positions remain exact. Financial commands, review/confirmation/recovery, scopes and the broader backlog remain unchanged. Verification/release and native acceptance are STATUS checklist 275 and the task PR.
+
 ### Duo rendering and Undo feedback follow-up — 2026-11-11
 
 Completed implementation for the reported native presentation issues: clear scroll-indicator strip, opaque moving logo surfaces, and Undo through the existing value/text/placement feedback using a fresh canonical read. Pair changed action identities only for presentation when the saved review uniquely identifies the restored row; never alter request IDs or financial records. Five main titles share styling/position; only Transactions adds Overview's month picker, per the user's clarification. Shared/all-time goals/bank review scopes remain. App page surfaces and right graph width follow Overview. Verification/release and device acceptance are STATUS checklist 274 and the task PR. No backend writer, reconciliation lifecycle, repayment, schema or live financial test changes; broader backlog unchanged.
