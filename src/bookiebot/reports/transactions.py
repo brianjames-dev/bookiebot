@@ -17,6 +17,7 @@ from typing import Any
 from bookiebot.reports.app_access import PostgresAppAccessStore, build_app_access_store
 from bookiebot.reports.phone_history import parse_phone_report_month
 from bookiebot.reports.worksheet_reads import read_workbook_tabs
+from bookiebot.reports.transaction_repayments import accounted_amount, attach_repayment, purchase_context, repayment_details
 from bookiebot.reimbursements import service as shared
 from bookiebot.sheets import undo
 from bookiebot.sheets.auth import get_gspread_client
@@ -158,7 +159,7 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
             # Keep gross as the edit/split/bank authority. Bill presentation
             # follows confirmed canonical cash, even while Sheets is syncing.
             **({"displayAmountCents": gross_cents - int(action.metadata.get("canonical_settled_cents", "0"))}
-               if kind == "payment" and action.metadata.get("accounting") == "cash_v1" else {}),
+               if kind in {"expense", "payment"} and canonical and action.metadata.get("accounting") == "cash_v1" else {}),
             "split": action.metadata.get("split_method", "") if capabilities.can_change_split else "",
             "splitOptions": split_options,
             "capabilities": {"update": capabilities.can_update and not generated, "move": capabilities.can_move and not generated,
@@ -263,9 +264,11 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
         years = sorted({p.year for p in periods}) if periods else sorted(configured_reimbursement_workbooks(actor, now_pacific().year), reverse=True)
         client, result = get_gspread_client(), []
         owner = get_user_config(actor).budget_owner_key
-        allocations = []
+        allocations, events = [], []
         if shared.enabled():
-            allocations = shared.build_reimbursement_store().snapshot(owner, include_inactive=True)["allocations"]
+            snapshot = shared.build_reimbursement_store().snapshot(owner, include_inactive=True)
+            allocations, events = snapshot["allocations"], snapshot["events"]
+        allocation_by_id = {value["id"]: value for value in allocations}
         aliases = actor_key_aliases(actor)
         for year in years:
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
@@ -325,6 +328,14 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                             continue
                     occupied.add(address)
                     row = _public(actor, period, logged, rows, manual=manual)
+                    allocation = allocation_by_id.get(a.metadata.get("allocation_id"))
+                    if allocation:
+                        if str(allocation["version"]) != a.metadata.get("canonical_version"):
+                            raise TransactionConflict("The split changed while reading. Refresh Transactions.")
+                        if allocation.get("lifecycle", "active") == "active":
+                            attach_repayment(row, repayment_details(allocation, events, owner))
+                        elif "incomePayerCents" in row["splitOptions"]:
+                            row["splitOptions"]["payerCents"] = row["splitOptions"]["incomePayerCents"]
                     if row["kind"] == "payment":
                         timing = bill_payment_state(row["category"], year, number, schedules, as_of=as_of)
                         if not timing.paid:
@@ -334,6 +345,25 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                     if row["amountCents"] > 0:
                         result.append(row)
                 result.extend(_subscription_rows(actor, period, personal.get("Subscriptions", []), as_of=as_of))
+        # A debtor may have no sheet expense until a repayment is confirmed.
+        # Purchase context is a disclosure, never a new cash transaction. Existing
+        # recipient bill cells already represent that cash and get the same cue.
+        for allocation in allocations:
+            if allocation["partnerOwner"] != owner or allocation["outstandingCents"] <= 0 or allocation.get("lifecycle", "active") != "active":
+                continue
+            details = repayment_details(allocation, events, owner)
+            context = purchase_context(allocation, details)
+            if not context or int(context["month"][:4]) not in years or month not in {"all", context["month"]}:
+                continue
+            recipient = next((row for row in result if allocation["sourceWorksheet"] == "income"
+                              and row["month"] == context["month"] and row["category"] == allocation["category"]
+                              and row.get("notice", "").startswith("This is a linked repayment.")), None)
+            if recipient is not None:
+                attach_repayment(recipient, details)
+            else:
+                context["categoryLabel"] = expense_category_label(context["category"]) or context["category"]
+                attach_repayment(context, details)
+                result.append(context)
         result.sort(key=lambda row: (row["month"], row["date"], getattr(row.get("_logged"), "created_at", ""), row["id"]), reverse=True)
         with _CACHE_LOCK:
             if len(_CACHE) >= 32:
@@ -349,7 +379,7 @@ def public_row(row: dict[str, Any]) -> dict[str, Any]:
 def _daily_totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     days: dict[str, dict[str, Any]] = {}
     for row in rows:
-        amount = row.get("displayAmountCents", row["amountCents"])
+        amount = accounted_amount(row)
         key = row["date"] or row["month"] + ":undated"
         day = days.setdefault(key, {"date": row["date"], "month": row["month"], "count": 0,
                                    "totalCents": 0, "needsCents": 0, "wantsCents": 0})
@@ -406,7 +436,7 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         result["days"] = _daily_totals(selected)
         if day:
             result["listDays"] = _daily_totals(visible)
-        result["totalAmountCents"] = sum(row.get("displayAmountCents", row["amountCents"]) for row in selected)
+        result["totalAmountCents"] = sum(accounted_amount(row) for row in selected)
     return result
 
 

@@ -1,5 +1,7 @@
 # Finance Operations Workstream
 
+2026-11-12 completed implementation — approved Transactions repayment UI: canonical owner-scoped allocation/event presentation, Owed/Due pills, confirmed-cash prices and debtor purchase context; existing reviewed canonical split command remains the only financial writer. Context is excluded from aggregates because actual linked repayment entries retain payment dates. Both DUO poses share the split editor and post-save feedback. No reconciliation lifecycle, financial storage or projection changes. Full local suite: 2,978 passed / 596 optional PostgreSQL skipped; clean types/build, both-engine native editor/feedback/recovery checks and narrow WebKit checks. Cancel/re-split remains supported. User device acceptance is STATUS checklist 278; required CI/merge/rollout evidence belongs to the release PR. Finance Ops backlog otherwise unchanged.
+
 Last updated: 2026-11-11
 
 ## Goal

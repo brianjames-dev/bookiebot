@@ -7,9 +7,9 @@ import {DailySpendingChart, CategoryFilterControl} from './report-app'
 import {useAppNavigation} from './app-navigation'
 import {DailyTransactionDays} from './daily-transactions'
 import {TransactionSwipeContext,wrapTransactionRow} from './transaction-swipe'
-import {displayedAmount,recordedDays,recordedChart,recordedChartWindow,recordedDateLabel,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
+import {accountedAmount,recordedDays,recordedChart,recordedChartWindow,recordedDateLabel,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
 import { type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
-import {InlineTransactionEditor,transactionMotion,type InlineSnapshot} from './transaction-inline-editor'
+import {InlineTransactionEditor,transactionMotion,type InlineSnapshot,type InlineEditorProps} from './transaction-inline-editor'
 import {ChangeMotionContext,type ChangePlan} from './transaction-value-motion'
 import {preparePlacement,playPlacement,discardPlacement,type Placement} from './transaction-row-placement'
 import {UndoPopup,type UndoNotice} from './transaction-undo-popup'
@@ -17,13 +17,15 @@ import {confirmedRows,motionValues,settledTransactionRow,undoPresentationTarget}
 import {allocate,type SplitMethod} from './transaction-split-model'
 import type {SplitInputDraft} from "./transaction-split-control"
 import {DuoTransactionPane} from "./duo-transaction-pane"
+import {RepaymentExpansion,TransactionRepaymentEditor,repaymentRow} from "./transaction-repayment-editor"
+import {validRepayment,type TransactionRepayment} from "./transaction-repayment-model"
 import "./transactions-screen.css"
 import "./duo-transactions.css"
 
 type Operation = TransactionOperation
 export interface RecordedTransaction {
   id: string; actionId: string; month: string; version: string; date: string; title: string; location: string
-  person: string; kind: string; category: string; categoryLabel: string; amountCents: number; displayAmountCents?: number; split: string; notice?: string
+  person: string; kind: string; category: string; categoryLabel: string; amountCents: number; displayAmountCents?: number; split: string; notice?: string; contextOnly?:boolean; repayment?:TransactionRepayment
   fields: Record<string, string>; editableFields: string[]; capabilities: Record<Operation, boolean>; reasons: Record<string, string>
   splitOptions?: {custom: boolean; payerName: string; partnerName: string; payerBasisPoints: number; payerCents?: number; incomePayerCents?:number}
 }
@@ -58,6 +60,8 @@ function checkedListing(value: any): Listing {
     || value.nextOffset!==null&&!value.days
     || value.items.some((row: any) => !row || typeof row.id !== "string" || typeof row.version !== "string" || !Number.isSafeInteger(row.amountCents) || !row.capabilities || !Array.isArray(row.editableFields)
       || row.displayAmountCents !== undefined && (!Number.isSafeInteger(row.displayAmountCents) || row.displayAmountCents < 0 || row.displayAmountCents > row.amountCents)
+      || row.repayment!==undefined&&!validRepayment(row.repayment)
+      || row.contextOnly!==undefined&&typeof row.contextOnly!=='boolean'
       || row.splitOptions && (typeof row.splitOptions.custom !== "boolean" || !row.splitOptions.payerName || !row.splitOptions.partnerName
         || !Number.isSafeInteger(row.splitOptions.payerBasisPoints) || row.splitOptions.payerBasisPoints < 0 || row.splitOptions.payerBasisPoints > 10_000
         || row.splitOptions.payerCents !== undefined && (!Number.isSafeInteger(row.splitOptions.payerCents) || row.splitOptions.payerCents < 0 || row.splitOptions.payerCents > row.amountCents)
@@ -88,6 +92,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const [listing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
   const [displayScope, setDisplayScope] = useState({filter:"all",month:initialMonth})
   const [selected, setSelected] = useState<RecordedTransaction | null>(null)
+  const [repaymentOpen,setRepaymentOpen]=useState(false),splitOrigin=useRef<'row'|'repayment'>('row')
   const [operation, setOperation] = useState<Operation | null>(null), [draft, setDraft] = useState<Record<string, string>>({})
   const [destination, setDestination] = useState(""), [method, setMethod] = useState<SplitMethod>("income")
   const [payerShareCents, setPayerShareCents] = useState(0), [customValid, setCustomValid] = useState(true)
@@ -99,7 +104,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const [announcement,setAnnouncement]=useState('')
   const inFlight = useRef(false), generation = useRef(0), mounted = useRef(true)
   const product = useRef<HTMLElement>(null),sequence=useRef(0),placement=useRef<Placement|null>(null),placementPlayer=useRef<ReturnType<typeof playPlacement>|null>(null)
-  const [commit,setCommit]=useState<{token:number;id:string;before:Listing;after:Listing;result:Result;phase:'reading'|'closing'|'animating'|'placing';fresh?:boolean;targetId?:string}|null>(null)
+  const [commit,setCommit]=useState<{token:number;id:string;before:Listing;after:Listing;result:Result;phase:'reading'|'returning'|'closing'|'animating'|'placing';fresh?:boolean;targetId?:string}|null>(null)
   const [notice,setNotice]=useState<(UndoNotice&{undo?:{id:string;month:string}})|null>(null),[autoUndo,setAutoUndo]=useState(false)
   const ownChange=useRef(false)
   const facets = useRef<{categories:string[];persons:string[]}>({categories:[],persons:[]})
@@ -108,7 +113,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const loadAbort = useRef<AbortController | null>(null)
   const storageKey = `bookiebot:transaction-request:${ownerName}`
   const uncertain = Boolean(pending && result?.state !== "done")
-  const discard = useCallback(() => { setSelected(null); setOperation(null); setReview(null); setReviewBody(null); setAutoUndo(false); setDraft({});setSplitInput(null) }, [])
+  const discard = useCallback(() => { setSelected(null); setRepaymentOpen(false); setOperation(null); setReview(null); setReviewBody(null); setAutoUndo(false); setDraft({});setSplitInput(null) }, [])
   const duoSelection=useRef(false)
   useEffect(()=>{
     if(!duoWide){duoSelection.current=false;return}
@@ -184,7 +189,8 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     return () => window.removeEventListener("bookiebot:reimbursements-changed", refresh)
   }, [])
   const changed = () => { ownChange.current=true; window.dispatchEvent(new Event("bookiebot:transactions-changed")); window.dispatchEvent(new Event("bookiebot:reimbursements-changed")); ownChange.current=false }
-  const begin = (row: RecordedTransaction, op: Operation) => {
+  const begin = (row: RecordedTransaction, op: Operation, origin:'row'|'repayment'='row') => {
+    splitOrigin.current=origin;setRepaymentOpen(Boolean(row.repayment&&(op==='split'||op==='cancel_split')))
     setAnnouncement('')
     setSelected(row); setOperation(op); setDraft({...row.fields, amount: (row.amountCents / 100).toFixed(2)})
     setDestination(row.category); setMethod((row.split || 'income') as SplitMethod); setReview(null); setReviewBody(null); setError(""); setResult(null);setNotice(null)
@@ -239,7 +245,22 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
       if (next.success) {
         setNeedsFresh(true)
         const before=listingRef.current,id=selected?.id
-        manager.current.close?.();discard()
+        manager.current.close?.()
+        if(before&&id&&next.summary?.operation==='split'){
+          const token=++sequence.current
+          setCommit({token,id,before,after:before,result:next,phase:'reading',fresh:true})
+          void load(0,false,true,after=>{
+            if(!mounted.current||sequence.current!==token)return
+            if(after.pendingCommand){setCommit(null);return}
+            const saved=after.items.find(row=>row.id===id)
+            if(saved?.repayment){
+              setRepaymentOpen(true);setOperation(null);setReview(null);setReviewBody(null);setSplitInput(null)
+              setCommit({token,id,before,after,result:next,phase:'returning',fresh:true})
+            }else{discard();setCommit({token,id,before,after,result:next,phase:'closing',fresh:true})}
+          }).then(loaded=>{if(!loaded&&mounted.current&&sequence.current===token){setCommit(null);setResult(null);discard();setError('Your split was saved. Refresh Transactions to see its current balance.')}})
+          return
+        }
+        discard()
         if(before&&next.summary?.operation==='undo'){
           // Restore the canonical saved rows, including deleted entries and moved
           // categories, through the same value-motion path as a forward edit.
@@ -254,7 +275,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
           })
         }else if(before&&id&&before.items.some(row=>row.id===id)&&next.summary){
           const afterItems=confirmedRows(before.items,id,next.summary)
-          const old=before.items.find(row=>row.id===id)!,after=afterItems.find(row=>row.id===id),delta=(after?displayedAmount(after):0)-displayedAmount(old)
+          const old=before.items.find(row=>row.id===id)!,after=afterItems.find(row=>row.id===id),delta=(after?accountedAmount(after):0)-accountedAmount(old)
           const updateDays=(days:RecordedDay[]|undefined)=>days?.flatMap(day=>day.date===old.date&&day.month===old.month?day.count===1&&!after?[]:[{...day,count:day.count-(after?0:1),totalCents:day.totalCents+delta}]:[day])
           const periodDelta=before.month==='all'||before.month===old.month?delta:0
           // Keep identities inert during feedback; only the subsequent fresh
@@ -306,14 +327,26 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   useEffect(()=>{
     if(!commit)return
     let live=true
-    if(commit.phase==='closing')void settledTransactionRow(product.current,commit.id).then(()=>{if(live&&sequence.current===commit.token){if(commit.fresh&&(!commit.targetId||!commit.before.items.some(row=>row.id===commit.id)))setListing(commit.after);setCommit({...commit,phase:'animating'})}})
-    else if(commit.phase==='animating')void Promise.allSettled([...(plan?.promises??[])]).then(()=>{
+    if(commit.phase==='returning')void(async()=>{
+      await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()))
+      const viewport=product.current?.querySelector<HTMLElement>(`.sp-detail[data-entry-id="${CSS.escape(commit.id)}"] > .bi-step-viewport`)
+      await Promise.allSettled(viewport?.getAnimations({subtree:true}).filter(animation=>animation.playState==='running').map(animation=>animation.finished)??[])
+      if(!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise<void>(resolve=>setTimeout(resolve,220))
+      if(live&&sequence.current===commit.token)setCommit({...commit,phase:'animating'})
+    })()
+    else if(commit.phase==='closing')void settledTransactionRow(product.current,commit.id).then(()=>{if(live&&sequence.current===commit.token){if(commit.fresh&&(!commit.targetId||!commit.before.items.some(row=>row.id===commit.id)))setListing(commit.after);setCommit({...commit,phase:'animating'})}})
+    else if(commit.phase==='animating')void(async()=>{
+      // Folding remounts the editor; include animation work registered by that
+      // scene before releasing the canonical result and its financial guard.
+      do{const batch=[...(plan?.promises??[])];await Promise.allSettled(batch);await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));if([...(plan?.promises??[])].every(work=>batch.includes(work)))break}while(live)
+
       if(!live||sequence.current!==commit.token)return
+      if(repaymentOpen&&commit.result.summary?.operation==='split'){setSelected(commit.after.items.find(row=>row.id===commit.id)??null);setListing(commit.after);void finishFeedback(commit.result,commit.after);return}
       placement.current=preparePlacement(product.current,commit.targetId??commit.id,commit.after.items,transactionMotion,commit.id)
       setListing(commit.after)
       if(placement.current)setCommit({...commit,phase:'placing'})
       else void finishFeedback(commit.result,commit.fresh?commit.after:undefined)
-    })
+    })()
     return()=>{live=false}
   },[commit?.token,commit?.phase])
   useLayoutEffect(()=>{
@@ -333,12 +366,13 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const periodChart=useMemo(()=>recordedChart(days,displayScope.month),[days,displayScope.month])
   const historyChart=useMemo(()=>recordedChartWindow(graphHistory?.key===historyKey?graphHistory.days:[],initialMonth,chartMonths),[graphHistory,historyKey,initialMonth,chartMonths])
   const chart=historyEnabled?historyChart:periodChart
+  useEffect(()=>{if(selected&&!operation&&!commit&&!uncertain&&listing){const current=listing.items.find(row=>row.id===selected.id);if(current)setSelected(current);else discard()}},[listing,operation,commit?.phase,uncertain])
   const rows=useMemo(()=>new Map(listing?.items.map(row=>[row.id,row])??[]),[listing])
   const filtersList=[{value:'all',label:'All'},{value:'needs',label:'Needs'},{value:'wants',label:'Wants'},{value:'shared',label:'Shared'},...Object.entries(categoryOptions).map(([value,label])=>({value:'category:'+value,label:spendingCategories[value]??label})),{value:'income',label:'Income'},{value:'savings',label:'Savings'}]
   const changeFilter=(value:string)=>{if(locked||operation||notice)return;manager.current.close?.();setDay('');setFilter(value)}
   const displayedFilter=displayScope.filter,graphFilter=historyEnabled?filter:displayedFilter
   const metricLabel=displayedFilter==='income'?'Total Income':displayedFilter==='savings'?'Total Saved':'Total Spent'
-  const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+displayedAmount(row),0)??0
+  const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+accountedAmount(row),0)??0
   useEffect(()=>{manager.current.close?.(true);setDay('')},[month,search,active])
   const inspectGraphDay=(value:string)=>{
     if(locked||operation||notice)return
@@ -358,11 +392,17 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const canReview=Boolean(selected&&operation&&(operation==='update'?validAmount&&validFields&&(destination!==selected.category||selected.editableFields.some(field=>field==='amount'?Math.round(amountValue*100)!==selected.amountCents:(draft[field]??'').trim()!==(selected.fields[field]??'').trim())):operation==='split'?customValid&&(method!=='custom'||Boolean(selected.splitOptions?.custom))&&(method!=='fronted'||selected.kind==='expense')&&(selected.split?method!==selected.split||payerShareCents!==(selected.splitOptions?.payerCents??selected.amountCents):payerShareCents!==selected.amountCents):true))
   const summary:TransactionChangeSummary|null=review?{operation:review.operation,title:review.item.title,date:review.item.date,category:review.item.categoryLabel,location:review.item.location,person:review.item.person,amountCents:review.item.amountCents,before:review.item.fields,after:review.after,destination:review.destination,share:review.share,restoration:review.restoration}:null
   const snapshot:InlineSnapshot|null=selected&&operation?{row:selected,operation,draft,destination,method,payerCents:payerShareCents,splitInput,review:summary,canReview,locked,busy,categories:{...categories,...(selected.category in categories?{}:{[selected.category]:selected.categoryLabel})},persons:['Hannah','Brian (BofA)','Brian (AL)'],error}:null
-  const editorFor=(row:RecordedTransaction)=><InlineTransactionEditor key={row.id} snapshot={selected?.id===row.id?snapshot:null} onField={(key,value)=>setDraft(previous=>({...previous,[key]:value}))} onCategory={setDestination} onShare={(value,method)=>{setPayerShareCents(value);setMethod(method);setCustomValid(true)}} onValidity={setCustomValid} onSplitInput={setSplitInput} onReview={()=>void preview()} onConfirm={()=>void confirm()} onBack={()=>{setReview(null);setReviewBody(null)}} onCancel={discard} onRemoveSplit={()=>begin(row,'cancel_split')}/>
+  const editorProps=(row:RecordedTransaction,reference=false):InlineEditorProps=>({snapshot:selected?.id===row.id&&snapshot?snapshot:reference?{row,operation:'split',draft:row.fields,destination:row.category,method:(row.split||'income') as SplitMethod,payerCents:row.splitOptions?.payerCents??row.amountCents,splitInput:null,review:null,canReview:false,locked:true,busy:false,categories:categoryOptions,persons:[],error:''}:null,
+    onField:(key,value)=>setDraft(previous=>({...previous,[key]:value})),onCategory:setDestination,onShare:(value,method)=>{setPayerShareCents(value);setMethod(method);setCustomValid(true)},onValidity:setCustomValid,onSplitInput:setSplitInput,onReview:()=>void preview(),onConfirm:()=>void confirm(),onBack:()=>{setReview(null);setReviewBody(null)},onCancel:()=>{if(repaymentOpen&&splitOrigin.current==='repayment'){setOperation(null);setReview(null);setReviewBody(null);setError('')}else discard()},onRemoveSplit:()=>begin(row,'cancel_split',splitOrigin.current)})
+  const selectedPresentation=selected&&commit?.phase==='animating'?commit.after.items.find(row=>row.id===selected.id)??selected:selected
+  const inspector=(row:RecordedTransaction,compact:boolean)=><TransactionRepaymentEditor row={row} compact={compact} open={selected?.id===row.id&&repaymentOpen} editing={selected?.id===row.id&&Boolean(operation)} locked={locked||loading} editor={editorProps(row,true)} onClose={discard} onEdit={()=>begin(row,'split','repayment')}/>
+  const editorFor=(row:RecordedTransaction)=>row.repayment&&(!operation||selected?.id!==row.id||operation==='split'||operation==='cancel_split')?<RepaymentExpansion open={selected?.id===row.id&&repaymentOpen}>{inspector(selectedPresentation?.id===row.id?selectedPresentation:row,true)}</RepaymentExpansion>:<InlineTransactionEditor key={row.id} {...editorProps(row)}/>
+  const openRepayment=(row:RecordedTransaction)=>{if(locked)return;manager.current.close?.(true);if(selected?.id===row.id&&repaymentOpen){discard();return}discard();setSelected(row);setRepaymentOpen(true);setError('');setResult(null);setNotice(null);setDuoGraphOpen(false)}
   const wrap=(entry:Parameters<typeof wrapTransactionRow>[0],position:number,children:ReactNode,standalone=false)=>{
     const row=rows.get(entry.id??'')
-    return <div className="bi-selected-row" data-entry-id={entry.id} data-editing={selected?.id===entry.id&&Boolean(operation)} data-design="levels" data-duo-selected={duoWide&&selected?.id===entry.id}>
-      {wrapTransactionRow(entry,position,cloneElement(children as ReactElement<{className:string}>,{className:(children as ReactElement<{className:string}>).props.className+' bi-editable-row'}),standalone)}
+    const decorated=row?repaymentRow(row,children,selected?.id===row.id&&repaymentOpen,()=>openRepayment(row),locked||loading||Boolean(notice),commit?.id===row.id):children
+    return <div className="bi-selected-row" data-entry-id={entry.id} data-editing={selected?.id===entry.id&&Boolean(operation||repaymentOpen)} data-design="levels" data-duo-selected={duoWide&&selected?.id===entry.id}>
+      {wrapTransactionRow(entry,position,cloneElement(decorated as ReactElement<{className:string}>,{className:(decorated as ReactElement<{className:string}>).props.className+' bi-editable-row'}),standalone)}
       {row&&!duoWide&&editorFor(row)}
     </div>
   }
@@ -378,9 +418,9 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
       manager.current.close?.();if(group.querySelector('.bi-selected-row[data-editing="true"]')&&!busy&&!uncertain)discard()
     }else group.querySelectorAll<HTMLElement>('.bi-expansion[data-open="false"]').forEach(element=>element.getAnimations().forEach(animation=>animation.finish()))
   }
-  return <TransactionSwipeContext.Provider value={{manager:manager.current,rows,locked:locked||loading||Boolean(notice),onAction:begin,onManage:duoWide?manageDuo:undefined,selectedId:duoWide?selected?.id:undefined}}><section ref={product} className="bb-transactions bb-daily-spending-content bi-product" data-tone="sage" data-save-phase={commit?.phase??'idle'} onClickCapture={dayToggle} aria-label="Recorded transactions" aria-busy={loading||Boolean(commit)} onPointerDownCapture={event=>{if(!(event.target as Element).closest('.bb-recorded-swipe'))manager.current.close?.()}}>
+  return <ChangeMotionContext.Provider value={plan}><TransactionSwipeContext.Provider value={{manager:manager.current,rows,locked:locked||loading||Boolean(notice),onAction:(row,op)=>begin(row,op),onManage:duoWide?manageDuo:undefined,selectedId:duoWide?selected?.id:undefined}}><section ref={product} className="bb-transactions bb-daily-spending-content bi-product" data-tone="sage" data-save-phase={commit?.phase??'idle'} onClickCapture={dayToggle} aria-label="Recorded transactions" aria-busy={loading||Boolean(commit)} onPointerDownCapture={event=>{if(!(event.target as Element).closest('.bb-recorded-swipe'))manager.current.close?.()}}>
     <div className="bi-workspace" inert={Boolean(notice)} data-duo-pane={duoWide&&selected&&!graphOpen?"editor":"graph"}>
-    {duoWide&&selected&&<DuoTransactionPane row={selected} operation={operation} reviewing={Boolean(review)} graphOpen={graphOpen} locked={locked||loading} onOptions={()=>{setOperation(null);setReview(null);setReviewBody(null)}} onAction={op=>{begin(selected,op);setDuoGraphOpen(false)}} onGraph={()=>setDuoGraphOpen(value=>!value)} onClose={discard} editor={editorFor(selected)} status={status} aliases={aliases}/>}
+    {duoWide&&selected&&repaymentOpen&&selectedPresentation?.repayment?<aside className="bb-duo-action-pane bb-duo-repayment-pane" data-peek={graphOpen} role="region" aria-label="Transaction options and editor"><div className="bb-duo-repayment-tools bb-duo-pane-tools"><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Return to transaction editor':'Show Daily Spending'} aria-expanded={graphOpen} disabled={locked||loading} onClick={()=>setDuoGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div><div className="bb-duo-pane-content" hidden={graphOpen}>{inspector(selectedPresentation,false)}{status}</div></aside>:duoWide&&selected&&<DuoTransactionPane row={selected} operation={operation} reviewing={Boolean(review)} graphOpen={graphOpen} locked={locked||loading} onOptions={()=>{setRepaymentOpen(false);setOperation(null);setReview(null);setReviewBody(null)}} onAction={op=>{begin(selected,op);setDuoGraphOpen(false)}} onGraph={()=>setDuoGraphOpen(value=>!value)} onClose={discard} editor={editorFor(selected)} status={status} aliases={aliases}/>}
     <header className="bb-transactions-heading" hidden={navigation?.monthHeader}><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={refreshDisabled} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
     {headerActions && createPortal(<button type="button" className="bb-transaction-all-months" aria-label="All recorded months" aria-pressed={month==='all'} disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>{setDay('');setMonth(month==='all'?initialMonth:'all')}}>All months</button>,headerActions)}
     {navigation?.monthHeader?<div className="bb-transaction-period bb-transaction-scope"><span>{periodMonth==='all'?'All months':new Date(periodMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}</span></div>:
@@ -394,12 +434,12 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     {loading && !listing && <p role="status" className="bb-recorded-loading">Loading recorded transactions…</p>}
     {!loading && !listing && !error && <p className="bb-transaction-empty">Open Transactions to load your recorded activity.</p>}
     {listing?.items.length===0&&<div className="bb-transaction-empty"><p>{search||filterCount?'No transactions match these filters.':'No recorded transactions in this period.'}</p>{(search||filterCount>0)&&<button type="button" onClick={()=>{setSearch('');setFilter('all')}}>Clear search and filters</button>}</div>}
-    <div className="bb-transaction-list bb-daily-transactions" id="bb-recorded-days"><ChangeMotionContext.Provider value={plan}><DailyTransactionDays groups={groups} year={Number(initialMonth.slice(0,4))} month={Number(initialMonth.slice(5))} flatSingles wrapRow={wrap} aliases={aliases} categoryColors={recordedCategoryColors}/></ChangeMotionContext.Provider></div>
+    <div className="bb-transaction-list bb-daily-transactions" id="bb-recorded-days"><DailyTransactionDays groups={groups} year={Number(initialMonth.slice(0,4))} month={Number(initialMonth.slice(5))} flatSingles wrapRow={wrap} aliases={aliases} categoryColors={recordedCategoryColors}/></div>
     {listing?.nextOffset !== null && listing?.nextOffset !== undefined && <button className="bb-transaction-load" type="button" disabled={loading||locked||Boolean(operation)||Boolean(notice)} onClick={()=>void load(listing.nextOffset!,true)}>{loading ? "Loading…" : "Load more transactions"}</button>}
     {error && !listing && <button type="button" disabled={loading} onClick={()=>void load(0,false,true)}>Try again</button>}
     </div>
     </div>
     <span className="bi-sr-only" role="status" aria-live="polite">{announcement}</span>
     {notice&&<UndoPopup notice={notice} onUndo={()=>{const undo=notice.undo;setNotice(null);if(undo)void preview(undo,true)}} onDismiss={()=>setNotice(null)} returnFocus={()=>product.current?.querySelector<HTMLButtonElement>('.bb-daily-day-header,.bb-recorded-row-access')??null}/>}
-  </section></TransactionSwipeContext.Provider>
+  </section></TransactionSwipeContext.Provider></ChangeMotionContext.Provider>
 }
