@@ -1,8 +1,13 @@
 .bb-shell-transactions { padding-top: 14px; }
 .bb-transactions { min-width: 0; }
 .bb-recorded-results { display:contents; }
-.bb-transaction-scope { display:flex; align-items:center; justify-content:space-between; gap:12px; color:hsl(var(--muted-foreground)); font-size:12px; }
-.bb-transaction-scope button[aria-pressed="true"] { background:hsl(var(--primary) / .12); }
+.bb-transaction-scope { min-height:20px; line-height:20px; color:hsl(var(--muted-foreground)); font-size:12px; }
+/* Keep the common header geometry stable for native tab scroll restoration. */
+.bb-transactions .bb-transaction-scope { margin-top:-10px; }
+.bb-transactions-title-actions { display:flex; align-items:center; grid-column:2; grid-row:1; margin-left:auto; }
+.bb-transaction-all-months { cursor:pointer; font:inherit; font-size:13px; white-space:nowrap; color:hsl(var(--primary)); background:transparent; border:1px solid hsl(var(--border)); border-radius:10px; min-height:44px; padding:8px 12px; -webkit-tap-highlight-color:transparent; }
+.bb-transaction-all-months[aria-pressed="true"] { background:hsl(var(--primary) / .12); }
+.bb-transaction-all-months:disabled { opacity:.5; cursor:default; }
 .bb-transactions-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0; }
 .bb-transactions h1 { font:400 clamp(26px,7vw,30px)/1.15 var(--bb-display-font); margin:0 0 8px; }
 .bb-transactions-heading p,.bb-transaction-list-heading { color:hsl(var(--muted-foreground)); font-size:13px; margin:0; }

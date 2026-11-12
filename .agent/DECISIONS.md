@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-11 - Transactions header scope and independent update time
+
+Place All months beside the existing Transactions title/month picker, with the month caption directly beneath it in both poses. Portal the existing controller-owned button into the stable common-header slot; retain its current locks, scope and local drafts. Keep common header geometry constant and tighten the caption locally so native tab scroll restoration remains exact. Remove the redundant unfolded chart heading and its reserved row; graph-peek tools retain their own clearance.
+
+Transactions records its own successful listing publication time, including canonical post-save/Undo readback, and shares Overview’s timestamp formatting beneath BookieBot. Failed, superseded, aborted or inactive responses never advance it; clearing access clears it. Owner-scoped shell presentation keeps Overview updates independent and prevents cross-owner timestamp reuse. No backend timestamp, persistence, financial writer or request semantics change. Native acceptance is STATUS checklist 275.
+
 ## 2026-11-11 - Common main-tab titles and canonical Undo feedback
 
 The user wants the five main tab headings in Overview's exact type and position, keeping page names. Following clarification, only Transactions adds the existing month picker; Overview retains it, while Shared, Savings and Reconcile keep plain names and their current all-month/lifetime data scopes. Reuse the existing header and responsive Duo masthead/heading variables, synchronize Transactions with the selected report month and retain its explicit All months scope. Unify app page/full-width section backgrounds; retain meaningful component/status styling and the accepted fixed glass dock.

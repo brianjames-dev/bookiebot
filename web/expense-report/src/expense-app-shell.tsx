@@ -24,6 +24,7 @@ import { TransactionsScreen } from "./transactions-screen"
 import { PageRefreshProvider, usePageRefresh } from "./page-refresh"
 import { PullToRefresh } from "./pull-to-refresh"
 import { ReportBrand, ReportHeader } from "./report-header"
+import { AppUpdatedTime } from "./app-refresh-control"
 import { useDuoLayout } from "./duo-layout"
 import type { ExpenseReportData } from "./types"
 
@@ -56,6 +57,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [sourceRequest, setSourceRequest] = useState<{ section: string; id: number; scope: string } | null>(null)
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const [transactionsHeaderActions, setTransactionsHeaderActions] = useState<HTMLDivElement | null>(null)
+  const [transactionsUpdated, setTransactionsUpdated] = useState<{ owner: string; time: number | null } | null>(null)
+  const onTransactionsUpdated = useCallback((time: number | null) => setTransactionsUpdated({ owner, time }), [owner])
   const askTriggerRef = useRef<HTMLButtonElement>(null)
   const screenRef = useRef(screen)
   const displayedScreen = useRef(screen)
@@ -194,6 +198,10 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   }, [sourceRequest, screen])
 
   const reportVisible = screen === "overview"
+  const transactionsUpdatedAt = transactionsUpdated?.owner === owner ? transactionsUpdated.time : null
+  const brandStatus = screen === "transactions" ? <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
+    {transactionsUpdatedAt === null ? <span>Not updated yet</span> : <AppUpdatedTime updatedAt={transactionsUpdatedAt} />}
+  </div> : controls
   const fallback = report && <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
     receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
@@ -206,7 +214,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen} />
       <header className="bb-masthead bb-shell-masthead">
-        <ReportBrand owner={owner} avatarUrl={avatarUrl} status={controls} statusHidden={!reportVisible} />
+        <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"} />
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)}
           onSettings={() => selectScreen(screen === "settings" && !widgetGuideOpen ? lastMain : "settings")} />
@@ -215,7 +223,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
 
       <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screenTitles[screen]} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
-        disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible} />
+        disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible}
+        controls={<div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} />} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
@@ -227,7 +236,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
-        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} />}
+        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}

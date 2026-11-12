@@ -71,7 +71,8 @@ function ReportLeaf({ report, appControls, appMonthControl, appComparison }) {
 function useTheme() { const [theme, setTheme] = React.useState('dark'); return { theme, toggleTheme() { setTheme(value => value === 'dark' ? 'light' : 'dark') } } }
 function AskLeaf(props) { ask = props; const [draft, setDraft] = React.useState(''); return h('aside', { hidden: !props.open }, h('input', { 'aria-label': 'Question fixture', value: draft, onChange: e => setDraft(e.target.value) })) }
 function NotificationsLeaf() { const [value, setValue] = React.useState(false); return h('button', { 'aria-label': 'Notification fixture', 'aria-pressed': value, onClick: () => setValue(!value) }, 'Fixture preference') }
-mocks.set(src('transactions-screen.tsx'), {TransactionsScreen: () => h('p', null, 'Transactions fixture')})
+let transactionProps
+mocks.set(src('transactions-screen.tsx'), {TransactionsScreen: props => {transactionProps=props;return h('p', null, 'Transactions fixture')}})
 mocks.set(src('report-app.tsx'), { ExpenseReportApp: ReportLeaf, useExpenseReportTheme: useTheme })
 mocks.set(src('ask-bookiebot-panel.tsx'), { AskBookieBotPanel: AskLeaf })
 mocks.set(src('phone-notifications.tsx'), { PhoneNotifications: NotificationsLeaf })
@@ -121,6 +122,20 @@ request = async (url, options = {}) => {
 }
 async function main() {
   let tree
+  await run(() => { tree = create(shell(report)) })
+  await tap(tree, 'Transactions')
+  assert.ok(text(tree.root.findByProps({className:'bb-brand-status'})).includes('Not updated yet'))
+  const transactionTime=Date.UTC(2026,10,11,16,7)
+  await run(()=>transactionProps.onUpdated(transactionTime))
+  assert.equal(tree.root.findByProps({className:'bb-brand-status'}).findByType('time').props.dateTime,new Date(transactionTime).toISOString())
+  await run(()=>tree.update(shell({...report,generatedAt:'overview-only-refresh'})))
+  assert.equal(tree.root.findByProps({className:'bb-brand-status'}).findByType('time').props.dateTime,new Date(transactionTime).toISOString(),'Overview refresh does not replace Transactions freshness')
+  await tap(tree,'Overview')
+  assert.ok(text(tree.root.findByProps({className:'bb-brand-status'})).includes('Refresh fixture'),'Overview retains its own status')
+  await tap(tree,'Transactions');await run(()=>transactionProps.onUpdated(null))
+  assert.equal(tree.root.findByProps({className:'bb-brand-status'}).findAllByType('time').length,0,'Cleared transaction access removes the old timestamp')
+  await run(()=>tree.unmount())
+  reads={goals:0,reimbursements:0}
   await run(() => { tree = create(shell(report)) })
   assert.equal(screen(tree), 'overview'); assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1)
   const tools = tree.root.findAll(node => node.type === 'div' && node.props.role === 'group' && node.props['aria-label'] === 'BookieBot tools')[0]

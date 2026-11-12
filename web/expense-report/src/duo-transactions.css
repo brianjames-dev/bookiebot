@@ -24,7 +24,7 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace {
   grid-column:1; grid-row:2; display:grid; min-height:0;
   grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);
-  grid-template-rows:max(44px,var(--bb-duo-heading)) 44px 70px 58px auto minmax(0,1fr);
+  grid-template-rows:max(44px,var(--bb-duo-heading)) 28px 70px 58px auto minmax(0,1fr);
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transactions-heading {
   grid-column:1; grid-row:1; min-width:0; margin-inline:35px; align-items:center;
@@ -55,15 +55,12 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-summary-controls { max-width:55%; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-summary-controls .bb-category-mix-filter { max-width:100%; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-reveal {
-  grid-column:2; grid-row:1 / 7; display:grid; grid-template-rows:var(--bb-duo-heading) minmax(0,1fr);
+  grid-column:2; grid-row:1 / 7; display:grid; grid-template-rows:minmax(0,1fr);
   min-height:0; opacity:1; margin:0 16px;
   padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
   transition:none;
  }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-heading {
-  margin:0; align-self:center;
-  font-size:28px; font-weight:500; line-height:1.25; letter-spacing:-.025em;
- }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace:has(.bb-duo-action-pane[data-peek="true"]) .bb-recorded-graph-reveal { padding-top:var(--bb-duo-heading); }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip { overflow:visible; min-height:0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip > .bb-daily-plot {
   display:grid; grid-template-rows:minmax(0,1fr) auto; gap:16px;
