@@ -185,7 +185,7 @@ const dateLabel = (value: string) => value ? new Date(value.includes("T") ? valu
 const money = (value: number) => `${value < 0 ? "+" : ""}${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.abs(value) / 100)}`
 const statusLabel = (value: ReviewStatus) => value === "ignored" ? "Ignored" : value === "checked" ? "Matched" : value === "pending" ? "Pending" : "Needs review"
 
-export function ReconciliationScreen({ controller }: { controller: Controller }) {
+export function ReconciliationScreen({ controller, embeddedHeader=false }: { controller: Controller; embeddedHeader?:boolean }) {
   const { snapshot, error, busy, needsRefresh, revision, resetReview, pendingOperation, load, rejectAccess } = controller
   const [filter, setFilter] = useState<Filter>("needs_review")
   const [openId, setOpenId] = useState<number | null>(null)
@@ -252,8 +252,8 @@ export function ReconciliationScreen({ controller }: { controller: Controller })
     refresh: () => load(needsRefresh || !snapshot?.enabled ? undefined : { operation: "check" }),
     disabled: busy || Boolean(receiptTarget),
   })
-  return <section className="bb-reconcile" aria-labelledby="bb-reconcile-title">
-    <div className="bb-reconcile-heading"><div><h1 id="bb-reconcile-title">Reconcile</h1><p className="bb-reconcile-muted">{snapshot?.checkedAt
+  return <section className="bb-reconcile" aria-labelledby={embeddedHeader?'bb-main-page-title':'bb-reconcile-title'}>
+    <div className="bb-reconcile-heading"><div>{!embeddedHeader&&<h1 id="bb-reconcile-title">Reconcile</h1>}<p className="bb-reconcile-muted">{snapshot?.checkedAt
       ? `Checked ${new Date(snapshot.checkedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Review your logged expenses"}</p></div>
       {!pageRefresh && <button type="button" className="bb-reconcile-check" disabled={!snapshot?.enabled || busy || Boolean(receiptTarget)} onClick={() => void load(needsRefresh ? undefined : { operation: "check" })}><RefreshCw size={17} aria-hidden="true" />{busy ? "Checking…" : needsRefresh ? "Check status" : "Check"}</button>}</div>
     {receiptTarget && <div ref={receiptPanel}><ReimbursementLedger key={receiptTarget.allocationId} fallback={<p>Shared payments are currently unavailable.</p>}

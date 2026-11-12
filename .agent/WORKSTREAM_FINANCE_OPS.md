@@ -4,6 +4,10 @@ Last updated: 2026-11-11
 
 ## Goal
 
+### Duo rendering and Undo feedback follow-up — 2026-11-11
+
+Completed implementation for the reported native presentation issues: clear scroll-indicator strip, opaque moving logo surfaces, and Undo through the existing value/text/placement feedback using a fresh canonical read. Pair changed action identities only for presentation when the saved review uniquely identifies the restored row; never alter request IDs or financial records. Five main titles share styling/position; only Transactions adds Overview's month picker, per the user's clarification. Shared/all-time goals/bank review scopes remain. App page surfaces and right graph width follow Overview. Verification/release and device acceptance are STATUS checklist 274 and the task PR. No backend writer, reconciliation lifecycle, repayment, schema or live financial test changes; broader backlog unchanged.
+
 ### Approved Duo Transactions workspace — 2026-11-11
 
 Implemented the newly approved code-native preview: bounded native list/controls left, Daily Spending right, and entry actions plus all existing editors/review/confirmation/recovery/Undo on the right when unfolded. The graph minimizes to its button and returns to the same draft; draft/review (including invalid split text) and disclosed swipe menus transfer across folds. Closed and ordinary devices retain native swipe/inline editing and the independent closed graph choice. Shared controller, financial review/confirm/idempotency, reconciliation/action lineage and repayment semantics remain unchanged; no data migration or live financial test writes. This completes the approved presentation slice and supersedes the November 10 rollback for Transactions. Verification/release evidence is in STATUS and the task PR; native acceptance is checklist 273. The broader Finance Ops priorities/backlog are unchanged.

@@ -12,6 +12,7 @@ body:has(.bb-page[data-duo-enabled="true"]) { height: 100%; overflow: hidden; ov
   --bb-duo-inset: clamp(16px, 4vw, 35px);
   --bb-duo-right-inset: 16px;
   --bb-duo-heading: 48px;
+  --bb-duo-masthead: 72px;
   --bb-duo-nav-height: 54px;
   --bb-duo-nav-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   --bb-duo-fold: calc((100vw - var(--bb-duo-overlay) + var(--bb-duo-right-rail)) / 2);
@@ -28,6 +29,20 @@ body:has(.bb-page[data-duo-enabled="true"]) { height: 100%; overflow: hidden; ov
 .bb-app-shell[data-duo-landscape="true"] .bb-shell-header-actions {
   right: calc(var(--bb-duo-overlay) + var(--bb-duo-right-inset));
 }
+.bb-page[data-duo-landscape="true"] > .bb-report-header { display:flex; align-items:center; }
+.bb-page[data-duo-landscape="true"]:is([data-screen="shared"],[data-screen="savings"],[data-screen="reconcile"]) .bb-shell-masthead {
+  height:var(--bb-duo-masthead); min-height:var(--bb-duo-masthead); margin:0; padding-inline:var(--bb-duo-inset);
+}
+.bb-page[data-duo-landscape="true"]:is([data-screen="shared"],[data-screen="savings"],[data-screen="reconcile"]) {
+  padding-left:0; padding-right:var(--bb-duo-overlay);
+}
+.bb-page[data-duo-landscape="true"]:is([data-screen="shared"],[data-screen="savings"],[data-screen="reconcile"]) > .bb-report-header {
+  height:var(--bb-duo-heading); min-height:0; padding:0; margin:0 var(--bb-duo-inset);
+  width:calc(var(--bb-duo-fold) - 2 * var(--bb-duo-inset));
+}
+.bb-page[data-duo-landscape="true"]:is([data-screen="shared"],[data-screen="savings"],[data-screen="reconcile"]) > .bb-main {
+  width:calc(100% - 2 * var(--bb-duo-inset));
+}
 .bb-app-shell[data-duo-landscape="true"] .bb-bottom-navigation {
   left: calc(var(--bb-duo-fold) + var(--bb-duo-right-width) / 2);
   width: min(404px, var(--bb-duo-right-width));
@@ -40,7 +55,7 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-app-shell[data-duo-overview="true"] {
   display: grid;
   grid-template-columns: minmax(0, calc((100% + var(--bb-duo-right-rail)) / 2)) minmax(0, 1fr);
-  grid-template-rows: 72px var(--bb-duo-heading) minmax(0, 1fr);
+  grid-template-rows: var(--bb-duo-masthead) var(--bb-duo-heading) minmax(0, 1fr);
   min-height: 0;
   height: 100dvh;
   overflow: clip;
@@ -143,7 +158,7 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-duo-category-list:has(> li:nth-child(9)) button { padding-block: 3px; line-height: 1.2; }
 .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list:has(> li:nth-child(9)) { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 8px; }
 @media (max-height: 610px) {
-  .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 44px; }
+  .bb-app-shell[data-duo-landscape="true"] { --bb-duo-heading: 44px; }
   .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { --bb-duo-comparison-space: 160px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-card { padding-block: 8px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-value { font-size: 24px; margin-top: 4px; }
@@ -170,8 +185,9 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
   .bb-category-mix-page:has(> .bb-category-overflow) .bb-duo-category-list button { padding-block: 2px; line-height: 1.1; }
 }
 @media (max-height: 520px) {
-  .bb-app-shell[data-duo-overview="true"] { --bb-duo-heading: 40px; grid-template-rows: 66px var(--bb-duo-heading) minmax(0, 1fr); padding-bottom: 12px; }
-  .bb-app-shell[data-duo-overview="true"] .bb-report-header h1 { font-size: 30px; }
+  .bb-app-shell[data-duo-landscape="true"] { --bb-duo-heading: 40px; --bb-duo-masthead: 66px; }
+  .bb-app-shell[data-duo-overview="true"] { padding-bottom: 12px; }
+  .bb-app-shell[data-duo-landscape="true"] > .bb-report-header h1 { font-size: 30px; }
   .bb-app-shell[data-duo-overview="true"] .bb-overview-summary { --bb-duo-comparison-space: 142px; padding-top: 4px; gap: 8px; }
   .bb-app-shell[data-duo-overview="true"] .bb-metric-card { padding-block: 4px; }
   .bb-app-shell[data-duo-overview="true"] .bb-left-categories { margin-top: 0; }

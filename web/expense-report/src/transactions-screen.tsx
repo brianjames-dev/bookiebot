@@ -12,7 +12,7 @@ import {InlineTransactionEditor,transactionMotion,type InlineSnapshot} from './t
 import {ChangeMotionContext,type ChangePlan} from './transaction-value-motion'
 import {preparePlacement,playPlacement,discardPlacement,type Placement} from './transaction-row-placement'
 import {UndoPopup,type UndoNotice} from './transaction-undo-popup'
-import {confirmedRows,motionValues,settledTransactionRow} from './transaction-feedback'
+import {confirmedRows,motionValues,settledTransactionRow,undoPresentationTarget} from './transaction-feedback'
 import {allocate,type SplitMethod} from './transaction-split-model'
 import type {SplitInputDraft} from "./transaction-split-control"
 import {DuoTransactionPane} from "./duo-transaction-pane"
@@ -68,6 +68,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
   const graphOpen=duoWide?duoGraphOpen:closedGraphOpen
   const setGraphOpen=duoWide?setDuoGraphOpen:setClosedGraphOpen
   const [month, setMonth] = useState(initialMonth)
+  useEffect(()=>setMonth(initialMonth),[initialMonth])
   const [search, setSearch] = useState("")
   useEffect(()=>{const request=navigation?.sourceRequest;if(active&&request?.section==='activity')navigation?.consumeSource?.(request.id)},[active,navigation?.sourceRequest?.id])
   const [filter,setFilter]=useState("all"),[day,setDay]=useState("")
@@ -87,7 +88,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
   const [announcement,setAnnouncement]=useState('')
   const inFlight = useRef(false), generation = useRef(0), mounted = useRef(true)
   const product = useRef<HTMLElement>(null),sequence=useRef(0),placement=useRef<Placement|null>(null),placementPlayer=useRef<ReturnType<typeof playPlacement>|null>(null)
-  const [commit,setCommit]=useState<{token:number;id:string;before:Listing;after:Listing;result:Result;phase:'closing'|'animating'|'placing'}|null>(null)
+  const [commit,setCommit]=useState<{token:number;id:string;before:Listing;after:Listing;result:Result;phase:'reading'|'closing'|'animating'|'placing';fresh?:boolean;targetId?:string}|null>(null)
   const [notice,setNotice]=useState<(UndoNotice&{undo?:{id:string;month:string}})|null>(null),[autoUndo,setAutoUndo]=useState(false)
   const ownChange=useRef(false)
   const facets = useRef<{categories:string[];persons:string[]}>({categories:[],persons:[]})
@@ -115,7 +116,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
     try { const saved = sessionStorage.getItem(storageKey); if (saved) { const body = JSON.parse(saved); if (body.requestId && body.id) {setPending(body); setResult({state: "running"})} } } catch {}
     return () => { mounted.current = false; ++sequence.current; placementPlayer.current?.finish(); discardPlacement(placement.current); loadAbort.current?.abort() }
   }, [storageKey])
-  const load = useCallback(async (offset = 0, append = false, fresh = false) => {
+  const load = useCallback(async (offset = 0, append = false, fresh = false, stage?: (next:Listing)=>void) => {
     const token = ++generation.current
     loadAbort.current?.abort(); const controller = new AbortController(); loadAbort.current = controller
     const query = new URLSearchParams({month, search, kind, category, split, scope, bucket, view:"daily", offset: String(offset),fresh:fresh ? "1" : ""})
@@ -130,9 +131,12 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
       }
       if(append&&listingRef.current?.snapshotVersion&&next.snapshotVersion!==listingRef.current.snapshotVersion)throw new Error("Recorded activity changed. Refresh Transactions before loading more.")
       manager.current.close?.(true)
-      setListing(previous => append && previous ? {...next, items: [...previous.items, ...next.items]} : next)
-      setDisplayScope({filter,month})
-      setNeedsFresh(false)
+      if(stage)stage(next)
+      else {
+        setListing(previous => append && previous ? {...next, items: [...previous.items, ...next.items]} : next)
+        setDisplayScope({filter,month})
+        setNeedsFresh(false)
+      }
       return true
     } catch (failure) { if (mounted.current && token === generation.current && !controller.signal.aborted) handleError(failure) }
     finally { if (mounted.current && token === generation.current) setLoading(false) }
@@ -206,7 +210,19 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
         setNeedsFresh(true)
         const before=listingRef.current,id=selected?.id
         manager.current.close?.();discard()
-        if(before&&id&&before.items.some(row=>row.id===id)&&next.summary&&next.summary.operation!=='undo'){
+        if(before&&next.summary?.operation==='undo'){
+          // Restore the canonical saved rows, including deleted entries and moved
+          // categories, through the same value-motion path as a forward edit.
+          const token=++sequence.current
+          setCommit({token,id:id??'',before,after:before,result:next,phase:'reading',fresh:true})
+          void load(0,false,true,after=>{
+            if(!mounted.current||sequence.current!==token)return
+            if(after.pendingCommand){setCommit(null);return}
+            setCommit({token,id:id??'',before,after,result:next,phase:'closing',fresh:true,targetId:undoPresentationTarget(before.items,after.items,id??'',next.summary!)})
+          }).then(loaded=>{
+            if(!loaded&&mounted.current&&sequence.current===token){setCommit(null);setResult(null);setError('Your change was saved. Refresh Transactions to see the current rows.')}
+          })
+        }else if(before&&id&&before.items.some(row=>row.id===id)&&next.summary){
           const afterItems=confirmedRows(before.items,id,next.summary)
           const old=before.items.find(row=>row.id===id)!,after=afterItems.find(row=>row.id===id),delta=(after?displayedAmount(after):0)-displayedAmount(old)
           const afterDays=before.days?.flatMap(day=>day.date===old.date&&day.month===old.month?day.count===1&&!after?[]:[{...day,count:day.count-(after?0:1),totalCents:day.totalCents+delta}]:[day])
@@ -238,13 +254,20 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
   const plan=useMemo<ChangePlan|null>(()=>{
     if(!commit||commit.phase!=='animating')return null
     const before=motionValues(commit.before.items,commit.before.days??[],aliases),after=motionValues(commit.after.items,commit.after.days??[],aliases)
+    if(commit.targetId&&commit.targetId!==commit.id){
+      const target='row:'+commit.targetId+':',source='row:'+commit.id+':'
+      for(const [key,value]of Object.entries(after.values))if(key.startsWith(target))after.values[source+key.slice(target.length)]=value
+      for(const [key,value]of Object.entries(after.colors))if(key.startsWith(target))after.colors[source+key.slice(target.length)]=value
+    }
+    if(commit.fresh)for(const key of Object.keys(after.values))if(!(key in before.values))before.values[key]=key.endsWith(':amount')?'$0.00':''
     return {token:commit.token,from:before.values,to:after.values,fromColors:before.colors,toColors:after.colors,timing:transactionMotion,promises:new Set()}
   },[commit?.token,commit?.phase])
-  async function finishFeedback(saved:Result){
+  async function finishFeedback(saved:Result,readBack?:Listing){
     setCommit(null);setResult(null);changed()
     setAnnouncement(saved.summary?.operation==='undo'?'Change undone':saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split saved':'Change saved')
     const currentSequence=sequence.current
-    const loaded=await load(0,false,true)
+    const loaded=readBack?true:await load(0,false,true)
+    if(readBack){setListing(readBack);setDisplayScope({filter,month});setNeedsFresh(false)}
     if(!mounted.current||currentSequence!==sequence.current)return
     if(saved.undo&&loaded){const seconds=transactionMotion.undoSeconds;setNotice({id:++sequence.current,title:saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split updated':'Purchase updated',deadline:Date.now()+seconds*1000,seconds,undo:saved.undo})}
     else if(!loaded)setError('Your change was saved. Refresh Transactions to see the current rows.')
@@ -252,20 +275,20 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
   useEffect(()=>{
     if(!commit)return
     let live=true
-    if(commit.phase==='closing')void settledTransactionRow(product.current,commit.id).then(()=>{if(live&&sequence.current===commit.token)setCommit({...commit,phase:'animating'})})
+    if(commit.phase==='closing')void settledTransactionRow(product.current,commit.id).then(()=>{if(live&&sequence.current===commit.token){if(commit.fresh&&(!commit.targetId||!commit.before.items.some(row=>row.id===commit.id)))setListing(commit.after);setCommit({...commit,phase:'animating'})}})
     else if(commit.phase==='animating')void Promise.allSettled([...(plan?.promises??[])]).then(()=>{
       if(!live||sequence.current!==commit.token)return
-      placement.current=preparePlacement(product.current,commit.id,commit.after.items,transactionMotion)
+      placement.current=preparePlacement(product.current,commit.targetId??commit.id,commit.after.items,transactionMotion,commit.id)
       setListing(commit.after)
       if(placement.current)setCommit({...commit,phase:'placing'})
-      else void finishFeedback(commit.result)
+      else void finishFeedback(commit.result,commit.fresh?commit.after:undefined)
     })
     return()=>{live=false}
   },[commit?.token,commit?.phase])
   useLayoutEffect(()=>{
     if(commit?.phase!=='placing'||!placement.current)return
     let live=true;const player=playPlacement(placement.current);placementPlayer.current=player
-    void player.finished.then(()=>{if(live&&sequence.current===commit.token){placement.current=null;placementPlayer.current=null;void finishFeedback(commit.result)}})
+    void player.finished.then(()=>{if(live&&sequence.current===commit.token){placement.current=null;placementPlayer.current=null;void finishFeedback(commit.result,commit.fresh?commit.after:undefined)}})
     return()=>{live=false;player.finish();placementPlayer.current=null;discardPlacement(placement.current);placement.current=null}
   },[commit?.token,commit?.phase])
   const categoryOptions = {...categories, ...Object.fromEntries((listing?.categories ?? facets.current.categories).filter(value=>!(value in categories)).map(value=>[value,value]))}
@@ -308,11 +331,12 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases}: {
       manager.current.close?.();if(group.querySelector('.bi-selected-row[data-editing="true"]')&&!busy&&!uncertain)discard()
     }else group.querySelectorAll<HTMLElement>('.bi-expansion[data-open="false"]').forEach(element=>element.getAnimations().forEach(animation=>animation.finish()))
   }
-  return <TransactionSwipeContext.Provider value={{manager:manager.current,rows,locked:locked||loading||Boolean(notice),onAction:begin,onManage:duoWide?manageDuo:undefined,selectedId:duoWide?selected?.id:undefined}}><section ref={product} className="bb-transactions bb-daily-spending-content bi-product" data-tone="sage" data-save-phase={commit?.phase??'idle'} onClickCapture={dayToggle} aria-label="Recorded transactions" aria-busy={loading} onPointerDownCapture={event=>{if(!(event.target as Element).closest('.bb-recorded-swipe'))manager.current.close?.()}}>
+  return <TransactionSwipeContext.Provider value={{manager:manager.current,rows,locked:locked||loading||Boolean(notice),onAction:begin,onManage:duoWide?manageDuo:undefined,selectedId:duoWide?selected?.id:undefined}}><section ref={product} className="bb-transactions bb-daily-spending-content bi-product" data-tone="sage" data-save-phase={commit?.phase??'idle'} onClickCapture={dayToggle} aria-label="Recorded transactions" aria-busy={loading||Boolean(commit)} onPointerDownCapture={event=>{if(!(event.target as Element).closest('.bb-recorded-swipe'))manager.current.close?.()}}>
     <div className="bi-workspace" inert={Boolean(notice)} data-duo-pane={duoWide&&selected&&!graphOpen?"editor":"graph"}>
     {duoWide&&selected&&<DuoTransactionPane row={selected} operation={operation} reviewing={Boolean(review)} graphOpen={graphOpen} locked={locked||loading} onOptions={()=>{setOperation(null);setReview(null);setReviewBody(null)}} onAction={op=>{begin(selected,op);setDuoGraphOpen(false)}} onGraph={()=>setDuoGraphOpen(value=>!value)} onClose={discard} editor={editorFor(selected)} status={status} aliases={aliases}/>}
-    <header className="bb-transactions-heading"><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={refreshDisabled} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
-    <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>
+    <header className="bb-transactions-heading" hidden={navigation?.monthHeader}><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={refreshDisabled} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
+    {navigation?.monthHeader?<div className="bb-transaction-period bb-transaction-scope"><span>{new Date(initialMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}</span><button type="button" aria-label="All recorded months" aria-pressed={month==='all'} disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setMonth(month==='all'?initialMonth:'all')}>All months</button></div>:
+    <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>}
     {listing && <DailySpendingChart graphOpen={graphOpen} graphHeading={duoWide?"Daily Spending":undefined} data={chart} total={total/100} filter={displayedFilter==='needs'||displayedFilter==='wants'?displayedFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={value=>{if(!loading&&!locked&&!operation&&!notice)setDay(previous=>previous===value?'':value)}} metricLabel={metricLabel} legendLabel={displayedFilter==='income'?'Income':displayedFilter==='savings'?'Savings':undefined}
       transactionControl={<div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div>}/>}
     <label className="bb-recorded-search"><Search aria-hidden="true"/><input type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder="Search transactions" maxLength={200} value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>setSearch(event.target.value)}/>{search&&<button type="button" aria-label="Clear search" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setSearch('')}><X aria-hidden="true"/></button>}</label>

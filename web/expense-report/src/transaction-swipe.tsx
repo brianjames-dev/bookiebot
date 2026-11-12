@@ -39,11 +39,11 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
   // reveal. Avoid retaining an identity 3D layer when nothing is moving.
   row.style.transform=Math.abs(value)>.1||closing?`translate3d(${value}px,0,0)`:'none'
   const access=el.querySelector<HTMLElement>('.bb-recorded-row-access')
-  if(access){access.style.transition=`transform ${transition}`;access.style.transform=`translate3d(${value}px,0,0)`}
+  if(access){access.style.transition=`transform ${transition}`;access.style.transform=Math.abs(value)>.1||closing?`translate3d(${value}px,0,0)`:'none'}
   // The existing day motion reads this invisible anchor on resize. Keep it
   // stationary while the visible row and persistent painted logo slide.
   const anchor=row.querySelector<HTMLElement>('.bb-daily-row-icon-anchor')!
-  if(!standalone){anchor.style.setProperty('transition',`transform ${transition}`,'important');anchor.style.transform=`translate3d(${-value}px,0,0)`}
+  if(!standalone){anchor.style.setProperty('transition',`transform ${transition}`,'important');anchor.style.transform=Math.abs(value)>.1||closing?`translate3d(${-value}px,0,0)`:'none'}
   if(bead){
    // Clip against a fixed row window. Animating an inset on the moving bead
    // erases it before it reaches the edge and lets it leak on the way back.
@@ -59,7 +59,7 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
    bead.style.translate=`${value}px 0`
    bead.style.clipPath=''
   }
-  if(closing)settleTimer.current=setTimeout(()=>{settleTimer.current=null;if(target.current!==0||!el.isConnected)return;el.dataset.side='closed';el.dataset.revealed='false';row.style.transition='none';row.style.transform='none';if(viewport)viewport.style.clipPath=''},duration+20)
+  if(closing)settleTimer.current=setTimeout(()=>{settleTimer.current=null;if(target.current!==0||!el.isConnected)return;el.dataset.side='closed';el.dataset.revealed='false';row.style.transition='none';row.style.transform='none';if(access){access.style.transition='none';access.style.transform='none'}anchor.style.transform='none';if(viewport)viewport.style.clipPath=''},duration+20)
   x.current=value
  }
  const close=(instant=false)=>{target.current=0;setSide(0);paint(0,!instant)}

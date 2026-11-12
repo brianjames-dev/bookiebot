@@ -11,15 +11,20 @@ const rows=(group:HTMLElement)=>[...group.querySelectorAll<HTMLElement>('.bi-sel
 
 // Read the old presentation only after every value effect has settled. A
 // closed day, unchanged sort position, or deletion needs no placement flight.
-export function preparePlacement(product:HTMLElement|null,id:string,after:RecordedTransaction[],timing:PlacementTiming):Placement|null{
+export function preparePlacement(product:HTMLElement|null,id:string,after:RecordedTransaction[],timing:PlacementTiming,previousId=id):Placement|null{
  if(!product||matchMedia('(prefers-reduced-motion: reduce)').matches)return null
- const row=product.querySelector<HTMLElement>(`[data-entry-id="${CSS.escape(id)}"]`),group=row?.closest<HTMLElement>('.bb-daily-day-group')
+ const row=product.querySelector<HTMLElement>(`[data-entry-id="${CSS.escape(previousId)}"]`),group=row?.closest<HTMLElement>('.bb-daily-day-group')
  if(!group||group.querySelector('.bb-daily-day-header')?.getAttribute('aria-expanded')!=='true'||group.dataset.moving==='true')return null
  const current=rows(group),next=recordedDays(after,[],after[0]?.month??'all').find(day=>day.entries.some(entry=>entry.id===id))
  if(!next||next.entries.length!==current.length||!next.entries.some(entry=>entry.id===id))return null
  const order=next.entries.map((entry,index)=>({entry,index,label:transactionCategory(entry).label})).sort((a,b)=>collator.compare(a.label,b.label)||a.index-b.index).map(({entry})=>entry.id)
- if(order.every((entry,index)=>entry===current[index].dataset.entryId))return null
- const origin=group.getBoundingClientRect(),before=new Map(current.map(node=>[node.dataset.entryId!,bounds(node,origin)]))
+ const presentationId=(node:HTMLElement)=>node.dataset.entryId===previousId?id:node.dataset.entryId!
+ // A fresh Undo read may also replace neighboring manual-sheet identities.
+ // Animate placement only when every destination has a captured origin.
+ const known=new Set(current.map(presentationId))
+ if(order.some(entry=>!known.has(entry!)))return null
+ if(order.every((entry,index)=>entry===presentationId(current[index])))return null
+ const origin=group.getBoundingClientRect(),before=new Map(current.map(node=>[presentationId(node),bounds(node,origin)]))
  // The native day scene still owns each bead's resting pose. Only the outer
  // row and its existing icon viewport receive temporary layout offsets.
  group.dataset.rowReordering='true'
