@@ -199,7 +199,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
-  return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape }}>
+  return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape, monthHeader:true }}>
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
       data-duo-enabled={duo.enabled || undefined}
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
@@ -213,9 +213,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </header>
 
 
-      <ReportHeader month={monthControl} projected={preferences.mode === "projected"}
+      <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screenTitles[screen]} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
-        disabled={!report} hidden={!reportVisible} />
+        disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
@@ -227,7 +227,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
-        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={`${report.year}-${String(report.month).padStart(2,"0")}`} />}
+        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}
@@ -236,7 +236,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <><SavingsGoals /><Investments report={report} ready={monthlyReady} /></>}
       </main>
       <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>
-        {report && <ReconciliationScreen controller={reconciliation} />}
+        {report && <ReconciliationScreen controller={reconciliation} embeddedHeader />}
       </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen}>
         {report && <><div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>

@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm')
 const {createRequire}=require('node:module'),req=createRequire(path.resolve('web/expense-report/package.json'))
 const React=req('react'),Renderer=req('react-test-renderer'),ts=req('typescript'),{act}=Renderer
-const requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map()
+const plans=[],requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map()
 let serial=0,tree,work,duoWide=false
 const SwipeContext=React.createContext(null)
 function ActionFixture({entry}){const ctx=React.useContext(SwipeContext),row=ctx.rows.get(entry.id);return ctx.onManage?React.createElement('button',{'aria-label':'Manage '+entry.id,disabled:ctx.locked,onClick:()=>ctx.onManage(row)},'Manage entry'):React.createElement('div',null,entry.item,['update','split','delete'].filter(op=>row.capabilities[op]).map(op=>React.createElement('button',{key:op,disabled:ctx.locked,onClick:()=>ctx.onAction(row,op)},op==='split'&&row.split?'Edit split':op[0].toUpperCase()+op.slice(1))))}
@@ -10,7 +10,7 @@ const presentation={
  './transaction-undo-popup':{UndoPopup:({notice,onUndo,onDismiss})=>React.createElement('div',{'aria-label':'Undo popup'},notice.title,React.createElement('button',{onClick:onUndo},'Undo'),React.createElement('button',{onClick:onDismiss},'Dismiss undo'))},
  './app-navigation':{useAppNavigation:()=>duoWide?{duoLandscape:true}:null},
  './transaction-swipe':{TransactionSwipeContext:SwipeContext,wrapTransactionRow:(entry)=>React.createElement(ActionFixture,{entry})},
- './daily-transactions':{TransactionIcon:()=>null,DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))},
+ './daily-transactions':{TransactionIcon:()=>null,DailyTransactionDays:({groups,wrapRow})=>{const plan=React.useContext(load(path.resolve('web/expense-report/src/transaction-value-motion.tsx')).ChangeMotionContext);if(plan&&plan!==plans.at(-1))plans.push(plan);return React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))}},
  './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
@@ -70,13 +70,18 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  const summary={operation:'update',title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:1234,before:row.fields,after:{...row.fields,amount:'22.00'}}
  await respond({state:'done',success:true,detail:'Raw Discord text must stay hidden',summary,undo:{month:row.month,id:row.month+':update-1'}})
  assert.match(latest().url,/fresh=1/,'Only a confirmed result advances to feedback and a fresh read')
- await respond(listing([{...row,amountCents:2200,fields:summary.after}]))
+ await respond(listing([{...row,id:row.month+':update-1',amountCents:2200,fields:summary.after}]))
  assert.equal(work.uncertain,false);assert.equal(work.pending,false);assert.ok(button('Undo'));assert.ok(!button('Undo last change'));assert.ok(!text(tree.toJSON()).includes('Raw Discord'))
  assert.ok(events.includes('bookiebot:transactions-changed'));assert.ok(events.includes('bookiebot:reimbursements-changed'))
  await click('Undo');assert.equal(body().operation,'undo');assert.equal(body().id,row.month+':update-1')
  const undoReview=review(body(),{...row,id:row.month+':update-1'});undoReview.review.restoration={operation:'update',current:summary.after,currentCategory:'Shopping',restoredCategory:'Shopping'}
  await respond(undoReview);assert.equal(latest().url,'/app/transactions');assert.equal(body().operation,'undo','Explicit timed Undo still obtains a fresh server review before confirmation')
- await respond({state:'done',success:true,summary:{...summary,operation:'undo'}});await respond(listing());assert.ok(!button('Undo'))
+ const beforeUndoPlans=plans.length
+ await respond({state:'done',success:true,summary:{...summary,operation:'undo',after:row.fields}});assert.equal(work.pending,true,'Undo remains guarded while its saved presentation is read')
+ await respond(listing());assert.ok(!button('Undo'))
+ assert.ok(plans.length>beforeUndoPlans,'Timed Undo must enter the shared animation pipeline')
+ assert.equal(plans.at(-1).from['row:'+row.month+':update-1:amount'],'$22.00')
+ assert.equal(plans.at(-1).to['row:'+row.month+':update-1:amount'],'$12.34','Undo animates canonical readback across action IDs')
  await change('Search transactions','cable');await tick();const old=latest();await change('Search transactions','payroll');await tick();const current=latest()
  await respond(listing([{...row,title:'Payroll fixture',fields:{...row.fields,item:'Payroll fixture'},id:'payroll'}]),200,current);await respond(listing(),200,old)
  const listText=text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'}));assert.match(listText,/Payroll fixture/);assert.ok(!listText.includes('Fixture cable'))
@@ -144,7 +149,17 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  await respond(listing([]));await run(()=>{for(const [id,timer]of[...timers])if(timer.ms===700){timers.delete(id);timer.fn()}})
  assert.ok(button('Undo'));await click('Undo');assert.equal(body().operation,'undo');await respond(review(body()))
  assert.ok(inPane(button('Confirm undo')),'Undo is right-side even when its source row is no longer listed')
- assert.equal(body().operation,'undo');await respond({state:'done',success:true,summary:{...summary,operation:'undo'}});await respond(listing());await run(()=>tree.unmount());duoWide=false
+ assert.equal(body().operation,'undo');await respond({state:'done',success:true,summary:{...summary,operation:'undo',after:row.fields}});await respond(listing())
+ assert.equal(plans.at(-1).from['row:'+row.id+':amount'],'$0.00','Restored deleted rows animate their entrance')
+ assert.equal(plans.at(-1).to['row:'+row.id+':amount'],'$12.34');await run(()=>tree.unmount());duoWide=false
+ await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing())
+ await run(()=>tree.update(React.createElement(TransactionsScreen,{active:true,ownerName:'Brian',initialMonth:'2026-09'})));await tick()
+ assert.match(latest().url,/month=2026-09/,'The shared report month must update the already-mounted Transactions controller')
+ await respond(listing([],{month:'2026-09'}));await run(()=>tree.unmount())
+ const {undoPresentationTarget}=load(path.resolve('web/expense-report/src/transaction-feedback.ts'))
+ const prior={...row,id:'latest-action'},restored={...row,id:'restored-parent'}
+ assert.equal(undoPresentationTarget([prior],[restored],prior.id,{...summary,operation:'undo',after:row.fields}),restored.id)
+ assert.equal(undoPresentationTarget([prior],[restored,{...restored,id:'identical-twin'}],prior.id,{...summary,operation:'undo',after:row.fields}),undefined)
  for(const {options}of requests){assert.equal(options.referrerPolicy,'same-origin');assert.equal(options.mode,'same-origin');assert.equal(options.credentials,'same-origin');assert.equal(options.headers['X-BookieBot-App'],'1')}
  console.log('Inline transaction review/cancel, combined Move, split cents/pie shortcut, explicit confirmation, immutable recovery, fresh reads, timed Undo handoff search races and Duo right-pane/fold/graph/draft recovery passed')
 })().catch(error=>{console.error(error);process.exitCode=1})

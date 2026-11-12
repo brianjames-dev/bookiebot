@@ -40,6 +40,7 @@ const compiled = ts.transpileModule(activityDay + "\n" + declarations.map(node =
 }).outputText
 const chartSurface = ({ children }) => React.createElement("div", null, children)
 const runtime = {
+  useAppNavigation: () => null,
   exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useLayoutEffect: React.useLayoutEffect, useId: React.useId,
   useRef: React.useRef, DailyTransactionDays: require("./load_frontend_module.cjs")("daily-transactions.tsx").DailyTransactionDays, memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
   CollapsibleContent: motionRuntime.exports.CollapsibleContent,

@@ -34,6 +34,7 @@ export function screenForReportSource(source: string): MainScreen {
 export interface AppNavigation {
   screen: AppScreen
   duoLandscape?: boolean
+  monthHeader?: boolean
   selectScreen: (screen: AppScreen) => void
   preferences: ReturnType<typeof useReportViewPreferences>
   sourceRequest: { section: string; id: number } | null

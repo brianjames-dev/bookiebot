@@ -15,7 +15,8 @@ async function resume(page){await page.evaluate(()=>{for(const a of document.que
 async function startExpansion(page,header){
  const beforeWillChange=await page.locator('.bb-daily-bead').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).willChange))
  await header.click()
- const handoff=await page.locator('.bb-daily-bead').evaluateAll(nodes=>({willChange:nodes.map(n=>getComputedStyle(n).willChange),redundantOpacity:nodes.flatMap(n=>n.getAnimations().filter(a=>{const frames=a.effect.getKeyframes();return frames.some(f=>'opacity' in f)&&frames.every(f=>Number(f.opacity)===1)})).length}))
+ const handoff=await page.locator('.bb-daily-bead').evaluateAll(nodes=>({willChange:nodes.map(n=>getComputedStyle(n).willChange),opaqueBase:nodes.every(n=>!getComputedStyle(n.querySelector('.bb-daily-bead-body'),'::before').backgroundColor.startsWith('rgba(')),redundantOpacity:nodes.flatMap(n=>n.getAnimations().filter(a=>{const frames=a.effect.getKeyframes();return frames.some(f=>'opacity' in f)&&frames.every(f=>Number(f.opacity)===1)})).length}))
+ assert.equal(handoff.opaqueBase,true,'Moving icons need an opaque round base so row text cannot show through their translucent tint')
  assert.equal(handoff.redundantOpacity,0,'Opaque preview icons must not acquire an opacity effect when motion starts')
  assert.deepEqual(handoff.willChange,beforeWillChange,'Starting motion must not change icon layer hints')
 }

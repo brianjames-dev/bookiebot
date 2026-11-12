@@ -2,6 +2,13 @@
 @property --bb-glass-reveal { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
 .bb-app-shell { --bb-nav-height: 86px; padding-bottom: calc(var(--bb-nav-height) + env(safe-area-inset-bottom, 0px) + 24px); }
 .bb-app-shell [hidden], .bb-app-shell .bb-main[hidden], .bb-app-shell .bb-page-header[hidden] { display: none !important; }
+.bb-page.bb-app-shell { background:hsl(var(--background)); }
+.bb-page.bb-app-shell > .bb-report-header { grid-template-rows:minmax(46px,auto); }
+.bb-page.bb-app-shell > .bb-report-header > .bb-report-context { min-height:44px; }
+/* Main tabs share the page surface; their contents do not paint full-width bands. */
+.bb-app-shell :is(.bb-shell-shared,.bb-shell-savings) > .bb-report-section { background:transparent; color:inherit; box-shadow:none; clip-path:none; }
+.bb-app-shell .bb-chart-carousel-band { background:transparent; box-shadow:none; clip-path:none; }
+.bb-app-shell .bb-investments-section::before { display:none; }
 .bb-app-shell .bb-shell-masthead { box-sizing: border-box; min-height: calc(max(18px, env(safe-area-inset-top, 0px)) + 64px); padding-top: max(18px, env(safe-area-inset-top, 0px)); padding-right: 114px; }
 .bb-app-shell .bb-shell-masthead .bb-wordmark { min-width: 0; }
 .bb-app-shell .bb-shell-masthead .bb-report-brand { min-width: 0; }
@@ -36,6 +43,7 @@
 .bb-app-shell .bb-report-content { min-width: 0; }
 .bb-app-shell .bb-main > .bb-report-screen > .bb-chart-carousel-band { margin: 0; }
 .bb-app-shell .bb-shell-shared, .bb-app-shell .bb-shell-savings { padding-top: 14px; }
+.bb-app-shell .bb-shell-transactions { padding-top:0; }
 .bb-app-shell .bb-shell-shared > .bb-report-section, .bb-app-shell .bb-shell-savings > .bb-report-section { margin-top: 0; }
 .bb-app-shell .bb-bottom-navigation { position: fixed; z-index: 50; left: 50%; bottom: 0; width: min(460px, 100%); transform: translateX(-50%); padding-inline: 22px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); height: auto; pointer-events: none; transition: width 420ms cubic-bezier(.22, 1, .36, 1); }
 .bb-app-shell .bb-bottom-navigation > div:last-child { height: 60px; padding: 0; width: 100%; gap: 0; transition: height 420ms cubic-bezier(.22, 1, .36, 1); }

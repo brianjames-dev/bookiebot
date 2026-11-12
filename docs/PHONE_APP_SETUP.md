@@ -64,7 +64,9 @@ Unfolded **Transactions** uses the same two physical pages: period, total, filte
 
 The overall comparison difference and both exact month totals stay visible after opening or folding, at the same compact scale in both poses.
 
-Turn the preference off to use the standard responsive layout. After updating from the Home Screen icon, verify both poses and both themes using acceptance checklist 273 (the user accepted the fold/scroll navbar behavior in checklist 269).
+Main-tab headings share Overview’s exact title font and position in both poses, including short landscape. Page names stay visible: **Transactions** opens the same month picker as Overview; **Shared**, **Savings** and **Reconcile** are plain headings and retain their existing all-month/lifetime scopes. Selecting a Transactions month updates its mounted list/graph controller and the shared report month. **All months** remains an explicit Transactions scope. The app uses one page/full-width section background in each theme. Daily Spending follows Overview’s fitted dollar-axis width and 8px inside plot margin. The list keeps a clear strip for its native scroll indicator, and moving company/fallback icons have an opaque round base inside their transparent overlap cutouts. A confirmed timed Undo reads its canonical saved rows, then plays the same reverse digit/text and row-position feedback, including when saved action IDs change.
+
+Turn the preference off to use the standard responsive layout. After updating from the Home Screen icon, verify both poses and both themes using acceptance checklist 274 (the user accepted the fold/scroll navbar behavior in checklist 269).
 
 ## Optional phone notifications
 

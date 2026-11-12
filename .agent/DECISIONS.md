@@ -1,5 +1,12 @@
 # Agent Decisions
 
+## 2026-11-11 - Common main-tab titles and canonical Undo feedback
+
+The user wants the five main tab headings in Overview's exact type and position, keeping page names. Following clarification, only Transactions adds the existing month picker; Overview retains it, while Shared, Savings and Reconcile keep plain names and their current all-month/lifetime data scopes. Reuse the existing header and responsive Duo masthead/heading variables, synchronize Transactions with the selected report month and retain its explicit All months scope. Unify app page/full-width section backgrounds; retain meaningful component/status styling and the accepted fixed glass dock.
+
+A confirmed Undo reads canonical saved rows before entering the same native digit/text/placement animation pipeline as a forward edit. Action-log IDs can change on restoration: pair presentation keys using the saved review and unique new canonical row, without changing row/request IDs or guessing ambiguous twins. Keep reads/animation guarded until authoritative rows are installed; failed reads require a fresh read before more actions. Original review/confirmation/idempotency/recovery and all writers remain unchanged. Moving logos get a solid page-color circular base inside their persistent clipping body; existing overlap geometry/cutout transparency remain. This prevents underlying row text from showing through translucent category/logo surfaces; the old renderer fails the same pixel case. No new animation abstraction or per-frame React rendering.
+
+
 ## 2026-11-11 - Approved Duo Transactions right-side actions
 
 The user approved the code-native two-page Transactions preview and its follow-up action/editor placement. Opted-in open landscape uses the existing physical fold/native-strip geometry: native period/total/filter/search and independently scrolling day groups left; Daily Spending right, clear of the accepted glass dock. A tapped entry replaces the graph with a right-side action chooser and the existing InlineTransactionEditor. All edit/category-change/split/delete/review/confirmation, uncertain-save controls and Undo stay right. The graph button peeks and returns to the same parent-owned draft; Back returns to the chooser and Cancel/close restores browsing. Keep raw split input with the parent draft so invalid text and validation also survive pane changes. Fold transfers a draft/review; unfolding a revealed closed swipe menu transfers it to the chooser.

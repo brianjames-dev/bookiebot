@@ -8,7 +8,7 @@ const shots=process.env.BOOKIEBOT_DUO_SHOTS;
 const poses=process.env.BOOKIEBOT_DUO_POSE?[process.env.BOOKIEBOT_DUO_POSE.split('x').map(Number)]:[[867,669],[951,648],[867,480],[800,480]];
 async function bounds(page){return page.evaluate(()=>{
  const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height}},page=document.querySelector('.bb-page'),list=document.querySelector('.bb-recorded-results');
- return {list:box('.bb-recorded-results'),title:box('.bb-transactions-heading'),graph:box('.bb-recorded-graph-reveal'),graphContent:box('.bb-daily-legend'),nav:box('.bb-navigation-pane'),pane:document.querySelector('.bb-duo-action-pane')?box('.bb-duo-action-pane'):null,paneContent:document.querySelector('.bb-duo-pane-content')?box('.bb-duo-pane-content'):null,scroll:[scrollY,page.scrollTop,page.scrollHeight,page.clientHeight],listScroll:[list.scrollHeight,list.clientHeight],viewport:[innerWidth,innerHeight]};
+ return {list:box('.bb-recorded-results'),title:box('.bb-report-header'),graph:box('.bb-recorded-graph-reveal'),graphContent:box('.bb-daily-legend'),nav:box('.bb-navigation-pane'),pane:document.querySelector('.bb-duo-action-pane')?box('.bb-duo-action-pane'):null,paneContent:document.querySelector('.bb-duo-pane-content')?box('.bb-duo-pane-content'):null,scroll:[scrollY,page.scrollTop,page.scrollHeight,page.clientHeight],listScroll:[list.scrollHeight,list.clientHeight],viewport:[innerWidth,innerHeight]};
 });}
 const stable=page=>page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false'&&document.querySelector('.bb-recorded-row-access'));
 ;(async()=>{let cases=0;

@@ -2327,6 +2327,7 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
 }
 
 function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void; legendLabel?: string }) {
+  const duoLandscape=useAppNavigation()?.duoLandscape===true
   const axis = dailySpendingAxis(data)
   const chartData = dailySpendingChartRows(data, axis)
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
@@ -2346,7 +2347,7 @@ function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: 
       >
         <div className="bb-chart-motion-surface" data-bb-chart-transition={reducedMotion ? "none" : "morph"}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
+            <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: duoLandscape ? 8 : 16, left: 0, bottom: 0 }}>
               <CartesianGrid
                 className="bb-daily-spending-grid"
                 vertical={false}
@@ -2370,7 +2371,7 @@ function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: 
                 tickFormatter={(value) => dailySpendingAxisTickLabel(Number(value), axis)}
                 tickLine={false}
                 axisLine={false}
-                width={58}
+                width={duoLandscape ? "auto" : 58}
               />
               <ChartTooltip content={<DailySpendingTooltipContent filter={filter} legendLabel={legendLabel} />} cursor={{ fill: dailySpendingCursorFill(filter) }} />
               {showStackedBars ? (

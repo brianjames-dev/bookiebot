@@ -4,6 +4,17 @@ import {transactionMerchant,transactionText} from './transaction-identity'
 import {recordedDays,recordedCategoryColors,type RecordedDay} from './recorded-transaction-view'
 const money=(cents:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100)
 
+/** Resolve only the animation target; canonical request IDs/rows stay untouched. */
+export function undoPresentationTarget(before:RecordedTransaction[],after:RecordedTransaction[],id:string,summary:TransactionChangeSummary){
+ if(after.some(row=>row.id===id))return id
+ const source=before.find(row=>row.id===id)
+ const known=new Set(before.map(row=>row.id))
+ const matches=after.filter(row=>(!source||row.month===source.month&&row.kind===source.kind)&&!known.has(row.id)&&Object.entries(summary.after).every(([key,value])=>key==='amount'
+  ?row.amountCents===Math.round(Number(value.replace(/[$,]/g,''))*100)
+  :(row.fields[key]??'').trim()===value.trim())&&(!summary.restoration||row.categoryLabel===summary.restoration.restoredCategory))
+ return matches.length===1?matches[0].id:undefined
+}
+
 /** Confirmed presentation only. The workspace stays locked until its fresh read. */
 export function confirmedRows(items:RecordedTransaction[],id:string,summary:TransactionChangeSummary){
  return summary.operation==='delete'?items.filter(row=>row.id!==id):items.map(row=>{
