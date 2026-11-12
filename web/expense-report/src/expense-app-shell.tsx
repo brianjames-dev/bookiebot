@@ -33,12 +33,11 @@ interface ExpenseAppShellProps {
   avatarUrl: string; initialVersion: string; signOut: () => void; signingOut: boolean
   monthlyReady?: boolean; questionMonth?: string
   onRefresh?: () => Promise<boolean>; reportBusy?: boolean
-  onSelectMonth?: (month:string) => void
 }
 export function ExpenseAppShell(props: ExpenseAppShellProps) {
   return <AmountAppearanceBoundary owner={props.report?.ownerName ?? props.ownerName ?? ""} enabled={Boolean(props.report)}><PageRefreshProvider><ExpenseAppShellContent {...props} /></PageRefreshProvider></AmountAppearanceBoundary>
 }
-function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false, onSelectMonth }: ExpenseAppShellProps) {
+function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false }: ExpenseAppShellProps) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const reconciliation = useReconciliation(Boolean(report))
   const owner = report?.ownerName ?? ownerName
@@ -237,7 +236,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
-        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} onSelectMonth={onSelectMonth} />}
+        {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
         {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}

@@ -69,7 +69,7 @@ const declarations=file.statements.filter(node=>ts.isFunctionDeclaration(node)?n
 assert.equal(declarations.length,names.size)
 const compiled=ts.transpileModule(declarations.map(node=>node.getText(file)).join('\n')+'\nexports.Pie=CategoryMixPieSurface; exports.Daily=DailySpendingChart',{
  compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText
-const runtime={exports:{},require:req,window:global.window,memo:React.memo,useState:React.useState,useEffect:React.useEffect,useAppNavigation:()=>null,
+const runtime={exports:{},require:req,window:global.window,memo:React.memo,useMemo:React.useMemo,useState:React.useState,useEffect:React.useEffect,useAppNavigation:()=>null,
 useDailySpendingSelection:require('./load_frontend_module.cjs')('daily-spending-selection.ts').useDailySpendingSelection,
 recordedDateLabel:require('./load_frontend_module.cjs')('recorded-transaction-view.ts').recordedDateLabel,
  categoryRingAnimation:helperRuntime.exports.categoryRingAnimation,stableBarAnimation,stableBarShape:props=>React.createElement(ObservedBar,props),

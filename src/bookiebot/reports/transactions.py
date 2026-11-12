@@ -346,15 +346,32 @@ def public_row(row: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in row.items() if not key.startswith("_")}
 
 
+def _daily_totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    days: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        amount = row.get("displayAmountCents", row["amountCents"])
+        key = row["date"] or row["month"] + ":undated"
+        day = days.setdefault(key, {"date": row["date"], "month": row["month"], "count": 0,
+                                   "totalCents": 0, "needsCents": 0, "wantsCents": 0})
+        day["count"] += 1
+        day["totalCents"] += amount
+        day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
+    return list(days.values())
+
+
 def listing(actor: str, query: Any) -> dict[str, Any]:
     month = query.get("month") or now_pacific().strftime("%Y-%m")
     if len(str(query.get("search", ""))) > 200:
         raise TransactionValidation("Use a search of up to 200 characters.")
     day = query.get("day", "")
+    day_month = ""
+    undated = day == "undated" or isinstance(day, str) and day.endswith(":undated")
     if day and day != "undated":
         try:
-            if not isinstance(day, str) or date.fromisoformat(day).isoformat() != day:
+            requested = day.removesuffix(":undated") + "-01" if undated else day
+            if not isinstance(requested, str) or date.fromisoformat(requested).isoformat() != requested:
                 raise ValueError()
+            day_month = requested[:7]
         except ValueError as exc:
             raise TransactionValidation("Choose a valid transaction date.") from exc
     rows = load_transactions(actor, month, fresh=query.get("fresh") == "1")
@@ -366,13 +383,18 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
             raise ValueError()
     except ValueError as exc:
         raise TransactionValidation("Choose a valid transactions page.") from exc
-    selected = [row for row in rows if (not kind or row["kind"] == kind) and (not category or row["category"] == category)
-        and (query.get("scope") != "spending" or row["kind"] in {"expense", "payment", "subscription"})
-        and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needs") == query["bucket"])
-        and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
-        and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
-                or word in {f"{row['amountCents'] / 100:.2f}", f"{row.get('displayAmountCents', row['amountCents']) / 100:.2f}"} for word in search)]
-    visible = [row for row in selected if not day or (not row["date"] if day == "undated" else row["date"] == day)]
+    def filtered(source: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [row for row in source if (not kind or row["kind"] == kind) and (not category or row["category"] == category)
+            and (query.get("scope") != "spending" or row["kind"] in {"expense", "payment", "subscription"})
+            and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needs") == query["bucket"])
+            and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
+            and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
+                    or word in {f"{row['amountCents'] / 100:.2f}", f"{row.get('displayAmountCents', row['amountCents']) / 100:.2f}"} for word in search)]
+    selected = filtered(rows)
+    cross_month = bool(day_month and month != "all" and day_month != month)
+    day_rows = filtered(load_transactions(actor, day_month, fresh=query.get("fresh") == "1")) if cross_month else selected
+    visible = [row for row in day_rows if not day or (not row["date"] if undated else row["date"] == day)
+               and (not undated or not day_month or row["month"] == day_month)]
     result = {"items": [public_row(row) for row in visible[offset:offset + 40]], "total": len(visible),
             "nextOffset": offset + 40 if len(visible) > offset + 40 else None,
             "categories": sorted({row["category"] for row in rows if row["category"]}),
@@ -380,17 +402,10 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
     if query.get("view") == "daily":
         # Aggregate the complete selected snapshot, not the visible 40-row page.
         # These are recorded sources only; no estimates acquire edit capabilities.
-        days: dict[str, dict[str, Any]] = {}
-        for row in selected:
-            amount = row.get("displayAmountCents", row["amountCents"])
-            key = row["date"] or row["month"] + ":undated"
-            day = days.setdefault(key, {"date": row["date"], "month": row["month"], "count": 0,
-                                       "totalCents": 0, "needsCents": 0, "wantsCents": 0})
-            day["count"] += 1
-            day["totalCents"] += amount
-            day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
-        result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected])
-        result["days"] = list(days.values())
+        result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected + (visible if cross_month else [])])
+        result["days"] = _daily_totals(selected)
+        if day:
+            result["listDays"] = _daily_totals(visible)
         result["totalAmountCents"] = sum(row.get("displayAmountCents", row["amountCents"]) for row in selected)
     return result
 

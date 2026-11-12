@@ -94,7 +94,6 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
       monthlyReady={Boolean(state.report)}
       onRefresh={refresh} reportBusy={busy}
       questionMonth={state.selectedMonth ?? history.catalog?.currentMonth ?? reportMonth}
-      onSelectMonth={selectMonth}
       controls={controls}
       initialVersion={config.version ?? ""}
       avatarUrl={avatarUrl}

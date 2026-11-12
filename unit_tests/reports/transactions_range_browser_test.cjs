@@ -2,10 +2,10 @@
 // models WebKit 322885; current desktop WebKit cannot prove physical iOS paint.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
 const {fixture,tap,engines,report}=require('./duo_layout_browser_test.cjs');
-const poses=process.env.BOOKIEBOT_DUO_POSE?[process.env.BOOKIEBOT_DUO_POSE.split('x').map(Number)]:[[382,657],[867,480],[867,669],[951,648]];
+const poses=process.env.BOOKIEBOT_DUO_POSE?[process.env.BOOKIEBOT_DUO_POSE.split('x').map(Number)]:[[320,657],[382,657],[466,678],[867,480],[867,669],[951,648]];
 const ledger=[];
 function add(date,location,category='food',amount=1000){const id='range-'+ledger.length;ledger.push({id,actionId:id,month:date.slice(0,7),version:'fixture-v1',date,title:'Fixture '+id,location,person:'Brian',kind:'expense',category,categoryLabel:category==='gas'?'Gas':'Food',amountCents:amount,split:'',fields:{item:'Fixture '+id},editableFields:[],capabilities:{},reasons:{}})}
-for(const month of ['2025-10','2025-11','2026-07','2026-08','2026-09','2026-10','2026-11'])add(month+'-20','Unknown fixture');
+for(const month of ['2025-10','2025-11','2026-07','2026-08','2026-09','2026-10','2026-11'])add(month+'-20','Unknown fixture','food',month==='2026-10'?365783:1000);
 add('2026-10-08','Chevron','gas');add('2026-10-08','Costco','gas');add('2026-10-10','Whole Foods','grocery');add('2026-10-10','Unknown fixture');
 for(let i=0;i<51;i++)add('2026-09-15','Fixture September '+i,'food',100+i);
 add('2026-09-02','Fixture other day');
@@ -28,14 +28,15 @@ im=Image.open(sys.argv[1]).convert('RGB');p=json.loads(sys.argv[2]);print(json.d
 ;(async()=>{let count=0;
 for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){
  const browser=await engine.launch({headless:true});try{for(const dark of [false,true])for(const [width,height]of poses){
-  const reads=[],state={fail:false};const {page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,0,{
-   report:url=>{const value=url.searchParams.get('month')||'2026-10';return{...structuredClone(report),year:Number(value.slice(0,4)),month:Number(value.slice(5)),monthLabel:new Date(value+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})}},
+  const reads=[],reportReads=[],state={fail:false};const {page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,0,{
+   report:url=>{const value=url.searchParams.get('month')||'2026-10';reportReads.push(value);return{...structuredClone(report),year:Number(value.slice(0,4)),month:Number(value.slice(5)),monthLabel:new Date(value+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})}},
    transactions:async route=>{
     assert.equal(route.request().method(),'GET','Graph/list interaction is read-only');const q=new URL(route.request().url()).searchParams;reads.push(Object.fromEntries(q));
     if(q.get('month')==='all'&&state.fail)return route.fulfill({status:503,json:{error:'Graph source offline fixture'}});
     const all=ledger.filter(row=>(q.get('month')==='all'||row.month===q.get('month'))&&(!q.get('bucket')||q.get('bucket')===(row.category==='food'?'wants':'needs'))).sort((a,b)=>b.date.localeCompare(a.date));
-    const visible=all.filter(row=>!q.get('day')||row.date===q.get('day')),offset=Number(q.get('offset')||0);
-    return route.fulfill({json:{items:visible.slice(offset,offset+40),total:visible.length,nextOffset:visible.length>offset+40?offset+40:null,days:days(all),totalAmountCents:all.reduce((sum,row)=>sum+row.amountCents,0),categories:['food','gas','grocery'],persons:['Brian'],month:q.get('month'),snapshotVersion:'fixture-'+q.get('month')+'-'+q.get('bucket')}});
+    const target=q.get('day')?.slice(0,7),listRows=target&&q.get('month')!=='all'?ledger.filter(row=>row.month===target&&(!q.get('bucket')||q.get('bucket')===(row.category==='food'?'wants':'needs'))):all;
+    const visible=listRows.filter(row=>!q.get('day')||row.date===q.get('day')),offset=Number(q.get('offset')||0);
+    return route.fulfill({json:{items:visible.slice(offset,offset+40),total:visible.length,nextOffset:visible.length>offset+40?offset+40:null,days:days(all),...(q.get('day')?{listDays:days(visible)}:{}),totalAmountCents:all.reduce((sum,row)=>sum+row.amountCents,0),categories:['food','gas','grocery'],persons:['Brian'],month:q.get('month'),snapshotVersion:'fixture-'+q.get('month')+'-'+q.get('bucket')+'-'+q.get('day')}});
    }
   });
   await tap(page,page.getByRole('button',{name:'Transactions',exact:true}));await page.locator('.bb-transactions .bb-daily-day-group').first().waitFor();await ready(page);
@@ -57,18 +58,32 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   await period.selectOption('3');await page.waitForFunction(()=>!document.querySelector('.bb-recorded-graph-status'));await graphReady(page);assert.equal(reads.at(-1).month,'all');
   assert.equal(await page.locator('.bb-transaction-list').innerText(),listBefore,'The range selector does not change the list');assert.equal(await page.locator('.bb-daily-amount-row').innerText(),total);
   const historyCount=reads.length;await period.selectOption('6');await graphReady(page);assert.equal(reads.length,historyCount,'Window changes reuse the full daily snapshot');await period.selectOption('12');await graphReady(page);
-  const renderedLabels=await page.locator('.bb-daily-spending-x-axis-label').allTextContents();assert(renderedLabels.some(label=>label.includes('Nov')),'The year-boundary window renders prior November');
+  const labels12=days(ledger.filter(r=>r.month>='2025-11'&&r.month<='2026-10')).map(d=>d.date).sort();
+  if(width<800)await page.locator('.bb-daily-plot').scrollIntoViewIfNeeded();
+  const priorNovember=await point(page,labels12,'2025-11-20');await page.mouse.move(priorNovember.x,priorNovember.y);await page.locator('.bb-chart-tooltip-title').filter({hasText:/Nov.*20.*2025/}).waitFor();
   await period.selectOption('3');await graphReady(page);
   const labels3=days(ledger.filter(r=>r.month>='2026-08'&&r.month<='2026-10')).map(d=>d.date).sort();
   if(width<800)await page.locator('.bb-daily-plot').scrollIntoViewIfNeeded();
+  const firstAugust=await point(page,labels3,'2026-08-20');await page.mouse.move(firstAugust.x,firstAugust.y);await page.locator('.bb-chart-tooltip-title').filter({hasText:/Aug.*20.*2026/}).waitFor();
+  const graphSnapshot=()=>page.locator('.bb-daily-plot').evaluate(el=>({x:[...el.querySelectorAll('.bb-daily-spending-x-axis-label')].map(n=>n.textContent),bars:[...el.querySelectorAll('.recharts-bar-rectangles path')].map(n=>n.getAttribute('d'))}));
+  const graphBeforeDay=await graphSnapshot(),reportBeforeDay=[...reportReads],readsBeforeDay=reads.length;
+  await page.evaluate(()=>window.__dayFilterGraph=document.querySelector('.bb-daily-plot .recharts-wrapper'));
+  if(width<800){const compact=await page.locator('.bb-recorded-graph-range').evaluate(el=>{const range=el.getBoundingClientRect(),controls=document.querySelector('.bb-recorded-summary-controls').getBoundingClientRect(),amount=document.querySelector('.bb-daily-amount-row').firstElementChild.getBoundingClientRect();return{gap:range.top-controls.bottom,amountGap:controls.left-amount.right,rangeRight:range.right,width:innerWidth,targets:[el.querySelector('select'),document.querySelector('.bb-recorded-graph-toggle'),document.querySelector('.bb-recorded-summary-controls select')].map(n=>n.getBoundingClientRect().height)}});assert(compact.gap>=12,'Compact controls have a separate range row with 12px clearance: '+JSON.stringify(compact));assert(compact.amountGap>=8&&compact.rangeRight<=compact.width-12,'Filters fit beside a four-digit total and inside the usable content');assert(compact.targets.every(h=>h>=44),'Comfortable touch targets remain intact')}
+  if(width<800)await page.locator('.bb-daily-plot').scrollIntoViewIfNeeded();
   const from=await point(page,labels3,'2026-08-20'),to=await point(page,labels3,'2026-09-15');
   if(engine.name()==='chromium'&&width===867&&height===669&&!dark)await touchScrub(page,from,to);else await scrub(page,from,to);
-  await page.waitForFunction(()=>document.querySelector('.bb-transaction-scope')?.textContent==='September 2026');await page.getByRole('button',{name:/Sep 15/}).waitFor();await ready(page);
-  assert(reads.some(r=>r.month==='2026-09'&&r.day==='2026-09-15'),'Release selects the final date and jumps the list month');assert.equal(await period.inputValue(),'3');
+  const chip=page.getByRole('button',{name:/Clear date filter.*Sep 15.*2026/});await chip.waitFor();await page.waitForFunction(()=>document.querySelector('.bb-transaction-list .bb-daily-day-header')?.getAttribute('aria-label').includes('51 entries'));await ready(page);
+  assert.equal(await page.locator('.bb-transaction-scope').innerText(),'October 2026','Inspecting another month retains the selected period');
+  assert(reads.some(r=>r.month==='2026-10'&&r.day==='2026-09-15'),'Release adds an exact-day list filter under the original period');assert.equal(await period.inputValue(),'3');
+  assert.deepEqual(reportReads,reportBeforeDay,'A date chip never selects or fetches another report month');
+  assert.equal(await page.locator('.bb-daily-amount-row').innerText(),total,'The original monthly total stays visible');
+  assert.deepEqual(await graphSnapshot(),graphBeforeDay,'The graph data and window stay unchanged');
+  assert(await page.evaluate(()=>window.__dayFilterGraph===document.querySelector('.bb-daily-plot .recharts-wrapper')),'Day inspection preserves the mounted graph');
+  assert(reads.slice(readsBeforeDay).every(r=>r.month==='2026-10'),'A day filter does not refetch/reanchor graph history');
   await page.locator('.bb-daily-day-header').click();await page.waitForFunction(()=>document.querySelector('.bb-daily-day-group')?.dataset.moving==='false');assert.equal(await page.locator('.bb-transaction-list [data-entry-id]').count(),40);await page.getByRole('button',{name:'Load more transactions',exact:true}).click();await ready(page);assert.equal(await page.locator('.bb-transaction-list [data-entry-id]').count(),51,'A chosen date remains complete beyond the first page');
-  assert.equal(await page.getByRole('button',{name:/Sep 15/}).count(),1,'The follow-up click cannot undo drag selection');
-  await page.getByRole('button',{name:/Sep 15/}).click();await ready(page);await period.selectOption('0');await graphReady(page);
-  state.fail=true;await period.selectOption('3');await page.getByRole('alert').getByText('Graph source offline fixture',{exact:true}).waitFor();assert.equal(await page.locator('.bb-transaction-scope').innerText(),'September 2026');state.fail=false;await page.getByRole('button',{name:'Retry graph',exact:true}).click();await graphReady(page);
+  assert.equal(await page.getByRole('button',{name:/Clear date filter.*Sep 15/}).count(),1,'The follow-up click cannot undo drag selection');
+  await chip.click();await page.waitForFunction(()=>!document.querySelector('.bb-recorded-day-chip'));await page.waitForFunction(expected=>document.querySelector('.bb-transaction-list')?.innerText===expected,listBefore);await ready(page);assert.equal(await page.locator('.bb-transaction-scope').innerText(),'October 2026');assert.equal(await page.locator('.bb-transaction-list').innerText(),listBefore);assert.deepEqual(await graphSnapshot(),graphBeforeDay);assert.equal(await page.locator('.bb-daily-amount-row').innerText(),total);await period.selectOption('0');await graphReady(page);
+  state.fail=true;await period.selectOption('3');await page.getByRole('alert').getByText('Graph source offline fixture',{exact:true}).waitFor();assert.equal(await page.locator('.bb-transaction-scope').innerText(),'October 2026');state.fail=false;await page.getByRole('button',{name:'Retry graph',exact:true}).click();await graphReady(page);
   if(process.env.BOOKIEBOT_DUO_SHOTS)await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`transactions-range-${engine.name()}-${width}x${height}-${dark?'dark':'light'}.png`)});
   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);await page.close();count++;console.log('PASS range/release/backing',engine.name(),width,height,dark?'dark':'light');
  }}finally{await browser.close()}

@@ -2333,8 +2333,8 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
 function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void; legendLabel?: string }) {
   const {click,...selection}=useDailySpendingSelection(data.map(row=>row.label),onInspectDay)
   const duoLandscape=useAppNavigation()?.duoLandscape===true
-  const axis = dailySpendingAxis(data)
-  const chartData = dailySpendingChartRows(data, axis)
+  const axis = useMemo(() => dailySpendingAxis(data), [data])
+  const chartData = useMemo(() => dailySpendingChartRows(data, axis), [data, axis])
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
   const showStackedBars = filter === "all" && !legendLabel
   const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"

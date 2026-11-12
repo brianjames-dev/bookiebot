@@ -3,6 +3,7 @@ import json
 import os
 import pytest
 from pathlib import Path
+from unittest.mock import Mock
 from bookiebot.reports import transactions as tx
 from unit_tests.reports.test_transactions import saved, access, row, B  # shared isolated fixtures
 
@@ -59,3 +60,42 @@ def test_workspace_filters_aggregate_recorded_rows_and_export_browser_samples(sa
     output=os.environ.get('BOOKIEBOT_TRANSACTION_WORKSPACE_FIXTURES')
     if output and isinstance(saved.access,tx.PostgresAppAccessStore) is False:
         Path(output).write_text(json.dumps({'month':saved.month,'results':results,'sources':[tx.public_row(value) for value in sources]}))
+
+
+def test_day_filter_reads_another_month_without_changing_period(saved, monkeypatch):
+    base = row(saved)
+    other_month = '2025-12'
+    period_rows = [{**base, 'id': saved.month + ':period', 'version': 'period-v1',
+                    'date': saved.month + '-20', 'amountCents': 9000, 'displayAmountCents': 6000}]
+    other_rows = [{**base, 'id': f'{other_month}:day-{i}', 'month': other_month,
+                   'date': other_month + '-15', 'version': f'day-v1-{i}',
+                   'amountCents': 200, 'displayAmountCents': 100} for i in range(45)]
+    other_rows.append({**other_rows[0], 'id': other_month + ':undated', 'date': ''})
+    reader = Mock(side_effect=lambda actor, month, **kwargs:
+                  period_rows + other_rows if month == 'all' else period_rows if month == saved.month else other_rows)
+    monkeypatch.setattr(tx, 'load_transactions', reader)
+    query = {'month': saved.month, 'view': 'daily', 'scope': 'spending'}
+    original = tx.listing(B, query)
+    selected = tx.listing(B, {**query, 'day': other_month + '-15'})
+    assert selected['month'] == saved.month
+    assert selected['days'] == original['days']
+    assert selected['totalAmountCents'] == original['totalAmountCents'] == 6000
+    assert selected['listDays'][0]['count'] == 45 and selected['listDays'][0]['totalCents'] == 4500
+    assert selected['total'] == 45 and len(selected['items']) == 40
+    assert all(value['month'] == other_month and value['date'] == other_month + '-15' for value in selected['items'])
+    page = tx.listing(B, {**query, 'day': other_month + '-15', 'offset': '40'})
+    assert len(page['items']) == 5 and page['nextOffset'] is None
+    assert page['snapshotVersion'] == selected['snapshotVersion']
+    assert page['listDays'] == selected['listDays']
+    other_rows[0]['version'] = 'day-v2'
+    assert tx.listing(B, {**query, 'day': other_month + '-15'})['snapshotVersion'] != selected['snapshotVersion']
+    assert tx.listing(B, query)['snapshotVersion'] == original['snapshotVersion']
+    for period in [saved.month, 'all']:
+        undated = tx.listing(B, {**query, 'month': period, 'day': other_month + ':undated'})
+        assert [value['id'] for value in undated['items']] == [other_month + ':undated']
+    reader.reset_mock()
+    with pytest.raises(tx.TransactionValidation, match='valid transaction date'):
+        tx.listing(B, {**query, 'day': '2026-13:undated'})
+    reader.assert_not_called()
+    restored = tx.listing(B, query)
+    assert restored == original

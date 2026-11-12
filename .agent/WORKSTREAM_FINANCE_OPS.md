@@ -4,6 +4,10 @@ Last updated: 2026-11-11
 
 ## Goal
 
+### Transactions day-only inspection and compact controls — 2026-11-11
+
+Completed the requested follow-up: graph date selection adds a removable full-date list filter without changing the shared month, period total or graph/window. This supersedes the earlier month-jump choice below. Compose existing authenticated period/day reads with identical filters, full day metadata before pagination and snapshot versions covering both sources. Historical-row reviews retain canonical row months; their feedback cannot change another period’s headline. Closed controls separate the range row by 12px with 44px targets. Full local **2,967 passed / 588 optional PostgreSQL skipped**, clean Python/frontend types and **24 Chromium/WebKit range/date-pagination/control cases** plus existing fold/dock checks pass. Native acceptance is STATUS checklist 277; final CI/merge/live evidence belongs to the task PR. Financial commands, schema, reconciliation and broader backlog remain unchanged. No live financial test writes.
+
 ### Transactions graph ranges, scrubbing and round backing — 2026-11-11
 
 Completed the requested presentation/read slice: graph-only 3/6/12-month windows use existing complete recorded-day aggregates; releasing on a date selects it and, per user clarification, switches the list/shared month. Add validated exact-day filtering before pagination while preserving complete period aggregates/snapshot lineage. Separate graph reads/errors/retries cannot detach drafts or write financial records. Keep the toolbar in the original collapse wrapper, tighten caption/legend gaps and bound round icon backing without changing overlap geometry or animation ownership. Native acceptance and verification/release evidence are STATUS checklist 276 and the task PR. Financial confirmation/recovery, writers, reconciliation lifecycle, schema and broader backlog remain unchanged. No live financial test writes.
