@@ -19,6 +19,10 @@ export function preparePlacement(product:HTMLElement|null,id:string,after:Record
  if(!next||next.entries.length!==current.length||!next.entries.some(entry=>entry.id===id))return null
  const order=next.entries.map((entry,index)=>({entry,index,label:transactionCategory(entry).label})).sort((a,b)=>collator.compare(a.label,b.label)||a.index-b.index).map(({entry})=>entry.id)
  const presentationId=(node:HTMLElement)=>node.dataset.entryId===previousId?id:node.dataset.entryId!
+ // A fresh Undo read may also replace neighboring manual-sheet identities.
+ // Animate placement only when every destination has a captured origin.
+ const known=new Set(current.map(presentationId))
+ if(order.some(entry=>!known.has(entry!)))return null
  if(order.every((entry,index)=>entry===presentationId(current[index])))return null
  const origin=group.getBoundingClientRect(),before=new Map(current.map(node=>[presentationId(node),bounds(node,origin)]))
  // The native day scene still owns each bead's resting pose. Only the outer

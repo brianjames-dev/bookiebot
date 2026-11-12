@@ -29,7 +29,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
     if(url.pathname.endsWith('/review'))return reply({review});
     assert.equal(url.pathname,'/app/transactions');assert.equal(body.reviewVersion,review.reviewVersion);commands.push(body);
     const summary={...review,title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:row.amountCents,before:row.fields};
-    if(body.operation==='undo')stores.set(row.month,undo.rows);
+    if(body.operation==='undo')stores.set(row.month,undo.rows.map((r,i)=>process.env.BOOKIEBOT_TEST_EXTRA_ID_CHANGE&&i===1?{...r,id:r.id+'-shifted'}:r));
     else{undo={row,id:row.id+'-saved',rows:structuredClone(rows(row.month))};stores.set(row.month,rows(row.month).map(r=>r.id===row.id?{...r,id:undo.id,fields:review.after,amountCents:body.updates.amount,category:body.destination||r.category,categoryLabel:body.destination?'Shopping':r.categoryLabel}:r));}
     return reply({state:'done',success:true,summary,...(body.operation==='undo'?{}:{undo:{month:row.month,id:undo.id}})});
    }
@@ -62,14 +62,14 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
    assert(paint.gap>=8,'The native scroll indicator has a clear strip above row paint');assert.equal(paint.isolation,'isolate');assert.equal(paint.access,'none');
    await page.getByRole('button',{name:/^Edit Starbucks/}).click();
   }else{await access.press('ArrowLeft');await page.getByRole('button',{name:'Update Starbucks Coffee Company',exact:true}).click();}
-  const editor=page.getByRole('region',{name:'Edit transaction',exact:true});await editor.getByRole('textbox',{name:'Amount',exact:true}).fill('12.75');await editor.getByRole('textbox',{name:'Item',exact:true}).fill('Changed fixture');
+  const editor=page.getByRole('region',{name:'Edit transaction',exact:true});await editor.getByRole('textbox',{name:'Amount',exact:true}).fill('12.75');await editor.getByRole('textbox',{name:'Item',exact:true}).fill('Changed fixture');await editor.getByRole('combobox',{name:'Update category',exact:true}).selectOption('shopping');
   await editor.getByRole('button',{name:'Review change',exact:true}).click();await editor.getByRole('button',{name:'Confirm update',exact:true}).click();
   const popup=page.getByRole('dialog',{name:'Purchase updated',exact:true});await popup.waitFor();await popup.getByRole('button',{name:'Undo',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.bb-transactions')?.dataset.savePhase==='animating');
   const change=page.locator('[data-change-key="row:'+sample.id+'-saved:amount"]');assert.equal(await change.getAttribute('data-value'),money(sample.amountCents));
   assert(await change.evaluate(el=>el.getAnimations({subtree:true}).length)>0,'Undo runs the digit reel animations');
   assert.equal(await page.locator('[data-change-key="row:'+sample.id+'-saved:item"]').getAttribute('data-change-state'),'text','Undo also animates changed descriptions');
-  await ready();assert.equal(commands.length,2);assert.deepEqual(commands.map(c=>c.operation),['update','undo']);
+  await ready();assert.equal(commands.length,2);assert.deepEqual(commands.map(c=>c.operation),['move','undo']);
   assert.equal(rows('2026-10')[0].fields.item,sample.fields.item);assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
   if(process.env.BOOKIEBOT_DUO_SHOTS){fs.mkdirSync(process.env.BOOKIEBOT_DUO_SHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.BOOKIEBOT_DUO_SHOTS,`polish-${engine.name()}-${width}x${height}-${dark?'dark':'light'}.png`)});}
   await page.close();count++;console.log('PASS Duo polish',engine.name(),width,height,dark?'dark':'light');
