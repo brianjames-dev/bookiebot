@@ -24,6 +24,8 @@ import { burnRateBalance, burnRateTooltipOccluders, positionBurnRateTooltip } fr
 import { CashflowCalendar, CalendarDayDetails, type CalendarSelection } from "./cashflow-calendar"
 import "./cashflow-calendar.css"
 import { useChartSwipe } from "./chart-swipe"
+import { useDailySpendingSelection } from "./daily-spending-selection"
+import { recordedDateLabel } from "./recorded-transaction-view"
 import { categoryRingAnimation, stableBarAnimation, stableBarShape, StablePieSector, type AnimatedPieSector } from "./chart-animation"
 import { ReportScreen, useAppNavigation } from "./app-navigation"
 import { ReportBrand, ReportHeader } from "./report-header"
@@ -2299,7 +2301,7 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   </>
 }
 
-export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel, graphOpen }: {
+export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel, graphOpen, graphControls, graphStatus, graphBusy = false }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total: number
@@ -2311,10 +2313,13 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
   metricLabel?: string
   legendLabel?: string
   graphOpen?: boolean
+  graphControls?: ReactNode
+  graphStatus?: ReactNode
+  graphBusy?: boolean
 }) {
   const plot = <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} legendLabel={legendLabel} />
   return <div className="bb-chart-layout">
-    {graphOpen === undefined ? plot : <div id={`${detailsId}-graph`} className="bb-recorded-graph-reveal" data-open={graphOpen} aria-hidden={!graphOpen} inert={!graphOpen}><div className="bb-recorded-graph-clip">{plot}</div></div>}
+    {graphOpen === undefined ? plot : <div id={`${detailsId}-graph`} className="bb-recorded-graph-reveal" data-open={graphOpen} aria-hidden={!graphOpen} inert={!graphOpen}><div className="bb-recorded-graph-clip" aria-busy={graphBusy}>{graphControls}{graphStatus || plot}</div></div>}
     <div className="bb-chart-side bb-daily-summary">
       <div className="bb-chart-kicker">{metricLabel}</div>
       <div className="bb-daily-amount-row" data-open={detailsOpen}>
@@ -2326,6 +2331,7 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
 }
 
 function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void; legendLabel?: string }) {
+  const {click,...selection}=useDailySpendingSelection(data.map(row=>row.label),onInspectDay)
   const duoLandscape=useAppNavigation()?.duoLandscape===true
   const axis = dailySpendingAxis(data)
   const chartData = dailySpendingChartRows(data, axis)
@@ -2344,9 +2350,9 @@ function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: 
         }
         className="bb-chart-box"
       >
-        <div className="bb-chart-motion-surface" data-bb-chart-transition={reducedMotion ? "none" : "morph"}>
+        <div className="bb-chart-motion-surface" data-bb-chart-transition={reducedMotion ? "none" : "morph"} {...selection}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} onClick={(state) => { if (state?.activeLabel !== undefined) onInspectDay(String(state.activeLabel)) }} margin={{ top: 12, right: duoLandscape ? 8 : 16, left: 0, bottom: 0 }}>
+            <BarChart data={chartData} onClick={(state,event) => click(state?.activeLabel,event?.detail===0)} margin={{ top: 12, right: duoLandscape ? 8 : 16, left: 0, bottom: 0 }}>
               <CartesianGrid
                 className="bb-daily-spending-grid"
                 vertical={false}
@@ -2356,7 +2362,7 @@ function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: 
               />
               <XAxis
                 dataKey="label"
-                tickFormatter={(value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? new Date(String(value) + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : String(value)}
+                tickFormatter={(value) => recordedDateLabel(String(value))}
                 tick={{ className: "bb-daily-spending-x-axis-label", fill: DAILY_SPENDING_BOUNDARY_COLOR }}
                 tickLine={false}
                 axisLine={false}
@@ -2546,7 +2552,7 @@ function DailySpendingTooltipContent({
 
   return (
     <div className="bb-chart-tooltip bb-touch-tooltip-content">
-      <div className="bb-chart-tooltip-title">Day {point.label}</div>
+      <div className="bb-chart-tooltip-title">{recordedDateLabel(String(point.label),true)}</div>
       {rows.map((item, index) => (
         <div className="bb-chart-tooltip-row" key={`${item.label}-${item.amount}-${index}`}>
           <span className="bb-chart-tooltip-dot" style={{ background: item.color }} />

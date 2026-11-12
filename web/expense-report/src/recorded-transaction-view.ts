@@ -21,5 +21,19 @@ export function recordedDays(rows:RecordedTransaction[],days:RecordedDay[],month
  return [...grouped].map(([key,entries])=>{const period=entries[0].month,meta=days.find(d=>(d.date||d.month+':undated')===key);return{key,day:entries[0].date?String(Number(entries[0].date.slice(-2))):'No date',entries:entries.map(recordedEntry),today:key===today,count:meta?.count??entries.length,total:(meta?.totalCents??entries.reduce((sum,row)=>sum+displayedAmount(row),0))/100,year:Number(period.slice(0,4)),month:Number(period.slice(5)),caption:month==='all'?new Date(period+'-01T12:00:00').toLocaleDateString(undefined,{month:'short',year:'2-digit'}):undefined}})
 }
 export function recordedChart(days:RecordedDay[],month:string){
- return [...days].sort((a,b)=>(a.date||a.month+'-99').localeCompare(b.date||b.month+'-99')).map(day=>({label:day.date?(month==='all'?day.date:String(Number(day.date.slice(-2)))):'Undated',amount:day.totalCents/100,needsAmount:day.needsCents/100,wantsAmount:day.wantsCents/100}))
+ return [...days].sort((a,b)=>(a.date||a.month+'-99').localeCompare(b.date||b.month+'-99')).map(day=>({label:day.date?(month==='all'?day.date:String(Number(day.date.slice(-2)))):month==='all'?day.month+':undated':'Undated',amount:day.totalCents/100,needsAmount:day.needsCents/100,wantsAmount:day.wantsCents/100}))
+}
+
+/** Calendar months ending in the selected report month; never paginate the graph. */
+export function recordedChartWindow(days:RecordedDay[],endingMonth:string,months:number){
+ const [year,month]=endingMonth.split('-').map(Number),end=year*12+month-1,start=end-months+1
+ return recordedChart(days.filter(day=>{const [y,m]=day.month.split('-').map(Number),index=y*12+m-1;return index>=start&&index<=end}),'all')
+}
+
+export function recordedDateLabel(value:string,full=false){
+ if(/^\d{4}-\d{2}(?:-\d{2}|:undated)$/.test(value)){
+  const undated=value.endsWith(':undated'),date=new Date((undated?value.slice(0,7)+'-01':value)+'T12:00:00')
+  return date.toLocaleDateString(undefined,{month:'short',...(!undated?{day:'numeric' as const}:{}),...(full?{year:'numeric' as const}:{})})+(undated?' · undated':'')
+ }
+ return full&&/^\d{1,2}$/.test(value)?'Day '+value:value
 }

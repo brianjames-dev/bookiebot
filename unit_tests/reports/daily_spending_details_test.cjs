@@ -41,6 +41,8 @@ const compiled = ts.transpileModule(activityDay + "\n" + declarations.map(node =
 const chartSurface = ({ children }) => React.createElement("div", null, children)
 const runtime = {
   useAppNavigation: () => null,
+  useDailySpendingSelection: require('./load_frontend_module.cjs')('daily-spending-selection.ts').useDailySpendingSelection,
+recordedDateLabel:require('./load_frontend_module.cjs')('recorded-transaction-view.ts').recordedDateLabel,
   exports: {}, require: req, useState: React.useState, useEffect: React.useEffect, useLayoutEffect: React.useLayoutEffect, useId: React.useId,
   useRef: React.useRef, DailyTransactionDays: require("./load_frontend_module.cjs")("daily-transactions.tsx").DailyTransactionDays, memo: React.memo, useMemo: React.useMemo, useCallback: React.useCallback,
   CollapsibleContent: motionRuntime.exports.CollapsibleContent,
@@ -140,3 +142,12 @@ update({ month: 9 })
 assert.equal(select().props.value, "", "Month changes reset the category selection")
 act(() => renderer.unmount())
 console.log("Daily spending Details: full list, category filters, totals, scope changes and day inspection passed")
+
+let disclosureFixture
+act(()=>{disclosureFixture=create(React.createElement(runtime.DailySpendingChart,{data:[],total:0,filter:'all',detailsOpen:true,detailsId:'fixture-chart',onToggleDetails(){},onInspectDay(){},graphOpen:false,graphControls:React.createElement('button',null,'Graph period'),graphStatus:React.createElement('p',null,'Graph unavailable'),graphBusy:false}))})
+const reveal=disclosureFixture.root.findByProps({className:'bb-recorded-graph-reveal'})
+assert.equal(reveal.children.length,1,'Graph controls must remain inside the existing single collapse wrapper')
+assert.equal(reveal.children[0].props.className,'bb-recorded-graph-clip')
+assert.equal(reveal.children[0].findByType('button').children.join(''),'Graph period')
+assert.equal(reveal.children[0].props['aria-busy'],false,'An error is a terminal state, not an endlessly busy graph')
+act(()=>disclosureFixture.unmount())

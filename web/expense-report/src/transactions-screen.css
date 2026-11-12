@@ -3,7 +3,16 @@
 .bb-recorded-results { display:contents; }
 .bb-transaction-scope { min-height:20px; line-height:20px; color:hsl(var(--muted-foreground)); font-size:12px; }
 /* Keep the common header geometry stable for native tab scroll restoration. */
-.bb-transactions .bb-transaction-scope { margin-top:-10px; }
+.bb-transactions .bb-transaction-scope { margin-top:-20px; }
+.bb-transactions .bb-daily-legend { padding:4px 0; }
+.bb-recorded-graph-controls { display:flex; justify-content:flex-end; align-items:center; min-height:44px; }
+.bb-recorded-graph-range { position:relative; display:flex; align-items:center; color:hsl(var(--foreground)); }
+.bb-recorded-graph-range select { appearance:none; font:inherit; font-size:13px; color:inherit; background:hsl(var(--foreground) / .045); border:1px solid hsl(var(--border)); border-radius:22px; min-height:44px; max-width:100%; padding:8px 32px 8px 14px; }
+.bb-recorded-graph-range>svg { position:absolute; right:12px; width:14px; height:14px; pointer-events:none; }
+.bb-recorded-graph-status { height:100%; min-height:120px; display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; color:hsl(var(--muted-foreground)); font-size:13px; text-align:center; }
+.bb-recorded-graph-status button { min-height:44px; padding:8px 14px; border:1px solid hsl(var(--border)); border-radius:10px; font:inherit; color:hsl(var(--primary)); background:transparent; }
+.bb-daily-plot .bb-chart-motion-surface { touch-action:pan-y pinch-zoom; }
+.bb-app-shell[data-screen="transactions"] > .bb-report-header { position:relative; z-index:4; }
 .bb-transactions-title-actions { display:flex; align-items:center; grid-column:2; grid-row:1; margin-left:auto; }
 .bb-transaction-all-months { cursor:pointer; font:inherit; font-size:13px; white-space:nowrap; color:hsl(var(--primary)); background:transparent; border:1px solid hsl(var(--border)); border-radius:10px; min-height:44px; padding:8px 12px; -webkit-tap-highlight-color:transparent; }
 .bb-transaction-all-months[aria-pressed="true"] { background:hsl(var(--primary) / .12); }

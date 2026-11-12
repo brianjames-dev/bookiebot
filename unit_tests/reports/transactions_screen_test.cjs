@@ -13,7 +13,7 @@ const presentation={
  './app-navigation':{useAppNavigation:()=>duoWide?{duoLandscape:true}:null},
  './transaction-swipe':{TransactionSwipeContext:SwipeContext,wrapTransactionRow:(entry)=>React.createElement(ActionFixture,{entry})},
  './daily-transactions':{TransactionIcon:()=>null,DailyTransactionDays:({groups,wrapRow})=>{const plan=React.useContext(load(path.resolve('web/expense-report/src/transaction-value-motion.tsx')).ChangeMotionContext);if(plan&&plan!==plans.at(-1))plans.push(plan);return React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))}},
- './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
+ './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl,props.graphControls,props.graphStatus),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
 const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(){},removeEventListener(){},dispatchEvent(e){events.push(e.type)},matchMedia(){return {matches:true}}}
@@ -171,6 +171,33 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  assert.equal(updates.at(-1),beforeInactive,'A cancelled inactive read cannot advance freshness')
  await run(()=>tree.update(fixture(true)));await tick();await respond({error:'Reconnect fixture'},401)
  assert.equal(updates.at(-1),null,'Cleared access removes the previous transaction update time');await run(()=>tree.unmount())
+ await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing())
+ const graphProps=()=>tree.root.findByType(presentation['./report-app'].DailySpendingChart).props
+ await run(()=>tree.root.findByProps({'aria-label':'Graph period'}).props.onChange({target:{value:'3'}}));await tick()
+ assert.match(latest().url,/month=all/);const historyRequest=latest()
+ const historyDays=['2025-10','2026-07','2026-08','2026-09','2026-10','2026-11'].map(month=>({month,date:month+'-20',count:1,totalCents:1000,needsCents:400,wantsCents:600}))
+ await respond(listing([row],{days:historyDays}),200,historyRequest)
+ assert.deepEqual(Array.from(graphProps().data,row=>row.label),['2026-08-20','2026-09-20','2026-10-20'])
+ const beforeRange=requests.length;await run(()=>tree.root.findByProps({'aria-label':'Graph period'}).props.onChange({target:{value:'6'}}));await tick();assert.equal(requests.length,beforeRange,'Changing the trailing window reuses complete daily aggregates')
+ assert.deepEqual(Array.from(graphProps().data,row=>row.label),['2026-07-20','2026-08-20','2026-09-20','2026-10-20'])
+ assert.equal(text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'})).includes('Fixture cable'),true,'Changing graph scope preserves the list')
+ const months=[];await run(()=>tree.update(React.createElement(TransactionsScreen,{active:true,ownerName:'Brian',initialMonth:'2026-10',onUpdated,onSelectMonth:month=>months.push(month)})))
+ await run(()=>graphProps().onInspectDay('2026-09-20'));assert.deepEqual(months,['2026-09'])
+ await run(()=>tree.update(React.createElement(TransactionsScreen,{active:true,ownerName:'Brian',initialMonth:'2026-09',onUpdated,onSelectMonth:month=>months.push(month)})));await tick()
+ assert.match(latest().url,/month=2026-09/);assert.match(latest().url,/day=2026-09-20/,'Date selection requests the exact date before pagination')
+ await respond(listing([{...row,id:'september-row',month:'2026-09',date:'2026-09-20'}],{month:'2026-09'}));assert.equal(tree.root.findByProps({'aria-label':'Graph period'}).props.value,6,'Selecting a date preserves the graph range')
+ const beforeFilter=requests.length;await run(()=>tree.root.findByProps({'aria-label':'Filter transactions'}).props.onChange({target:{value:'income'}}));await tick()
+ const filterReads=requests.slice(beforeFilter),nativeRead=filterReads.find(r=>!r.url.includes('month=all')),graphRead=filterReads.find(r=>r.url.includes('month=all'))
+ await respond({error:'Monthly fixture offline'},503,nativeRead);await respond(listing([],{days:historyDays}),200,graphRead)
+ assert.equal(graphProps().legendLabel,'Income','The graph labels its own successful scope even when the separate list read fails')
+ assert.equal(Boolean(graphProps().graphStatus),false,'A failed list read cannot leave a successfully loaded history graph spinning')
+ await run(()=>tree.unmount())
+ const view=load(path.resolve('web/expense-report/src/recorded-transaction-view.ts'))
+ const crossYear=['2025-10','2025-11','2025-12','2026-01','2026-02'].map(month=>({month,date:month+'-02',count:1,totalCents:1200,needsCents:400,wantsCents:800}))
+ assert.deepEqual(Array.from(view.recordedChartWindow(crossYear,'2026-01',3),row=>row.label),['2025-11-02','2025-12-02','2026-01-02'])
+ const undated=view.recordedChartWindow([{...crossYear[1],date:''},{...crossYear[2],date:''}],'2026-01',3)
+ assert.deepEqual(Array.from(undated,row=>row.label),['2025-11:undated','2025-12:undated'],'Undated bars retain their month identity')
+ assert.match(view.recordedDateLabel('2025-12:undated',true),/Dec.*2025.*undated/)
  const {undoPresentationTarget}=load(path.resolve('web/expense-report/src/transaction-feedback.ts'))
  const prior={...row,id:'latest-action'},restored={...row,id:'restored-parent'}
  assert.equal(undoPresentationTarget([prior],[restored],prior.id,{...summary,operation:'undo',after:row.fields}),restored.id)

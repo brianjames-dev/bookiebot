@@ -24,14 +24,14 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace {
   grid-column:1; grid-row:2; display:grid; min-height:0;
   grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);
-  grid-template-rows:max(44px,var(--bb-duo-heading)) 28px 70px 58px auto minmax(0,1fr);
+  grid-template-rows:max(44px,var(--bb-duo-heading)) 20px 70px 58px auto minmax(0,1fr);
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transactions-heading {
   grid-column:1; grid-row:1; min-width:0; margin-inline:35px; align-items:center;
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transactions-heading h1 { margin:0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transaction-period {
-  grid-column:1; grid-row:2; margin:0 35px; align-self:start;
+  grid-column:1; grid-row:2; margin:-12px 35px 0; align-self:start;
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transaction-period summary { min-height:24px; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-daily-summary {
@@ -60,16 +60,16 @@
   padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
   transition:none;
  }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace:has(.bb-duo-action-pane[data-peek="true"]) .bb-recorded-graph-reveal { padding-top:var(--bb-duo-heading); }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip { overflow:visible; min-height:0; }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace:has(.bb-duo-action-pane[data-peek="true"]) .bb-recorded-graph-controls { padding-right:104px; }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip { display:grid; grid-template-rows:44px minmax(0,1fr); overflow:visible; min-height:0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip > .bb-daily-plot {
-  display:grid; grid-template-rows:minmax(0,1fr) auto; gap:16px;
+  display:grid; grid-template-rows:minmax(0,1fr) auto; gap:4px;
   height:100%; min-height:0; padding-top:12px;
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-daily-plot .bb-chart-box {
   height:100%; min-height:0;
  }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-daily-legend { margin:0; }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-daily-legend { margin:0; padding:2px 0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace[data-duo-pane="editor"] .bb-recorded-graph-reveal { visibility:hidden; opacity:0; pointer-events:none; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-action-pane {
   grid-column:2; grid-row:1 / 7; z-index:3; min-width:0; min-height:0;
