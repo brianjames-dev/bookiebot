@@ -350,6 +350,13 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
     month = query.get("month") or now_pacific().strftime("%Y-%m")
     if len(str(query.get("search", ""))) > 200:
         raise TransactionValidation("Use a search of up to 200 characters.")
+    day = query.get("day", "")
+    if day and day != "undated":
+        try:
+            if not isinstance(day, str) or date.fromisoformat(day).isoformat() != day:
+                raise ValueError()
+        except ValueError as exc:
+            raise TransactionValidation("Choose a valid transaction date.") from exc
     rows = load_transactions(actor, month, fresh=query.get("fresh") == "1")
     search = str(query.get("search", "")).casefold().split()
     kind, category, person, split = (query.get(key, "") for key in ("kind", "category", "person", "split"))
@@ -365,8 +372,9 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
         and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
                 or word in {f"{row['amountCents'] / 100:.2f}", f"{row.get('displayAmountCents', row['amountCents']) / 100:.2f}"} for word in search)]
-    result = {"items": [public_row(row) for row in selected[offset:offset + 40]], "total": len(selected),
-            "nextOffset": offset + 40 if len(selected) > offset + 40 else None,
+    visible = [row for row in selected if not day or (not row["date"] if day == "undated" else row["date"] == day)]
+    result = {"items": [public_row(row) for row in visible[offset:offset + 40]], "total": len(visible),
+            "nextOffset": offset + 40 if len(visible) > offset + 40 else None,
             "categories": sorted({row["category"] for row in rows if row["category"]}),
             "persons": sorted({row["person"] for row in rows}), "month": month}
     if query.get("view") == "daily":

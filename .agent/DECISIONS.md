@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-11 - Transactions trailing graph windows and release selection
+
+Add graph-only 3/6/12 calendar-month windows ending in the selected report month, defaulting to the existing list period. Reuse the authenticated complete daily aggregates from the existing All months read; changing windows reuses that snapshot rather than fetching paginated rows or inventing estimates. Graph reads have separate abort/stale/loading/error/retry handling and refresh after canonical saves/Undo. Their successful scope controls their legend even if the separate list read fails. Preserve scope across folds/editor peeks and retain native financial confirmation/recovery semantics.
+
+Per the user's explicit follow-up, releasing on a date in an earlier month moves the list/shared picker to that month. Commit the final horizontal band on pointer release, suppress the follow-up click, and preserve pure tapping and keyboard selection. Native scroll changes, cancellation, additional contacts, out-of-plot release and range replacement cancel selection. Optional validated `day` filtering applies before 40-row pagination while monthly aggregates and snapshot lineage stay complete. Undated multi-month bars retain their month identities. No writer, action identity, schema or reconciliation change.
+
+Keep controls inside the graph's existing single collapse wrapper; a second direct grid child left a hidden hit area in closed mode. Give the common Transactions header a local paint order without changing its flow geometry. Tighten caption/legend spacing locally. Bound the persistent icon body with its own round overflow clip while preserving all prior overlap holes, images, timing and layer hints. [WebKit 322885](https://bugs.webkit.org/show_bug.cgi?id=322885) and its [fix](https://github.com/WebKit/WebKit/commit/56c34b19052f1b17a93edb6d8decbbaaef1df934) document black rectangular backing around clipped opaque descendants, supporting this defensive boundary; desktop WebKit does not establish the physical Duo cause. Regression models an uncleared black backing and checks clear fallback/PNG/SVG corners, alongside existing motion pixels. Native acceptance is checklist 276.
+
 ## 2026-11-11 - Transactions header scope and independent update time
 
 Place All months beside the existing Transactions title/month picker, with the month caption directly beneath it in both poses. Portal the existing controller-owned button into the stable common-header slot; retain its current locks, scope and local drafts. Keep common header geometry constant and tighten the caption locally so native tab scroll restoration remains exact. Remove the redundant unfolded chart heading and its reserved row; graph-peek tools retain their own clearance.

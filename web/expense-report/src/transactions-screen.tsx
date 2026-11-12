@@ -7,7 +7,7 @@ import {DailySpendingChart, CategoryFilterControl} from './report-app'
 import {useAppNavigation} from './app-navigation'
 import {DailyTransactionDays} from './daily-transactions'
 import {TransactionSwipeContext,wrapTransactionRow} from './transaction-swipe'
-import {displayedAmount,recordedDays,recordedChart,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
+import {displayedAmount,recordedDays,recordedChart,recordedChartWindow,recordedCategoryColors,spendingCategories,transactionFilter,type RecordedDay} from './recorded-transaction-view'
 import { type TransactionChangeSummary, type TransactionOperation } from "./transaction-change-summary"
 import {InlineTransactionEditor,transactionMotion,type InlineSnapshot} from './transaction-inline-editor'
 import {ChangeMotionContext,type ChangePlan} from './transaction-value-motion'
@@ -50,7 +50,7 @@ async function request(path: string, body?: unknown, signal?: AbortSignal): Prom
 }
 function checkedListing(value: any): Listing {
   if (!value || !Array.isArray(value.items) || value.items.length > 40 || !Number.isSafeInteger(value.total) || !Array.isArray(value.categories) || !Array.isArray(value.persons)
-    || value.days && (!Array.isArray(value.days)||!Number.isSafeInteger(value.totalAmountCents)||value.days.some((day:any)=>!Number.isSafeInteger(day.count)||day.count<1||!Number.isSafeInteger(day.totalCents)||!Number.isSafeInteger(day.needsCents)||!Number.isSafeInteger(day.wantsCents)))
+    || value.days && (!Array.isArray(value.days)||!Number.isSafeInteger(value.totalAmountCents)||value.days.some((day:any)=>typeof day.date!=='string'||typeof day.month!=='string'||!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(day.month)||!Number.isSafeInteger(day.count)||day.count<1||!Number.isSafeInteger(day.totalCents)||!Number.isSafeInteger(day.needsCents)||!Number.isSafeInteger(day.wantsCents)))
     || value.nextOffset!==null&&!value.days
     || value.items.some((row: any) => !row || typeof row.id !== "string" || typeof row.version !== "string" || !Number.isSafeInteger(row.amountCents) || !row.capabilities || !Array.isArray(row.editableFields)
       || row.displayAmountCents !== undefined && (!Number.isSafeInteger(row.displayAmountCents) || row.displayAmountCents < 0 || row.displayAmountCents > row.amountCents)
@@ -61,7 +61,7 @@ function checkedListing(value: any): Listing {
   return value
 }
 
-export function TransactionsScreen({active, ownerName, initialMonth, aliases, headerActions, onUpdated}: {active: boolean; ownerName: string; initialMonth: string;aliases?:Record<string,string>;headerActions?:HTMLElement|null;onUpdated?:(time:number|null)=>void}) {
+export function TransactionsScreen({active, ownerName, initialMonth, aliases, headerActions, onUpdated, onSelectMonth}: {active: boolean; ownerName: string; initialMonth: string;aliases?:Record<string,string>;headerActions?:HTMLElement|null;onUpdated?:(time:number|null)=>void;onSelectMonth?:(month:string)=>void}) {
   const navigation=useAppNavigation()
   // Keep the closed graph preference independent of the unfolded workspace.
   const duoWide=navigation?.duoLandscape===true
@@ -71,10 +71,15 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const [month, setMonth] = useState(initialMonth)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   useEffect(() => { onUpdated?.(updatedAt) }, [updatedAt, onUpdated])
-  useEffect(()=>setMonth(initialMonth),[initialMonth])
+  const inspectedDay=useRef('')
+  useEffect(()=>{setMonth(initialMonth);setDay(inspectedDay.current);inspectedDay.current=''},[initialMonth])
   const [search, setSearch] = useState("")
   useEffect(()=>{const request=navigation?.sourceRequest;if(active&&request?.section==='activity')navigation?.consumeSource?.(request.id)},[active,navigation?.sourceRequest?.id])
   const [filter,setFilter]=useState("all"),[day,setDay]=useState("")
+  const [chartMonths,setChartMonths]=useState(0),[graphRevision,setGraphRevision]=useState(0)
+  const [graphHistory,setGraphHistory]=useState<{key:string;days:RecordedDay[]}|null>(null)
+  const [graphLoading,setGraphLoading]=useState(false),[graphError,setGraphError]=useState('')
+  const historyFreshRevision=useRef(0)
   const {kind,category,split,scope,bucket}=transactionFilter(filter)
   const manager=useRef<{close?:(instant?:boolean)=>void}>({})
   const [listing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
@@ -122,7 +127,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const load = useCallback(async (offset = 0, append = false, fresh = false, stage?: (next:Listing)=>void) => {
     const token = ++generation.current
     loadAbort.current?.abort(); const controller = new AbortController(); loadAbort.current = controller
-    const query = new URLSearchParams({month, search, kind, category, split, scope, bucket, view:"daily", offset: String(offset),fresh:fresh ? "1" : ""})
+    const query = new URLSearchParams({month, search, kind, category, split, scope, bucket, day:day==='Undated'?'undated':day, view:"daily", offset: String(offset),fresh:fresh ? "1" : ""})
     setLoading(true); setError("")
     try {
       const next = checkedListing(await request(`/app/transactions?${query}`, undefined, controller.signal))
@@ -140,18 +145,36 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
         setDisplayScope({filter,month})
         setNeedsFresh(false)
         setUpdatedAt(Date.now())
+        if(fresh)setGraphRevision(value=>value+1)
       }
       return true
     } catch (failure) { if (mounted.current && token === generation.current && !controller.signal.aborted) handleError(failure) }
     finally { if (mounted.current && token === generation.current) setLoading(false) }
     return false
-  }, [month, search, kind, category, split, scope, bucket, filter])
+  }, [month, search, kind, category, split, scope, bucket, filter, day])
   useEffect(() => {
     if (!active||commit) return
     setLoading(true)
     const timer = window.setTimeout(() => { const fresh=freshNext.current; freshNext.current=false; void load(0,false,fresh) }, search ? 250 : 0)
     return () => { window.clearTimeout(timer); ++generation.current; loadAbort.current?.abort() }
   }, [active, load, revision])
+  const historyEnabled=chartMonths>0,historyKey=JSON.stringify([ownerName,filter,search,graphRevision])
+  useEffect(()=>{
+    if(!active||!historyEnabled)return
+    const controller=new AbortController();let live=true
+    setGraphLoading(true);setGraphError('')
+    const timer=window.setTimeout(()=>{
+      const fresh=historyFreshRevision.current!==graphRevision;historyFreshRevision.current=graphRevision
+      const query=new URLSearchParams({month:'all',view:'daily',search,kind,category,split,scope,bucket,fresh:fresh?'1':''})
+      void request('/app/transactions?'+query,undefined,controller.signal).then(checkedListing).then(next=>{
+        if(!live||controller.signal.aborted)return
+        if(!next.days)throw new Error("Couldn't read the graph's recorded days.")
+        setGraphHistory({key:historyKey,days:next.days});setUpdatedAt(Date.now())
+      }).catch(failure=>{if(live&&!controller.signal.aborted){if(failure instanceof RequestError&&[401,403].includes(failure.status)){setGraphHistory(null);handleError(failure)}setGraphError(failure instanceof Error?failure.message:"Couldn't load the graph.")}})
+      .finally(()=>{if(live)setGraphLoading(false)})
+    },search?250:0)
+    return()=>{live=false;window.clearTimeout(timer);controller.abort()}
+  },[active,historyEnabled,historyKey])
   useEffect(() => {
     const refresh = () => { if(ownChange.current)return; freshNext.current=true; setRevision(value => value + 1) }
     window.addEventListener("bookiebot:reimbursements-changed", refresh)
@@ -271,7 +294,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     setAnnouncement(saved.summary?.operation==='undo'?'Change undone':saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split saved':'Change saved')
     const currentSequence=sequence.current
     const loaded=readBack?true:await load(0,false,true)
-    if(readBack){setListing(readBack);setDisplayScope({filter,month});setNeedsFresh(false);setUpdatedAt(Date.now())}
+    if(readBack){setListing(readBack);setDisplayScope({filter,month});setNeedsFresh(false);setUpdatedAt(Date.now());setGraphRevision(value=>value+1)}
     if(!mounted.current||currentSequence!==sequence.current)return
     if(saved.undo&&loaded){const seconds=transactionMotion.undoSeconds;setNotice({id:++sequence.current,title:saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split updated':'Purchase updated',deadline:Date.now()+seconds*1000,seconds,undo:saved.undo})}
     else if(!loaded)setError('Your change was saved. Refresh Transactions to see the current rows.')
@@ -302,14 +325,33 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const filterCount = Number(filter!=="all")
   const days=useMemo(()=>listing?.days??[],[listing])
   const groups=useMemo(()=>recordedDays(listing?.items??[],days,displayScope.month).filter(group=>!day||group.day===day||group.key===day||day==='Undated'&&!Number.isFinite(Number(group.day))),[listing,days,displayScope.month,day])
-  const chart=useMemo(()=>recordedChart(days,displayScope.month),[days,displayScope.month])
+  const chart=useMemo(()=>historyEnabled?recordedChartWindow(graphHistory?.key===historyKey?graphHistory.days:[],initialMonth,chartMonths):recordedChart(days,displayScope.month),[days,displayScope.month,historyEnabled,graphHistory,historyKey,initialMonth,chartMonths])
   const rows=useMemo(()=>new Map(listing?.items.map(row=>[row.id,row])??[]),[listing])
   const filtersList=[{value:'all',label:'All'},{value:'needs',label:'Needs'},{value:'wants',label:'Wants'},{value:'shared',label:'Shared'},...Object.entries(categoryOptions).map(([value,label])=>({value:'category:'+value,label:spendingCategories[value]??label})),{value:'income',label:'Income'},{value:'savings',label:'Savings'}]
   const changeFilter=(value:string)=>{if(locked||operation||notice)return;manager.current.close?.();setDay('');setFilter(value)}
-  const displayedFilter=displayScope.filter
+  const displayedFilter=displayScope.filter,graphFilter=historyEnabled?filter:displayedFilter
   const metricLabel=displayedFilter==='income'?'Total Income':displayedFilter==='savings'?'Total Saved':'Total Spent'
   const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+displayedAmount(row),0)??0
-  useEffect(()=>{manager.current.close?.(true);setDay('')},[month,search,active])
+  useEffect(()=>{manager.current.close?.(true);setDay('')},[search,active])
+  const inspectGraphDay=(value:string)=>{
+    if(loading||locked||operation||notice)return
+    const date=/^\d{4}-\d{2}-\d{2}$/.test(value)?value:/^\d{1,2}$/.test(value)?`${month==='all'?initialMonth:month}-${value.padStart(2,'0')}`:value
+    const selectedDay=date.endsWith(':undated')?'Undated':date
+    if(/^\d{4}-\d{2}(?:-\d{2}|:undated)$/.test(date)){
+      const target=date.slice(0,7)
+      if(target!==initialMonth&&onSelectMonth){inspectedDay.current=selectedDay;onSelectMonth(target);return}
+      if(month!==target){setMonth(target);setDay(selectedDay);return}
+    }
+    setDay(previous=>previous===selectedDay?'':selectedDay)
+  }
+  const periodMonth=listing?displayScope.month:initialMonth
+  const graphPending=historyEnabled&&(graphLoading||!graphError&&(graphHistory?.key!==historyKey))
+  const graphControls=<div className="bb-recorded-graph-controls">
+    <label className="bb-recorded-graph-range"><span className="sr-only">Graph period</span><select aria-label="Graph period" title={chartMonths?'Calendar months through '+new Date(initialMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'}):periodMonth==='all'?'All recorded months':'Selected report month'} value={chartMonths} disabled={locked||Boolean(notice)} onChange={event=>setChartMonths(Number(event.target.value))}>
+      <option value="0">{periodMonth==='all'?'All months':'Selected month'}</option><option value="3">Last 3 months</option><option value="6">Last 6 months</option><option value="12">Last 12 months</option>
+    </select><ChevronDown aria-hidden="true"/></label>
+  </div>
+  const graphStatus=historyEnabled&&(graphError?<div className="bb-recorded-graph-status" role="alert"><span>{graphError}</span><button type="button" onClick={()=>setGraphRevision(value=>value+1)}>Retry graph</button></div>:graphPending?<div className="bb-recorded-graph-status" role="status">Loading graph…</div>:chart.length===0?<div className="bb-recorded-graph-status" role="status">No recorded activity in this period.</div>:null)
   const amountValue=Number(draft.amount),validAmount=/^\d+(?:\.\d{1,2})?$/.test(draft.amount??'')&&amountValue>0&&Number.isSafeInteger(Math.round(amountValue*100))
   const validFields=selected?.editableFields.every(field=>field==='amount'||draft[field]===selected.fields[field]||Boolean(draft[field]?.trim())&&draft[field].length<=200)
   const canReview=Boolean(selected&&operation&&(operation==='update'?validAmount&&validFields&&(destination!==selected.category||selected.editableFields.some(field=>field==='amount'?Math.round(amountValue*100)!==selected.amountCents:(draft[field]??'').trim()!==(selected.fields[field]??'').trim())):operation==='split'?customValid&&(method!=='custom'||Boolean(selected.splitOptions?.custom))&&(method!=='fronted'||selected.kind==='expense')&&(selected.split?method!==selected.split||payerShareCents!==(selected.splitOptions?.payerCents??selected.amountCents):payerShareCents!==selected.amountCents):true))
@@ -339,13 +381,13 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     <div className="bi-workspace" inert={Boolean(notice)} data-duo-pane={duoWide&&selected&&!graphOpen?"editor":"graph"}>
     {duoWide&&selected&&<DuoTransactionPane row={selected} operation={operation} reviewing={Boolean(review)} graphOpen={graphOpen} locked={locked||loading} onOptions={()=>{setOperation(null);setReview(null);setReviewBody(null)}} onAction={op=>{begin(selected,op);setDuoGraphOpen(false)}} onGraph={()=>setDuoGraphOpen(value=>!value)} onClose={discard} editor={editorFor(selected)} status={status} aliases={aliases}/>}
     <header className="bb-transactions-heading" hidden={navigation?.monthHeader}><h1>Transactions</h1>{!pageRefresh && <button type="button" aria-label="Refresh transactions" disabled={refreshDisabled} onClick={() => void load(0,false,true)}><RefreshCw size={18}/></button>}</header>
-    {headerActions && createPortal(<button type="button" className="bb-transaction-all-months" aria-label="All recorded months" aria-pressed={month==='all'} disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setMonth(month==='all'?initialMonth:'all')}>All months</button>,headerActions)}
-    {navigation?.monthHeader?<div className="bb-transaction-period bb-transaction-scope"><span>{month==='all'?'All months':new Date(initialMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}</span></div>:
+    {headerActions && createPortal(<button type="button" className="bb-transaction-all-months" aria-label="All recorded months" aria-pressed={month==='all'} disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>{setDay('');setMonth(month==='all'?initialMonth:'all')}}>All months</button>,headerActions)}
+    {navigation?.monthHeader?<div className="bb-transaction-period bb-transaction-scope"><span>{periodMonth==='all'?'All months':new Date(periodMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}</span></div>:
     <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>}
-    {listing && <DailySpendingChart graphOpen={graphOpen} data={chart} total={total/100} filter={displayedFilter==='needs'||displayedFilter==='wants'?displayedFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={value=>{if(!loading&&!locked&&!operation&&!notice)setDay(previous=>previous===value?'':value)}} metricLabel={metricLabel} legendLabel={displayedFilter==='income'?'Income':displayedFilter==='savings'?'Savings':undefined}
+    {listing && <DailySpendingChart graphOpen={graphOpen} graphControls={graphControls} graphStatus={graphStatus} graphBusy={graphPending} data={chart} total={total/100} filter={graphFilter==='needs'||graphFilter==='wants'?graphFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={inspectGraphDay} metricLabel={metricLabel} legendLabel={graphFilter==='income'?'Income':graphFilter==='savings'?'Savings':undefined}
       transactionControl={<div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div>}/>}
     <label className="bb-recorded-search"><Search aria-hidden="true"/><input type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder="Search transactions" maxLength={200} value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>setSearch(event.target.value)}/>{search&&<button type="button" aria-label="Clear search" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setSearch('')}><X aria-hidden="true"/></button>}</label>
-    {day&&<button type="button" className="bb-recorded-day-chip" onClick={()=>setDay('')}>Day {day}<X aria-hidden="true"/></button>}
+    {day&&<button type="button" className="bb-recorded-day-chip" onClick={()=>setDay('')}>{/^\d{4}-\d{2}-\d{2}$/.test(day)?new Date(day+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}):'Day '+day}<X aria-hidden="true"/></button>}
     <div className="bb-recorded-results">
     {(!duoWide||!selected)&&status}
     {loading && !listing && <p role="status" className="bb-recorded-loading">Loading recorded transactions…</p>}

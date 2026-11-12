@@ -4,6 +4,10 @@ Last updated: 2026-11-11
 
 ## Goal
 
+### Transactions graph ranges, scrubbing and round backing — 2026-11-11
+
+Completed the requested presentation/read slice: graph-only 3/6/12-month windows use existing complete recorded-day aggregates; releasing on a date selects it and, per user clarification, switches the list/shared month. Add validated exact-day filtering before pagination while preserving complete period aggregates/snapshot lineage. Separate graph reads/errors/retries cannot detach drafts or write financial records. Keep the toolbar in the original collapse wrapper, tighten caption/legend gaps and bound round icon backing without changing overlap geometry or animation ownership. Native acceptance and verification/release evidence are STATUS checklist 276 and the task PR. Financial confirmation/recovery, writers, reconciliation lifecycle, schema and broader backlog remain unchanged. No live financial test writes.
+
 ### Transactions header and independent update time — 2026-11-11
 
 Completed the requested presentation refinement: remove the unfolded graph heading, tighten the month caption and place the existing All months control on the shared title row in both poses. The controller publishes its last successful listing time beneath BookieBot separately from Overview; failed/stale/cancelled reads cannot advance it. Preserve common header geometry so saved native tab scroll positions remain exact. Financial commands, review/confirmation/recovery, scopes and the broader backlog remain unchanged. Verification/release and native acceptance are STATUS checklist 275 and the task PR.

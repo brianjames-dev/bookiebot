@@ -1,6 +1,7 @@
 """Canonical read-model aggregation for the approved recorded daily workspace."""
 import json
 import os
+import pytest
 from pathlib import Path
 from bookiebot.reports import transactions as tx
 from unit_tests.reports.test_transactions import saved, access, row, B  # shared isolated fixtures
@@ -43,6 +44,18 @@ def test_workspace_filters_aggregate_recorded_rows_and_export_browser_samples(sa
     assert results['income']['totalAmountCents']==300000
     assert results['savings']['totalAmountCents']==50000
     assert results['all']['totalAmountCents']==sum(value[-1] for value in fixtures)
+    selected_day = tx.listing(B, {**query, 'day': f'{saved.month}-01'})
+    assert selected_day['total'] == 45 and len(selected_day['items']) == 40
+    assert all(value['date'] == f'{saved.month}-01' for value in selected_day['items'])
+    last_day_page = tx.listing(B, {**query, 'day': f'{saved.month}-01', 'offset': '40'})
+    assert len(last_day_page['items']) == 5 and last_day_page['nextOffset'] is None
+    assert selected_day['days'] == results['all']['days']
+    assert selected_day['totalAmountCents'] == results['all']['totalAmountCents']
+    assert selected_day['snapshotVersion'] == results['all']['snapshotVersion']
+    empty_day = tx.listing(B, {**query, 'day': f'{saved.month}-20'})
+    assert empty_day['items'] == [] and empty_day['total'] == 0
+    with pytest.raises(tx.TransactionValidation, match='valid transaction date'):
+        tx.listing(B, {**query, 'day': '2026-02-30'})
     output=os.environ.get('BOOKIEBOT_TRANSACTION_WORKSPACE_FIXTURES')
     if output and isinstance(saved.access,tx.PostgresAppAccessStore) is False:
         Path(output).write_text(json.dumps({'month':saved.month,'results':results,'sources':[tx.public_row(value) for value in sources]}))

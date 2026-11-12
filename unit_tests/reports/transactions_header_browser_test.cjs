@@ -42,11 +42,11 @@ const updated=page=>page.waitForFunction(()=>document.querySelector('.bb-brand-s
     assert(Math.abs(bounds.title.y+bounds.title.height/2-bounds.all.y-bounds.all.height/2)<=1,'All months is centered on the title row: '+JSON.stringify(bounds));
     assert(bounds.all.x>=bounds.title.right+4&&bounds.all.right<=bounds.header.right+1,'Title and All months fit without overlap');
     assert(bounds.all.height>=44,'All months keeps its touch target');
-    assert(bounds.month.y-bounds.title.bottom>=-1&&bounds.month.y-bounds.title.bottom<=10,'Month caption sits directly beneath the title: '+JSON.stringify(bounds));
+    assert(bounds.month.y-bounds.title.bottom>=-16&&bounds.month.y-bounds.title.bottom<=2,'Month caption sits directly beneath the title: '+JSON.stringify(bounds));
     assert(bounds.bodyWidth<=bounds.windowWidth,'The header never creates horizontal overflow');
     if(width>=800){
      const graphTop=await page.locator('.bb-daily-plot').evaluate(el=>el.getBoundingClientRect().top);
-     assert(graphTop<bounds.graph.y+20,'No empty title row remains above the graph');
+     const controlBottom=await page.locator('.bb-recorded-graph-controls').evaluate(el=>el.getBoundingClientRect().bottom);assert(graphTop-controlBottom<=16,'The plot follows the new range control without an empty title row');
      assert(bounds.all.right<width-60,'All months stays in the left pane, clear of the native strip');
     }
     const all=page.getByRole('button',{name:'All recorded months',exact:true});await advance(page);await all.click();await ready(page);await updated(page);
