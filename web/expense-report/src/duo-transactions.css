@@ -60,6 +60,7 @@
   padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
   transition:none;
  }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-controls { padding:0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace:has(.bb-duo-action-pane[data-peek="true"]) .bb-recorded-graph-controls { padding-right:104px; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip { display:grid; grid-template-rows:44px minmax(0,1fr); overflow:visible; min-height:0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-clip > .bb-daily-plot {

@@ -5,7 +5,7 @@
 /* Keep the common header geometry stable for native tab scroll restoration. */
 .bb-transactions .bb-transaction-scope { margin-top:-20px; }
 .bb-transactions .bb-daily-legend { padding:4px 0; }
-.bb-recorded-graph-controls { display:flex; justify-content:flex-end; align-items:center; min-height:44px; }
+.bb-recorded-graph-controls { display:flex; justify-content:flex-end; align-items:center; min-height:44px; padding:12px 0 4px; }
 .bb-recorded-graph-range { position:relative; display:flex; align-items:center; color:hsl(var(--foreground)); }
 .bb-recorded-graph-range select { appearance:none; font:inherit; font-size:13px; color:inherit; background:hsl(var(--foreground) / .045); border:1px solid hsl(var(--border)); border-radius:22px; min-height:44px; max-width:100%; padding:8px 32px 8px 14px; }
 .bb-recorded-graph-range>svg { position:absolute; right:12px; width:14px; height:14px; pointer-events:none; }
@@ -85,7 +85,7 @@
 .bb-transaction-period summary::-webkit-details-marker { display:none; }
 .bb-transaction-period>div { position:absolute; z-index:10; top:100%; left:0; width:240px; max-width:100%; padding:14px; border:1px solid hsl(var(--border)); border-radius:14px; background:hsl(var(--card)); box-shadow:0 8px 24px hsl(var(--foreground) / .08); }
 .bb-transaction-period>div button { width:100%; margin-top:10px; }
-.bb-recorded-day-chip { display:flex; align-items:center; gap:8px; padding:8px 12px; margin-top:12px; color:hsl(var(--primary)); background:hsl(var(--primary) / .08); border:1px solid hsl(var(--border)); border-radius:24px; }
+.bb-recorded-day-chip { display:flex; align-items:center; gap:8px; min-height:44px; max-width:100%; padding:8px 12px; margin-top:12px; color:hsl(var(--primary)); background:hsl(var(--primary) / .08); border:1px solid hsl(var(--border)); border-radius:24px; }
 .bb-recorded-day-chip svg { width:14px; height:14px; }
 .bb-recorded-loading,.bb-daily-page-note { color:hsl(var(--muted-foreground)); font-size:12px; padding:12px 0; }
 @media(prefers-reduced-motion:reduce) { .bb-recorded-swipe * { transition:none!important; } .bb-recorded-graph-reveal,.bb-recorded-graph-toggle { transition:none; } }

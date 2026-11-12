@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-11 - Day inspection preserves the selected report period
+
+The latest user feedback supersedes the month-jump choice below and checklist 276: tapping or releasing a graph drag applies an idempotent, removable full-date chip to the Transactions list only. Keep the shared report month, period headline and graph/window unchanged, including when the inspected day belongs to an earlier month. Explicit month selection still changes the report and clears the day filter. Retain the accepted pointer/scroll cancellation and editor locks.
+
+The existing authenticated listing composes the selected period with an independently loaded day month, applying the same filters before pagination. `days`/`totalAmountCents` remain period aggregates; optional `listDays` holds the complete filtered day counts/totals for paginated headers and value feedback. The snapshot includes both period and cross-month day versions. Qualified undated keys preserve month identity. Canonical row months continue to drive financial review/confirmation; feedback for another month cannot alter the retained period total. No writer, command, schema or reconciliation lifecycle changes.
+
+Separate the compact graph-range row from category/graph controls by 12px while retaining 44px targets; unfolded toolbar placement stays unchanged. Keep the graph mounted and memoize its independent period/history geometry so day reads do not rebuild the historical window. Native acceptance is STATUS checklist 277.
+
 ## 2026-11-11 - Transactions trailing graph windows and release selection
 
 Add graph-only 3/6/12 calendar-month windows ending in the selected report month, defaulting to the existing list period. Reuse the authenticated complete daily aggregates from the existing All months read; changing windows reuses that snapshot rather than fetching paginated rows or inventing estimates. Graph reads have separate abort/stale/loading/error/retry handling and refresh after canonical saves/Undo. Their successful scope controls their legend even if the separate list read fails. Preserve scope across folds/editor peeks and retain native financial confirmation/recovery semantics.
