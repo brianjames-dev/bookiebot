@@ -2,8 +2,12 @@ import React,{useRef,useState} from 'react'
 import {ChartPie} from 'lucide-react'
 import {allocate,circleFillHeight,identifySplit,quarterShare,sliderShare,stepShare,parseShare,shareText,splitMoney,splitNotches,splitMethodLabel,type SplitMethod} from './transaction-split-model'
 
-export function NotchedSplitControl({total,payerCents,method,incomeBasis,capture,incomeTarget,payerName,partnerName,allowCustom=true,disabled,onChange,onValidityChange}:{total:number;payerCents:number;method:SplitMethod;incomeBasis:number;capture:number;incomeTarget?:number;payerName:string;partnerName:string;allowCustom?:boolean;disabled:boolean;onChange:(cents:number,method:SplitMethod)=>void;onValidityChange:(valid:boolean)=>void}){
- const [draft,setDraft]=useState<{payer:boolean;text:string}|null>(null),[announcement,setAnnouncement]=useState('')
+export type SplitInputDraft={payer:boolean;text:string}|null
+export function NotchedSplitControl({total,payerCents,method,incomeBasis,capture,incomeTarget,payerName,partnerName,allowCustom=true,disabled,onChange,onValidityChange,inputDraft,onInputDraft}:{total:number;payerCents:number;method:SplitMethod;incomeBasis:number;capture:number;incomeTarget?:number;payerName:string;partnerName:string;allowCustom?:boolean;disabled:boolean;onChange:(cents:number,method:SplitMethod)=>void;onValidityChange:(valid:boolean)=>void;inputDraft?:SplitInputDraft;onInputDraft?:(draft:SplitInputDraft)=>void}){
+ const [localDraft,setLocalDraft]=useState<SplitInputDraft>(null),[announcement,setAnnouncement]=useState('')
+ // Transactions keeps raw input with its draft so changing panes preserves validation too.
+ const draft=inputDraft===undefined?localDraft:inputDraft
+ const setDraft=(next:SplitInputDraft)=>{setLocalDraft(next);onInputDraft?.(next)}
  const pointer=useRef(false),held=useRef<number|null>(null),travel=useRef(240),slider=useRef<HTMLInputElement>(null)
  const incomeCents=incomeTarget??allocate(total,incomeBasis),notches=splitNotches(total,incomeBasis,incomeCents),mode=splitMethodLabel(method,incomeBasis,partnerName),partner=total-payerCents
  const debt=partner===0?`${partnerName} owes nothing.`:`${partnerName} will owe ${payerName} ${splitMoney(partner)}.`

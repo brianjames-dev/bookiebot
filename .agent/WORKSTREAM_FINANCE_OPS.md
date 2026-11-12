@@ -1,8 +1,12 @@
 # Finance Operations Workstream
 
-Last updated: 2026-11-10
+Last updated: 2026-11-11
 
 ## Goal
+
+### Approved Duo Transactions workspace — 2026-11-11
+
+Implemented the newly approved code-native preview: bounded native list/controls left, Daily Spending right, and entry actions plus all existing editors/review/confirmation/recovery/Undo on the right when unfolded. The graph minimizes to its button and returns to the same draft; draft/review (including invalid split text) and disclosed swipe menus transfer across folds. Closed and ordinary devices retain native swipe/inline editing and the independent closed graph choice. Shared controller, financial review/confirm/idempotency, reconciliation/action lineage and repayment semantics remain unchanged; no data migration or live financial test writes. This completes the approved presentation slice and supersedes the November 10 rollback for Transactions. Verification/release evidence is in STATUS and the task PR; native acceptance is checklist 273. The broader Finance Ops priorities/backlog are unchanged.
 
 ### iPhone Duo Transactions preview rollback — 2026-11-10
 

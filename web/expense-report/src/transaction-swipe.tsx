@@ -3,7 +3,7 @@ import {Pencil,UsersRound,Trash2} from 'lucide-react'
 import type {DailyTransaction} from './transaction-identity'
 import type {RecordedTransaction} from './transactions-screen'
 import type {ReactNode} from 'react'
-interface SwipeState { manager: {close?: (instant?:boolean)=>void}; rows: Map<string,RecordedTransaction>; locked:boolean; onAction:(row:RecordedTransaction,operation:'update'|'split'|'delete')=>void }
+interface SwipeState { manager: {close?: (instant?:boolean)=>void}; rows: Map<string,RecordedTransaction>; locked:boolean; onAction:(row:RecordedTransaction,operation:'update'|'split'|'delete')=>void; onManage?:(row:RecordedTransaction)=>void; selectedId?:string }
 const settings={buttonWidth:54,duration:420}
 
 export const TransactionSwipeContext=createContext<SwipeState|null>(null)
@@ -79,8 +79,12 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
   return()=>{sizeObserver.disconnect();if(settleTimer.current!==null)clearTimeout(settleTimer.current);group.removeEventListener('click',closeOnDay,true);const bead=ownedBead;if(bead){bead.style.translate='';bead.style.clipPath='';bead.style.removeProperty('transition');const viewport=bead.closest<HTMLElement>('.bb-recorded-swipe-icon-viewport');if(viewport)viewport.style.clipPath=''}}
  },[position,entry.id])
  useLayoutEffect(()=>{const id=requestAnimationFrame(()=>paint(target.current*revealWidth(),false));return()=>cancelAnimationFrame(id)},[actionWidth,settings.duration])
+ // Transfer an already revealed closed-mode tray when the device unfolds.
+ useLayoutEffect(()=>{
+  if(context.onManage&&target.current!==0){close(true);drag.current=null;if(recorded&&!readonly)context.onManage(recorded)}
+ },[Boolean(context.onManage)])
  function down(event:React.PointerEvent){
-  if(readonly||event.button!==0||(event.target as Element).closest('.bb-recorded-swipe-actions'))return
+  if(context.onManage||readonly||event.button!==0||(event.target as Element).closest('.bb-recorded-swipe-actions'))return
   if(shell.current?.closest<HTMLElement>('.bb-daily-day-group')?.dataset.moving==='true')return
   const row=shell.current!.querySelector<HTMLElement>('.bb-daily-transaction')!,actual=new DOMMatrix(getComputedStyle(row).transform).m41
   paint(actual,false)
@@ -104,7 +108,7 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
    {available.map(([op,label,Icon])=><button type="button" className={`bb-recorded-action bb-recorded-action-${op}`} key={op} disabled={readonly} onClick={()=>activate(op)} aria-label={`${label} ${entry.location||entry.item}`}><Icon aria-hidden="true"/></button>)}
   </div>}
   {children}
-  {/* Zero-detail activation preserves keyboard/assistive access; pointer taps do not reveal actions. */}
-  {!readonly&&<button type="button" className="bb-recorded-row-access" aria-label={`Show actions for ${entry.location||entry.item}`} aria-expanded={side!==0} style={{transform:`translateX(${target.current*revealWidth()}px)`}} onClick={event=>{if(event.detail===0&&!suppressed.current)reveal(target.current?0:-1)}} onKeyDown={event=>{if(event.key==='ArrowLeft'){event.preventDefault();reveal(-1)}if(event.key==='ArrowRight'){event.preventDefault();reveal(0)}if(event.key==='Escape'){event.preventDefault();reveal(0)}}}/>}
+  {/* Closed mode keeps swipe/keyboard disclosure; unfolded taps open the right pane. */}
+  {!readonly&&<button type="button" className="bb-recorded-row-access" aria-label={`Show actions for ${entry.location||entry.item}`} aria-expanded={context.onManage?context.selectedId===recorded?.id:side!==0} aria-controls={context.onManage?'bb-duo-transaction-pane':undefined} style={{transform:`translateX(${target.current*revealWidth()}px)`}} onClick={event=>{if(suppressed.current)return;if(context.onManage&&recorded){close(true);context.onManage(recorded)}else if(event.detail===0)reveal(target.current?0:-1)}} onKeyDown={event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();if(context.onManage&&recorded){close(true);context.onManage(recorded)}else reveal(event.key==='ArrowLeft'?-1:0)}if(event.key==='Escape'){event.preventDefault();reveal(0)}}}/>}
  </div>
 }

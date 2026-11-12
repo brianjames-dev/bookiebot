@@ -31,7 +31,7 @@ const css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=
 const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 // Hold mobile emulation at 1× during pose changes; explicit viewport cases below exercise zoom-coordinate guards.
 const html=(dark,old)=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
-async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0){
+async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0,options={}){
  const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[],comparison={hold:false,release:null};
  // A disclosure/fold may first measure these auto-sized grid items at 1px.
  // Verify real painted glyphs recover instead of leaving a zero-sized auto track.
@@ -61,9 +61,11 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url()),name=url.pathname;
+  if(url.origin==='https://bookie.test'&&name.startsWith('/app/transactions')&&options.transactions)return options.transactions(route);
   if(url.origin!=='https://bookie.test'||request.method()!=='GET'){unexpected.push(request.method()+' '+url);return route.abort();}
   if(name==='/app/expenses')return route.fulfill({contentType:'text/html',body:html(dark,old)});
   if(/^\/app\/assets\/category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,path.basename(name)),'utf8')});
+  if(/^\/app\/assets\/company-logo-[\w-]+\.(png|svg)$/.test(name))return route.fulfill({contentType:name.endsWith('.png')?'image/png':'image/svg+xml',body:fs.readFileSync(path.join(assets,path.basename(name)))});
   let value;
   if(name==='/app/expenses/data')value=page.url().includes('pressure=1')?pressureReport:report;
   else if(name==='/app/expenses/months')value={currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
@@ -327,7 +329,8 @@ async function bottomScroll(page){
  await page.setViewportSize({width:867,height:669});await page.waitForTimeout(100);
  await page.emulateMedia({reducedMotion:'reduce'});
 }
-;(async()=>{
+module.exports={fixture,tap,engines:[chromium,webkit]};
+if(require.main===module)(async()=>{
  let checked=0;
  for(const engine of [chromium,webkit]){
   const browser=await engine.launch({headless:true});

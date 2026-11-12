@@ -1,5 +1,6 @@
 .bb-shell-transactions { padding-top: 14px; }
 .bb-transactions { min-width: 0; }
+.bb-recorded-results { display:contents; }
 .bb-transactions-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0; }
 .bb-transactions h1 { font:400 clamp(26px,7vw,30px)/1.15 var(--bb-display-font); margin:0 0 8px; }
 .bb-transactions-heading p,.bb-transaction-list-heading { color:hsl(var(--muted-foreground)); font-size:13px; margin:0; }
