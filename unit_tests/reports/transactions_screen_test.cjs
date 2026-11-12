@@ -2,15 +2,15 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {createRequire}=require('node:module'),req=createRequire(path.resolve('web/expense-report/package.json'))
 const React=req('react'),Renderer=req('react-test-renderer'),ts=req('typescript'),{act}=Renderer
 const requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map()
-let serial=0,tree,work
+let serial=0,tree,work,duoWide=false
 const SwipeContext=React.createContext(null)
-function ActionFixture({entry}){const ctx=React.useContext(SwipeContext),row=ctx.rows.get(entry.id);return React.createElement('div',null,entry.item,['update','split','delete'].filter(op=>row.capabilities[op]).map(op=>React.createElement('button',{key:op,disabled:ctx.locked,onClick:()=>ctx.onAction(row,op)},op==='split'&&row.split?'Edit split':op[0].toUpperCase()+op.slice(1))))}
+function ActionFixture({entry}){const ctx=React.useContext(SwipeContext),row=ctx.rows.get(entry.id);return ctx.onManage?React.createElement('button',{'aria-label':'Manage '+entry.id,disabled:ctx.locked,onClick:()=>ctx.onManage(row)},'Manage entry'):React.createElement('div',null,entry.item,['update','split','delete'].filter(op=>row.capabilities[op]).map(op=>React.createElement('button',{key:op,disabled:ctx.locked,onClick:()=>ctx.onAction(row,op)},op==='split'&&row.split?'Edit split':op[0].toUpperCase()+op.slice(1))))}
 const presentation={
  './transaction-step-motion':{StepMotion:({review,edit,confirm})=>React.createElement(React.Fragment,null,React.createElement('div',{inert:review},edit),React.createElement('div',{inert:!review},confirm))},
  './transaction-undo-popup':{UndoPopup:({notice,onUndo,onDismiss})=>React.createElement('div',{'aria-label':'Undo popup'},notice.title,React.createElement('button',{onClick:onUndo},'Undo'),React.createElement('button',{onClick:onDismiss},'Dismiss undo'))},
- './app-navigation':{useAppNavigation:()=>null},
+ './app-navigation':{useAppNavigation:()=>duoWide?{duoLandscape:true}:null},
  './transaction-swipe':{TransactionSwipeContext:SwipeContext,wrapTransactionRow:(entry)=>React.createElement(ActionFixture,{entry})},
- './daily-transactions':{DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))},
+ './daily-transactions':{TransactionIcon:()=>null,DailyTransactionDays:({groups,wrapRow})=>React.createElement('div',null,groups.flatMap(group=>group.entries.map(entry=>React.createElement(React.Fragment,{key:entry.id},wrapRow(entry,0,React.createElement('div',{className:'bb-daily-transaction'},entry.item))))))},
  './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
@@ -105,6 +105,46 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing());await click('Update');await change('Amount','22.00');await submit();await respond(review(body()));await click('Confirm update');await respond({state:'done',success:true,summary});await reject()
  assert.ok(button('Update').props.disabled,'Confirmed presentation identities remain inert after a failed refresh')
  await click('Refresh transactions');await respond(listing());assert.equal(button('Update').props.disabled,false,'A successful fresh read restores authoritative actionable identities');await run(()=>tree.unmount())
+ // The real editor/controller is shared by both placements, with independent graph preferences.
+ duoWide=true
+ await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing())
+ const graph=()=>tree.root.findAll(node=>node.props['data-graph-open']!==undefined)[0].props['data-graph-open']
+ const inPane=node=>{for(let n=node;n;n=n.parent)if(n.props.className==='bb-duo-action-pane')return true;return false}
+ const forms=()=>tree.root.findAllByType('form').filter(visible)
+ assert.equal(graph(),true,'Unfolded browsing starts with Daily Spending')
+ const beforeDuo=requests.length
+ await click('Manage '+row.id);assert.equal(graph(),false);assert.equal(forms().length,0)
+ assert.ok(button('Edit'));assert.ok(button('Delete'));assert.ok(inPane(button('Edit')))
+ await click('Edit');await change('Amount','23.45')
+ assert.equal(forms().length,1);assert.ok(inPane(forms()[0]),'No inline editor may open in the left list')
+ await click('Show Daily Spending');assert.equal(graph(),true);assert.equal(forms().length,0)
+ await click('Return to transaction editor');assert.equal(input('Amount').props.value,'23.45')
+ assert.equal(requests.length,beforeDuo,'Selection, graph peek and local edits cannot write or review')
+ await run(()=>{duoWide=false;tree.update(fixture(true))})
+ assert.equal(graph(),false,'Unfolding did not alter the closed graph preference')
+ assert.equal(input('Amount').props.value,'23.45');assert.ok(!inPane(forms()[0]))
+ await submit();const duoCommand=body();await respond(review(duoCommand))
+ await run(()=>{duoWide=true;tree.update(fixture(true))})
+ assert.ok(inPane(button('Confirm update')),'An existing review follows the fold into the right pane')
+ assert.equal(graph(),false);await click('Back');assert.equal(input('Amount').props.value,'23.45')
+ await click('Back to transaction actions');assert.equal(forms().length,0);assert.equal(work.dirty,false)
+ await click('Split');assert.ok(inPane(forms()[0]));await change("Brian's share amount",'1.001')
+ await run(()=>{duoWide=false;tree.update(fixture(true))});assert.equal(input("Brian's share amount").props.value,'1.001','An invalid custom input must remain visible when folding')
+ assert.equal(button('Review split').props.disabled,true)
+ await run(()=>{duoWide=true;tree.update(fixture(true))});assert.equal(input("Brian's share amount").props.value,'1.001')
+ await change("Brian's share amount",'6.00')
+ await run(()=>{duoWide=false;tree.update(fixture(true))});assert.equal(input("Brian's share amount").props.value,'6.00')
+ await run(()=>{duoWide=true;tree.update(fixture(true))});assert.equal(input("Brian's share amount").props.value,'6.00')
+ await submit();assert.equal(body().payerShareCents,600);await respond(review(body()))
+ assert.ok(inPane(button('Confirm split')));await cancel();assert.equal(graph(),true)
+ await click('Manage '+row.id);await click('Delete');await submit();await respond(review(body()))
+ await click('Confirm delete');const frozenDuo=body();assert.equal(button('Close transaction options').props.disabled,true)
+ await reject();assert.ok(inPane(button('Check saved status')),'Recovery must be accessible in the right pane')
+ await click('Retry same confirmation');assert.deepEqual(body(),frozenDuo);await respond({state:'done',success:true,summary:{...summary,operation:'delete'},undo:{month:row.month,id:row.month+':delete-duo'}})
+ await respond(listing([]));await run(()=>{for(const [id,timer]of[...timers])if(timer.ms===700){timers.delete(id);timer.fn()}})
+ assert.ok(button('Undo'));await click('Undo');assert.equal(body().operation,'undo');await respond(review(body()))
+ assert.ok(inPane(button('Confirm undo')),'Undo is right-side even when its source row is no longer listed')
+ assert.equal(body().operation,'undo');await respond({state:'done',success:true,summary:{...summary,operation:'undo'}});await respond(listing());await run(()=>tree.unmount());duoWide=false
  for(const {options}of requests){assert.equal(options.referrerPolicy,'same-origin');assert.equal(options.mode,'same-origin');assert.equal(options.credentials,'same-origin');assert.equal(options.headers['X-BookieBot-App'],'1')}
- console.log('Inline transaction review/cancel, combined Move, split cents/pie shortcut, explicit confirmation, immutable recovery, fresh reads, timed Undo handoff and search races passed')
+ console.log('Inline transaction review/cancel, combined Move, split cents/pie shortcut, explicit confirmation, immutable recovery, fresh reads, timed Undo handoff search races and Duo right-pane/fold/graph/draft recovery passed')
 })().catch(error=>{console.error(error);process.exitCode=1})

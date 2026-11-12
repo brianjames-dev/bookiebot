@@ -3,13 +3,13 @@ import {ArrowLeft,ArrowRight,ChevronDown} from 'lucide-react'
 import type {RecordedTransaction} from './transactions-screen'
 import type {TransactionChangeSummary,TransactionOperation} from './transaction-change-summary'
 import {StepMotion} from './transaction-step-motion'
-import {NotchedSplitControl} from './transaction-split-control'
+import {NotchedSplitControl,type SplitInputDraft} from './transaction-split-control'
 import {splitMoney,splitMethodLabel,type SplitMethod} from './transaction-split-model'
 import './transaction-inline-editor.css'
 
 export const transactionMotion={duration:440,rollDuration:1200,strikeDelay:360,strikeDuration:300,strikeHold:700,fadeDuration:260,undoSeconds:8,reorderLift:160,reorderGap:220,reorderTravel:400,reorderLand:180,reorderHeight:6,reorderSpace:3}
-export type InlineSnapshot={row:RecordedTransaction;operation:TransactionOperation;draft:Record<string,string>;destination:string;method:SplitMethod;payerCents:number;review:TransactionChangeSummary|null;canReview:boolean;locked:boolean;busy:boolean;categories:Record<string,string>;persons:string[];error:string}
-type Props={snapshot:InlineSnapshot|null;onField:(key:string,value:string)=>void;onCategory:(value:string)=>void;onShare:(value:number,method:SplitMethod)=>void;onValidity:(value:boolean)=>void;onReview:()=>void;onConfirm:()=>void;onBack:()=>void;onCancel:()=>void;onRemoveSplit:()=>void}
+export type InlineSnapshot={row:RecordedTransaction;operation:TransactionOperation;draft:Record<string,string>;destination:string;method:SplitMethod;payerCents:number;splitInput?:SplitInputDraft;review:TransactionChangeSummary|null;canReview:boolean;locked:boolean;busy:boolean;categories:Record<string,string>;persons:string[];error:string}
+type Props={snapshot:InlineSnapshot|null;onField:(key:string,value:string)=>void;onCategory:(value:string)=>void;onShare:(value:number,method:SplitMethod)=>void;onValidity:(value:boolean)=>void;onSplitInput?:(draft:SplitInputDraft)=>void;onReview:()=>void;onConfirm:()=>void;onBack:()=>void;onCancel:()=>void;onRemoveSplit:()=>void}
 const names:Record<string,string>={amount:'Amount',item:'Item',source:'Income source',location:'Merchant',person:'Card',category:'Category'}
 export function transactionReviewChanges(summary:TransactionChangeSummary,row:RecordedTransaction){
  const restoration=summary.operation==='undo'?summary.restoration:undefined,before=restoration?.current??summary.before
@@ -32,7 +32,7 @@ export function InlineTransactionEditor(props:Props){
  const current=props.snapshot?props:cached.current,snapshot=current?.snapshot,open=Boolean(props.snapshot)
  useLayoutEffect(()=>{if(!open){setShown(false);return}const frame=requestAnimationFrame(()=>setShown(true));return()=>cancelAnimationFrame(frame)},[open])
  if(!current||!snapshot)return null
- const {row,operation,draft,destination,method,payerCents,review,canReview,locked,busy,categories,persons,error}=snapshot
+ const {row,operation,draft,destination,method,payerCents,splitInput,review,canReview,locked,busy,categories,persons,error}=snapshot
  const field=(key:string,label=names[key]??key)=><label key={key}>{label}<input type="text" aria-label={label} inputMode={key==='amount'?'decimal':undefined} disabled={locked} value={draft[key]??''} onChange={event=>current.onField(key,event.target.value)}/></label>
  const payer=row.splitOptions?.payerName??'You',partner=row.splitOptions?.partnerName??'Partner',incomeTarget=row.splitOptions?.incomePayerCents
  const editing=operation==='update'||operation==='move',title=editing?'Update purchase':operation==='split'?'Split purchase':operation==='delete'?'Delete purchase':operation==='undo'?'Undo change':'Remove split'
@@ -46,7 +46,7 @@ export function InlineTransactionEditor(props:Props){
     {row.editableFields.filter(key=>['item','source'].includes(key)).map(key=>field(key))}
     {['food','shopping','need_expenses'].includes(destination)&&!row.editableFields.includes('item')&&field('item')}
     <div className="bi-secondary-fields">{row.editableFields.includes('location')&&field('location')}{row.editableFields.includes('person')&&<label>Card<span className="bi-select"><select aria-label="Person or card" disabled={locked} value={draft.person??''} onChange={event=>current.onField('person',event.target.value)}>{[...new Set([draft.person,...persons])].filter(Boolean).map(value=><option key={value} value={value}>{value}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>}</div>
-   </>:operation==='split'?<><NotchedSplitControl total={row.amountCents} payerCents={payerCents} method={method} incomeBasis={incomeTarget===undefined?5000:Math.round(incomeTarget/row.amountCents*10000)} incomeTarget={incomeTarget} payerName={payer} partnerName={partner} allowCustom={row.splitOptions?.custom??false} capture={7} disabled={locked||Boolean(review)} onChange={current.onShare} onValidityChange={current.onValidity}/>{row.capabilities.cancel_split&&<button type="button" className="bi-cancel" disabled={locked} onClick={current.onRemoveSplit}>Remove split</button>}</>:<div className="bi-delete-copy"><p>{operation==='delete'?'Remove this recorded purchase?':operation==='cancel_split'?'Remove this split?':'Undo this change?'}</p><span>{operation==='delete'?'Only this entry is removed. Its saved history is retained.':'Repayments remain separate.'}</span></div>}
+   </>:operation==='split'?<><NotchedSplitControl inputDraft={splitInput} onInputDraft={current.onSplitInput} total={row.amountCents} payerCents={payerCents} method={method} incomeBasis={incomeTarget===undefined?5000:Math.round(incomeTarget/row.amountCents*10000)} incomeTarget={incomeTarget} payerName={payer} partnerName={partner} allowCustom={row.splitOptions?.custom??false} capture={7} disabled={locked||Boolean(review)} onChange={current.onShare} onValidityChange={current.onValidity}/>{row.capabilities.cancel_split&&<button type="button" className="bi-cancel" disabled={locked} onClick={current.onRemoveSplit}>Remove split</button>}</>:<div className="bi-delete-copy"><p>{operation==='delete'?'Remove this recorded purchase?':operation==='cancel_split'?'Remove this split?':'Undo this change?'}</p><span>{operation==='delete'?'Only this entry is removed. Its saved history is retained.':'Repayments remain separate.'}</span></div>}
    <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={current.onCancel}>Cancel</button><button type="submit" className="bi-primary" disabled={!canReview||locked}>{busy?'Preparing review…':operation==='delete'?'Review deletion':operation==='split'?'Review split':'Review change'}</button></footer>
    </form>
   </>} confirm={<>

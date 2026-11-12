@@ -1,5 +1,12 @@
 # Agent Decisions
 
+## 2026-11-11 - Approved Duo Transactions right-side actions
+
+The user approved the code-native two-page Transactions preview and its follow-up action/editor placement. Opted-in open landscape uses the existing physical fold/native-strip geometry: native period/total/filter/search and independently scrolling day groups left; Daily Spending right, clear of the accepted glass dock. A tapped entry replaces the graph with a right-side action chooser and the existing InlineTransactionEditor. All edit/category-change/split/delete/review/confirmation, uncertain-save controls and Undo stay right. The graph button peeks and returns to the same parent-owned draft; Back returns to the chooser and Cancel/close restores browsing. Keep raw split input with the parent draft so invalid text and validation also survive pane changes. Fold transfers a draft/review; unfolding a revealed closed swipe menu transfers it to the chooser.
+
+Keep one existing transaction controller and unchanged review/confirm/idempotency/recovery/repayment/data flow. Only placement changes; no preview fetch/runtime code ships. Closed graph state is independent of the unfolded graph/editor state. Closed and ordinary devices retain native swipe/inline behavior, and the stationary Duo content/dock ownership is unchanged. Bounded results and editor scrollers include pagination, empty/error and recovery states; no document growth or scroll-driven dock positioning. This supersedes the preview rollback for the newly user-approved Transactions layout. Native acceptance is STATUS checklist 273.
+
+
 ## 2026-11-11 - Shared dollar axis and separate comparison context
 
 The user’s screenshots show confusing gray progress-like bars and oversized closed-Duo comparison styling. Stack the two month rows with distinct month/fill colors, exact values and one rounded dollar axis with visible endpoints and headroom. Native SVG rectangles encode the actual ratio directly; neither month defines a 100% goal. Existing net refunds use a signed axis/zero marker; zero and cent-sized amounts remain accurate. For the supplied $3,043.37 and $3,149.82 the common extent is $0–$3,500. Totals, matching-period selection, difference and percentage remain server-authoritative.
