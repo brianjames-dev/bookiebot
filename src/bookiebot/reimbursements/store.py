@@ -90,7 +90,7 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
                 "sourceWorksheet", "sourceRow", "sourceActionId", "sourceYear", "grossCents", "payerShareCents",
                 "partnerShareCents", "method", "accounting"}
     optional = {"splitActionId", "sourceSpreadsheetId", "settledCents", "sourceValues", "sourceColumnMap", "actorKey",
-                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle", "customPayerBasisPoints", "customPayerRatio"}
+                "ledgerSpreadsheetId", "ledgerYear", "originalPerson", "legacyReceivedAt", "sourceSheetTitle", "baselineSettledCents", "lifecycle", "customPayerBasisPoints", "customPayerRatio", "billPlanId", "partnerSourceLabel", "billCategory"}
     if not isinstance(payload, dict) or set(payload) - required - optional or required - set(payload):
         raise ReimbursementValidationError("Allocation fields are missing or unexpected.")
     result: dict[str, Any] = {}
@@ -108,6 +108,19 @@ def _allocation_details(payload: Any) -> dict[str, Any]:
     result["expenseDate"] = _date(payload["expenseDate"], "Expense date")
     result["sourceRow"] = _integer(payload["sourceRow"], "Source row", 1, 1_000_000)
     result["sourceYear"] = _integer(payload["sourceYear"], "Source year", 1900, 2200)
+    if "billPlanId" in payload:
+        identity = _text(payload["billPlanId"], "Bill plan", 96, required=True)
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9_-]{6,96}", identity) or payload["sourceWorksheet"] != "income":
+            raise ReimbursementValidationError("The recurring bill source is invalid.")
+        result["billPlanId"] = identity
+        result["partnerSourceLabel"] = _text(payload.get("partnerSourceLabel"), "Partner bill", 200, required=True)
+        from bookiebot.sheets.recurring import CATEGORIES
+        if payload.get("billCategory") not in CATEGORIES:
+            raise ReimbursementValidationError("The recurring bill category is invalid.")
+        result["billCategory"] = payload["billCategory"]
+    elif "partnerSourceLabel" in payload or "billCategory" in payload:
+        raise ReimbursementValidationError("The recurring bill identity is missing.")
     result["sourceSpreadsheetId"] = _text(payload.get("sourceSpreadsheetId", ""), "Source spreadsheet", 200)
     result["splitActionId"] = _text(payload.get("splitActionId", ""), "Split action", 200)
     for key in ("grossCents", "payerShareCents", "partnerShareCents", "settledCents"):

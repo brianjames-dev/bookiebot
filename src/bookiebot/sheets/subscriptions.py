@@ -12,7 +12,7 @@ from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config, now_pacific
 from bookiebot.sheets.utils import clean_money
 
-SubscriptionCadence = Literal["monthly", "yearly"]
+SubscriptionCadence = Literal["monthly", "yearly", "quarterly"]
 
 
 class _WorksheetWithUpdate(Protocol):
@@ -46,6 +46,10 @@ class Subscription:
     active: bool = True
     source_range: str = ""
     updated_at: str = ""
+    effective_from: str = "0001-01"
+    effective_until: str = "9999-12"
+    pull_months: tuple[int, ...] = ()
+    monthly_source: bool = False
 
 
 @dataclass(frozen=True)
@@ -330,8 +334,25 @@ def _parse_block_layout(
     return subscriptions
 
 
-def list_subscription_schedules(rows: list[list[str]] | None = None) -> list[Subscription]:
+def list_subscription_schedules(rows: list[list[str]] | None = None, *, all_versions: bool = False, period: str | None = None) -> list[Subscription]:
+    if rows is None:
+        existing = getattr(get_sheets_repo(), "find_subscription_schedule_sheet", lambda: None)()
+        if existing is not None:
+            from bookiebot.sheets.recurring_rows import managed
+            candidate = existing.get_all_values()
+            if managed(candidate):
+                rows = candidate
     rows_data = rows if rows is not None else cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
+    from bookiebot.sheets.recurring_rows import managed, decode
+    from bookiebot.sheets.recurring import SUBSCRIPTION_TAB, selected
+    if managed(rows_data):
+        plans = decode(rows_data, SUBSCRIPTION_TAB)
+        plans = plans if all_versions else selected(plans, period or now_pacific().strftime("%Y-%m"))
+        return [Subscription(p.name, (p.amount_cents or 0) / 100, cast(SubscriptionCadence, p.cadence),
+            p.pull_day or None, p.pull_months[0] if p.cadence == "yearly" else None,
+            id=p.id, kind="Wants" if p.category == "subscriptions_wants" else "Needs", account=p.account,
+            active=p.active, source_range="billplan:" + p.id, effective_from=p.effective_from,
+            effective_until=p.effective_until, pull_months=p.pull_months, monthly_source=p.monthly_source) for p in plans]
     subscriptions = _parse_normalized_table(rows_data)
     if subscriptions:
         return [subscription for subscription in subscriptions if subscription.active]
@@ -464,6 +485,9 @@ def _write_subscription_schedule_rows(subscriptions: list[Subscription]) -> None
     rows = [NORMALIZED_SCHEDULE_HEADERS] + [_subscription_to_row(subscription) for subscription in subscriptions]
     ws = get_sheets_repo().subscription_schedule_sheet()
     existing_rows = ws.get_all_values()
+    from bookiebot.sheets.recurring_rows import managed
+    if managed(existing_rows):
+        return  # Native Bills settings are authoritative after enrollment.
     rows_to_write = max(len(rows), len(existing_rows), 1)
     width = max(len(NORMALIZED_SCHEDULE_HEADERS), max((len(row) for row in existing_rows), default=0))
     padded_rows = [
@@ -475,6 +499,10 @@ def _write_subscription_schedule_rows(subscriptions: list[Subscription]) -> None
 
 
 def sync_subscription_schedule_sheet() -> list[Subscription]:
+    from bookiebot.sheets.recurring_rows import managed
+    existing = get_sheets_repo().subscription_schedule_sheet().get_all_values()
+    if managed(existing):
+        return list_subscription_schedules(existing, all_versions=True)
     rows = cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
     subscriptions = parse_visible_subscription_schedules(rows)
     drafts = _parse_visible_subscription_schedule_drafts(rows)
@@ -483,6 +511,12 @@ def sync_subscription_schedule_sheet() -> list[Subscription]:
 
 
 def debug_subscription_sync() -> tuple[list[Subscription], list[SubscriptionParseWarning]]:
+    existing = getattr(get_sheets_repo(), "find_subscription_schedule_sheet", lambda: None)()
+    if existing is not None:
+        from bookiebot.sheets.recurring_rows import managed
+        candidate = existing.get_all_values()
+        if managed(candidate):
+            return list_subscription_schedules(candidate, all_versions=True), []
     rows = cast(list[list[str]], get_sheets_repo().subscriptions_sheet().get_all_values())
     subscriptions, warnings = parse_visible_subscription_schedules_with_warnings(rows)
     drafts = _parse_visible_subscription_schedule_drafts(rows)
@@ -494,7 +528,7 @@ def list_normalized_subscription_schedules() -> list[Subscription]:
     rows = get_sheets_repo().subscription_schedule_sheet().get_all_values()
     if not rows:
         return []
-    subscriptions = _parse_normalized_table(rows)
+    subscriptions = list_subscription_schedules(rows)
     return [subscription for subscription in subscriptions if subscription.active]
 
 
@@ -504,6 +538,14 @@ def _clamped_date(year: int, month: int, day: int) -> date:
 
 
 def next_pull_date(subscription: Subscription, today: date) -> date | None:
+    if not subscription.active:
+        return None
+    if subscription.id and subscription.source_range.startswith("billplan:"):
+        from bookiebot.sheets.recurring import BillPlan, SUBSCRIPTION_TAB
+        return BillPlan(subscription.id, "subscription", subscription.name, round(subscription.amount * 100),
+            subscription.cadence, subscription.pull_day or 0, subscription.pull_months, "static_bills_subscriptions_needs",
+            subscription.account, subscription.name, SUBSCRIPTION_TAB, effective_from=subscription.effective_from,
+            effective_until=subscription.effective_until).next_date(today)
     if subscription.pull_day is None:
         return None
 
@@ -532,6 +574,8 @@ def due_subscription_reminders_for_subscriptions(
 ) -> list[SubscriptionReminder]:
     reminders: list[SubscriptionReminder] = []
     for subscription in subscriptions:
+        if subscription.monthly_source:
+            continue
         if not subscription.active:
             continue
         pull_date = next_pull_date(subscription, today)

@@ -9,6 +9,7 @@ from bookiebot.sheets.config import category_layout, normalize_expense_category
 from dateutil import parser as dateparser
 from collections import defaultdict, Counter
 from bookiebot.sheets.routing import (
+    SheetRoutingError,
     SpreadsheetQuotaError,
     UnknownDiscordUserError,
     get_user_config,
@@ -460,6 +461,17 @@ async def average_daily_spend(persons: Optional[list[str]] = None):
 async def expense_breakdown_percentages(persons: list[str] | None = None):
     if not persons:
         return {}
+    from bookiebot.sheets.recurring_storage import repository_managed
+    if repository_managed():
+        from bookiebot.reports.expense_breakdown import build_expense_breakdown_report, parse_budget_month
+        from bookiebot.sheets.routing import get_user_config
+        actor = get_current_discord_user_id()
+        if actor is None:
+            raise SheetRoutingError("Choose your budget profile before reading bill totals.")
+        config = get_user_config(actor)
+        report = build_expense_breakdown_report(actor_key=actor, owner_name=config.name, persons=persons, month=parse_budget_month())
+        result = {key: dict(value) for key, value in report.breakdown.items()}
+        return {"categories": result, "grand_total": round(sum(float(v["amount"]) for v in result.values()), 2)}
 
     ws = _expense_ws()
     if ws is None:
@@ -1429,11 +1441,17 @@ async def list_subscriptions():
     wants_total = 0.0
 
     rows = ws.get_all_values()
+    from bookiebot.sheets.recurring_rows import managed
+    hidden = getattr(get_sheets_repo(), "find_subscription_schedule_sheet", lambda: None)()
+    authoritative = hidden.get_all_values() if hidden is not None else []
+    is_managed = managed(authoritative)
+    if is_managed:
+        rows = authoritative
     try:
         from bookiebot.sheets.subscriptions import list_subscription_schedules
 
         schedules = list_subscription_schedules(rows)
-        if schedules:
+        if schedules or is_managed:
             for subscription in schedules:
                 is_need = subscription.kind.lower() in {"need", "needs"}
                 target = needs if is_need else wants
@@ -1444,6 +1462,8 @@ async def list_subscriptions():
                     wants_total += subscription.amount
             return needs, round(needs_total, 2), wants, round(wants_total, 2)
     except Exception:
+        if is_managed:
+            raise  # A damaged managed schedule must not resurrect its old mirror.
         logger.exception("Failed to parse subscription schedules; falling back to legacy layout")
 
     # Needs and Wants start at row 7 (0-based index = 6)
@@ -1478,6 +1498,10 @@ def log_payment(category_label, amount, *, return_action_id: bool = False):
     Finds the row where column B matches category_label (case-insensitive),
     and writes the amount to column C of that row.
     """
+    from bookiebot.sheets.recurring_storage import repository_managed
+    if repository_managed():
+        from bookiebot.sheets.routing import SheetRoutingError
+        raise SheetRoutingError("Enter monthly bill amounts in Settings → Bills. Edit an existing charge or split in Transactions.")
     try:
         ws = _income_ws()
         rows = ws.get_all_values()

@@ -220,19 +220,15 @@ export function PhoneNotifications({ embedded = false }: { embedded?: boolean } 
   const body = (
       <div className="bb-notification-settings">
         {embedded && <div className="bb-notification-embedded-state"><h2>Notifications</h2><strong role="status">{stateLabel}</strong></div>}
-        <p>Choose what this phone receives. Each phone has its own preferences.</p>
-        {!supported && <p>On iPhone, open BookieBot from your Home Screen to enable notifications. Requires iOS 16.4 or later.</p>}
-        {toggle("weekly", "Weekly check-in · Mondays")}
-        {toggle("upcoming", "Scheduled payments · day before")}
-        <p className="bb-notification-hint">Payment reminders are additional to your Discord reminders and start only when selected.</p>
-        <label className="bb-notification-option"><span>Delivery time · Pacific</span><select aria-label="Notification delivery time" value={preferences.hour} disabled={busy || !settings} onChange={(event) => changePreferences({ ...preferences, hour: Number(event.target.value) })}>
+        {!supported && <p>Open from your Home Screen to enable notifications (iOS 16.4+).</p>}
+        {toggle("weekly", "Weekly summary · Mondays")}
+        {toggle("upcoming", "Payment reminders · day before")}
+        <label className="bb-notification-option"><span>Delivery time (Pacific)</span><select aria-label="Notification delivery time" value={preferences.hour} disabled={busy || !settings} onChange={(event) => changePreferences({ ...preferences, hour: Number(event.target.value) })}>
           {Array.from({ length: 15 }, (_, index) => index + 7).map((hour) => <option key={hour} value={hour}>{hour % 12 || 12} {hour < 12 ? "AM" : "PM"}</option>)}
         </select></label>
-        {toggle("showAmounts", "Show amounts on the Lock Screen")}
-        <p className="bb-notification-hint">Amounts stay private unless you enable them. Signing out or resetting phone access stops future sends.</p>
-        {settings?.enabled && <p className="bb-notification-hint">Changes save automatically. Choose at least one notification type, or use Turn off.</p>}
+        {toggle("showAmounts", "Show Lock Screen amounts")}
         <div className="bb-notification-actions">
-          <button className="bb-toolbar-button" type="button" onClick={() => void save()} disabled={busy || !settings || (!settings.enabled && (!registration || !supported)) || (!preferences.weekly && !preferences.upcoming)}>{busy ? "Saving…" : settings?.enabled ? "Save preferences" : "Enable on this phone"}</button>
+          {(!settings?.enabled || dirty || busy) && <button className="bb-toolbar-button" type="button" onClick={() => void save()} disabled={busy || !settings || (!settings.enabled && (!registration || !supported)) || (!preferences.weekly && !preferences.upcoming)}>{busy ? "Saving…" : settings?.enabled ? "Save preferences" : "Enable on this phone"}</button>}
           {settings?.enabled && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => void turnOff()}>Turn off</button>}
           {settings?.enabled && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => void sendTest()}>Send a test</button>}
           {(!settings || (supported && !registration)) && !preparing && <button className="bb-toolbar-button" type="button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>Try again</button>}

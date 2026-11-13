@@ -62,6 +62,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url()),name=url.pathname;
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/transactions')&&options.transactions)return options.transactions(route);
+  if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills')&&options.bills)return options.bills(route);
   if(url.origin!=='https://bookie.test'||request.method()!=='GET'){unexpected.push(request.method()+' '+url);return route.abort();}
   if(name==='/app/expenses')return route.fulfill({contentType:'text/html',body:html(dark,old)});
   if(/^\/app\/assets\/category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,path.basename(name)),'utf8')});

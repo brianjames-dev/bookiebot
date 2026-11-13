@@ -39,6 +39,8 @@ export interface AppNavigation {
   preferences: ReturnType<typeof useReportViewPreferences>
   sourceRequest: { section: string; id: number } | null
   consumeSource?: (id: number) => void
+  billTransaction?: {month:string;id:string;date?:string}|null
+  consumeBillTransaction?: ()=>void
 }
 export const AppNavigationContext = createContext<AppNavigation | null>(null)
 export const useAppNavigation = () => useContext(AppNavigationContext)

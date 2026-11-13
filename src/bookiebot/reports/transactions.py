@@ -128,8 +128,8 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
     kind = kind if kind in {"expense", "income", "payment", "savings"} else "expense"
     uid = f"{month}:{logged.id}"
     version = digest([asdict(logged), current])
-    category = action.metadata.get("category", "")
-    description = values.get("item") or values.get("source") or expense_category_label(category) or action.description
+    category = action.metadata.get("bill_category") or action.metadata.get("category", "")
+    description = action.metadata.get("bill_display_name") or values.get("item") or values.get("source") or action.metadata.get("exact_source_label") or expense_category_label(category) or action.description
     generated = (action.metadata.get("linked_repayment") == "true") or manual and (values.get("item", "").startswith(("Reimbursement ·", "Offset ·"))
                             or values.get("location", "").startswith(("Reimbursement to ", "Offset to ")))
     owner = get_user_config(actor).budget_owner_key
@@ -152,6 +152,7 @@ def _public(actor: str, month: str, logged: undo.LoggedAction, rows: list[list[s
             split_options["payerCents"] = (cents(action.metadata["payer_share"]) if canonical and "payer_share" in action.metadata
                                             else round(split_amounts(gross_cents / 100, split_method, owner)[0] * 100))
     return {"id": uid, "actionId": logged.id, "month": month, "version": version,
+            **({"billPlanId": action.metadata["bill_plan_id"]} if action.metadata.get("bill_plan_id") else {}),
             "date": _date(values.get("date", "")), "title": description, "location": values.get("location", ""),
             "person": values.get("person") or action.metadata.get("person") or get_user_config(actor).name,
             "kind": kind, "category": category, "categoryLabel": expense_category_label(category) if category else kind.title(),
@@ -204,9 +205,14 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
     for row, values in enumerate(personal, 1):
         label = cell(personal, row, 2)
         if label and _normalize_label(label) in payment_labels:
+            group = payment_labels[_normalize_label(label)][0]
+            from bookiebot.sheets.bills import list_bill_schedules
+            schedule = next((s for s in list_bill_schedules(bill_schedule_rows or [], period=month) if s.source_label == label), None)
+            amount_column = 4 if schedule and group == "subscriptions_wants" else 3
+            extra = {"bill_plan_id": schedule.plan_id, "bill_category": group, "bill_display_name": schedule.display_name} if schedule and schedule.plan_id else {}
             yield undo.LoggedAction(id=f"sheet-payment-{row}", created_at=month + "-01", user_key=actor,
-                action=undo.UndoAction(worksheet="income", kind="restore_cells", row=row, columns=[3], previous_values=[""],
-                    new_values=[cell(personal, row, 3)], metadata={"type": "payment", "category": label, "exact_source_label": label}, description=label))
+                action=undo.UndoAction(worksheet="income", kind="restore_cells", row=row, columns=[amount_column], previous_values=[""],
+                    new_values=[cell(personal, row, amount_column)], metadata={"type": "payment", "category": label, "exact_source_label": label, **extra}, description=label))
     savings_labels = {"enter monthly savings contribution", "enter 1st paycheck deposit", "enter 2nd paycheck deposit"}
     for row, values in enumerate(personal, 1):
         for col, label in enumerate(values, 1):
@@ -274,8 +280,10 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
             logs = [f"_BookieBot Action Log - {year:04d}-{number:02d}" for number in numbers]
-            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule", "Subscriptions"])
-            schedules = list_bill_schedules(personal.get("_BookieBot Bill Schedule", []))
+            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule", "Subscriptions", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges"])
+            from bookiebot.sheets.recurring_rows import runtime_tables
+            bills, subscriptions, _ = runtime_tables(owner, personal.get("_BookieBot Bill Schedule", []),
+                personal.get("_BookieBot Subscription Schedule", []), personal.get("Subscriptions", []), personal.get("_BookieBot Bill Charges", []))
             shared_rows = read_workbook_tabs(client, get_shared_expenses_spreadsheet_id(year), [*titles, *logs])
             for number, title, log in zip(numbers, titles, logs):
                 if title not in shared_rows or title not in personal:
@@ -283,6 +291,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                         raise TransactionValidation("That month's transaction sheets are not available.")
                     continue
                 period = f"{year:04d}-{number:02d}"
+                schedules = list_bill_schedules(bills, period=period)
                 history = []
                 if log in shared_rows and any(shared_rows[log]):
                     if shared_rows[log][0][:6] != undo._LOG_HEADERS:
@@ -295,7 +304,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                     entry for entry in history if entry.status == "active" and entry.action.metadata.get("type") not in {"system_state", "delete"}
                 ], history=history), history)
                 occupied = set()
-                for logged, manual in [(entry, False) for entry in active] + [(entry, True) for entry in _manual_actions(actor, period, shared_rows[title], personal[title], personal.get("_BookieBot Bill Schedule", []))]:
+                for logged, manual in [(entry, False) for entry in active] + [(entry, True) for entry in _manual_actions(actor, period, shared_rows[title], personal[title], bills)]:
                     a = logged.action
                     if manual:
                         managed = [value for value in allocations if value["payerOwner"] == owner and value["sourceYear"] == year
@@ -313,7 +322,8 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                             _normalized_label = lambda value: re.sub(r"[^a-z0-9]", "", str(value).casefold())
                             if any(value["partnerOwner"] == owner and value["sourceYear"] == year
                                    and value["sourceSheetTitle"] == title and value["sourceWorksheet"] == "income"
-                                   and _normalized_label(value["category"]) == _normalized_label(a.metadata.get("category", "")) for value in allocations):
+                                   and ((value.get("billPlanId") and value.get("billPlanId") == a.metadata.get("bill_plan_id"))
+                                        or _normalized_label(value.get("partnerSourceLabel") or value["category"]) == _normalized_label(a.metadata.get("category", ""))) for value in allocations):
                                 a.metadata["linked_repayment"] = "true"
                     address = (a.worksheet, a.row, a.metadata.get("category", "") if a.worksheet == "expense" else "")
                     if address in occupied:
@@ -337,14 +347,14 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                         elif "incomePayerCents" in row["splitOptions"]:
                             row["splitOptions"]["payerCents"] = row["splitOptions"]["incomePayerCents"]
                     if row["kind"] == "payment":
-                        timing = bill_payment_state(row["category"], year, number, schedules, as_of=as_of)
-                        if not timing.paid:
+                        timing = bill_payment_state(a.metadata.get("exact_source_label") or row["category"], year, number, schedules, as_of=as_of)
+                        if not timing.paid and not a.metadata.get("bill_charge_date"):
                             continue
-                        row["date"] = timing.withdrawal_date.isoformat() if timing.withdrawal_date else ""
+                        row["date"] = a.metadata.get("bill_charge_date") or (timing.withdrawal_date.isoformat() if timing.withdrawal_date else "")
                         row["version"] = digest([row["version"], row["date"]])
                     if row["amountCents"] > 0:
                         result.append(row)
-                result.extend(_subscription_rows(actor, period, personal.get("Subscriptions", []), as_of=as_of))
+                result.extend(_subscription_rows(actor, period, subscriptions, as_of=as_of))
         # A debtor may have no sheet expense until a repayment is confirmed.
         # Purchase context is a disclosure, never a new cash transaction. Existing
         # recipient bill cells already represent that cash and get the same cue.
@@ -356,7 +366,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
             if not context or int(context["month"][:4]) not in years or month not in {"all", context["month"]}:
                 continue
             recipient = next((row for row in result if allocation["sourceWorksheet"] == "income"
-                              and row["month"] == context["month"] and row["category"] == allocation["category"]
+                              and row["month"] == context["month"] and (row.get("billPlanId") == allocation.get("billPlanId") if allocation.get("billPlanId") else row["category"] == allocation["category"])
                               and row.get("notice", "").startswith("This is a linked repayment.")), None)
             if recipient is not None:
                 attach_repayment(recipient, details)
@@ -620,13 +630,8 @@ class TransactionCommands:
         self.access = access
 
     def initialize(self):
-        with self.access.connect(write=True) as db:
-            if isinstance(self.access, PostgresAppAccessStore):
-                db.execute("SELECT pg_advisory_xact_lock(84392509)")
-            db.execute("CREATE TABLE IF NOT EXISTS app_transaction_owners (owner_key TEXT PRIMARY KEY)")
-            db.execute("""CREATE TABLE IF NOT EXISTS app_transaction_commands (
-                owner_key TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
-                state TEXT NOT NULL, result_json TEXT NOT NULL, command_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(owner_key, request_id))""")
+        from bookiebot.reports.financial_commands import initialize_commands
+        initialize_commands(self.access)
 
     def saved(self, owner: str, request_id: str):
         with self.access.connect() as db:
@@ -673,6 +678,8 @@ class TransactionCommands:
             pending = db.execute("SELECT request_id FROM app_transaction_commands WHERE owner_key=? AND state!='done'", (owner,)).fetchone()
             if pending:
                 raise TransactionConflict("A prior change still needs verification. Check its saved status before another change.")
+            if db.execute("SELECT request_id FROM app_bill_commands WHERE owner_key=? AND state!='done'", (owner,)).fetchone():
+                raise TransactionConflict("A bill change needs verification. Check its saved status in Settings → Bills first.")
             db.execute("INSERT INTO app_transaction_commands VALUES (?,?,?,'running','{}',?,?)", (owner, request_id, fingerprint, json.dumps(body,sort_keys=True),datetime.now(timezone.utc).isoformat()))
         state, result = "done", {}
         writer_started = False

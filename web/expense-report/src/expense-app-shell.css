@@ -101,6 +101,7 @@
 .bb-settings-note, .bb-app-version { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.6; }
 .bb-settings-action { min-height: 44px; border: 0; background: transparent; color: hsl(var(--primary)); font: inherit; text-align: left; padding: 8px 0; cursor: pointer; }
 .bb-settings-action:disabled { opacity: .5; cursor: default; }
+.bb-app-shell[data-duo-landscape="true"] .bb-shell-bills { max-width:none; }
 .bb-setting-switch { width: 52px; height: 44px; padding: 6px 2px; border: 0; background: transparent; position: relative; flex: 0 0 52px; cursor: pointer; }
 .bb-setting-switch::before { content: ""; position: absolute; inset: 8px 2px; border-radius: 20px; background: hsl(var(--foreground) / .18); transition: background var(--bb-motion-duration); }
 .bb-setting-switch[aria-checked="true"]::before { background: hsl(var(--primary)); }

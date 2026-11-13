@@ -68,6 +68,10 @@ Main-tab headings share Overview’s exact title font and position in both poses
 
 Turn the preference off to use the standard responsive layout. After updating from the Home Screen icon, verify both poses and both themes using acceptance checklist 274 (the user accepted the fold/scroll navbar behavior in checklist 269).
 
+## Bills
+
+Settings → Bills opens subscriptions, variable bills and fixed bills. Configure a starting month and optional split for new charges, enter monthly variable amounts, or open a recorded charge in the native Transactions editor. Stop/restart schedules from a chosen month while preserving earlier months. Closed DUO uses an inline editor; open landscape uses equal list/editor panes. See [Bills](BILLS.md).
+
 ## Optional phone notifications
 
 If Enable previously showed “Change notifications from BookieBot,” load the available app update first, then tap **Enable on this phone** again. Existing iPhone permission can be reused; the section must say **On** and confirm the save. Change one preference and refresh to confirm it persists. Reinstalling the Home Screen icon is unnecessary.

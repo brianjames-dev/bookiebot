@@ -12,6 +12,10 @@ from unit_tests.support.sheets_repo_stub import SheetsRepoStub
 @pytest.fixture(autouse=True)
 def _freeze_today(monkeypatch):
     monkeypatch.setattr(su, "get_local_today", lambda: datetime(2025, 5, 15))
+    from bookiebot.sheets.repo import GSpreadSheetsRepository
+    # These legacy worksheet-function doubles have no managed hidden sources.
+    monkeypatch.setattr(GSpreadSheetsRepository, "find_bill_schedule_sheet", lambda self: None)
+    monkeypatch.setattr(GSpreadSheetsRepository, "find_subscription_schedule_sheet", lambda self: None)
     yield
 
 
