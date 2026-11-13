@@ -1,4 +1,4 @@
-import {Children,cloneElement,isValidElement,useEffect,useLayoutEffect,useRef,useState,type ReactElement,type ReactNode} from 'react'
+import {Children,cloneElement,isValidElement,useEffect,useLayoutEffect,useRef,type ReactElement,type ReactNode} from 'react'
 import {ArrowUp,ArrowDown,Clock3} from 'lucide-react'
 import type {RecordedTransaction} from './transactions-screen'
 import {InlineTransactionEditor,transactionMotion,type InlineEditorProps} from './transaction-inline-editor'
@@ -62,11 +62,4 @@ export function TransactionRepaymentEditor({row,open,compact,editing,editor,onCl
    <footer className="bi-editor-footer sp-summary-footer"><button className="bi-cancel" type="button" disabled={locked} onClick={onClose}>Close</button><button className="bi-primary" type="button" onClick={onEdit} disabled={!details.canEdit||!shown.capabilities.split||locked} aria-describedby={details.editReason?'reason-'+shown.id:undefined}>Edit split</button></footer>
   </div>} confirm={<InlineTransactionEditor {...editor} embedded/>}/>
  </section>
-}
-
-export function RepaymentExpansion({open,children}:{open:boolean;children:ReactNode}){
- const [shown,setShown]=useState(false),[present,setPresent]=useState(open)
- useLayoutEffect(()=>{if(!open){setShown(false);if(matchMedia('(prefers-reduced-motion: reduce)').matches)setPresent(false);return}setPresent(true);const frame=requestAnimationFrame(()=>setShown(true));return()=>cancelAnimationFrame(frame)},[open])
- useEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)'),change=()=>{if(media.matches&&!open)setPresent(false)};media.addEventListener('change',change);return()=>media.removeEventListener('change',change)},[open])
- return <div className="bi-expansion sp-inline-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open} onTransitionEnd={event=>{if(event.target===event.currentTarget&&event.propertyName==='grid-template-rows'&&!open)setPresent(false)}}><div className="bi-expansion-clip"><div className="bi-editor sp-inline-editor">{(present||open)&&children}</div></div></div>
 }

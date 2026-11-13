@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-12 — Persistent editor scenes and separate tree guides
+
+Keep one expansion per selected compact row and one unfolded pane while switching between native transaction actions and reimbursement details. Retain the outgoing and incoming scene under the existing 440ms slide; inactive surfaces are inert and hidden from assistive technology. Nested Edit/Review and reimbursement/split transitions keep their existing draft, confirmation and feedback controller. If nested content finishes measuring during a slide, retarget the height from its current presentation value within the remaining slide time. Reduced motion settles immediately; changing editors never closes and reopens the row.
+
+The user's clarified tree layout supersedes the parent-only guide decision below: each child editor has its own guide, inset 4px from that level's row/logo origin, matching the parent level's left-edge alignment rather than the logo center. Single-entry date/weekday placement is independent of editor state; remove the older conditional 3px padding.
+
+Unfolded offset inspection reuses the normal transaction context card and a small split explanation, without financial action buttons or a footer Close. The existing pane X closes it. Compact recorded details retain their inline Close. Financial capabilities, requests, persistence and reconciliation semantics are unchanged. Native acceptance is STATUS checklist 280.
+
 ## 2026-11-11 - Day inspection preserves the selected report period
 
 The latest user feedback supersedes the month-jump choice below and checklist 276: tapping or releasing a graph drag applies an idempotent, removable full-date chip to the Transactions list only. Keep the shared report month, period headline and graph/window unchanged, including when the inspected day belongs to an earlier month. Explicit month selection still changes the report and clears the day filter. Retain the accepted pointer/scroll cancellation and editor locks.

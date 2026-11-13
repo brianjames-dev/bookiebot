@@ -9,7 +9,7 @@ import './transaction-inline-editor.css'
 
 export const transactionMotion={duration:440,rollDuration:1200,strikeDelay:360,strikeDuration:300,strikeHold:700,fadeDuration:260,undoSeconds:8,reorderLift:160,reorderGap:220,reorderTravel:400,reorderLand:180,reorderHeight:6,reorderSpace:3}
 export type InlineSnapshot={row:RecordedTransaction;operation:TransactionOperation;draft:Record<string,string>;destination:string;method:SplitMethod;payerCents:number;splitInput?:SplitInputDraft;review:TransactionChangeSummary|null;canReview:boolean;locked:boolean;busy:boolean;categories:Record<string,string>;persons:string[];error:string}
-export type InlineEditorProps={embedded?:boolean;snapshot:InlineSnapshot|null;onField:(key:string,value:string)=>void;onCategory:(value:string)=>void;onShare:(value:number,method:SplitMethod)=>void;onValidity:(value:boolean)=>void;onSplitInput?:(draft:SplitInputDraft)=>void;onReview:()=>void;onConfirm:()=>void;onBack:()=>void;onCancel:()=>void;onRemoveSplit:()=>void}
+export type InlineEditorProps={embedded?:boolean;contained?:boolean;snapshot:InlineSnapshot|null;onField:(key:string,value:string)=>void;onCategory:(value:string)=>void;onShare:(value:number,method:SplitMethod)=>void;onValidity:(value:boolean)=>void;onSplitInput?:(draft:SplitInputDraft)=>void;onReview:()=>void;onConfirm:()=>void;onBack:()=>void;onCancel:()=>void;onRemoveSplit:()=>void}
 const names:Record<string,string>={amount:'Amount',item:'Item',source:'Income source',location:'Merchant',person:'Card',category:'Category'}
 export function transactionReviewChanges(summary:TransactionChangeSummary,row:RecordedTransaction){
  const restoration=summary.operation==='undo'?summary.restoration:undefined,before=restoration?.current??summary.before
@@ -60,5 +60,5 @@ export function InlineTransactionEditor(props:InlineEditorProps){
   </>}/>
   {error&&<p role="alert" className="bs-error">{error}</p>}
  </section>
- return props.embedded?content:<div className="bi-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open}><div className="bi-expansion-clip">{content}</div></div>
+ return props.embedded||props.contained?content:<div className="bi-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open}><div className="bi-expansion-clip">{content}</div></div>
 }
