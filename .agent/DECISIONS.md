@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-12 — One slide owner per editor route
+
+All Edit, Split, Delete and reimbursement routes share native StepMotion's 440ms duration/easing in both DUO poses. Preserve the active scene for field/review updates, but give each incoming route visit a fresh inner view: reactivating a cached summary or review must not start a second inner slide inside the outer route slide. The outgoing surface and outer workspace stay mounted for motion; controlled drafts, invalid split text, review/confirmation identity and recovery remain in TransactionsScreen. Native Edit/Review and reimbursement/Edit split slides continue within the current visit.
+
+When folding restores an already active compact editor, start its expansion open rather than replaying the user-open animation. Folding settles presentation at the current requested view without changing financial state, then subsequent routes animate normally. Compare expansion height to the current intrinsic content in fold regressions, because available width and text wrapping also change during the resize; do not mistake that layout change for replaying expansion. Reduced motion settles immediately. Native acceptance is STATUS checklist 281, retaining 280's guides/date/offset requirements.
+
 ## 2026-11-12 — Persistent editor scenes and separate tree guides
 
 Keep one expansion per selected compact row and one unfolded pane while switching between native transaction actions and reimbursement details. Retain the outgoing and incoming scene under the existing 440ms slide; inactive surfaces are inert and hidden from assistive technology. Nested Edit/Review and reimbursement/split transitions keep their existing draft, confirmation and feedback controller. If nested content finishes measuring during a slide, retarget the height from its current presentation value within the remaining slide time. Reduced motion settles immediately; changing editors never closes and reopens the row.
