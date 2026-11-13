@@ -3,7 +3,7 @@ import {Pencil,UsersRound,Trash2} from 'lucide-react'
 import type {DailyTransaction} from './transaction-identity'
 import type {RecordedTransaction} from './transactions-screen'
 import type {ReactNode} from 'react'
-interface SwipeState { manager: {close?: (instant?:boolean)=>void}; rows: Map<string,RecordedTransaction>; locked:boolean; onAction:(row:RecordedTransaction,operation:'update'|'split'|'delete')=>void; onManage?:(row:RecordedTransaction)=>void; selectedId?:string }
+interface SwipeState { manager: {close?: (instant?:boolean)=>void}; rows: Map<string,RecordedTransaction>; locked:boolean; onAction:(row:RecordedTransaction,operation:'update'|'split'|'delete')=>void; onManage?:(row:RecordedTransaction)=>void; onInspect?:(row:RecordedTransaction)=>void; selectedId?:string }
 const settings={buttonWidth:54,duration:420}
 
 export const TransactionSwipeContext=createContext<SwipeState|null>(null)
@@ -17,7 +17,8 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
  const available=actions.filter(([operation])=>recorded?.capabilities[operation])
  const actionWidth=settings.buttonWidth*available.length
  const revealWidth=()=>Math.min(actionWidth,Math.max(0,shell.current?.clientWidth??actionWidth))
- const readonly=context.locked||entry.status==='scheduled'||!recorded||!available.length
+ const disabled=context.locked||entry.status==='scheduled'||!recorded
+ const readonly=disabled||!available.length,selectable=!disabled&&(available.length>0||Boolean(context.onManage||context.onInspect))
  const paint=(value:number,animate=false)=>{
   const el=shell.current;if(!el)return
   const width=revealWidth()
@@ -103,12 +104,15 @@ function TransactionSwipeRow({entry,position,children,standalone=false}:{entry:D
   else paint(target.current*revealWidth(),true)
  }
  function activate(operation:'update'|'split'|'delete'){if(readonly||!recorded)return;reveal(0);context.onAction(recorded,operation)}
- return <div className="bb-recorded-swipe" ref={shell} data-readonly={readonly} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={()=>{drag.current=null;paint(target.current*revealWidth(),true)}} style={{'--bb-recorded-button-width':`${settings.buttonWidth}px`,'--bb-recorded-action-width':`${actionWidth}px`,'--bb-recorded-action-count':available.length} as React.CSSProperties}>
+ return <div className="bb-recorded-swipe" ref={shell} data-readonly={readonly} onClickCapture={event=>{
+   if(suppressed.current){event.preventDefault();event.stopPropagation();return}
+   if(target.current!==0&&!(event.target as Element).closest('.bb-recorded-swipe-actions')){event.preventDefault();event.stopPropagation();close()}
+  }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={()=>{drag.current=null;paint(target.current*revealWidth(),true)}} style={{'--bb-recorded-button-width':`${settings.buttonWidth}px`,'--bb-recorded-action-width':`${actionWidth}px`,'--bb-recorded-action-count':available.length} as React.CSSProperties}>
   {available.length>0&&<div className="bb-recorded-swipe-actions bb-recorded-actions-left" role="group" aria-label={`Actions for ${entry.location||entry.item}`} inert={side!==-1} aria-hidden={side!==-1}>
    {available.map(([op,label,Icon])=><button type="button" className={`bb-recorded-action bb-recorded-action-${op}`} key={op} disabled={readonly} onClick={()=>activate(op)} aria-label={`${label} ${entry.location||entry.item}`}><Icon aria-hidden="true"/></button>)}
   </div>}
   {children}
   {/* Closed mode keeps swipe/keyboard disclosure; unfolded taps open the right pane. */}
-  {!readonly&&<button type="button" className="bb-recorded-row-access" aria-label={`Show actions for ${entry.location||entry.item}`} aria-expanded={context.onManage?context.selectedId===recorded?.id:side!==0} aria-controls={context.onManage?'bb-duo-transaction-pane':undefined} style={{transform:`translateX(${target.current*revealWidth()}px)`}} onClick={event=>{if(suppressed.current)return;if(context.onManage&&recorded){close(true);context.onManage(recorded)}else if(event.detail===0)reveal(target.current?0:-1)}} onKeyDown={event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();if(context.onManage&&recorded){close(true);context.onManage(recorded)}else reveal(event.key==='ArrowLeft'?-1:0)}if(event.key==='Escape'){event.preventDefault();reveal(0)}}}/>}
+  {selectable&&<button type="button" className="bb-recorded-row-access" aria-label={`${available.length?'Show actions':'View details'} for ${entry.location||entry.item}`} aria-expanded={context.onManage||!available.length?context.selectedId===recorded?.id:side!==0} aria-controls={context.onManage?'bb-duo-transaction-pane':!available.length?(recorded?.repayment?'repayment-':'recorded-details-')+recorded?.id:undefined} style={{transform:`translateX(${target.current*revealWidth()}px)`}} onClick={event=>{if(suppressed.current)return;if(context.onManage&&recorded){close(true);context.onManage(recorded)}else if(!available.length&&recorded&&context.onInspect){context.manager.close?.(true);context.onInspect(recorded)}else if(event.detail===0)reveal(target.current?0:-1)}} onKeyDown={event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();if(context.onManage&&recorded){close(true);context.onManage(recorded)}else if(!available.length&&recorded&&context.onInspect)context.onInspect(recorded);else reveal(event.key==='ArrowLeft'?-1:0)}if(event.key==='Escape'){event.preventDefault();reveal(0)}}}/>}
  </div>
 }

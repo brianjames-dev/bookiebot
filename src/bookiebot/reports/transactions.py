@@ -546,11 +546,39 @@ def _undo_review_row(actor: str, month: str, action_id: str) -> dict[str, Any]:
     return row
 
 
-def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
+def _accepted_split_row(actor: str, month: str, body: dict[str, Any]) -> dict[str, Any] | None:
+    """Review an accepted canonical snapshot with a fresh ledger guard.
+
+    Split arithmetic needs no month-wide Sheets read. Confirmation still reads
+    the complete source and revalidates the reviewed version before any writer.
+    Cache eviction, noncanonical sources and other operations use the full path.
+    """
+    if body.get("operation") != "split" or not shared.enabled():
+        return None
+    with _CACHE_LOCK:
+        candidates = [rows for (cached_actor, cached_month, _day), (_time, rows) in _CACHE.items()
+                      if cached_actor == actor and cached_month in {month, "all"}]
+        row = next((row for rows in candidates for row in rows if row["id"] == body.get("id")
+                    and row["month"] == month and row["version"] == body.get("version")
+                    and row.get("repayment", {}).get("accounting") == "cash_v1"
+                    and row.get("repayment", {}).get("direction") == "incoming"), None)
+    if row is None:
+        return None
+    owner = get_user_config(actor).budget_owner_key
+    snapshot = shared.build_reimbursement_store().snapshot(owner, include_inactive=True)
+    allocation = next((value for value in snapshot["allocations"]
+                       if value["id"] == row["repayment"]["id"] and value["payerOwner"] == owner), None)
+    if allocation is None or repayment_details(allocation, snapshot["events"], owner) != row["repayment"]:
+        raise TransactionConflict("This split changed. Refresh Transactions before reviewing it again.")
+    return row
+
+
+def review(actor: str, body: dict[str, Any], *, fresh_source: bool = False) -> dict[str, Any]:
     month = body.get("month")
     if not isinstance(month, str) or month == "all":
         raise TransactionValidation("Choose the transaction's recorded month.")
-    row = (_undo_review_row(actor, month, str(body.get("id", "")).removeprefix(month + ":")) if body.get("operation") == "undo" else
+    accepted = None if fresh_source else _accepted_split_row(actor, month, body)
+    row = accepted or (_undo_review_row(actor, month, str(body.get("id", "")).removeprefix(month + ":")) if body.get("operation") == "undo" else
            next((row for row in load_transactions(actor, month, fresh=True) if row["id"] == body.get("id")), None))
     if row is None:
         raise TransactionConflict("This transaction is no longer available. Reload Transactions.")
@@ -582,6 +610,8 @@ def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
         payload["share"] = {"method": method, "payerCents": round(payer * 100), "partnerCents": round(partner * 100)}
         if method == "custom":
             payload["share"].update(payerBasisPoints=basis if basis is not None else round(payer / (payer + partner) * 10_000), payerName=row["splitOptions"]["payerName"], partnerName=row["splitOptions"]["partnerName"])
+    if payload.get("share"):
+        payload["reviewVersion"] = digest([row["version"], normalized, payload["share"]])
     return {"review": payload, "_row": row, "_normalized": normalized}
 
 
@@ -648,7 +678,7 @@ class TransactionCommands:
         writer_started = False
         try:
             with undo._RECENT_MUTATION_LOCK:
-                checked = review(actor, body)
+                checked = review(actor, body, fresh_source=True)
                 if body.get("reviewVersion") != checked["review"]["reviewVersion"]:
                     raise TransactionConflict("The review changed. Review the transaction again.")
                 row, data = checked["_row"], dict(checked["_normalized"])
