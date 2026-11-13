@@ -133,7 +133,8 @@
 .bs-review-note { margin:10px 0 0; color:hsl(var(--muted-foreground)); font-size:11px; line-height:16px; }
 @container biphone (max-width:340px) { .bi-product { padding-inline:12px; } .bi-key-fields,.bi-secondary-fields { grid-template-columns:minmax(0,1fr); gap:var(--bi-gap); } }
 @media(prefers-reduced-motion:reduce) { .bi-expansion,.bi-editable-row::before { transition:none; } }
-.bi-product.bb-transactions { --bi-padding:12px; --bi-radius:14px; --bi-gap:8px; --bi-field-height:32px; --bi-tint-strength:4%; --bi-right-inset:10px; }
+.bi-product:is(.bb-transactions,.bb-bills) { --bi-padding:12px; --bi-radius:14px; --bi-gap:8px; --bi-field-height:32px; --bi-tint-strength:4%; --bi-right-inset:10px; }
+.bi-product:is(.bb-transactions,.bb-bills) .bi-editor { border-radius:var(--bi-radius); padding-block:4px; }
 .bi-undo-overlay { position:fixed; z-index:80; padding-bottom:calc(110px + env(safe-area-inset-bottom)); border-radius:0; }
 
 .bi-undo-popup>#bi-undo-title { flex:1; min-width:0; }
