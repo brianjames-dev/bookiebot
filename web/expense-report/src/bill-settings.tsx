@@ -40,7 +40,7 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result|null>(null),[pending,setPending]=useState<Command|null>(null),[valid,setValid]=useState(true)
  const [splitInput,setSplitInput]=useState<SplitInputDraft>(null)
  const flight=useRef(false),alive=useRef(true),generation=useRef(0),draftId=useRef(''),abort=useRef<AbortController|null>(null)
- const placement=useRef({order:1,isNew:true})
+ const placement=useRef<{order:number;isNew:boolean;billId?:string}>({order:1,isNew:true})
  const storageKey=`bookiebot:bills-request:${ownerName.toLowerCase()}`
  const reset=useCallback(()=>{setForm(null);setSelected(null);setReview(null);setReviewBody(null);setMode('settings');setAmount('');setError('');setValid(true);setSplitInput(null)},[])
  const updateWork=useAppWorkStatus({label:'Bill changes',pending:busy,uncertain:Boolean(pending),dirty:Boolean(form),onDiscard:reset})
@@ -88,7 +88,7 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
  const visible=snapshot?.bills.filter(b=>filter==='all'||b.type===filter)??[]
  // Keep the editor's row anchor through its closing expansion. Folding changes
  // only the grid placement, never the mounted scenes or controlled draft.
- if(form)placement.current={order:selected?visible.findIndex(bill=>bill.id===selected.id)*2+3:1,isNew:!selected}
+ if(form)placement.current={order:selected?visible.findIndex(bill=>bill.id===selected.id)*2+3:1,isNew:!selected,billId:selected?.id}
  const locked=busy||Boolean(pending),lastReview=useRef<Review|null>(null)
  if(review)lastReview.current=review
  const shownReview=review??lastReview.current
@@ -104,37 +104,37 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
  ]:[]
  const heading=mode==='amount'?'Monthly amount':mode==='adopt'?'Recorded charge':mode==='stop'?'Stop bill':selected?(selected.active?'Edit bill':'Restart bill'):'New bill'
  const editView=form&&snapshot&&<>
-  <header className="sp-flow-heading bb-bill-heading"><h2>{heading}</h2>{selected&&<p className="sp-flow-context">{selected.name}</p>}</header>
-  <form className="bi-fields" onSubmit={e=>{e.preventDefault();void prepare()}}>
+  <header className="sp-flow-heading bb-bill-heading"><h2>{heading}</h2>{selected&&<p className="sp-flow-context">{selected.name}<span className="bb-bills-wide-month"> · {monthLabel(snapshot.month)}</span></p>}</header>
+  <form className="bi-fields bb-bills-form" data-editor-mode={mode} onSubmit={e=>{e.preventDefault();void prepare()}}>
    {mode==='amount'||mode==='adopt'?<>
     {mode==='amount'?<label>Amount paid<span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label="Amount paid" inputMode="decimal" required value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00"/></span></label>:<p className="bi-footnote">Open this {money(selected?.amountCents)} charge in the existing transaction editor.</p>}
    </>:<>
     {selected&&mode==='settings'&&<div className="bb-bills-charge-actions">
      <span className="bi-footnote">{monthLabel(snapshot.month)}</span>
-     {selected.active&&selected.charge.available&&selected.type==='variable'&&!selected.charge.recorded&&!selected.charge.amountCents&&<button type="button" className="bb-settings-action" disabled={locked} onClick={()=>{setMode('amount');setAmount('')}}>Enter monthly amount<ChevronRight aria-hidden="true"/></button>}
-     {(selected.charge.recorded||Boolean(selected.charge.amountCents))&&<button type="button" className="bb-settings-action" disabled={locked} onClick={()=>void openCharge()}>Edit this charge / split<ChevronRight aria-hidden="true"/></button>}
-     {selected.charge.virtual&&selected.charge.date&&selected.charge.date<=snapshot.today&&<button type="button" className="bb-settings-action" disabled={locked} onClick={()=>setMode('adopt')}>Edit this charge / split<ChevronRight aria-hidden="true"/></button>}
-     {selected.active&&<button type="button" className="bb-bills-stop" disabled={locked} onClick={()=>setMode('stop')}><Trash2 aria-hidden="true"/>Stop bill</button>}
+     {selected.active&&selected.charge.available&&selected.type==='variable'&&!selected.charge.recorded&&!selected.charge.amountCents&&<button type="button" className="bb-settings-action" aria-label="Enter monthly amount" disabled={locked} onClick={()=>{setMode('amount');setAmount('')}}><span className="bb-bills-full-label">Enter monthly amount</span><span className="bb-bills-short-label" aria-hidden="true">Monthly amount</span><ChevronRight aria-hidden="true"/></button>}
+     {(selected.charge.recorded||Boolean(selected.charge.amountCents))&&<button type="button" className="bb-settings-action" aria-label="Edit this charge / split" disabled={locked} onClick={()=>void openCharge()}><span className="bb-bills-full-label">Edit this charge / split</span><span className="bb-bills-short-label" aria-hidden="true">Charge / split</span><ChevronRight aria-hidden="true"/></button>}
+     {selected.charge.virtual&&selected.charge.date&&selected.charge.date<=snapshot.today&&<button type="button" className="bb-settings-action" aria-label="Edit this charge / split" disabled={locked} onClick={()=>setMode('adopt')}><span className="bb-bills-full-label">Edit this charge / split</span><span className="bb-bills-short-label" aria-hidden="true">Charge / split</span><ChevronRight aria-hidden="true"/></button>}
+     {selected.active&&<button type="button" className="bb-bills-stop" aria-label="Stop bill" title="Stop bill" disabled={locked} onClick={()=>setMode('stop')}><Trash2 aria-hidden="true"/><span className="bb-bills-full-label">Stop bill</span></button>}
     </div>}
     {mode==='stop'?<p className="bi-footnote">Earlier months stay unchanged.</p>:<>
-     <label>Name<input className="bb-bills-input" required maxLength={100} value={form.name} onChange={e=>change({name:e.target.value})}/></label>
+     <label data-bill-field="name">Name<input className="bb-bills-input" required maxLength={100} value={form.name} onChange={e=>change({name:e.target.value})}/></label>
      <div className="bi-secondary-fields">
-      <label>Type<span className="bi-select"><select aria-label="Type" value={form.type} disabled={Boolean(selected)} onChange={e=>change({type:e.target.value as Form['type'],category:e.target.value==='subscription'?'static_bills_subscriptions_needs':'bills_utilities'})}><option value="subscription">Subscription</option><option value="variable">Variable bill</option><option value="fixed">Fixed bill</option></select><ChevronDown aria-hidden="true"/></span></label>
-      <label>{form.type==='variable'?'Estimate (optional)':'Amount'}<span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label={form.type==='variable'?'Estimate (optional)':'Amount'} required={form.type!=='variable'} inputMode="decimal" placeholder="0.00" value={form.amount} onChange={e=>change({amount:e.target.value})}/></span></label>
+      <label data-bill-field="type">Type<span className="bi-select"><select aria-label="Type" value={form.type} disabled={Boolean(selected)} onChange={e=>change({type:e.target.value as Form['type'],category:e.target.value==='subscription'?'static_bills_subscriptions_needs':'bills_utilities'})}><option value="subscription">Subscription</option><option value="variable">Variable bill</option><option value="fixed">Fixed bill</option></select><ChevronDown aria-hidden="true"/></span></label>
+      <label data-bill-field="amount"><span className="bb-bills-full-label">{form.type==='variable'?'Estimate (optional)':'Amount'}</span><span className="bb-bills-short-label" aria-hidden="true">{form.type==='variable'?'Estimate':'Amount'}</span><span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label={form.type==='variable'?'Estimate (optional)':'Amount'} required={form.type!=='variable'} inputMode="decimal" placeholder="0.00" value={form.amount} onChange={e=>change({amount:e.target.value})}/></span></label>
      </div>
      <div className="bi-secondary-fields">
-      <label>Repeats<span className="bi-select"><select aria-label="Repeats" value={form.cadence} onChange={e=>change({cadence:e.target.value as Form['cadence']})}><option value="monthly">Monthly</option>{form.type!=='subscription'&&<option value="quarterly">Quarterly</option>}<option value="yearly">Yearly</option></select><ChevronDown aria-hidden="true"/></span></label>
-      <label>Payment day<input className="bb-bills-input" type="number" min={1} max={31} required value={form.pullDay} onChange={e=>change({pullDay:Number(e.target.value)})}/></label>
+      <label data-bill-field="cadence">Repeats<span className="bi-select"><select aria-label="Repeats" value={form.cadence} onChange={e=>change({cadence:e.target.value as Form['cadence']})}><option value="monthly">Monthly</option>{form.type!=='subscription'&&<option value="quarterly">Quarterly</option>}<option value="yearly">Yearly</option></select><ChevronDown aria-hidden="true"/></span></label>
+      <label data-bill-field="day">Payment day<input className="bb-bills-input" type="number" min={1} max={31} required value={form.pullDay} onChange={e=>change({pullDay:Number(e.target.value)})}/></label>
      </div>
-     {form.cadence!=='monthly'&&<label>{form.cadence==='yearly'?'Billing month':'First billing month'}<span className="bi-select"><select aria-label={form.cadence==='yearly'?'Billing month':'First billing month'} value={form.firstMonth} onChange={e=>change({firstMonth:Number(e.target.value)})}>{Array.from({length:12},(_,i)=><option value={i+1} key={i}>{new Date(2026,i,1).toLocaleDateString('en-US',{month:'long'})}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>}
+     {form.cadence!=='monthly'&&<label data-bill-field="billing-month"><span className="bb-bills-full-label">{form.cadence==='yearly'?'Billing month':'First billing month'}</span><span className="bb-bills-short-label" aria-hidden="true">{form.cadence==='yearly'?'Billing month':'First month'}</span><span className="bi-select"><select aria-label={form.cadence==='yearly'?'Billing month':'First billing month'} value={form.firstMonth} onChange={e=>change({firstMonth:Number(e.target.value)})}>{Array.from({length:12},(_,i)=><option value={i+1} key={i}>{new Date(2026,i,1).toLocaleDateString('en-US',{month:'long'})}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>}
      <div className="bi-secondary-fields">
-      <label>Budget category<span className="bi-select"><select aria-label="Budget category" value={form.category} onChange={e=>change({category:e.target.value})}>{Object.entries(categoryLabels).filter(([key])=>form.type==='subscription'||key!=='subscriptions_wants').map(([key,label])=><option value={key} key={key}>{label}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>
-      <label>Account<input className="bb-bills-input" maxLength={80} value={form.account} placeholder="Optional" onChange={e=>change({account:e.target.value})}/></label>
+      <label data-bill-field="category"><span className="bb-bills-full-label">Budget category</span><span className="bb-bills-short-label" aria-hidden="true">Category</span><span className="bi-select"><select aria-label="Budget category" value={form.category} onChange={e=>change({category:e.target.value})}>{Object.entries(categoryLabels).filter(([key])=>form.type==='subscription'||key!=='subscriptions_wants').map(([key,label])=><option value={key} key={key}>{label}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>
+      <label data-bill-field="account">Account<input className="bb-bills-input" maxLength={80} value={form.account} placeholder="Optional" onChange={e=>change({account:e.target.value})}/></label>
      </div>
     </>}
-    <label>{mode==='stop'?'Stop from':'Starting month'}<input className="bb-bills-input" type="month" required min={selected?.earliestEffectiveMonth??snapshot.month} value={form.effectiveFrom} onChange={e=>change({effectiveFrom:e.target.value})}/></label>
+    <label data-bill-field="starting-month">{mode==='stop'?'Stop from':'Starting month'}<input className="bb-bills-input" type="month" required min={selected?.earliestEffectiveMonth??snapshot.month} value={form.effectiveFrom} onChange={e=>change({effectiveFrom:e.target.value})}/></label>
     {mode!=='stop'&&<>
-     <label className="bb-bills-toggle"><span>Split new charges</span><input type="checkbox" checked={form.splitMethod!=='none'} disabled={!snapshot.splitsEnabled&&form.splitMethod==='none'} onChange={e=>{setSplitInput(null);setValid(true);change({splitMethod:e.target.checked?'income':'none',payerBasisPoints:snapshot.incomeBasisPoints})}}/></label>
+     <label className="bb-bills-toggle" data-bill-field="split"><span>Split new charges</span><input type="checkbox" checked={form.splitMethod!=='none'} disabled={!snapshot.splitsEnabled&&form.splitMethod==='none'} onChange={e=>{setSplitInput(null);setValid(true);change({splitMethod:e.target.checked?'income':'none',payerBasisPoints:snapshot.incomeBasisPoints})}}/></label>
      {form.splitMethod!=='none'&&<div className="sp-management"><NotchedSplitControl unit="percent" inputDraft={splitInput} onInputDraft={setSplitInput} total={10000} payerCents={selectedIncome} method={form.splitMethod} incomeBasis={snapshot.incomeBasisPoints} capture={6} payerName={snapshot.ownerName} partnerName={snapshot.partnerName} disabled={locked} onChange={(payerBasisPoints,splitMethod)=>change({payerBasisPoints,splitMethod})} onValidityChange={setValid}/></div>}
     </>}
    </>}
@@ -152,22 +152,24 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
  </>
  return <div className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
   <div className="bb-settings-heading"><button className="bb-settings-back" type="button" disabled={locked} onClick={()=>{reset();onBack()}}><ArrowLeft aria-hidden="true"/>Settings</button><h1>Bills</h1><button type="button" className="bb-bills-refresh" aria-label="Refresh bills" disabled={locked||Boolean(form)} onClick={()=>{setResult(null);void load()}}><RefreshCw aria-hidden="true"/></button></div>
-  {error&&!form&&<p className="bb-bills-error" role="alert">{error}</p>}
+  <div className="bb-bills-notices">
+  {error&&(!form||wide)&&<p className="bb-bills-error" role="alert">{error}</p>}
   {result?.detail&&<p role="status" className="bb-bills-status">{result.detail}</p>}
   {pending&&<div className="bb-bills-recovery"><p role="status">Check the saved status before making another change.</p><button className="bb-bills-primary" type="button" disabled={busy} onClick={()=>void checkSaved()}>Check saved status</button><button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void checkSaved(true)}>Retry same confirmation</button></div>}
   {!snapshot&&busy&&<p role="status" className="bb-bills-empty">Loading bills…</p>}
   {!snapshot&&!busy&&<button type="button" className="bb-settings-action" onClick={()=>void load()}>Reload Bills</button>}
+  </div>
   {snapshot&&<div className="bb-bills-panes">
    <section className="bb-bills-list" aria-label="Your bills">
     <div className="bb-bills-toolbar"><select aria-label="Bill type" disabled={locked||Boolean(form)} value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All bills</option><option value="subscription">Subscriptions</option><option value="variable">Variable bills</option><option value="fixed">Fixed bills</option></select><button type="button" className="bb-bills-add" disabled={locked||Boolean(form)} onClick={()=>choose()}><Plus aria-hidden="true"/>Add bill</button></div>
-    {visible.map((bill,index)=><button style={{order:index*2+2}} type="button" className="bb-bills-row" aria-pressed={bill.id===selected?.id} disabled={locked||Boolean(form)} key={bill.id} onClick={()=>choose(bill)}><ReceiptText aria-hidden="true"/><span className="bb-bills-row-text"><strong>{bill.name}</strong><small>{!bill.active?'Stopped':bill.needsSetup?'Finish setup':`${kindLabel[bill.type]} · ${bill.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span><span className="bb-bills-row-amount">{bill.type==='variable'&&bill.charge.recorded?money(bill.charge.amountCents):bill.amountCents===null?'Enter amount':money(bill.amountCents)}{bill.type==='variable'&&(bill.charge.recorded||bill.amountCents!==null)&&<small>{bill.charge.recorded?'this month':'estimate'}</small>}</span><ChevronRight aria-hidden="true"/></button>)}
-    {!visible.length&&<p className="bb-bills-empty">No bills here yet.</p>}
+    <div className="bb-bills-rows">{visible.map((bill,index)=><button style={{order:index*2+2}} type="button" className="bb-bills-row" aria-pressed={bill.id===selected?.id} data-editor-anchor={bill.id===placement.current.billId} disabled={locked||Boolean(form)} key={bill.id} onClick={()=>choose(bill)}><ReceiptText aria-hidden="true"/><span className="bb-bills-row-text"><strong>{bill.name}</strong><small>{!bill.active?'Stopped':bill.needsSetup?'Finish setup':`${kindLabel[bill.type]} · ${bill.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span><span className="bb-bills-row-amount">{bill.type==='variable'&&bill.charge.recorded?money(bill.charge.amountCents):bill.amountCents===null?'Enter amount':money(bill.amountCents)}{bill.type==='variable'&&(bill.charge.recorded||bill.amountCents!==null)&&<small>{bill.charge.recorded?'this month':'estimate'}</small>}</span><ChevronRight aria-hidden="true"/></button>)}
+    {!visible.length&&<p className="bb-bills-empty">No bills here yet.</p>}</div>
    </section>
    <section className="bb-bills-editor" aria-label="Bill editor" data-new={placement.current.isNew} data-open={Boolean(form)} inert={locked} style={{order:placement.current.order}}>
     <EditorExpansion open={Boolean(form)}><EditorScenes scene={mode} open={Boolean(form)}>
      <div className="bi-editor" data-design="levels" data-operation={mode==='stop'?'delete':'update'}>
       <StepMotion review={Boolean(review)} open={Boolean(form)} mode="slide" duration={transactionMotion.duration} edit={editView} confirm={reviewView}/>
-      {error&&<p className="bs-error" role="alert">{error}</p>}
+      {error&&!wide&&<p className="bs-error" role="alert">{error}</p>}
      </div>
     </EditorScenes></EditorExpansion>
     {!form&&<p className="bb-bills-empty">Choose a bill to manage it.</p>}
