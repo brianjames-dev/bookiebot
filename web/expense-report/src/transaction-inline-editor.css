@@ -138,3 +138,8 @@
 .bi-undo-overlay { position:fixed; z-index:80; padding-bottom:calc(110px + env(safe-area-inset-bottom)); border-radius:0; }
 
 .bi-undo-popup>#bi-undo-title { flex:1; min-width:0; }
+
+/* Grouped rows share the day's existing continuous guide. Singleton editors
+   retain the guide beneath their merchant icon. */
+.bb-transactions .bb-daily-day-entries .bi-expansion::before { display:none; }
+.bi-product .bi-editor.bi-editor-embedded { margin:0; padding:0; border-radius:0; background:transparent; }

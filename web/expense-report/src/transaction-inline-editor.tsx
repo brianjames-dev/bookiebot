@@ -37,7 +37,7 @@ export function InlineTransactionEditor(props:InlineEditorProps){
  const payer=row.splitOptions?.payerName??'You',partner=row.splitOptions?.partnerName??'Partner',incomeTarget=row.splitOptions?.incomePayerCents
  const editing=operation==='update'||operation==='move',title=editing?'Update purchase':operation==='split'?'Split purchase':operation==='delete'?'Delete purchase':operation==='undo'?'Undo change':'Remove split'
  const changes=review?transactionReviewChanges(review,row):[]
- const content=<section className={"bi-editor"+(operation==='split'?' sp-management':'')} data-operation={operation} data-review={Boolean(review)} data-design="levels" role="region" aria-label="Edit transaction">
+ const content=<section className={"bi-editor"+(operation==='split'?' sp-management':'')+(props.embedded?' bi-editor-embedded':'')} data-operation={operation} data-review={Boolean(review)} data-design="levels" role="region" aria-label="Edit transaction">
   <span className="bi-sr-only">{title}</span>
   <StepMotion review={Boolean(review)} open={open} mode="slide" duration={transactionMotion.duration} edit={<>
    {operation==='split'&&<header className="sp-flow-heading"><h2>Edit split</h2><p className="sp-flow-context">{row.location||row.title} · {splitMoney(row.amountCents)}</p>{row.capabilities.cancel_split&&<details className="sp-split-options"><summary aria-label="Split options">•••</summary><button type="button" disabled={locked} onClick={current.onRemoveSplit}>Remove split</button></details>}</header>}

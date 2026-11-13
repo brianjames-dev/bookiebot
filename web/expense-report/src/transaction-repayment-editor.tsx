@@ -22,7 +22,7 @@ export function repaymentRow(row:RecordedTransaction,node:ReactNode,open:boolean
  const label=`${incoming?details.partnerName+' owes you':'You owe '+details.payerName} ${splitMoney(details.outstandingCents)}. View repayment details`
  return cloneElement(node,{'data-has-pending-split':true} as any,...children.filter(child=>!used.includes(child)),
   <div className="sp-row-primary" key="primary">{names}{price}</div>,
-  <div className="sp-row-secondary" key="secondary">{meta}<button type="button" className="sp-cue" data-direction={incoming?'receive':'send'} data-split-entry={row.id} aria-label={label} aria-expanded={open} aria-controls={'repayment-'+row.id} disabled={locked} onPointerDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();onOpen()}}><span className="sp-pill">{incoming?<ArrowUp aria-hidden="true"/>:<ArrowDown aria-hidden="true"/>}<span><ChangedMoney value={splitMoney(details.outstandingCents)} motionKey={key+'remaining'}/> {incoming?'Owed':'Due'}</span></span></button></div>)
+  <div className="sp-row-secondary" key="secondary">{meta}<button type="button" className="sp-cue" data-direction={incoming?'receive':'send'} data-split-entry={row.id} aria-label={label} aria-expanded={open} aria-controls={'repayment-'+row.id} disabled={locked} onClick={event=>{event.stopPropagation();onOpen()}}><span className="sp-pill">{incoming?<ArrowUp aria-hidden="true"/>:<ArrowDown aria-hidden="true"/>}<span><ChangedMoney value={splitMoney(details.outstandingCents)} motionKey={key+'remaining'}/> {incoming?'Owed':'Due'}</span></span></button></div>)
 }
 
 /** Both row Split and repayment Edit split render this same nested native editor. */
@@ -31,10 +31,10 @@ export function TransactionRepaymentEditor({row,open,compact,editing,editor,onCl
  if(open)cached.current=row
  const shown=open?row:cached.current,details=shown.repayment!,incoming=details.direction==='incoming',key='split:'+shown.id+':',mode=editing?(editor.snapshot?.review?'review':'edit'):'summary'
  useLayoutEffect(()=>{
-  const root=rootRef.current!,summary=root.querySelector<HTMLElement>(':scope > .bi-step-viewport > .bi-step-edit')!,edit=root.querySelector<HTMLElement>('.sp-management > .bi-step-viewport > .bi-step-edit'),footer=summary.querySelector<HTMLElement>('.sp-summary-footer')!
+  const root=rootRef.current!,summary=root.querySelector<HTMLElement>(':scope > .bi-step-viewport > .bi-step-edit')!,edit=root.querySelector<HTMLElement>('.sp-management > .bi-step-viewport > .bi-step-edit')
   if(!edit)return
   let frame=0
-  const measure=()=>{const current=parseFloat(getComputedStyle(footer).paddingTop)||0,extra=compact?Math.max(0,edit.getBoundingClientRect().height-(summary.getBoundingClientRect().height-current)):0;if(Math.abs(extra-current)>.01)root.style.setProperty('--sp-summary-footer-top',extra.toFixed(4)+'px')}
+  const measure=()=>{const style=getComputedStyle(summary),inset=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0),height=compact?Math.max(0,edit.getBoundingClientRect().height-inset):0,current=parseFloat(root.style.getPropertyValue('--sp-summary-height'))||0;if(Math.abs(height-current)>.01)root.style.setProperty('--sp-summary-height',height.toFixed(4)+'px')}
   measure();const observer=new ResizeObserver(()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(measure)});observer.observe(summary);observer.observe(edit)
   return()=>{observer.disconnect();cancelAnimationFrame(frame)}
  },[compact])

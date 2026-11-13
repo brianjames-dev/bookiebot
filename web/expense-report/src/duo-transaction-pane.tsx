@@ -3,6 +3,7 @@ import {ArrowLeft,ChartNoAxesColumn,Pencil,UsersRound,Trash2,X} from 'lucide-rea
 import {TransactionIcon} from './daily-transactions'
 import {recordedEntry} from './recorded-transaction-view'
 import {transactionMerchant,transactionText} from './transaction-identity'
+import {RecordedTransactionDetails,transactionHasActions} from './transaction-details'
 import type {RecordedTransaction} from './transactions-screen'
 import type {TransactionOperation} from './transaction-change-summary'
 
@@ -25,7 +26,7 @@ export function DuoTransactionPane({row,operation,reviewing,graphOpen,locked,onA
    </div>
   </header>
   <div className="bb-duo-pane-content" hidden={graphOpen}>
-   <div className="bb-duo-entry-context">
+   {!operation&&!transactionHasActions(row)?<RecordedTransactionDetails row={row} onClose={onClose} locked={locked}/>:<><div className="bb-duo-entry-context">
     <TransactionIcon entry={entry} aliases={aliases} eager/>
     <div><strong>{copy.primary}</strong><span>{copy.item?`${copy.category} · ${copy.item}`:copy.category}</span></div>
     <strong className="bb-duo-entry-amount">{amount}</strong>
@@ -34,8 +35,9 @@ export function DuoTransactionPane({row,operation,reviewing,graphOpen,locked,onA
     {actions.map(([op,label,Icon])=><button key={op} type="button" className={`bb-recorded-action bb-recorded-action-${op}`} data-active={operation===op} disabled={locked||!row.capabilities[op]} aria-label={`${label} ${copy.primary}`} onClick={()=>onAction(op)}><Icon aria-hidden="true"/><span>{label}</span></button>)}
    </div>}
    {!operation&&<p className="bb-duo-action-hint">Choose an action for this entry.</p>}
+   </>}
    {status}
-   <div className="bb-duo-editor-host">{editor}</div>
+   <div className="bb-duo-editor-host">{(operation||transactionHasActions(row))&&editor}</div>
   </div>
  </aside>
 }

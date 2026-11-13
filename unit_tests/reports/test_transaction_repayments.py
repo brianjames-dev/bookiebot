@@ -168,3 +168,74 @@ def test_cancelled_split_has_no_pill_and_can_be_split_again(purchase):
     assert 'repayment' not in row and row['split'] == '' and row['capabilities']['split']
     assert row['splitOptions']['payerCents'] == row['splitOptions']['incomePayerCents']
     assert not any(row.get('repayment') for row in listing(purchase,H)['items'])
+
+
+def split_change(row):
+    return {'id':row['id'],'month':row['month'],'version':row['version'],
+            'operation':'split','method':'custom','payerShareCents':120}
+
+
+def test_edit_split_review_reads_fresh_ledger_without_reloading_month_sheets(purchase,monkeypatch):
+    saved,ledger,allocation = purchase
+    row = managed(listing(purchase))
+    before = deepcopy(ledger.snapshot('brian'))
+    monkeypatch.setattr(tx,'read_workbook_tabs',lambda *a,**k:pytest.fail('Warm split review must not reload month sheets'))
+    result = tx.review(B,split_change(row))['review']
+    assert result['share']['payerCents'] == 120 and result['share']['partnerCents'] == 180
+    assert result['item']['version'] == row['version']
+    assert ledger.snapshot('brian') == before
+
+
+def test_fast_split_review_rechecks_pending_reports_and_fails_closed(purchase,monkeypatch):
+    saved,ledger,allocation = purchase
+    row = managed(listing(purchase))
+    ledger.command('hannah',payment(allocation,50,'report_payment'))
+    monkeypatch.setattr(tx,'read_workbook_tabs',lambda *a,**k:pytest.fail('A changed ledger must fail without slow source reads'))
+    with pytest.raises(tx.TransactionConflict):
+        tx.review(B,split_change(row))
+    monkeypatch.setattr(ledger,'snapshot',lambda *a,**k:(_ for _ in ()).throw(RuntimeError('ledger unavailable')))
+    with pytest.raises(RuntimeError,match='ledger unavailable'):
+        tx.review(B,split_change(row))
+
+
+def test_confirm_reloads_source_after_fast_split_review(purchase,monkeypatch):
+    saved,ledger,allocation = purchase
+    row = managed(listing(purchase))
+    change = split_change(row)
+    review = tx.review(B,change)['review']
+    repo = saved.repos[saved.month]
+    with repo.patched():
+        columns = undo._category_columns('shopping')
+        repo.expense.update_cell(3,columns['amount'],'4.00')
+    before = deepcopy(ledger.snapshot('brian'))
+    result = saved.commands.command(B,{**change,'reviewVersion':review['reviewVersion'],
+        'requestId':'isolated-fast-review-source-check'})
+    assert result['state'] == 'done' and not result['success']
+    assert 'changed' in result['detail'].lower()
+    assert ledger.snapshot('brian') == before
+
+
+def test_split_review_cold_cache_falls_back_to_full_source_read(purchase,monkeypatch):
+    row = managed(listing(purchase))
+    tx._CACHE.clear()
+    from unittest.mock import Mock
+    read = Mock(wraps=tx.read_workbook_tabs)
+    monkeypatch.setattr(tx,'read_workbook_tabs',read)
+    assert tx.review(B,split_change(row))['review']['share']['payerCents'] == 120
+    assert read.call_count > 0
+
+
+def test_fast_income_review_keeps_exact_reviewed_shares_bound_on_save(purchase,monkeypatch):
+    saved,ledger,allocation = purchase
+    row = managed(listing(purchase))
+    change = {**split_change(row),'method':'income'}
+    change.pop('payerShareCents')
+    review = tx.review(B,change)['review']
+    from bookiebot.sheets import collaboration
+    target = 1 if review['share']['payerCents'] != 1 else 2
+    monkeypatch.setattr(collaboration,'split_amounts',lambda amount,*a,**k:(target/100,amount-target/100))
+    before = deepcopy(ledger.snapshot('brian'))
+    result = saved.commands.command(B,{**change,'reviewVersion':review['reviewVersion'],
+        'requestId':'isolated-fast-review-income-check'})
+    assert not result['success'] and 'review changed' in result['detail'].lower()
+    assert ledger.snapshot('brian') == before
