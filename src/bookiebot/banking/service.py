@@ -150,12 +150,27 @@ def _existing_schedule_rows(title: str) -> list[list[str]]:
     return worksheet.get_all_values()
 
 
+class _SubscriptionSources(list[Any]):
+    """Retain managed-empty provenance so legacy mirrors cannot reappear."""
+    def __init__(self, values: list[Any], managed: bool):
+        super().__init__(values)
+        self.managed = managed
+
+
 def _read_subscription_schedules() -> list[Any]:
-    return list_subscription_schedules(_existing_schedule_rows(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE))
+    from bookiebot.sheets.recurring_rows import managed
+    rows = _existing_schedule_rows(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE)
+    return _SubscriptionSources([s for s in list_subscription_schedules(rows, all_versions=managed(rows)) if not s.monthly_source], managed(rows))
 
 
 def _read_bill_schedules() -> list[Any]:
-    return list_bill_schedules(_existing_schedule_rows(BILL_SCHEDULE_WORKSHEET_TITLE))
+    from bookiebot.sheets.recurring_rows import managed, runtime_tables
+    rows = _existing_schedule_rows(BILL_SCHEDULE_WORKSHEET_TITLE)
+    subscriptions = _existing_schedule_rows(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE)
+    if managed(rows) or managed(subscriptions):
+        from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config
+        rows, _, _ = runtime_tables(get_user_config(get_current_discord_user_id()).budget_owner_key, rows, subscriptions, [])
+    return list_bill_schedules(rows, all_versions=True)
 
 
 def _bill_amounts_for_schedules(bills: list[Any]) -> list[tuple[Any, bool, float]]:
@@ -164,7 +179,8 @@ def _bill_amounts_for_schedules(bills: list[Any]) -> list[tuple[Any, bool, float
     rows = _existing_schedule_rows(get_current_month_name())
     amounts = []
     for bill in bills:
-        amount = bill_source_amount(rows, bill.source_label)
+        amount = (bill_source_amount(rows, bill.source_label, amount_column=4)
+                  if getattr(bill, "category", "") == "subscriptions_wants" else bill_source_amount(rows, bill.source_label))
         amounts.append((bill, amount is not None and amount > 0, amount or 0.0))
     return amounts
 
@@ -190,7 +206,7 @@ def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[A
                 extra={"actor_key": actor_key},
                 exc_info=True,
             )
-        if not subscriptions and not subscription_load_failed:
+        if not subscriptions and not subscription_load_failed and not getattr(subscriptions, "managed", False):
             try:
                 subscriptions = parse_visible_subscription_schedules()
             except WorksheetNotFound:

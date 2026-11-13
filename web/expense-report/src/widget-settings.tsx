@@ -196,7 +196,6 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
     </div>
     <CollapsibleContent open={formOpen} id={`${id}-form`}>
       <form className="bb-widget-form" onSubmit={event => { event.preventDefault(); if (canCreate && label.trim()) void run({ operation: "pair", label: label.trim(), mode }) }}>
-        <p className="bb-settings-note">Read-only access to {ownerName}’s budget. Small and Medium can share one pairing.</p>
         <label>Widget name<input autoComplete="off" maxLength={60} value={label} disabled={busy} onChange={event => setLabel(event.target.value)} /></label>
         <label>Budget view<select aria-label="New widget budget view" value={mode} disabled={busy} onChange={event => setMode(event.target.value as WidgetMode)}><option value="current">Current</option><option value="projected">Projected</option></select></label>
         <div className="bb-widget-actions"><button className="bb-toolbar-button" type="submit" disabled={!canCreate || !label.trim()}>Create setup code</button><button className="bb-settings-action" type="button" disabled={busy} onClick={discard}>Cancel</button></div>

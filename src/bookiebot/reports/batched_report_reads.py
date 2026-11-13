@@ -44,7 +44,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
     selected_months = range(1, min(month.month + 1, 12) + 1)
     requested: dict[str, list[str]] = {
         personal_id: [*(calendar.month_name[number] for number in selected_months),
-                      "Subscriptions", "_BookieBot Bill Schedule", "Shared Reimbursements", SETTINGS_TAB],
+                      "Subscriptions", "_BookieBot Bill Schedule", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges", "Shared Reimbursements", SETTINGS_TAB],
     }
     requested.setdefault(shared_id, []).append(month.name)
     history_books = {month.year: personal_id}
@@ -104,6 +104,8 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
         personal_budget=ReportWorksheetRows(month.name, personal[month.name]),
         subscriptions=optional("Subscriptions"),
         bill_schedule=optional("_BookieBot Bill Schedule"),
+        subscription_schedule=optional("_BookieBot Subscription Schedule"),
+        bill_charges=optional("_BookieBot Bill Charges"),
         shared_reimbursements=optional("Shared Reimbursements"),
         budget_history=tuple(history),
         savings_settings_rows=personal.get(SETTINGS_TAB),

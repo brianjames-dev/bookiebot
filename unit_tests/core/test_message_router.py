@@ -228,6 +228,9 @@ async def test_utility_message_writes_bill_cell_and_opens_working_split_dialog(m
     from bookiebot.intents import handlers
     import bookiebot.splits as splits
     from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
+    from bookiebot.sheets.repo import GSpreadSheetsRepository
+    monkeypatch.setattr(GSpreadSheetsRepository, "find_bill_schedule_sheet", lambda self: None)
+    monkeypatch.setattr(GSpreadSheetsRepository, "find_subscription_schedule_sheet", lambda self: None)
 
     class Client:
         user = SimpleNamespace(id=1)

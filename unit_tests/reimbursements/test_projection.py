@@ -111,7 +111,12 @@ class Book:
         if len(set(additions)) != len(additions) or set(additions) & set(self.names):
             raise RuntimeError("Duplicate named range; transaction rejected")
         for entry in body["requests"]:
-            if "appendDimension" in entry:
+            if "addSheet" in entry:
+                props = entry["addSheet"]["properties"]
+                self.add_sheet(props["title"]).id = props["sheetId"]
+            elif "updateSheetProperties" in entry:
+                pass
+            elif "appendDimension" in entry:
                 request = entry["appendDimension"]
                 sheet = self.by_id(request["sheetId"])
                 if request["dimension"] == "ROWS":
@@ -149,8 +154,9 @@ class Book:
                 request = entry["updateCells"]
                 assert request["fields"] in {"userEnteredValue,note", "userEnteredValue"}
                 start = request["start"]
-                values = [next(iter(cell["userEnteredValue"].values())) for cell in request["rows"][0]["values"]]
-                self.by_id(start["sheetId"]).write(start["rowIndex"], start["columnIndex"], values)
+                for index, row in enumerate(request["rows"]):
+                    values = [next(iter(cell["userEnteredValue"].values())) for cell in row["values"]]
+                    self.by_id(start["sheetId"]).write(start["rowIndex"] + index, start["columnIndex"], values)
             else:
                 raise AssertionError(entry)
         if self.timeout_after_batch:

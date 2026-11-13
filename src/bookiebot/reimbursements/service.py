@@ -139,6 +139,13 @@ def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], va
             "sourceColumnMap": fields, "sourceValues": values, "actorKey": user_key,
             **amounts, "settledCents": 0, "method": method, "accounting": "cash_v1",
         }
+        if logged.action.metadata.get("bill_plan_id"):
+            from bookiebot.reimbursements.projection import _PERSONAL_BILL_LABELS
+            label = values.get("item") or logged.action.metadata.get("exact_source_label", "")
+            legacy_label = _PERSONAL_BILL_LABELS.get(logged.action.metadata.get("category", "").casefold())
+            payload.update(billPlanId=logged.action.metadata["bill_plan_id"],
+                billCategory=logged.action.metadata["bill_category"],
+                partnerSourceLabel=legacy_label or f"{owner.title()} · {label}")
         allocation = store.register_allocation(payload)
     if not allocation["splitActionId"]:
         split_id = record_undo_action(user_key, UndoAction(

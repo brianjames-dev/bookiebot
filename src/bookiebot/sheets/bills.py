@@ -12,7 +12,7 @@ from openpyxl.utils import get_column_letter
 from bookiebot.sheets.repo import get_sheets_repo
 from bookiebot.sheets.routing import now_pacific
 
-BillRecurrence = Literal["monthly", "quarterly"]
+BillRecurrence = Literal["monthly", "quarterly", "yearly"]
 BillTrackingMode = Literal["manual", "automatic"]
 
 
@@ -57,6 +57,12 @@ class BillSchedule:
     updated_at: str = ""
     expected_amount: float | None = None
     tracking_mode: BillTrackingMode = "manual"
+    active: bool = True
+    category: str = ""
+    plan_id: str = ""
+    effective_from: str = "0001-01"
+    effective_until: str = "9999-12"
+    recorded_months: str = ""
 
 
 @dataclass(frozen=True)
@@ -81,7 +87,7 @@ def bill_payment_state(
     if len(matches) != 1:
         return BillPaymentState(None, False, "ambiguous_schedule" if matches else "missing_schedule")
     bill = matches[0]
-    if bill.recurrence == "quarterly" and month not in bill.pull_months:
+    if bill.recurrence != "monthly" and month not in bill.pull_months:
         return BillPaymentState(None, False, "outside_billing_month")
     withdrawal = _clamped_date(year, month, bill.pull_day)
     return BillPaymentState(withdrawal, withdrawal <= as_of)
@@ -150,6 +156,8 @@ def _parse_recurrence(value: str) -> BillRecurrence | None:
         return "monthly"
     if text in {"quarterly", "quarter"}:
         return "quarterly"
+    if text in {"yearly", "annual"}:
+        return "yearly"
     return None
 
 
@@ -226,10 +234,16 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
             source_label=source_label,
             account=fields.get("account", ""),
             notes=fields.get("notes", ""),
-            source_range=source_range,
+            source_range=("billplan:" + fields["plan_id"] if fields.get("plan_id") and not fields.get("source_range", "").startswith("billplan-receipt:")
+                          else fields.get("source_range") or source_range),
             updated_at=fields.get("updated_at", ""),
             expected_amount=expected_amount,
             tracking_mode="automatic" if mode == "automatic" else "manual",
+            active=fields.get("active", "true").casefold() != "false",
+            category=fields.get("category", ""),
+            plan_id=fields.get("plan_id", ""),
+            effective_from=fields.get("effective_from", "0001-01"), effective_until=fields.get("effective_until", "9999-12"),
+            recorded_months=fields.get("recorded_months", ""),
         ),
         None,
     )
@@ -263,12 +277,29 @@ def ensure_bill_schedule_sheet() -> None:
     _update_range(ws, 1, 1, [BILL_SCHEDULE_HEADERS] + _template_rows())
 
 
-def parse_bill_schedules_with_warnings(rows: list[list[str]] | None = None) -> tuple[list[BillSchedule], list[BillScheduleWarning]]:
+def parse_bill_schedules_with_warnings(rows: list[list[str]] | None = None, *, period: str | None = None, all_versions: bool = False) -> tuple[list[BillSchedule], list[BillScheduleWarning]]:
     if rows is None:
         ensure_bill_schedule_sheet()
         rows = get_sheets_repo().bill_schedule_sheet().get_all_values()
+        sub_sheet = getattr(get_sheets_repo(), "find_subscription_schedule_sheet", lambda: None)()
+        charge_sheet = getattr(get_sheets_repo(), "find_bill_charges_sheet", lambda: None)()
+        sub_rows = sub_sheet.get_all_values() if sub_sheet is not None else []
+        charge_rows = charge_sheet.get_all_values() if charge_sheet is not None else []
+        from bookiebot.sheets.recurring_rows import managed
+        if managed(rows or []) or managed(sub_rows) or charge_rows:
+            from bookiebot.sheets.recurring_rows import runtime_tables
+            from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config
+            rows, _, _ = runtime_tables(get_user_config(get_current_discord_user_id()).budget_owner_key,
+                rows or [], sub_rows, get_sheets_repo().subscriptions_sheet().get_all_values(), charge_rows)
     if not rows:
         return [], []
+    from bookiebot.sheets.recurring_rows import period_rows
+    from bookiebot.sheets.recurring_rows import managed, decode
+    if managed(rows):
+        from bookiebot.sheets.recurring import BILL_TAB
+        decode(rows, BILL_TAB)
+    if not all_versions:
+        rows = period_rows(rows, period or now_pacific().strftime("%Y-%m"))
 
     header = [_normalize_header(value) for value in rows[0]]
     if not {"display_name", "recurrence", "pull_day", "source_label"} <= set(header):
@@ -306,17 +337,17 @@ def parse_bill_schedules_with_warnings(rows: list[list[str]] | None = None) -> t
     return bills, warnings
 
 
-def list_bill_schedules(rows: list[list[str]] | None = None) -> list[BillSchedule]:
-    bills, _warnings = parse_bill_schedules_with_warnings(rows)
+def list_bill_schedules(rows: list[list[str]] | None = None, *, period: str | None = None, all_versions: bool = False) -> list[BillSchedule]:
+    bills, _warnings = parse_bill_schedules_with_warnings(rows, period=period, all_versions=all_versions)
     return bills
 
 
-def bill_source_amount(rows: list[list[str]], source_label: str) -> float | None:
+def bill_source_amount(rows: list[list[str]], source_label: str, *, amount_column: int | None = None) -> float | None:
     """Read one exact bill row; zero is unrecorded, None is unverified."""
     target = _slug(source_label)
     if not target:
         return None
-    matches = [
+    matches = [_cell(row, amount_column - 1) for row in rows if _slug(_cell(row, 1)) == target] if amount_column else [
         _cell(row, index + 1)
         for row in rows
         for index, value in enumerate(row)
@@ -351,6 +382,14 @@ def _next_allowed_month(current_month: int, months: tuple[int, ...]) -> int:
 
 
 def next_bill_pull_date(bill: BillSchedule, today: date) -> date | None:
+    if not bill.active:
+        return None
+    if bill.plan_id:
+        from bookiebot.sheets.recurring import BillPlan, BILL_TAB
+        return BillPlan(bill.plan_id, "fixed" if bill.tracking_mode == "automatic" else "variable", bill.display_name,
+            round(bill.expected_amount * 100) if bill.expected_amount is not None else None, bill.recurrence,
+            bill.pull_day, bill.pull_months, bill.category, bill.account, bill.source_label, BILL_TAB,
+            effective_from=bill.effective_from, effective_until=bill.effective_until).next_date(today)
     if bill.recurrence == "monthly":
         candidate = _clamped_date(today.year, today.month, bill.pull_day)
         if candidate < today:
@@ -377,6 +416,10 @@ def next_bill_pull_date(bill: BillSchedule, today: date) -> date | None:
 
 
 def overdue_bill_pull_date(bill: BillSchedule, today: date) -> date | None:
+    if not bill.active:
+        return None
+    if bill.plan_id and not bill.effective_from <= today.strftime("%Y-%m") < bill.effective_until:
+        return None
     if bill.recurrence == "monthly":
         candidate = _clamped_date(today.year, today.month, bill.pull_day)
     elif today.month in bill.pull_months:
@@ -388,12 +431,39 @@ def overdue_bill_pull_date(bill: BillSchedule, today: date) -> date | None:
 
 def due_bill_reminders_for_bills(bills: list[BillSchedule], today: date) -> list[BillReminder]:
     reminders: list[BillReminder] = []
+    managed_rows: list[list[str]] | None = None
+    recorded_ids: set[str] = set()
+    recorded_labels: set[str] = set()
+    if any(bill.plan_id for bill in bills):
+        managed_rows = get_sheets_repo().income_sheet().get_all_values()
+        from bookiebot.sheets.recurring_charges import decode_charges
+        charges_ws = getattr(get_sheets_repo(), "find_bill_charges_sheet", lambda: None)()
+        if charges_ws is not None:
+            recorded_ids.update(c.plan_id for c in decode_charges(charges_ws.get_all_values())
+                                if c.recorded and c.month == today.strftime("%Y-%m"))
+        from bookiebot.reimbursements import service
+        if service.enabled():
+            from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config
+            owner = get_user_config(get_current_discord_user_id()).budget_owner_key
+            for value in service.build_reimbursement_store().snapshot(owner, include_inactive=True)["allocations"]:
+                if value["payerOwner"] == owner and value["sourceYear"] == today.year and value["sourceWorksheet"] == "income" and value.get("sourceSheetTitle") == today.strftime("%B"):
+                    recorded_ids.add(value.get("billPlanId", ""))
+                    recorded_labels.add(value.get("sourceValues", {}).get("item", ""))
     for bill in bills:
-        amount_entered, amount = bill_amount_for_source_label(bill.source_label)
+        if bill.plan_id and managed_rows is not None:
+            column = 3 if bill.category == "subscriptions_wants" else 2
+            cells = [_cell(row, column) for row in managed_rows if _cell(row, 1) == bill.source_label]
+            amount = _parse_bill_amount(cells[0], allow_zero=True) or 0 if len(cells) == 1 else 0
+            amount_entered = amount > 0 or bill.plan_id in recorded_ids or bill.source_label in recorded_labels
+        else:
+            amount_entered, amount = bill_amount_for_source_label(bill.source_label)
         automatic = bill.tracking_mode == "automatic"
         reminder_amount = bill.expected_amount if automatic else amount if amount_entered else bill.expected_amount
         pull_date = next_bill_pull_date(bill, today)
         if pull_date is not None:
+            if bill.plan_id and (pull_date.year, pull_date.month) != (today.year, today.month):
+                amount_entered = False
+                reminder_amount = bill.expected_amount
             days_until = (pull_date - today).days
             if 0 <= days_until <= 7:
                 reminders.append(BillReminder(bill, pull_date, days_until, reminder_amount, amount_entered))
@@ -406,5 +476,5 @@ def due_bill_reminders_for_bills(bills: list[BillSchedule], today: date) -> list
 
 
 def due_bill_reminders(today: date) -> tuple[list[BillReminder], list[BillScheduleWarning]]:
-    bills, warnings = parse_bill_schedules_with_warnings()
+    bills, warnings = parse_bill_schedules_with_warnings(all_versions=True)
     return due_bill_reminders_for_bills(bills, today), warnings

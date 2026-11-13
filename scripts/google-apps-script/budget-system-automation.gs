@@ -324,6 +324,7 @@ function prepareBudgetMonthTab(bookId, config, period, owner) {
     const plan = resolvePersonalBudgetSavingsPlan(ss, period.name, false);
     if (plan) writePersonalBudgetSavingsPlan(sheet, plan, period.year, false, period.name);
     updatePersonalBudgetImportRanges(sheet, config.sharedExpensesId, period.name, owner);
+    applyManagedBillPlans(ss, sheet, period);
   }
   SpreadsheetApp.flush();
   validatePreparedBudgetMonthTab(sheet, config, period, owner);
@@ -702,6 +703,83 @@ function createYearFilesFromTemplates(year) {
   return config;
 }
 
+function managedBillTable(ss, title) {
+  const sheet=ss.getSheetByName(title);
+  if (!sheet) return null;
+  const rows=sheet.getDataRange().getValues(), headers=rows[0]||[];
+  if (!headers.includes("plan_id")) return null;
+  for(const key of ["effective_from","effective_until","active","bill_type","monthly_source","version"]) {
+    if(!headers.includes(key)) throw new Error(`Incomplete managed bill schedule: ${title}`);
+  }
+  return {sheet,rows,headers};
+}
+
+function carryManagedBillPlans(previous, current) {
+  const known=new Set(["bill_key","display_name","recurrence","pull_day","pull_months","source_label","account","notes","updated_at","expected_amount","tracking_mode","source_range","cadence","name","amount","pull_month","kind","plan_id","effective_from","effective_until","active","bill_type","category","split_method","payer_basis_points","version","request_id","monthly_source","split_starts_on"]);
+  for(const title of ["_BookieBot Bill Schedule","_BookieBot Subscription Schedule"]) {
+    const table=managedBillTable(previous,title);
+    if(!table) continue;
+    const target=current.getSheetByName(title)||current.insertSheet(title);
+    // These are unpublished annual books. Carry the complete version history;
+    // charge/source maps stay in their original annual book and are not copied.
+    if(target.getMaxColumns()<table.headers.length)target.insertColumnsAfter(target.getMaxColumns(),table.headers.length-target.getMaxColumns());
+    if(target.getMaxRows()<table.rows.length)target.insertRowsAfter(target.getMaxRows(),table.rows.length-target.getMaxRows());
+    target.clearContents();
+    target.getRange(1,1,table.rows.length,table.headers.length).setValues(table.rows.map(row=>Array.from({length:table.headers.length},(_,i)=>{
+      const value=row[i]??"";return typeof value==="string"&&value.startsWith("=")?"'"+value:value;
+    })));
+    const formulas=table.sheet.getDataRange().getFormulas();
+    for(let r=1;r<formulas.length;r++)for(let c=0;c<table.headers.length;c++) {
+      if(!known.has(table.headers[c])&&formulas[r][c])target.getRange(r+1,c+1).setFormula(formulas[r][c]);
+    }
+    target.hideSheet();
+  }
+}
+
+function applyManagedBillPlans(ss, sheet, period) {
+  const tables=["_BookieBot Bill Schedule","_BookieBot Subscription Schedule"].map(title=>({title,table:managedBillTable(ss,title)})).filter(value=>value.table);
+  if(!tables.length)return;
+  const plans=[];
+  for(const {title,table} of tables)for(let index=1;index<table.rows.length;index++) {
+    const raw=table.rows[index], item=Object.fromEntries(table.headers.map((key,i)=>[key,raw[i]??""]));
+    if(!item.plan_id)continue;
+    if(String(item.effective_from)<=period.key&&period.key<String(item.effective_until))plans.push({...item,title,row:index+1,headers:table.headers});
+  }
+  const ids=plans.map(plan=>plan.plan_id);if(new Set(ids).size!==ids.length)throw new Error("Overlapping managed bill versions");
+  let rows=sheet.getDataRange().getValues(), formulas=sheet.getDataRange().getFormulas(), tail=rows.length+2;
+  const extras={3:[],4:[]}, virtual={3:[],4:[]};
+  const letter=index=>{let result="";for(let n=index;n;n=Math.floor((n-1)/26))result=String.fromCharCode(65+(n-1)%26)+result;return result;};
+  for(const plan of plans) {
+    const active=String(plan.active).toLowerCase()==="true", monthly=String(plan.monthly_source).toLowerCase()==="true";
+    const day=Number(plan.pull_day), months=String(plan.pull_months||plan.pull_month||"").split(",").map(Number);
+    const cadence=plan.recurrence||plan.cadence, due=active&&day>0&&(cadence==="monthly"||months.includes(period.month));
+    const column=plan.category==="subscriptions_wants"?4:3;
+    const amountColumn=plan.title==="_BookieBot Bill Schedule"?"expected_amount":"amount";
+    const ref=`'${plan.title}'!${letter(plan.headers.indexOf(amountColumn)+1)}${plan.row}`;
+    if(!monthly){if(due)virtual[column].push(ref);continue;}
+    const matches=rows.map((row,i)=>String(row[1]||"").trim()===String(plan.source_label).trim()?i+1:0).filter(Boolean);
+    if(matches.length>1)throw new Error("Ambiguous managed bill source");
+    let row=matches[0];
+    if(!row&&due){row=tail++;sheet.getRange(row,2).setValue(String(plan.source_label).startsWith("=")?"'"+plan.source_label:plan.source_label);extras[column].push(`${letter(column)}${row}`);}
+    if(!row)continue;
+    if(plan.bill_type!=="variable"&&due)sheet.getRange(row,column).setFormula("="+ref);
+    else sheet.getRange(row,column).setValue(0);
+  }
+  for(const column of [3,4]) {
+    const subtotal=column===3?"(Needs) Subtotal:":"(Wants) Subtotal:";
+    if(extras[column].length){
+      const matches=rows.map((row,i)=>row[1]===subtotal?i+1:0).filter(Boolean);if(matches.length!==1)throw new Error("Missing managed bill subtotal");
+      const original=formulas[matches[0]-1][column-1],pattern=new RegExp(`SUM\\(${letter(column)}\\$?\\d+:${letter(column)}\\$?\\d+\\)`,"gi"),sums=[...new Set(original.match(pattern)||[])];
+      if(sums.length!==1)throw new Error("Managed bill subtotal needs review");
+      sheet.getRange(matches[0],column).setFormula(original.split(sums[0]).join(`(${sums[0]}+SUM(${extras[column].join(",")}))`));
+    }
+    if(tables.some(value=>value.title==="_BookieBot Subscription Schedule"))for(let i=0;i<rows.length;i++) {
+      const label=String(rows[i][1]||"").toLowerCase(),matches=column===4?label==="subscriptions (wants)":label==="subscriptions (needs)"||label==="static bills & subscriptions (needs)";
+      if(matches)sheet.getRange(i+1,column).setFormula(virtual[column].length?`=SUM(${virtual[column].join(",")})`:"=0");
+    }
+  }
+}
+
 function initializeNewYearFiles(config, pending = null, pendingKey = null) {
   const previousConfig = getYearConfig(config.year - 1);
   for (const key of ["brianBudgetId", "hannahBudgetId"]) {
@@ -715,6 +793,7 @@ function initializeNewYearFiles(config, pending = null, pendingKey = null) {
       ? resolvePersonalBudgetSavingsPlan(SpreadsheetApp.openById(previousConfig[key]), "December", true)
       : readPersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss));
     if (priorSavings) writePersonalBudgetSavingsPlan(getMonthlyTemplateSheet(ss), priorSavings, config.year);
+    if (previousConfig) carryManagedBillPlans(SpreadsheetApp.openById(previousConfig[key]), ss);
     if (pending) {
       SpreadsheetApp.flush();
       pending[`${key}Initialized`] = true;

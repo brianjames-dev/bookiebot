@@ -71,6 +71,8 @@ def prepare_schedule_change(owner: str, actor: str, item: ReconciliationItem,
     if candidate.action_type != 'schedule':
         raise ScheduleChangeConflict('Choose a scheduled payment.')
     source_ref = candidate.sheet_ref.split('#pull=', 1)[0]
+    if source_ref.startswith("billplan:"):
+        raise ScheduleChangeConflict("Manage this recurring bill in Settings → Bills. Edit an existing charge in Transactions.")
     kind = 'subscription' if candidate.action_id.startswith('schedule:subscription:') else 'bill'
     target = f'{abs(item.transaction.amount):.2f}'
     targets: list[dict[str, Any]] = []

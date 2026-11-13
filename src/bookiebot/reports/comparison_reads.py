@@ -27,7 +27,7 @@ def load_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
     # All baseline months in this annual workbook share four actual HTTP reads.
     # Required batch failures propagate: a quota error is never an empty month.
     personal = read_workbook_tabs(gc, get_budget_spreadsheet_id_for_user(actor, year),
-                                 [*titles, "Subscriptions", "_BookieBot Bill Schedule"])
+                                 [*titles, "Subscriptions", "_BookieBot Bill Schedule", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges"])
     shared = read_workbook_tabs(gc, get_shared_expenses_spreadsheet_id(year), titles)
     history = tuple(BudgetHistoryRows(BudgetMonth(year, number), personal[calendar.month_name[number]])
                     for number in months if calendar.month_name[number] in personal)
@@ -46,6 +46,8 @@ def load_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
                 personal_budget=ReportWorksheetRows(title, personal[title]),
                 subscriptions=ReportWorksheetRows("Subscriptions", personal["Subscriptions"]) if "Subscriptions" in personal else None,
                 bill_schedule=ReportWorksheetRows("_BookieBot Bill Schedule", personal["_BookieBot Bill Schedule"]) if "_BookieBot Bill Schedule" in personal else None,
+                subscription_schedule=ReportWorksheetRows("_BookieBot Subscription Schedule", personal.get("_BookieBot Subscription Schedule", [])),
+                bill_charges=ReportWorksheetRows("_BookieBot Bill Charges", personal.get("_BookieBot Bill Charges", [])),
                 budget_history=history,
             ),
         )

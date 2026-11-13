@@ -166,6 +166,9 @@ class SheetsRepoStub:
     def subscription_schedule_sheet(self):
         return self.subscription_schedule
 
+    def find_subscription_schedule_sheet(self):
+        return self.subscription_schedule
+
     def find_bill_schedule_sheet(self):
         return self.bill_schedule_sheet()
 

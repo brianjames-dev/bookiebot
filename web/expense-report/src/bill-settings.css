@@ -1,0 +1,48 @@
+.bb-bills { width:100%;min-width:0;color:hsl(var(--foreground));padding-bottom:100px }
+.bb-bills .bb-settings-heading { margin-bottom:20px }
+.bb-bills .bb-settings-heading { position:relative;padding-right:48px }
+.bb-bills-refresh { position:absolute;right:0;bottom:0;display:grid;place-items:center;min-width:44px;min-height:44px;border:0;background:transparent;color:hsl(var(--primary)) }
+.bb-bills-panes { display:grid;gap:24px;min-width:0 }
+.bb-bills[data-wide=false] .bb-bills-panes { display:flex;flex-direction:column;gap:0 }
+.bb-bills[data-wide=false] .bb-bills-list { display:contents }
+.bb-bills[data-wide=false] .bb-bills-toolbar { order:0 }
+.bb-bills[data-wide=false] .bb-bills-editor { padding-block:20px }
+.bb-bills[data-wide=true] .bb-bills-panes { grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px }
+.bb-bills-list,.bb-bills-editor { min-width:0 }
+.bb-bills-toolbar { display:flex;justify-content:space-between;gap:12px;margin-bottom:8px }
+.bb-bills select,.bb-bills .bb-bills-input:not([type=checkbox]) { width:100%;min-width:0;min-height:44px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:inherit;font:inherit;padding:10px 12px }
+.bb-bills input:disabled,.bb-bills select:disabled { opacity:.65 }
+.bb-bills-toolbar select { width:auto;max-width:58% }
+.bb-bills button { font:inherit;cursor:pointer }
+.bb-bills button:disabled { opacity:.5;cursor:default }
+.bb-bills-add { display:flex;align-items:center;gap:6px;border:0;background:transparent;color:hsl(var(--primary));padding:8px 0;white-space:nowrap }
+.bb-bills svg { width:18px;height:18px;flex:none }
+.bb-bills-row { display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid hsl(var(--border));background:transparent;color:inherit;padding:16px 0;text-align:left;min-height:72px }
+.bb-bills-row[aria-pressed=true] { color:hsl(var(--primary)) }
+.bb-bills-row-text { min-width:0;flex:1 }
+.bb-bills-row-text strong { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500 }
+.bb-bills-row small { display:block;color:hsl(var(--muted-foreground));font-size:12px;margin-top:4px }
+.bb-bills-row-amount { flex:none;text-align:right;font-size:14px;font-variant-numeric:tabular-nums }
+.bb-bills-editor h2 { margin:0 0 20px;font-size:21px;font-weight:500 }
+.bb-bills-editor h3 { margin:0 0 14px;font-size:16px;font-weight:500 }
+.bb-bills-editor form { display:grid;gap:14px }
+.bb-bills-editor label { display:grid;gap:6px;min-width:0;font-size:13px;color:hsl(var(--muted-foreground)) }
+.bb-bills-editor label input,.bb-bills-editor label select { font-size:15px;color:hsl(var(--foreground)) }
+.bb-bills-fields { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px }
+.bb-bills .bb-bills-toggle { display:flex;justify-content:space-between;align-items:center;min-height:44px;color:hsl(var(--foreground)) }
+.bb-bills-toggle input { width:22px;height:22px;accent-color:hsl(var(--primary)) }
+.bb-bills-actions { display:flex;justify-content:space-between;gap:12px;margin-top:8px;padding:12px 0 }
+.bb-bills-actions button,.bb-bills-primary { min-height:44px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:inherit;padding:10px 20px }
+.bb-bills .bb-bills-primary { background:hsl(var(--primary));border-color:hsl(var(--primary));color:hsl(var(--primary-foreground)) }
+.bb-bills-charge-actions { border-top:1px solid hsl(var(--border));padding-top:18px;display:grid;gap:4px }
+.bb-bills-charge-actions .bb-settings-action { display:flex;align-items:center;justify-content:space-between }
+.bb-bills-stop { border:0;background:transparent;color:hsl(var(--destructive));display:flex;gap:8px;align-items:center;min-height:44px;padding:8px 0 }
+.bb-bills-note,.bb-bills-empty { color:hsl(var(--muted-foreground));font-size:13px;line-height:1.5 }
+.bb-bills-summary { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;font-size:14px;margin:20px 0 }
+.bb-bills-summary strong { color:hsl(var(--muted-foreground));font-weight:400 }
+.bb-bills-summary span { text-align:right }
+.bb-bills-error { color:hsl(var(--destructive));font-size:14px }
+.bb-bills-status,.bb-bills-recovery { font-size:14px;line-height:1.5 }
+.bb-bills-review-amount { font-size:30px;font-variant-numeric:tabular-nums }
+.bb-bills .bs-split { margin:0;max-width:100% }
+@media(max-width:360px) { .bb-bills-fields { gap:8px }.bb-bills-row { gap:7px }.bb-bills-row>svg:first-child { display:none } }

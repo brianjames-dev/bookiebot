@@ -36,6 +36,8 @@ The bot could send a short alert and offer actions like confirm, delete, update,
 
 ### 3. Bill and Subscription Pull-Date Reminders
 
+Implemented 2026-11-13: native Settings → Bills supports subscription, variable and fixed plans, effective-month edits/stops, monthly actual amounts and recurring split defaults. Hidden schedule history, canonical charge/split editing and recoverable monthly/yearly projection preserve recorded cash and prior months. Notification settings use concise labels; [implementation and usage](../docs/BILLS.md).
+
 Track the dates that bills and subscriptions usually pull money from the bank, then send proactive Discord reminders.
 
 Examples:

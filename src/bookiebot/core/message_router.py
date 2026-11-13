@@ -477,6 +477,8 @@ def register_events(client, tree):
             _AVATAR_ROTATION_TASK = asyncio.create_task(run_avatar_rotation_loop(client))
         ensure_bank_reconciliation_loop(client)
         ensure_subscription_reminder_loop(client)
+        from bookiebot.core.recurring_bills import ensure_recurring_bill_loop
+        ensure_recurring_bill_loop()
         try:
             await tree.sync()
             logger.info("✅ Synced application commands")

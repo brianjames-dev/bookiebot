@@ -1589,7 +1589,8 @@ def _fixed_budget_target_matches(ws: Any, action: UndoAction, *, values: list[li
         if "exact_source_label" in action.metadata:
             expected = action.metadata["exact_source_label"].strip().casefold()
             actual = str(row_values[1]).strip().casefold() if len(row_values) > 1 else ""
-            return bool(expected) and amount_column == 3 and actual == expected
+            expected_column = 4 if action.metadata.get("bill_plan_id") and action.metadata.get("bill_category") == "subscriptions_wants" else 3
+            return bool(expected) and amount_column == expected_column and actual == expected
         category = _normalized_sheet_label(action.metadata.get("category"))
         label = _normalized_sheet_label(row_values[1]) if len(row_values) > 1 else ""
         return bool(category) and amount_column == 3 and (label == category or label.startswith(category + " "))

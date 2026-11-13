@@ -92,7 +92,8 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const {kind,category,split,scope,bucket}=transactionFilter(filter)
   const manager=useRef<{close?:(instant?:boolean)=>void}>({})
   const [listing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
-  const [displayScope, setDisplayScope] = useState({filter:"all",month:initialMonth})
+  const [displayScope, setDisplayScope] = useState({filter:"all",month:initialMonth,day:''})
+  const billLoad = useRef('')
   const [selected, setSelected] = useState<RecordedTransaction | null>(null)
   const [repaymentOpen,setRepaymentOpen]=useState(false),splitOrigin=useRef<'row'|'repayment'>('row')
   const [operation, setOperation] = useState<Operation | null>(null), [draft, setDraft] = useState<Record<string, string>>({})
@@ -152,7 +153,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
       if(stage)stage(next)
       else {
         setListing(previous => append && previous ? {...next, items: [...previous.items, ...next.items]} : next)
-        setDisplayScope({filter,month})
+        setDisplayScope({filter,month,day})
         setNeedsFresh(false)
         setUpdatedAt(Date.now())
         if(fresh)setGraphRevision(value=>value+1)
@@ -198,6 +199,26 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     setDestination(row.category); setMethod((row.split || 'income') as SplitMethod); setReview(null); setReviewBody(null); setError(""); setResult(null);setNotice(null)
     setSplitInput(null);setCustomValid(true); setPayerShareCents(row.splitOptions?.payerCents ?? (row.split==='fronted'?0:row.split==='custom'?allocate(row.amountCents,row.splitOptions?.payerBasisPoints??5000):row.split==='equal'?allocate(row.amountCents,5000):row.splitOptions?.incomePayerCents??allocate(row.amountCents,5000)))
   }
+  useEffect(()=>{
+    const target=navigation?.billTransaction
+    if(!active||!target||busy||pending)return
+    const targetDay=target.date||'Undated'
+    if(month!==target.month||day!==targetDay||search||filter!=='all'){discard();setSearch('');setFilter('all');setDay(targetDay);setMonth(target.month);return}
+    if(loading||displayScope.month!==target.month||displayScope.day!==targetDay||!listing)return
+    const row=listing.items.find(item=>item.id===target.id)
+    if(!row){
+      const attempt=target.id+':'+listing.nextOffset
+      if(listing.nextOffset!==null&&billLoad.current!==attempt){billLoad.current=attempt;void load(listing.nextOffset,true);return}
+      setError('Refresh Transactions to find this bill charge.');navigation?.consumeBillTransaction?.();return
+    }
+    const header=product.current?.querySelector<HTMLButtonElement>('.bb-daily-day-header')
+    if(header?.getAttribute('aria-expanded')==='false')header.click()
+    if(duoWide)setDuoGraphOpen(false)
+    if(row.capabilities.split)begin(row,'split')
+    else if(row.capabilities.update)begin(row,'update')
+    else setSelected(row)
+    navigation?.consumeBillTransaction?.()
+  },[active,navigation?.billTransaction,month,day,search,filter,listing,loading,displayScope.month,displayScope.day,busy,pending])
   const preview = async (undo?: {id: string; month: string}, directUndo=false) => {
     if (inFlight.current || uncertain || commit) return
     const row = selected
@@ -321,7 +342,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     setAnnouncement(saved.summary?.operation==='undo'?'Change undone':saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split saved':'Change saved')
     const currentSequence=sequence.current
     const loaded=readBack?true:await load(0,false,true)
-    if(readBack){setListing(readBack);setDisplayScope({filter,month});setNeedsFresh(false);setUpdatedAt(Date.now());setGraphRevision(value=>value+1)}
+    if(readBack){setListing(readBack);setDisplayScope({filter,month,day});setNeedsFresh(false);setUpdatedAt(Date.now());setGraphRevision(value=>value+1)}
     if(!mounted.current||currentSequence!==sequence.current)return
     if(saved.undo&&loaded){const seconds=transactionMotion.undoSeconds;setNotice({id:++sequence.current,title:saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split updated':'Purchase updated',deadline:Date.now()+seconds*1000,seconds,undo:saved.undo})}
     else if(!loaded)setError('Your change was saved. Refresh Transactions to see the current rows.')

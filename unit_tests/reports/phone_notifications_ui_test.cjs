@@ -44,6 +44,9 @@ assert.ok(embeddedHtml.includes('aria-label="Phone notifications"'))
 assert.ok(!embeddedHtml.includes('aria-expanded='), "Settings embeds notifications without another collapsed heading")
 assert.ok(embeddedHtml.includes('role="status"') && embeddedHtml.includes("Loading…"), "Embedded settings retains device status")
 assert.equal([...embeddedHtml.matchAll(/role="switch"/g)].length, 3)
+assert.ok(embeddedHtml.includes("Weekly summary · Mondays") && embeddedHtml.includes("Payment reminders · day before"));
+assert.ok(embeddedHtml.includes("Show Lock Screen amounts"));
+assert.ok(!embeddedHtml.includes("Choose what this phone receives") && !embeddedHtml.includes("bb-notification-hint"), "Setting labels replace the routine explanation paragraphs");
 assert.ok(html.includes('aria-label="Phone notifications"'))
 assert.ok(html.includes('aria-expanded="false"') && html.includes('inert=""'))
 assert.ok(html.includes("iOS 16.4"))

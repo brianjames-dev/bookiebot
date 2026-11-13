@@ -72,6 +72,12 @@ class GSpreadSheetsRepository:
     def find_bill_schedule_sheet(self):
         return get_existing_personal_worksheet("_BookieBot Bill Schedule")
 
+    def find_subscription_schedule_sheet(self):
+        return get_existing_personal_worksheet("_BookieBot Subscription Schedule")
+
+    def find_bill_charges_sheet(self):
+        return get_existing_personal_worksheet("_BookieBot Bill Charges")
+
     def find_shared_reimbursements_sheet(self):
         return get_existing_personal_worksheet("Shared Reimbursements")
 
