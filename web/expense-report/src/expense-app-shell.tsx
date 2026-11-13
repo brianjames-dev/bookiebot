@@ -274,7 +274,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </section>
         </>}
       </main>
-      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} active={screen==='settings'&&billsOpen} onBack={()=>{widgetGuideRef.current=false;setBillsOpen(false)}} onTransaction={target=>{setBillTransaction(target);selectScreen('transactions')}}/></main>}
+      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen==='settings'&&billsOpen} onBack={()=>{widgetGuideRef.current=false;setBillsOpen(false)}} onTransaction={target=>{setBillTransaction(target);selectScreen('transactions')}}/></main>}
       {screen === "settings" && widgetGuideOpen && <main className="bb-shell-settings bb-main" aria-label="Widget setup">
         <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
       </main>}

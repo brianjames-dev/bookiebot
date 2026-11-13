@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
-import {ArrowLeft,ArrowRight,ChevronDown,ChevronRight,Plus,ReceiptText,Trash2,RefreshCw} from 'lucide-react'
+import {ArrowLeft,ArrowRight,ChevronDown,ChevronRight,Plus,Trash2,RefreshCw} from 'lucide-react'
+import {TransactionIcon} from './daily-transactions'
 import {useAppNavigation} from './app-navigation'
 import {useAppWorkStatus} from './app-work-guard'
 import {NotchedSplitControl,type SplitInputDraft} from './transaction-split-control'
@@ -16,6 +17,7 @@ type Form={name:string;type:Bill['type'];amount:string;cadence:Bill['cadence'];p
 type Command=Record<string,unknown>&{operation:string;requestId?:string;reviewVersion?:string}
 type Review={operation:string;reviewVersion:string;name?:string;amountCents?:number;month?:string;date?:string;effectiveFrom?:string;before?:Bill|null;after?:Bill;share?:{method:string;payerName?:string;partnerName?:string;payerCents:number;partnerCents:number};replacesScheduledChanges?:boolean}
 type Result={state:string;success?:boolean;detail?:string;splitPending?:boolean;transaction?:{id:string;month:string}}
+type Draft={form:Form;mode:'settings'|'amount'|'stop'|'adopt';amount:string;review:Review|null;reviewBody:Command|null;splitInput:SplitInputDraft;valid:boolean;draftId:string}
 const money=(cents:number|null|undefined)=>cents===null||cents===undefined?'Not set':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100)
 const monthLabel=(value:string)=>new Date(value+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})
 const kindLabel={subscription:'Subscription',variable:'Variable bill',fixed:'Fixed bill'}
@@ -33,16 +35,18 @@ async function request(path:string,body?:unknown,signal?:AbortSignal){
 }
 function newForm(snapshot:Snapshot,bill?:Bill):Form{return {name:bill?.name??'',type:bill?.type??'subscription',amount:bill?.amountCents==null?'':(bill.amountCents/100).toFixed(2),cadence:bill?.cadence??'monthly',pullDay:bill?.pullDay??1,firstMonth:bill?.pullMonths[0]??Number(snapshot.month.slice(5)),category:bill?.category??'static_bills_subscriptions_needs',account:bill?.account??'',effectiveFrom:[snapshot.month,bill?.earliestEffectiveMonth??'',bill?.effectiveFrom??''].sort()[2],splitMethod:bill?.splitMethod??'none',payerBasisPoints:bill?.payerBasisPoints??snapshot.incomeBasisPoints}}
 
-export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boolean;ownerName:string;onBack:()=>void;onTransaction:(target:{month:string;id:string})=>void}){
+export function BillSettings({active,ownerName,aliases,onBack,onTransaction}:{active:boolean;ownerName:string;aliases?:Record<string,string>;onBack:()=>void;onTransaction:(target:{month:string;id:string})=>void}){
  const navigation=useAppNavigation(),wide=navigation?.duoLandscape===true
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null),[filter,setFilter]=useState('all'),[selected,setSelected]=useState<Bill|null>(null),[form,setForm]=useState<Form|null>(null)
  const [mode,setMode]=useState<'settings'|'amount'|'stop'|'adopt'>('settings'),[amount,setAmount]=useState(''),[review,setReview]=useState<Review|null>(null),[reviewBody,setReviewBody]=useState<Command|null>(null)
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result|null>(null),[pending,setPending]=useState<Command|null>(null),[valid,setValid]=useState(true)
  const [splitInput,setSplitInput]=useState<SplitInputDraft>(null)
+ const [confirmReady,setConfirmReady]=useState(false)
+ const drafts=useRef(new Map<string,Draft>())
  const flight=useRef(false),alive=useRef(true),generation=useRef(0),draftId=useRef(''),abort=useRef<AbortController|null>(null)
  const placement=useRef<{order:number;isNew:boolean;billId?:string}>({order:1,isNew:true})
  const storageKey=`bookiebot:bills-request:${ownerName.toLowerCase()}`
- const reset=useCallback(()=>{setForm(null);setSelected(null);setReview(null);setReviewBody(null);setMode('settings');setAmount('');setError('');setValid(true);setSplitInput(null)},[])
+ const reset=useCallback(()=>{drafts.current.clear();setForm(null);setSelected(null);setReview(null);setReviewBody(null);setMode('settings');setAmount('');setError('');setValid(true);setSplitInput(null);setConfirmReady(false)},[])
  const updateWork=useAppWorkStatus({label:'Bill changes',pending:busy,uncertain:Boolean(pending),dirty:Boolean(form),onDiscard:reset})
  const load=useCallback(async()=>{
   const token=++generation.current;abort.current?.abort();const controller=new AbortController();abort.current=controller;setBusy(true);setError('')
@@ -55,11 +59,20 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
  },[storageKey])
  useEffect(()=>{alive.current=true;try{const saved=sessionStorage.getItem(storageKey);if(saved)setPending(JSON.parse(saved))}catch{}return()=>{alive.current=false;++generation.current;abort.current?.abort()}},[storageKey])
  useEffect(()=>{if(active&&!snapshot&&!flight.current)void load()},[active,snapshot,load])
- const choose=(bill?:Bill)=>{if(busy||pending||!snapshot)return;reset();setSelected(bill??null);setForm(newForm(snapshot,bill));draftId.current=crypto.randomUUID();setResult(null)}
+ const choose=(bill?:Bill)=>{
+  if(busy||pending||!snapshot||form&&bill?.id===selected?.id)return
+  if(form)drafts.current.set(selected?.id??'new',{form,mode,amount,review,reviewBody,splitInput,valid,draftId:draftId.current})
+  const draft=drafts.current.get(bill?.id??'new')
+  setSelected(bill??null);setForm(draft?.form??newForm(snapshot,bill));setMode(draft?.mode??'settings');setAmount(draft?.amount??'')
+  setReview(draft?.review??null);setReviewBody(draft?.reviewBody??null);setSplitInput(draft?.splitInput??null);setValid(draft?.valid??true)
+  draftId.current=draft?.draftId??crypto.randomUUID();setConfirmReady(false);setError('');setResult(null)
+ }
+ // Confirmation is a separate action after the review's native slide settles.
+ useEffect(()=>{setConfirmReady(false);if(!review)return;const timer=window.setTimeout(()=>setConfirmReady(true),transactionMotion.duration);return()=>window.clearTimeout(timer)},[review,selected?.id])
  const change=(patch:Partial<Form>)=>{setForm(previous=>previous?{...previous,...patch}:null);setReview(null);setReviewBody(null);setError('')}
  const prepare=async(operation=mode==='settings'?(selected?'update':'create'):mode==='stop'?'delete':mode)=>{
   if(flight.current||pending||!form||!snapshot)return
-  flight.current=true;setBusy(true);setError('');setResult(null)
+  flight.current=true;setBusy(true);setConfirmReady(false);setError('');setResult(null)
   const base:Command={operation,settingsVersion:snapshot.settingsVersion,...(selected?{id:selected.id,version:selected.version}:{draftId:draftId.current})}
   let body:Command
   if(operation==='amount'||operation==='adopt')body={operation,id:selected?.id,month:snapshot.month,settingsVersion:snapshot.settingsVersion,chargeVersion:selected?.charge.version,...(operation==='amount'?{amount}: {})}
@@ -75,7 +88,7 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
   }
  }
  const save=async()=>{
-  if(flight.current||pending||!review||!reviewBody)return
+  if(flight.current||pending||!review||!reviewBody||!confirmReady)return
   const command={...reviewBody,requestId:crypto.randomUUID(),reviewVersion:review.reviewVersion}
   try{sessionStorage.setItem(storageKey,JSON.stringify(command))}catch{setError('Keep this screen open until the save is verified.')}
   flight.current=true;setBusy(true);setPending(command);updateWork({label:'Bill changes',pending:true,uncertain:true})
@@ -119,7 +132,7 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
     {mode==='stop'?<p className="bi-footnote">Earlier months stay unchanged.</p>:<>
      <label data-bill-field="name">Name<input className="bb-bills-input" required maxLength={100} value={form.name} onChange={e=>change({name:e.target.value})}/></label>
      <div className="bi-secondary-fields">
-      <label data-bill-field="type">Type<span className="bi-select"><select aria-label="Type" value={form.type} disabled={Boolean(selected)} onChange={e=>change({type:e.target.value as Form['type'],category:e.target.value==='subscription'?'static_bills_subscriptions_needs':'bills_utilities'})}><option value="subscription">Subscription</option><option value="variable">Variable bill</option><option value="fixed">Fixed bill</option></select><ChevronDown aria-hidden="true"/></span></label>
+      <label data-bill-field="type">Type<span className="bi-select"><select aria-label="Type" value={form.type} onChange={e=>change({type:e.target.value as Form['type'],category:e.target.value==='subscription'?'static_bills_subscriptions_needs':'bills_utilities',cadence:e.target.value==='subscription'&&form.cadence==='quarterly'?'monthly':form.cadence})}><option value="subscription">Subscription</option><option value="variable">Variable bill</option><option value="fixed">Fixed bill</option></select><ChevronDown aria-hidden="true"/></span></label>
       <label data-bill-field="amount"><span className="bb-bills-full-label">{form.type==='variable'?'Estimate (optional)':'Amount'}</span><span className="bb-bills-short-label" aria-hidden="true">{form.type==='variable'?'Estimate':'Amount'}</span><span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label={form.type==='variable'?'Estimate (optional)':'Amount'} required={form.type!=='variable'} inputMode="decimal" placeholder="0.00" value={form.amount} onChange={e=>change({amount:e.target.value})}/></span></label>
      </div>
      <div className="bi-secondary-fields">
@@ -142,13 +155,13 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
   </form>
  </>
  const reviewView=shownReview&&<>
-  <header className="sp-flow-heading bb-bill-heading"><h2>{shownReview.operation==='delete'?'Stop bill':shownReview.operation==='adopt'?'Edit recorded charge':shownReview.operation==='amount'?'Record amount':'Review bill'}</h2><p className="sp-flow-context">{shownReview.after?.name??shownReview.name??selected?.name}</p></header>
+  <header className="sp-flow-heading bb-bill-heading"><h2>{shownReview.operation==='delete'?'Stop bill':shownReview.operation==='adopt'?'Edit recorded charge':shownReview.operation==='amount'?'Record amount':'Review bill'}</h2><p className="sp-flow-context bb-bills-review-context"><span title={shownReview.after?.name??shownReview.name??selected?.name}>{shownReview.after?.name??shownReview.name??selected?.name}</span>{shownReview.after&&<span> · {kindLabel[shownReview.after.type]}</span>}</p></header>
   {!shownReview.after&&<p className="bb-bills-review-amount">{money(shownReview.amountCents)}</p>}
   <dl className="bi-review-changes" aria-label="Bill changes to review">{reviewLines.map(line=><div className="bi-review-change" key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new">{line.after}</span>}</dd></div>)}</dl>
   {shownReview.after&&<p className="bi-footnote">Earlier months and existing splits stay unchanged.</p>}
   {shownReview.replacesScheduledChanges&&<p className="bi-footnote">Replaces later scheduled changes for this bill.</p>}
   {shownReview.operation==='adopt'&&<p className="bi-footnote">Makes this charge editable in Transactions. The purchase total stays unchanged.</p>}
-  <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}><ArrowLeft aria-hidden="true"/>Back</button><button type="button" className="bi-primary" disabled={locked||!review} onClick={()=>void save()}>{busy?'Saving…':shownReview.operation==='delete'?'Stop bill':shownReview.operation==='amount'?'Record amount':'Confirm'}</button></footer>
+  <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}><ArrowLeft aria-hidden="true"/>Back</button><button type="button" className="bi-primary" disabled={locked||!review||!confirmReady} onClick={()=>void save()}>{busy?'Saving…':shownReview.operation==='delete'?'Stop bill':shownReview.operation==='amount'?'Record amount':'Confirm'}</button></footer>
  </>
  return <div className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
   <div className="bb-settings-heading"><button className="bb-settings-back" type="button" disabled={locked} onClick={()=>{reset();onBack()}}><ArrowLeft aria-hidden="true"/>Settings</button><h1>Bills</h1><button type="button" className="bb-bills-refresh" aria-label="Refresh bills" disabled={locked||Boolean(form)} onClick={()=>{setResult(null);void load()}}><RefreshCw aria-hidden="true"/></button></div>
@@ -162,11 +175,11 @@ export function BillSettings({active,ownerName,onBack,onTransaction}:{active:boo
   {snapshot&&<div className="bb-bills-panes">
    <section className="bb-bills-list" aria-label="Your bills">
     <div className="bb-bills-toolbar"><select aria-label="Bill type" disabled={locked||Boolean(form)} value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All bills</option><option value="subscription">Subscriptions</option><option value="variable">Variable bills</option><option value="fixed">Fixed bills</option></select><button type="button" className="bb-bills-add" disabled={locked||Boolean(form)} onClick={()=>choose()}><Plus aria-hidden="true"/>Add bill</button></div>
-    <div className="bb-bills-rows">{visible.map((bill,index)=><button style={{order:index*2+2}} type="button" className="bb-bills-row" aria-pressed={bill.id===selected?.id} data-editor-anchor={bill.id===placement.current.billId} disabled={locked||Boolean(form)} key={bill.id} onClick={()=>choose(bill)}><ReceiptText aria-hidden="true"/><span className="bb-bills-row-text"><strong>{bill.name}</strong><small>{!bill.active?'Stopped':bill.needsSetup?'Finish setup':`${kindLabel[bill.type]} · ${bill.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span><span className="bb-bills-row-amount">{bill.type==='variable'&&bill.charge.recorded?money(bill.charge.amountCents):bill.amountCents===null?'Enter amount':money(bill.amountCents)}{bill.type==='variable'&&(bill.charge.recorded||bill.amountCents!==null)&&<small>{bill.charge.recorded?'this month':'estimate'}</small>}</span><ChevronRight aria-hidden="true"/></button>)}
+    <div className="bb-bills-rows">{visible.map((bill,index)=><button style={{order:index*2+2}} type="button" className="bb-bills-row" aria-pressed={bill.id===selected?.id} data-editor-anchor={bill.id===placement.current.billId} disabled={locked||Boolean(form)&&!wide} key={bill.id} onClick={()=>choose(bill)}><TransactionIcon entry={{date:bill.nextDate??'',category:bill.category==='bills_utilities'?'Bills & Utilities':bill.category==='rent'?'Rent':bill.category==='subscriptions_wants'?'Subs (Wants)':'Static Bills & Subscriptions',amount:(bill.amountCents??0)/100,person:ownerName,item:bill.name,location:bill.name}} aliases={aliases}/><span className="bb-bills-row-text"><strong>{bill.name}</strong><small>{!bill.active?'Stopped':bill.needsSetup?'Finish setup':`${kindLabel[bill.type]} · ${bill.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span><span className="bb-bills-row-amount">{bill.type==='variable'&&bill.charge.recorded?money(bill.charge.amountCents):bill.amountCents===null?'Enter amount':money(bill.amountCents)}{bill.type==='variable'&&(bill.charge.recorded||bill.amountCents!==null)&&<small>{bill.charge.recorded?'this month':'estimate'}</small>}</span><ChevronRight aria-hidden="true"/></button>)}
     {!visible.length&&<p className="bb-bills-empty">No bills here yet.</p>}</div>
    </section>
    <section className="bb-bills-editor" aria-label="Bill editor" data-new={placement.current.isNew} data-open={Boolean(form)} inert={locked} style={{order:placement.current.order}}>
-    <EditorExpansion open={Boolean(form)}><EditorScenes scene={mode} open={Boolean(form)}>
+    <EditorExpansion open={Boolean(form)}><EditorScenes scene={`${selected?.id??draftId.current}:${mode}`} open={Boolean(form)}>
      <div className="bi-editor" data-design="levels" data-operation={mode==='stop'?'delete':'update'}>
       <StepMotion review={Boolean(review)} open={Boolean(form)} mode="slide" duration={transactionMotion.duration} edit={editView} confirm={reviewView}/>
       {error&&!wide&&<p className="bs-error" role="alert">{error}</p>}

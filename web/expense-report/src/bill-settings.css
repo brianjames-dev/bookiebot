@@ -1,4 +1,4 @@
-.bb-bills { width:100%;min-width:0;color:hsl(var(--foreground));padding-bottom:100px }
+.bb-bills { width:100%;min-width:0;color:hsl(var(--foreground));padding-bottom:0 }
 .bb-bills .bb-settings-heading { position:relative;margin-bottom:20px;padding-right:48px }
 .bb-bills-refresh { position:absolute;right:0;bottom:0;display:grid;place-items:center;min-width:44px;min-height:44px;border:0;background:transparent;color:hsl(var(--primary)) }
 .bb-bills-panes { display:grid;gap:24px;min-width:0 }
@@ -15,6 +15,7 @@
 .bb-bills-add { display:flex;align-items:center;gap:6px;border:0;background:transparent;color:hsl(var(--primary));padding:8px 0;white-space:nowrap }
 .bb-bills :is(.bb-bills-row,.bb-bills-add,.bb-bills-refresh,.bb-bills-charge-actions) svg { width:18px;height:18px;flex:none }
 .bb-bills-row { display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid hsl(var(--border));background:transparent;color:inherit;padding:16px 0;text-align:left;min-height:72px }
+.bb-bills-row>.bb-transaction-icon { flex:none }
 .bb-bills-row[aria-pressed=true] { color:hsl(var(--primary)) }
 .bb-bills .bb-bills-row:disabled { opacity:1 }
 .bb-bills-row-text { min-width:0;flex:1 }
@@ -37,6 +38,9 @@
 .bb-bills .bb-bills-charge-actions button { justify-content:space-between;padding-inline:0;background:transparent;color:hsl(var(--primary)) }
 .bb-bills .bb-bills-charge-actions .bb-bills-stop { justify-content:flex-start;color:hsl(var(--destructive)) }
 .bb-bills-review-amount { margin:0 0 8px;font-size:24px;line-height:1.2;font-weight:500;font-variant-numeric:tabular-nums }
+.bb-bills-review-context { display:flex;gap:4px;min-width:0 }
+.bb-bills-review-context>span:first-child { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.bb-bills-review-context>span+span { flex:none }
 .bb-bills-empty { color:hsl(var(--muted-foreground));font-size:13px;line-height:1.5 }
 .bb-bills-error { color:hsl(var(--destructive));font-size:14px }
 .bb-bills-status,.bb-bills-recovery { font-size:14px;line-height:1.5 }

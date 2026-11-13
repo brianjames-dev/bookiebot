@@ -44,6 +44,7 @@ function load(file) {
     if (name === 'react' && file.endsWith('/expense-app-shell.tsx')) return {...React,startTransition:action=>holdPageTransitions?pageTransitions.push(action):React.startTransition(action)}
     if (!name.startsWith('.')) return req(name)
     const base = path.resolve(path.dirname(file), name)
+    if (name.endsWith('.json')) return JSON.parse(fs.readFileSync(base, 'utf8'))
     return load([base + '.tsx', base + '.ts'].find(fs.existsSync))
   }
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText

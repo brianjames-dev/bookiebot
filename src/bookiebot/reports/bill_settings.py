@@ -152,7 +152,7 @@ def carry_year(actor: str, source: WorkbookSnapshot, commands: BillCommands) -> 
         checked = _carry_review(source, body, now_pacific().date())["review"]
     except BillValidation:
         return False
-    request_id = "bill-year-" + fingerprint([source.owner, source.year, checked["reviewVersion"]])[:40]
+    request_id = commands.preparation_request_id(source.owner, "bill-year-" + fingerprint([source.owner, source.year, checked["reviewVersion"]])[:40])
     result = commands.command(actor, {**body, "reviewVersion": checked["reviewVersion"], "requestId": request_id})
     return bool(result.get("success"))
 
@@ -171,7 +171,7 @@ def prepare_month(actor: str, source: WorkbookSnapshot, commands: BillCommands) 
     checked = _projection_review(source, {"operation": "project", "settingsVersion": source.settings.version}, now_pacific().date())
     if not checked["batch"].requests:
         return False
-    request_id = "bill-month-" + checked["review"]["reviewVersion"][:40]
+    request_id = commands.preparation_request_id(source.owner, "bill-month-" + checked["review"]["reviewVersion"][:40])
     result = commands.command(actor, {"operation": "project", "settingsVersion": source.settings.version,
         "requestId": request_id, "reviewVersion": checked["review"]["reviewVersion"]})
     return bool(result.get("success"))
@@ -195,6 +195,20 @@ def charge_batch(snapshot: WorkbookSnapshot, checked: dict[str, Any], request_id
         now_pacific().isoformat(), snapshot.owner)
     existing = decode_charges(snapshot.rows.get(CHARGES_TAB, []))
     batch.table(CHARGES_TAB, encode_charges([*existing, charge], snapshot.rows.get(CHARGES_TAB, [])))
+    if not plan.monthly_source:
+        from bookiebot.sheets.recurring_rows import encode, managed
+        from bookiebot.sheets.recurring_storage import project_subscription_summaries
+        plans = list(snapshot.settings.plans)
+        tables = {t: snapshot.rows.get(t, []) for t in (BILL_TAB, SUBSCRIPTION_TAB)}
+        if not managed(tables[SUBSCRIPTION_TAB]):
+            # Explicit adoption enrolls the complete legacy subscription
+            # baseline. Inspection/review never provisions or writes it.
+            tables[SUBSCRIPTION_TAB] = encode(plans, SUBSCRIPTION_TAB, snapshot.formulas.get(SUBSCRIPTION_TAB, []))
+            batch.table(SUBSCRIPTION_TAB, tables[SUBSCRIPTION_TAB])
+        handled = project_subscription_summaries(batch, plans, tables, start_month=period,
+            charges=[*existing, charge], only_month=period)
+        if plan.category not in handled:
+            raise BillConflict("The subscription summary could not be identified. No charge was changed.")
     return batch, charge
 
 
@@ -265,6 +279,25 @@ class BillCommands:
         with self.access.connect() as db:
             return any(db.execute(f"SELECT request_id FROM {table} WHERE owner_key=? AND state!='done'", (owner,)).fetchone()
                        for table in ("app_transaction_commands", "app_bill_commands"))
+
+    def preparation_request_id(self, owner: str, base: str) -> str:
+        """Retry only proven no-write preparation failures, retaining every claim.
+
+        The normal owner claim in command() still serializes concurrent workers.
+        Running/unknown outcomes keep their identity until receipt recovery.
+        """
+        with self.access.connect() as db:
+            records = db.execute("SELECT request_id,state,result_json FROM app_bill_commands WHERE owner_key=? AND (request_id=? OR request_id LIKE ?)",
+                                 (owner, base, base + "-retry-%")).fetchall()
+        attempts = {0 if r["request_id"] == base else int(r["request_id"][len(base) + 7:]): r for r in records
+                    if r["request_id"] == base or re.fullmatch(re.escape(base) + r"-retry-\d+", r["request_id"])}
+        if not attempts:
+            return base
+        number = max(attempts)
+        latest = attempts[number]
+        if latest["state"] == "done" and json.loads(latest["result_json"]).get("success") is False:
+            return f"{base}-retry-{number + 1}"
+        return latest["request_id"]
 
     def _finish(self, owner: str, request_id: str, result: dict[str, Any]):
         with self.access.connect(write=True) as db:
