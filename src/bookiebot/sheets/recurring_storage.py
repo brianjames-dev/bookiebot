@@ -303,9 +303,10 @@ def project_subscription_summaries(batch: SheetBatch, plans: list[BillPlan], tab
         for r, line in enumerate(formulas, 1):
             for col, formula in enumerate(line, 1):
                 label = cell(rows, r, 2).casefold()
+                expected_column = 4 if label == "subscriptions (wants)" else 3
                 if not ((formula.startswith("=") and ("Subscriptions!" in formula or SUBSCRIPTION_TAB in formula)
                          or formula in {"0", "=SUM(0)"})
-                        and col in {3, 4} and label in {"subscriptions (needs)", "static bills & subscriptions (needs)", "subscriptions (wants)"}):
+                        and col == expected_column and label in {"subscriptions (needs)", "static bills & subscriptions (needs)", "subscriptions (wants)"}):
                     continue
                 category = "subscriptions_wants" if "wants" in label else "static_bills_subscriptions_needs"
                 if period < max(start_month, snapshot.settings.period):
@@ -362,10 +363,12 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
                 # Rebind that calculated source to this period's saved version;
                 # preserve literal edits, deletions and recorded repayments.
                 original_formula = cell(formulas, row, column)
-                if (plan.kind != "variable" and plan.version in price_refs
-                        and original_formula.startswith("=") and (BILL_TAB in original_formula or SUBSCRIPTION_TAB in original_formula)
+                if (original_formula.startswith("=") and (BILL_TAB in original_formula or SUBSCRIPTION_TAB in original_formula)
                         and not snapshot.charge(plan, period).get("recorded")):
-                    batch.values(title, row, column, [["=" + price_refs[plan.version] if plan.active and plan.due_date(period) else 0]], formulas=True)
+                    if plan.kind == "variable":
+                        batch.values(title, row, column, [[""]])
+                    elif plan.version in price_refs:
+                        batch.values(title, row, column, [["=" + price_refs[plan.version] if plan.active and plan.due_date(period) else 0]], formulas=True)
                 continue  # Never regenerate a cleared/edited existing charge.
             old_column = 4 if prior and prior.category == "subscriptions_wants" else 3
             if prior and old_column != column and period >= start_month:
@@ -383,7 +386,13 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
                 if BILL_TAB in formula or SUBSCRIPTION_TAB in formula:
                     batch.values(title, row, column, [[numeric(cell(rows, row, column))]])
                 continue
-            if plan.kind != "variable" and plan.version in price_refs and (not formula or formula.startswith("=") or numeric(cell(rows, row, column)) == 0):
+            if (plan.kind == "variable" and formula.startswith("=") and (BILL_TAB in formula or SUBSCRIPTION_TAB in formula)
+                    and not snapshot.charge(plan, period).get("recorded")):
+                # A saved estimate must not survive conversion (or an older
+                # rollover clone) as automatic cash. Keep literal actuals and
+                # recorded charge/split sources authoritative.
+                batch.values(title, row, column, [[""]])
+            elif plan.kind != "variable" and plan.version in price_refs and (not formula or formula.startswith("=") or numeric(cell(rows, row, column)) == 0):
                 batch.values(title, row, column, [["=" + price_refs[plan.version] if plan.active and due else 0]], formulas=True)
         for column, refs in extras.items():
             _add_to_subtotal(batch, title, formulas, column, refs)

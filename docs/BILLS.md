@@ -33,11 +33,15 @@ Native settings append stable plan IDs, exclusive effective intervals, type/cate
 
 Changing type retains the plan's original hidden tab, source label and identity; effective `bill_type` metadata determines its classification. A physical monthly source remains physical across later changes. Subscriptions assigned to Rent or Bills & utilities also use monthly sources, preserving their category in budget cells and report readers rather than disappearing from the Needs/Wants subscription summaries.
 
+Converting an automatic bill to Variable clears unrecorded schedule-price formulas from the effective month. Its estimate stays in Projected; literal actual payments and recorded charge/split sources remain unchanged. Month preparation also removes an unrecorded automatic formula copied by an older rollover script for a variable plan.
+
 Before enrollment, the visible `Subscriptions` tab remains the legacy source. After enrollment, the hidden subscription schedule is authoritative and legacy sync cannot overwrite it. The visible tab is retained as the legacy reference. Existing monthly subscription formulas are rebound to the appropriate hidden price versions, with prior calculated values frozen where needed. Reports, Transactions, reminders, widgets and bank schedule reads use effective versions; an empty/stopped managed schedule cannot revive its old visible mirror.
 
 Monthly sources use B for their stable label, C for Needs and D for Wants. New sources append below existing data with named anchors and extend the corresponding subtotal; they do not insert rows through income or transaction history. Existing recorded cash cells and confirmed repayments remain authoritative. A physical monthly source suppresses the corresponding virtual subscription occurrence. Confirmed zero cash expense is still recorded and cannot generate another forecast estimate.
 
 Adopting a virtual subscription updates its physical source, charge mapping and that month's subscription summary in one atomic batch. Summary projection excludes recorded plan/month occurrences even after full repayment, while future virtual occurrences remain scheduled. An unenrolled subscription schedule enrolls its complete legacy baseline in that confirmed adoption; Review never enrolls it. An unidentifiable summary blocks adoption before any write.
+
+Summary recovery recognizes an empty amount only in its category's column: C for Needs and D for Wants. A zero in the other column remains untouched.
 
 Ordinary personal bills remain separate between owners. A confirmed repayment for a newly configured shared bill may provision a uniquely identified partner source, such as **Brian · Student Loan**, without overwriting that person's own loan. Existing shared Rent/PG&E/Recology/Water labels remain compatible. Recipient entries are read-only repayment projections and cannot create forecast bills.
 

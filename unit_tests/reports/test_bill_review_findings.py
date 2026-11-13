@@ -17,7 +17,8 @@ from unit_tests.reports.test_goals_store import access as access
 
 @pytest.mark.parametrize('legacy', [False, True])
 @pytest.mark.parametrize('wants', [False, True])
-def test_adoption_removes_only_this_occurrence_from_sheet_summary_and_future_projection(legacy, wants, monkeypatch):
+@pytest.mark.parametrize('other_zero', ['0', '=SUM(0)'])
+def test_adoption_removes_only_this_occurrence_from_sheet_summary_and_future_projection(legacy, wants, other_zero, monkeypatch):
     monkeypatch.setattr(bills, 'now_pacific', lambda: datetime(2026, 11, 13, 12))
     client, _ = fixture()
     transport = client.http_client
@@ -43,6 +44,7 @@ def test_adoption_removes_only_this_occurrence_from_sheet_summary_and_future_pro
         transport.rows[title] = [['', 'Subscriptions (Wants)' if wants else 'Subscriptions (Needs)', '', ''],
                                  ['', '(Wants) Subtotal:' if wants else '(Needs) Subtotal:', '', '']]
         transport.rows[title][0][column - 1] = '25'
+        transport.rows[title][0][2 if wants else 3] = other_zero
         transport.formulas[title] = deepcopy(transport.rows[title])
         transport.formulas[title][0][column - 1] = '=SUM(Subscriptions!L5)' if wants else '=SUM(Subscriptions!D5)'
         letter = 'D' if wants else 'C'
@@ -60,6 +62,7 @@ def test_adoption_removes_only_this_occurrence_from_sheet_summary_and_future_pro
     assert not transport.sent
     batch.send()
     assert transport.formulas['November'][0][column - 1] == '=SUM(0)'
+    assert transport.formulas['November'][0][2 if wants else 3] == other_zero
     assert transport.rows['November'][adopted_index][1] == 'Zoom'
     assert float(transport.rows['November'][adopted_index][column - 1]) == 25
     assert transport.rows['December'][0][column - 1] == '25'
@@ -76,6 +79,7 @@ def test_adoption_removes_only_this_occurrence_from_sheet_summary_and_future_pro
         batch.send()
         assert transport.formulas['November'][0][column - 1] == '=SUM(0)'
         assert transport.formulas['December'][0][column - 1].startswith('=SUM(')
+        assert transport.formulas['December'][0][2 if wants else 3] == other_zero
         monthly, virtual, _ = runtime_tables('brian', current.rows[BILL_TAB], current.rows[SUBSCRIPTION_TAB], [], current.rows[bills.CHARGES_TAB])
         assert not any(p.id == sub.id and p.due_date('2026-11') for p in decode(virtual, SUBSCRIPTION_TAB))
         assert any(p.id == sub.id and p.category == category for p in decode(monthly, BILL_TAB))
@@ -124,6 +128,54 @@ def test_effective_type_changes_keep_identity_source_and_earlier_history(before,
     assert december.source_tab == november.source_tab == tab
     assert december.source_label == november.source_label == original.source_label
     assert december.monthly_source  # Preserve physical sources across later conversions.
+
+
+@pytest.mark.parametrize('source_kind', ['fixed', 'subscription'])
+@pytest.mark.parametrize('update_existing', [False, True])
+def test_variable_conversion_clears_automatic_formulas_but_preserves_recorded_cash(source_kind, update_existing):
+    tab = SUBSCRIPTION_TAB if source_kind == 'subscription' else BILL_TAB
+    original = plan(id='changing_type_123', kind=source_kind, version='original-v1',
+                    source_tab=tab, monthly_source=True, pull_day=31)
+    client, _ = fixture([original])
+    transport = client.http_client
+    if tab == SUBSCRIPTION_TAB:
+        transport.rows[tab] = encode([original], tab, [])
+        transport.formulas[tab] = deepcopy(transport.rows[tab])
+        transport.properties[tab] = {'title': tab, 'sheetId': 99, 'gridProperties': {'rowCount': 100, 'columnCount': 32}}
+    # November is eligible, but December is a real, manually entered payment.
+    transport.formulas['December'][0][2] = '60.23'
+    transport.formulas['November'][0][2] = f"='{tab}'!{'C' if tab == SUBSCRIPTION_TAB else 'J'}2"
+    source = storage.read_workbook(B, TODAY, client=client)
+    # The normal minimum prevents overriding the already recorded December
+    # payment. Test projection's independent protection as well.
+    assert source.settings.earliest_months[original.id] == '2027-01'
+    after = normalize_plan(form(type='variable', amount='60.23', splitMethod='none', effectiveFrom='2026-11'),
+                           current=original, today=TODAY, plan_id=original.id)
+    from bookiebot.sheets.recurring import versioned
+    versions = versioned(list(source.settings.plans), after, 'change-type')
+    tables = {t: encode(versions, t, source.formulas.get(t, [])) if t == tab else source.rows.get(t, [])
+              for t in (BILL_TAB, SUBSCRIPTION_TAB)}
+    # Use a normal unrecorded November snapshot, preserving the literal later
+    # payment and the historical October amount regardless of configuration.
+    source.settings.earliest_months[original.id] = '2026-11'
+    batch = storage.SheetBatch(source)
+    storage.project_sources(batch, versions, tables, start_month='2026-11', today=TODAY, update_existing=update_existing)
+    assert not transport.sent
+    batch.send()
+    assert transport.rows['October'][0][2] == '60.23'
+    assert transport.rows['November'][0][2] in {'', '0'}
+    assert transport.rows['December'][0][2] == '60.23'
+    assert not transport.formulas['December'][0][2].startswith('=')
+    # A recorded source is preserved even if it happens to contain a known
+    # schedule formula rather than a literal, in both projection routes.
+    transport.rows['November'][0][2] = '60.23'
+    transport.formulas['November'][0][2] = f"='{tab}'!{'C' if tab == SUBSCRIPTION_TAB else 'J'}2"
+    source = storage.read_workbook(B, TODAY, client=client)
+    source.recorded_plans.add((original.id, '2026-11'))
+    batch = storage.SheetBatch(source)
+    storage.project_sources(batch, versions, tables, start_month='2026-11', today=TODAY, update_existing=update_existing)
+    batch.send()
+    assert float(transport.rows['November'][0][2]) == 60.23
 
 
 @pytest.mark.parametrize('failure', ['prewrite', 'rejected', 'lost', 'uncertain'])
