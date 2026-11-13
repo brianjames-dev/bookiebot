@@ -43,7 +43,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   await tap(page,panel.getByRole('button',{name:'Record amount',exact:true}));
   await panel.getByRole('button',{name:'Check saved status',exact:true}).waitFor();
   await tap(page,panel.getByRole('button',{name:'Check saved status',exact:true}));
-  await panel.locator('.bb-bills-editor .bb-bills-empty').waitFor();assert.equal(commands.length,1);
+  await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});assert.equal(commands.length,1);
   await tap(page,panel.getByRole('button',{name:'Add bill',exact:true}));
   await panel.getByLabel('Name',{exact:true}).fill('Insurance');await panel.getByLabel('Type',{exact:true}).selectOption('fixed');
   await panel.getByLabel('Amount',{exact:true}).fill('42.30');await panel.getByLabel('Payment day',{exact:true}).fill('15');
@@ -61,12 +61,12 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+`/bills-editor-${engine.name()}-${width}-${dark?'dark':'light'}.png`,fullPage:true})}
   await tap(page,panel.getByRole('button',{name:'Review',exact:true}));await panel.getByRole('heading',{name:'Review bill',exact:true}).waitFor();
   assert.equal(reviews.at(-1).bill.splitMethod,'income');assert.equal(reviews.at(-1).bill.effectiveFrom,'2026-12');
-  await tap(page,panel.getByRole('button',{name:'Confirm',exact:true}));await panel.locator('.bb-bills-editor .bb-bills-empty').waitFor();
+  await tap(page,panel.getByRole('button',{name:'Confirm',exact:true}));await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});
   assert.equal(commands.length,2);assert.equal(new Set(commands.map(c=>c.requestId)).size,2);
   await tap(page,panel.locator('.bb-bills-row').filter({hasText:'Insurance'}));
   await tap(page,panel.getByRole('button',{name:'Stop bill',exact:true}));await panel.getByLabel('Stop from',{exact:true}).fill('2026-12');
   await tap(page,panel.getByRole('button',{name:'Review',exact:true}));await panel.getByRole('heading',{name:'Stop bill',exact:true}).waitFor();
-  await tap(page,panel.getByRole('button',{name:'Stop bill',exact:true}));await panel.locator('.bb-bills-editor .bb-bills-empty').waitFor();assert.equal(commands.at(-1).operation,'delete');
+  await tap(page,panel.getByRole('button',{name:'Stop bill',exact:true}));await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});assert.equal(commands.at(-1).operation,'delete');
   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
   if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+`/bills-${engine.name()}-${width}-${dark?'dark':'light'}.png`,fullPage:true})}
   await tap(page,panel.locator('.bb-bills-row').filter({hasText:'PG&E'}));

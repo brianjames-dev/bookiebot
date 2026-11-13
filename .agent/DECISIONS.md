@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-13 — Bills uses the native transaction editor presentation
+
+Extend the existing native editor CSS defaults to Bills rather than maintaining boxed fields, separate button styles and spacing. Reuse EditorExpansion, EditorScenes and StepMotion with the existing 440ms/easing and one slide owner per route/review. Keep configuration/monthly amount/Stop/recorded-charge drafts and reviewed commands in BillSettings; control raw percentage text there so a scene visit cannot erase invalid input. Folding changes placement without remounting the workspace, and closing retains its row anchor until expansion ends. Retain the last review for its outgoing slide. Financial commands, storage and recurring semantics are unchanged; native acceptance is STATUS checklist 283.
+
 ## 2026-11-13 — Effective-dated native bill management
 
 Use the existing hidden Bill Schedule and Subscription Schedule as independent, versioned authorities. First explicit Save enrolls that tab and retains legacy baselines. Managed subscription sync never overwrites native versions; the visible Subscriptions sheet remains a legacy reference. Appending price versions must also replace legacy aggregate SUMIF/visible-subscription references with period-specific prices and preserve prior calculated results. Unknown columns/formulas remain intact. Plan/source identities survive display-name changes.

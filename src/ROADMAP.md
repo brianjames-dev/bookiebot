@@ -38,6 +38,8 @@ The bot could send a short alert and offer actions like confirm, delete, update,
 
 Implemented 2026-11-13: native Settings → Bills supports subscription, variable and fixed plans, effective-month edits/stops, monthly actual amounts and recurring split defaults. Hidden schedule history, canonical charge/split editing and recoverable monthly/yearly projection preserve recorded cash and prior months. Notification settings use concise labels; [implementation and usage](../docs/BILLS.md).
 
+Bills editors share Transactions' fields, spacing, surfaces, footer buttons and native scene/review slides in both DUO poses, retaining drafts, validation and prepared reviews through folding.
+
 Track the dates that bills and subscriptions usually pull money from the bank, then send proactive Discord reminders.
 
 Examples:

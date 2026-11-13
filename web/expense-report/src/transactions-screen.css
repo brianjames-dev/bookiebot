@@ -76,7 +76,6 @@
 .bb-transactions .bb-daily-day-entries::before { content:""; position:absolute; left:-1px; top:0; bottom:6px; width:1px; background:hsl(var(--border)); pointer-events:none; }
 .bb-transactions .bi-editable-row::before { display:none; }
 .bb-transactions .bi-selected-row,.bb-transactions .bi-selected-row>.bb-recorded-swipe,.bb-transactions .bi-selected-row>.bb-recorded-swipe>.bb-daily-transaction { background:hsl(var(--background)); }
-.bb-transactions.bi-product .bi-editor { border-radius:var(--bi-radius); padding-block:4px; }
 .bb-transactions .bb-category-filter-label { min-width:0; max-width:100%; overflow:hidden; }
 .bb-transactions .bb-category-mix-filter select { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .bb-transaction-period { position:relative; margin:0 0 18px; font-size:13px; color:hsl(var(--muted-foreground)); }
