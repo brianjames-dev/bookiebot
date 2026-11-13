@@ -40,6 +40,8 @@ Implemented 2026-11-13: native Settings → Bills supports subscription, variabl
 
 Bills editors share Transactions' fields, spacing, surfaces, footer buttons and native scene/review slides in both DUO poses, retaining drafts, validation and prepared reviews through folding.
 
+Open Bills uses a compact fixed editor above the dock with independently scrolling bill rows; closed layout retains its native spacing and places the divider after the expanded editor.
+
 Track the dates that bills and subscriptions usually pull money from the bank, then send proactive Discord reminders.
 
 Examples:

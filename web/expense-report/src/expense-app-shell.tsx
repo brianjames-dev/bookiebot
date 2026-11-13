@@ -216,6 +216,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
       data-duo-enabled={duo.enabled || undefined}
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
+      data-duo-bills={duo.landscape && screen === "settings" && billsOpen || undefined}
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen || billsOpen} />
       <header className="bb-masthead bb-shell-masthead">

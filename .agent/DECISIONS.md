@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-13 — Fixed open Bills editor and independent list scrolling
+
+Open DUO Bills owns a viewport-sized grid using the existing masthead and dock dimensions. Only the left rows scroll; the right editor spans the stage beside the left heading/notices/list and reserves the dock's height. Put status/recovery messages and open-mode review errors above the left list so they cannot reduce the editor's available height. Fit controls intrinsically with a responsive field grid, header actions and native-size split circles/shares/slider rather than scaling the editor or clipping active controls. At the smallest supported height, tighten only panel/review spacing and the masthead. Keep native text/input/button sizes and existing scene/review state. Closed fields and spacing stay unchanged. Retain a bill anchor through collapse; its row border is transparent while the expansion has content and a divider follows the editor's bottom above StepMotion's retained surfaces, returning to the row once closing finishes. Financial APIs, command recovery and sheet authority are unchanged. Native acceptance is checklist 284.
+
 ## 2026-11-13 — Bills uses the native transaction editor presentation
 
 Extend the existing native editor CSS defaults to Bills rather than maintaining boxed fields, separate button styles and spacing. Reuse EditorExpansion, EditorScenes and StepMotion with the existing 440ms/easing and one slide owner per route/review. Keep configuration/monthly amount/Stop/recorded-charge drafts and reviewed commands in BillSettings; control raw percentage text there so a scene visit cannot erase invalid input. Folding changes placement without remounting the workspace, and closing retains its row anchor until expansion ends. Retain the last review for its outgoing slide. Financial commands, storage and recurring semantics are unchanged; native acceptance is STATUS checklist 283.

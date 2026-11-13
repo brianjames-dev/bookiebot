@@ -42,3 +42,88 @@
 .bb-bills-status,.bb-bills-recovery { font-size:14px;line-height:1.5 }
 .bb-bills-recovery .bb-bills-primary { min-height:44px;padding:8px 16px;border:0;border-radius:10px;background:hsl(var(--primary) / .14);color:hsl(var(--primary));font-size:13px;font-weight:500 }
 @media(max-width:360px) { .bb-bills-row { gap:7px }.bb-bills-row>svg:first-child { display:none } }
+
+.bb-bills-rows,.bb-bills-notices { display:contents }
+.bb-bills-short-label,.bb-bills-wide-month { display:none }
+/* The closing expansion retains its bill ID and content. Move the divider
+   with that expansion, then restore the row's own line once it is empty. */
+.bb-bills[data-wide=false] .bb-bills-editor { position:relative }
+.bb-bills[data-wide=false]:has(.bb-bills-editor .bi-expansion-clip:not(:empty)) .bb-bills-row[data-editor-anchor=true] { border-bottom-color:transparent }
+.bb-bills[data-wide=false] .bb-bills-editor:has(.bi-expansion-clip:not(:empty))::after { content:"";position:absolute;inset:auto 0 0;height:1px;z-index:3;background:hsl(var(--border));pointer-events:none }
+
+/* Open DUO owns one fixed stage. Only the left-hand list scrolls. The dock
+   remains on its existing body-level viewport surface. */
+.bb-page.bb-app-shell[data-duo-bills=true] { display:grid;grid-template-rows:var(--bb-duo-masthead) minmax(0,1fr);padding:0 var(--bb-duo-overlay) 0 0;overflow:clip }
+.bb-app-shell[data-duo-bills=true]>.bb-shell-masthead { grid-row:1;grid-column:1 / -1;width:100%;height:var(--bb-duo-masthead);min-height:var(--bb-duo-masthead);margin:0;padding-inline:var(--bb-duo-inset) }
+.bb-app-shell[data-duo-bills=true]>.bb-shell-bills { grid-row:2;width:100%;min-height:0;max-width:none;margin:0;padding:0 var(--bb-duo-right-inset) 0 var(--bb-duo-inset);gap:0;overflow:clip }
+.bb-bills[data-wide=true] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:48px auto minmax(0,1fr);gap:4px 32px;height:100%;min-height:0;padding-bottom:0;overflow:hidden }
+.bb-bills[data-wide=true]>.bb-settings-heading { grid-column:1;grid-row:1;display:grid;grid-template-columns:minmax(0,1fr) auto 44px;align-items:center;gap:12px;min-height:48px;margin:0;padding:0 }
+.bb-bills[data-wide=true]>.bb-settings-heading h1 { grid-row:1;grid-column:1;margin:0;line-height:48px }
+.bb-bills[data-wide=true]>.bb-settings-heading .bb-settings-back { grid-row:1;grid-column:2;font-size:13px }
+.bb-bills[data-wide=true] .bb-bills-refresh { grid-row:1;grid-column:3;position:static }
+.bb-bills[data-wide=true] .bb-bills-panes { display:contents }
+.bb-bills[data-wide=true] .bb-bills-notices { display:flex;flex-direction:column;gap:4px;grid-column:1;grid-row:2;min-height:0 }
+.bb-bills[data-wide=true] .bb-bills-notices p { margin:0 }
+.bb-bills[data-wide=true] .bb-bills-list { grid-column:1;grid-row:3;display:grid;grid-template-rows:44px minmax(0,1fr);gap:8px;min-height:0 }
+.bb-bills[data-wide=true] .bb-bills-toolbar { margin-bottom:0 }
+.bb-bills[data-wide=true] .bb-bills-rows { display:block;position:relative;isolation:isolate;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:12px }
+.bb-bills[data-wide=true] .bb-bills-editor { grid-column:2;grid-row:1 / 4;min-height:0;overflow:hidden;padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 8px) }
+.bb-bills[data-wide=true] .bb-bills-editor .bi-editor { margin-bottom:0 }
+.bb-bills[data-wide=true] .bi-step-edit>.bb-bill-heading { min-height:44px;margin-bottom:4px }
+.bb-bills[data-wide=true] .bi-step-edit:has(>.bb-bills-form>.bb-bills-charge-actions button)>.bb-bill-heading { padding-right:172px }
+.bb-bills[data-wide=true] .bb-bills-wide-month { display:inline }
+.bb-bills[data-wide=true] .bb-bills-charge-actions { position:absolute;top:0;right:0;display:flex;align-items:center;gap:4px;margin:0;padding:0;border:0 }
+.bb-bills[data-wide=true] .bb-bills-charge-actions>.bi-footnote { display:none }
+.bb-bills[data-wide=true] .bb-bills-full-label { display:none }
+.bb-bills[data-wide=true] .bb-bills-short-label { display:inline }
+.bb-bills[data-wide=true] .bb-bills-charge-actions .bb-bills-stop { justify-content:center;min-width:44px;width:44px;padding:0 }
+.bb-bills[data-wide=true] .bb-bills-form { grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 12px }
+.bb-bills[data-wide=true] .bb-bills-form>.bi-secondary-fields { display:contents }
+.bb-bills[data-wide=true] [data-bill-field=name] { order:0;grid-column:span 2 }
+.bb-bills[data-wide=true] [data-bill-field=type] { order:1 }
+.bb-bills[data-wide=true] [data-bill-field=amount] { order:2 }
+.bb-bills[data-wide=true] [data-bill-field=cadence] { order:3 }
+.bb-bills[data-wide=true] [data-bill-field=day] { order:4 }
+.bb-bills[data-wide=true] [data-bill-field=category] { order:5 }
+.bb-bills[data-wide=true] [data-bill-field=account] { order:6 }
+.bb-bills[data-wide=true] [data-bill-field=billing-month] { order:7 }
+.bb-bills[data-wide=true] [data-bill-field=starting-month] { order:8;grid-column:span 2 }
+.bb-bills[data-wide=true] [data-bill-field=split] { order:9;grid-column:span 1 }
+.bb-bills[data-wide=true] .bb-bills-form>.sp-management { order:10;grid-column:1 / -1 }
+.bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { order:11;grid-column:1 / -1 }
+.bb-bills[data-wide=true] .bb-bills-form>.bi-footnote,
+.bb-bills[data-wide=true] .bb-bills-form>label:not([data-bill-field]),
+.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=stop]>label { grid-column:1 / -1 }
+/* Keep the native 76px circles and 44px slider, with editable shares between
+   the circles instead of a separate row underneath them. */
+.bb-bills[data-wide=true] .sp-management .bs-split { display:grid;grid-template-columns:76px minmax(0,1fr) 76px;grid-template-rows:46px 44px;column-gap:4px }
+.bb-bills[data-wide=true] .sp-management :is(.bs-central,.bs-allocation) { display:contents }
+.bb-bills[data-wide=true] .sp-management .bs-orb { grid-row:1 / 3;align-self:center }
+.bb-bills[data-wide=true] .sp-management .bs-orb[data-person=payer] { grid-column:1 }
+.bb-bills[data-wide=true] .sp-management .bs-orb[data-person=partner] { grid-column:3 }
+.bb-bills[data-wide=true] .sp-management .bs-shares { grid-row:1;grid-column:2;column-gap:44px }
+.bb-bills[data-wide=true] .sp-management .bs-share-name>span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.bb-bills[data-wide=true] .sp-management .bs-context { grid-row:1;grid-column:2;height:44px;margin:0;z-index:2;pointer-events:none }
+.bb-bills[data-wide=true] .sp-management .bs-context>.bs-income-reset { top:0;pointer-events:auto }
+.bb-bills[data-wide=true] .sp-management .bs-slider { grid-row:2;grid-column:2;margin:0 }
+.bb-bills[data-wide=true] .sp-management .bs-error { grid-row:3;grid-column:1 / -1 }
+@media(max-height:640px) {
+ .bb-bills[data-wide=true] { grid-template-rows:44px auto minmax(0,1fr);row-gap:0 }
+ .bb-bills[data-wide=true]>.bb-settings-heading { min-height:44px;margin-bottom:0 }
+ .bb-bills[data-wide=true]>.bb-settings-heading h1 { font-size:36px;line-height:44px }
+ .bb-bills[data-wide=true] .bi-step-edit>.bb-bill-heading { margin-bottom:0 }
+ .bb-bills[data-wide=true] .bb-bills-form { grid-template-columns:repeat(4,minmax(0,1fr));row-gap:0 }
+ .bb-bills[data-wide=true] [data-bill-field=starting-month] { order:7;grid-column:span 2 }
+ .bb-bills[data-wide=true] [data-bill-field=billing-month] { order:8 }
+ .bb-bills[data-wide=true] [data-bill-field=split] { grid-column:span 2 }
+ .bb-bills[data-wide=true] .bb-bills-form:has([data-bill-field=billing-month]) [data-bill-field=split] { grid-column:span 1 }
+ .bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { margin-top:4px }
+}
+@media(max-height:520px) {
+ .bb-page.bb-app-shell[data-duo-bills=true] { --bb-duo-masthead:68px }
+ .bb-bills[data-wide=true] .bb-bills-editor .bi-editor { padding-block:0 }
+ .bb-bills[data-wide=true] .bi-editor>.bi-step-viewport>.bi-step-pane { padding-block:0 }
+ .bb-bills[data-wide=true] .bi-step-edit>.bb-bill-heading>.sp-flow-context { margin-bottom:0 }
+ .bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { margin-top:0 }
+ .bb-bills[data-wide=true] .bi-review-change { padding-block:5px;gap:2px }
+}

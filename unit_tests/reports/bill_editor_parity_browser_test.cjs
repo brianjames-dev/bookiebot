@@ -64,7 +64,7 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').first().waitFor();
      await press(panel.locator('.bb-bills-row').first());await settle(page);
      assert.equal(await host(page).locator('.bi-editor-scenes').count(),1,'Bills uses the retained native editor workspace');
-     assert.deepEqual(await styles(activeEditor(page),'Name'),native,'Bills matches actual native fields, spacing, surface and buttons');
+     assert.deepEqual(await styles(activeEditor(page),'Name'),width>=800?{...native,fields:{rowGap:'2px'}}:native,'Bills retains native controls; open DUO condenses the field grid');
      const guide=await host(page).locator('.bi-expansion').evaluate(el=>{const s=getComputedStyle(el,'::before');return {display:s.display,left:s.left}});
      assert.equal(guide.display,width>=800?'none':'block');if(width<800)assert.equal(guide.left,'4px');
      await panel.getByRole('textbox',{name:'Name',exact:true}).fill('PG&E draft');
