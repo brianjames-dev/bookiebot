@@ -3,7 +3,6 @@
 .bi-product .bb-daily-row-shell + .bb-daily-row-shell { border-top:1px solid hsl(var(--border) / .55); }
 .bi-product .bb-daily-single-day>.bi-selected-row { min-width:0; margin-right:24px; }
 .bi-product .bb-daily-single-day .bb-recorded-swipe { margin-right:0; }
-.bi-product .bb-daily-single-day:has(.bi-selected-row[data-editing="true"]) .bb-daily-single-date { align-self:start; padding-top:3px; }
 /* One physical track: the entire bar begins just beyond the row and moves
    by precisely the same number of pixels, with no seam at the row edge. */
 .bi-product .bb-recorded-swipe-actions { transform:translateX(calc(var(--bb-recorded-track-start,162px) + var(--bb-recorded-offset,0px))); transition:transform var(--bb-recorded-swipe-duration,0ms) cubic-bezier(.2,.85,.25,1); }
@@ -21,7 +20,7 @@
 .bi-editable-row::before { content:""; position:absolute; inset:0 0 0 var(--bi-surface-start,28px); z-index:-1; pointer-events:none; border-radius:var(--bi-radius) var(--bi-radius) 0 0; background:var(--bi-panel-surface); opacity:0; transition:opacity 220ms ease; }
 .bi-selected-row:is([data-design="grouped"],[data-design="joined"],[data-design="levels"],[data-design="circles"])[data-editing="true"] .bi-editable-row::before { opacity:1; }
 .bi-expansion { position:relative; display:grid; grid-template-rows:0fr; transition:grid-template-rows 360ms cubic-bezier(.2,.85,.25,1),opacity 220ms ease; opacity:0; }
-.bi-expansion::before { content:""; position:absolute; left:13.5px; top:4px; bottom:var(--bi-bottom-gap,8px); width:1px; background:hsl(var(--border)); pointer-events:none; }
+.bi-expansion::before { content:""; position:absolute; left:var(--bb-transaction-guide-inset,4px); z-index:3; top:4px; bottom:var(--bi-bottom-gap,8px); width:1px; background:hsl(var(--border)); pointer-events:none; }
 .bi-expansion[data-open="true"] { grid-template-rows:1fr; opacity:1; }
 .bi-expansion-clip { min-height:0; overflow:hidden; }
 .bi-editor { min-width:0; margin-left:var(--bi-surface-start,28px); margin-bottom:var(--bi-bottom-gap,8px); padding:8px var(--bi-right-inset,10px) 8px 8px; border-radius:var(--bi-radius); background:var(--bi-panel-surface); }
@@ -139,7 +138,8 @@
 
 .bi-undo-popup>#bi-undo-title { flex:1; min-width:0; }
 
-/* Grouped rows share the day's existing continuous guide. Singleton editors
-   retain the guide beneath their merchant icon. */
-.bb-transactions .bb-daily-day-entries .bi-expansion::before { display:none; }
 .bi-product .bi-editor.bi-editor-embedded { margin:0; padding:0; border-radius:0; background:transparent; }
+
+.bi-editor-scenes,.bi-editor-scene { min-width:0; }
+.bi-editor-scene { display:flow-root; }
+.bi-editor-scenes>.bi-step-viewport>.bi-step-pane { padding:0; background:hsl(var(--background)); }

@@ -16,7 +16,7 @@ const presentation={
  './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl,props.graphControls,props.graphStatus),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
-const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(){},removeEventListener(){},dispatchEvent(e){events.push(e.type)},matchMedia(){return {matches:true}}}
+const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(){},removeEventListener(){},dispatchEvent(e){events.push(e.type)},matchMedia(){return {matches:true,addEventListener(){},removeEventListener(){}}}}
 global.IS_REACT_ACT_ENVIRONMENT=true
 function load(file){
  if(cache.has(file))return cache.get(file)
@@ -44,7 +44,7 @@ row.splitOptions={custom:true,payerName:'Brian',partnerName:'Hannah',payerBasisP
 const listing=(items=[row],extra={})=>({items,total:items.length,nextOffset:null,days:items.length?[{date:row.date,month:row.month,count:items.length,totalCents:items.reduce((sum,r)=>sum+r.amountCents,0),needsCents:0,wantsCents:items.reduce((sum,r)=>sum+r.amountCents,0)}]:[],totalAmountCents:items.reduce((sum,r)=>sum+r.amountCents,0),categories:['shopping'],persons:['Brian (BofA)'],month:'2026-10',...extra})
 const review=(change,item=row)=>({review:{item,after:{...item.fields,amount:change.updates?.amount?String(change.updates.amount/100):item.fields.amount},operation:change.operation,destination:change.destination,reviewVersion:'review-'+change.operation,share:change.operation==='split'?{method:'income',payerCents:800,partnerCents:434}:undefined}})
 const expand=async()=>run(()=>{})
-const submit=async()=>run(()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}))
+const submit=async()=>run(()=>tree.root.findAllByType('form').filter(visible)[0].props.onSubmit({preventDefault(){}}))
 const input=label=>tree.root.findAllByType('input').filter(visible).find(node=>node.props['aria-label']===label)
 const change=async(label,value)=>run(()=>input(label).props.onChange({target:{value}}))
 const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel')}

@@ -1,5 +1,5 @@
 .bb-shell-transactions { padding-top: 14px; }
-.bb-transactions { min-width: 0; }
+.bb-transactions { min-width:0; --bb-transaction-guide-inset:4px; }
 .bb-recorded-results { display:contents; }
 .bb-transaction-scope { min-height:20px; line-height:20px; color:hsl(var(--muted-foreground)); font-size:12px; }
 /* Keep the common header geometry stable for native tab scroll restoration. */
@@ -72,7 +72,7 @@
 .bb-transactions .bb-daily-single-day { padding-block:8px; min-height:calc(var(--bb-recorded-day-height) + 1px); }
 /* Retain the original border slot so logo/editor anchors do not move, but
    stop the painted guide before the day divider without adding list space. */
-.bb-transactions .bb-daily-day-entries { position:relative; padding-bottom:0; margin-bottom:0; border-left-color:transparent; }
+.bb-transactions .bb-daily-day-entries { position:relative; padding-bottom:0; margin-bottom:0; margin-left:var(--bb-transaction-guide-inset); border-left-color:transparent; }
 .bb-transactions .bb-daily-day-entries::before { content:""; position:absolute; left:-1px; top:0; bottom:6px; width:1px; background:hsl(var(--border)); pointer-events:none; }
 .bb-transactions .bi-editable-row::before { display:none; }
 .bb-transactions .bi-selected-row,.bb-transactions .bi-selected-row>.bb-recorded-swipe,.bb-transactions .bi-selected-row>.bb-recorded-swipe>.bb-daily-transaction { background:hsl(var(--background)); }

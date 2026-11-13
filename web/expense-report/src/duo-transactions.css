@@ -101,3 +101,13 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-action-pane[data-peek="true"] .bb-duo-pane-tools { pointer-events:auto; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-undo-overlay { left:calc(var(--bb-duo-fold) + 16px); right:calc(var(--bb-duo-overlay) + 16px); top:var(--bb-duo-masthead); bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px); padding:0; background:transparent; }
 }
+
+@media(min-width:600px) {
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-transaction-workspace { grid-column:2; grid-row:1 / 7; z-index:3; min-width:0; min-height:0; margin:0 16px; padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px); }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-transaction-workspace .bb-duo-action-pane { height:100%; margin:0; padding-bottom:0; }
+ .bb-duo-transaction-workspace>.bi-editor-scenes,.bi-editor-scenes[data-fill="true"]>.bi-step-viewport,.bi-editor-scenes[data-fill="true"]>.bi-step-viewport>.bi-step-pane,.bi-editor-scenes[data-fill="true"] .bi-editor-scene { height:100%; }
+ .bi-editor-scenes[data-fill="true"]>.bi-step-viewport { height:100%!important; }
+ .bi-editor-scenes[data-fill="true"]>.bi-step-viewport>.bi-step-pane { background:transparent; }
+ .bb-duo-transaction-workspace[data-peek="true"] { pointer-events:none; }
+ .bb-duo-transaction-workspace .bb-duo-pane-tools { pointer-events:auto; }
+}
