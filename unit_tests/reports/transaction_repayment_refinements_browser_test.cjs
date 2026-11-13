@@ -12,7 +12,7 @@ async function drag(page,start,end){await page.mouse.move(start.x,start.y);await
 (async()=>{let cases=0;
  for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){
   const browser=await engine.launch({headless:true});try{
-   for(const dark of [false,true])for(const width of [320,382,867]){
+   for(const dark of [false,true])for(const width of [320,382,867].filter(w=>!process.env.ONLY_WIDTH||w===Number(process.env.ONLY_WIDTH))){
     const {page,errors,unexpected}=await fixture(browser,width,669,dark,false,false,0,{transactions:async route=>{
      const request=route.request(),url=new URL(request.url()),body=request.postDataJSON();
      if(request.method()==='GET')return route.fulfill({json:{items:[purchase,offset],total:2,nextOffset:null,month:'2026-10',categories:['shopping'],persons:['Brian (BofA)'],days:[{date:'2026-10-20',month:'2026-10',count:2,totalCents:12000,needsCents:0,wantsCents:12000}],totalAmountCents:12000,snapshotVersion:'isolated-v1'}});
@@ -37,6 +37,7 @@ async function drag(page,start,end){await page.mouse.move(start.x,start.y);await
        const client=await page.context().newCDPSession(page),rect=await cue.boundingBox(),x=rect.x+rect.width/2,y=rect.y+rect.height/2;
        await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});for(let i=1;i<=10;i++)await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x-i*16,y}]});await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(160);assert.equal(await shell.getAttribute('data-revealed'),'true','Native touch starting on the pill reaches the swipe recognizer');await page.mouse.click((await shell.boundingBox()).x+10,(await shell.boundingBox()).y+20);await page.waitForTimeout(150);
       }
+      await page.getByRole('button',{name:'Show actions for Target',exact:true}).press('ArrowLeft');assert.equal(await shell.getAttribute('data-revealed'),'true');await offsetAccess.press('ArrowLeft');await info.waitFor();assert.equal(await shell.getAttribute('data-revealed'),'false','Keyboard inspection closes the previously revealed row');await info.getByRole('button',{name:'Close',exact:true}).click();
      }
      await cue.click();const detail=page.getByRole('region',{name:'Split repayment details',exact:true});await detail.waitFor();
      if(width<600){
