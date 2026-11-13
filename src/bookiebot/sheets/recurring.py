@@ -23,6 +23,7 @@ VERSION_HEADERS = (
 )
 FIRST_MONTH, LAST_MONTH = "0001-01", "9999-12"
 CATEGORIES = {"rent", "bills_utilities", "static_bills_subscriptions_needs", "subscriptions_wants"}
+VIRTUAL_SUBSCRIPTION_CATEGORIES = {"static_bills_subscriptions_needs", "subscriptions_wants"}
 KINDS = {"subscription", "variable", "fixed"}
 CADENCES = {"monthly", "quarterly", "yearly"}
 SPLITS = {"none", "income", "equal", "fronted", "custom"}
@@ -154,8 +155,6 @@ def normalize_plan(body: dict[str, Any], *, current: BillPlan | None, today: dat
     kind, cadence = body.get("type"), body.get("cadence")
     if not isinstance(kind, str) or not isinstance(cadence, str) or kind not in KINDS or cadence not in CADENCES:
         raise BillValidation("Choose a bill type and billing frequency.")
-    if current and kind != current.kind:
-        raise BillValidation("Keep this bill's type, or create a new bill.")
     if kind == "subscription" and cadence == "quarterly":
         raise BillValidation("Subscriptions can repeat monthly or yearly.")
     name = text(body.get("name"), "bill name", required=True)
@@ -194,7 +193,8 @@ def normalize_plan(body: dict[str, Any], *, current: BillPlan | None, today: dat
                     current.source_tab if current else SUBSCRIPTION_TAB if kind == "subscription" else BILL_TAB,
                     current.source_range if current else "", effective, LAST_MONTH, True, method, basis)
     return replace(result, monthly_source=bool(current and current.monthly_source) or
-                   result.source_tab == BILL_TAB or kind == "variable" or method != "none")
+                   result.source_tab == BILL_TAB or kind != "subscription" or method != "none"
+                   or category not in VIRTUAL_SUBSCRIPTION_CATEGORIES)
 
 
 def versioned(plans: list[BillPlan], replacement: BillPlan, request_id: str) -> list[BillPlan]:

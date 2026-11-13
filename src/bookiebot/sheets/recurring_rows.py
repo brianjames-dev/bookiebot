@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 from bookiebot.sheets.recurring import (
     BILL_TAB, SUBSCRIPTION_TAB, VERSION_HEADERS, FIRST_MONTH, LAST_MONTH,
     CADENCES, CATEGORIES, KINDS, SPLITS, BillConflict, BillPlan, BillValidation,
-    boolean, fingerprint, month_key, money_cents,
+    boolean, fingerprint, month_key, money_cents, VIRTUAL_SUBSCRIPTION_CATEGORIES,
 )
 
 BILL_HEADERS = ("bill_key", "display_name", "recurrence", "pull_day", "pull_months", "source_label",
@@ -80,7 +80,8 @@ def decode(rows: list[list[str]], tab: str) -> list[BillPlan]:
                 money_cents(item.get("amount") if tab == SUBSCRIPTION_TAB else item.get("expected_amount"), optional=True),
                 cadence, day, tuple(sorted(months)), category, item.get("account", ""), source, tab,
                 item.get("source_range", ""), start, end, boolean(item["active"]), split, basis,
-                item["version"], item["request_id"], boolean(item["monthly_source"]), split_start))
+                item["version"], item["request_id"], boolean(item["monthly_source"])
+                or kind != "subscription" or category not in VIRTUAL_SUBSCRIPTION_CATEGORIES, split_start))
     except (BillValidation, KeyError, TypeError, ValueError) as exc:
         raise BillConflict("A saved bill version is invalid. Check its schedule before changing it.") from exc
     grouped: dict[str, list[BillPlan]] = {}

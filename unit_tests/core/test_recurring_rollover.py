@@ -1,6 +1,8 @@
 from dataclasses import replace
 from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import Mock
+import pytest
 
 from bookiebot.core import recurring_bills
 from bookiebot.reports import bill_settings as bills
@@ -12,7 +14,8 @@ from unit_tests.reports.test_bill_settings import saved as saved
 from unit_tests.reports.test_goals_store import access as access
 
 
-def test_backend_carries_authorized_versions_when_external_rollover_script_is_older(saved, monkeypatch):
+@pytest.mark.parametrize('first_failure', [None, 'prewrite', 'rejected'])
+def test_backend_carries_authorized_versions_when_external_rollover_script_is_older(saved, monkeypatch, first_failure):
     loan = replace(saved.loan, split_method="none", request_id="confirmed-plan", effective_until="2027-01")
     new_loan = replace(loan, effective_from="2027-01", effective_until="9999-12", amount_cents=8000, version="loan-v2")
     insurance = replace(loan, id="insurance_123", name="Insurance", source_label="Insurance", amount_cents=10000,
@@ -29,6 +32,26 @@ def test_backend_carries_authorized_versions_when_external_rollover_script_is_ol
     monkeypatch.setattr(recurring_bills, "now_pacific", bills.now_pacific)
     monkeypatch.setattr(bills, "build_commands", lambda: saved.commands)
     monkeypatch.setattr("bookiebot.reimbursements.service.enabled", lambda: False)
+    if first_failure:
+        writer = current.http_client.batch_update
+        if first_failure == 'prewrite':
+            reader = bills.read_workbook
+            source = reader(B, datetime(2027, 1, 17).date())
+            def fail_current(actor, today):
+                if today.year == 2027:
+                    raise RuntimeError('read failed')
+                return reader(actor, today)
+            monkeypatch.setattr(bills, 'read_workbook', fail_current)
+            assert not bills.carry_year(B, source, saved.commands)
+            monkeypatch.setattr(bills, 'read_workbook', reader)
+        else:
+            from gspread.exceptions import APIError
+            response = Mock(status_code=429)
+            response.json.return_value = {'error': {'code': 429, 'message': 'quota'}}
+            current.http_client.batch_update = Mock(side_effect=APIError(response))
+            recurring_bills.process_owner(B)
+            current.http_client.batch_update = writer
+        assert not current.http_client.sent
     recurring_bills.process_owner(B)
     carried = decode(current.http_client.rows[BILL_TAB], BILL_TAB)
     assert {p.id for p in carried} == {loan.id, insurance.id}
