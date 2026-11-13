@@ -1,6 +1,7 @@
 import type {RecordedTransaction} from './transactions-screen'
 import type {TransactionChangeSummary} from './transaction-change-summary'
 import {transactionMerchant,transactionText} from './transaction-identity'
+import {repaymentLabel} from './transaction-repayment-model'
 import {recordedDays,recordedCategoryColors,type RecordedDay} from './recorded-transaction-view'
 const money=(cents:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100)
 
@@ -29,6 +30,7 @@ export function motionValues(items:RecordedTransaction[],days:RecordedDay[],alia
   values[`day:${group.year}-${group.month}-${group.day}:amount`]=money(Math.round((group.total??group.entries.reduce((sum,row)=>sum+row.amount,0))*100))
   for(const entry of group.entries){const text=transactionText(entry,transactionMerchant(entry,aliases)),key=`row:${entry.id}:`;Object.assign(values,{[key+'primary']:text.primary,[key+'category']:text.category,[key+'item']:text.item??'',[key+'amount']:money(Math.round(entry.amount*100))});colors[key+'category']=recordedCategoryColors[entry.category]}
  }
+ for(const row of items){if(!row.repayment)continue;const value=row.repayment,key='split:'+row.id+':';Object.assign(values,{[key+'remaining']:money(value.outstandingCents),[key+'you']:money(value.direction==='incoming'?value.payerShareCents:value.partnerShareCents),[key+'partner']:money(value.direction==='incoming'?value.partnerShareCents:value.payerShareCents),[key+'method']:repaymentLabel(row)})}
  return {values,colors}
 }
 export async function settledTransactionRow(product:HTMLElement|null,id:string){

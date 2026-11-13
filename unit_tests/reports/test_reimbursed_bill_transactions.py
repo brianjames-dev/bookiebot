@@ -124,7 +124,7 @@ def test_confirmed_zero_exposure_keeps_the_paid_bill_and_its_identity(bill):
 
 
 @pytest.mark.parametrize("accounting,worksheet", [("cash_v1", "expense"), ("legacy_net", "income")])
-def test_other_purchase_and_legacy_amount_contracts_are_unchanged(bill, accounting, worksheet):
+def test_purchase_cash_uses_receipts_and_legacy_amount_contract_is_unchanged(bill, accounting, worksheet):
     value = {**bill.allocation, "sourceWorksheet": worksheet, "accounting": accounting, "settledCents": 2000,
              "category": "need_expenses" if worksheet == "expense" else "PG&E"}
     logged = undo.LoggedAction(id=value["sourceActionId"], created_at="2026-11-01", user_key=bill.actor,
@@ -133,7 +133,11 @@ def test_other_purchase_and_legacy_amount_contracts_are_unchanged(bill, accounti
     current = undo._allocation_action(logged, value)
     assert current is not None
     public = tx._public(bill.actor, "2026-11", current, bill.personal)
-    assert public["amountCents"] == 15208 and "displayAmountCents" not in public
+    assert public["amountCents"] == 15208
+    if accounting == "cash_v1":
+        assert public["displayAmountCents"] == 13208
+    else:
+        assert "displayAmountCents" not in public
 
 
 def test_recipient_bill_uses_its_existing_received_cell_without_second_deduction(bill):

@@ -7,7 +7,7 @@ const frame=()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()))
 function values(value:string,key:string,plan:ChangePlan|null){return{before:plan?.from[key]??value,after:plan?.to[key]??value}}
 
 function targetTextSize(el:HTMLElement,key:string,plan:ChangePlan){
- const row=el.closest<HTMLElement>('.bb-daily-transaction')!,clone=row.cloneNode(true) as HTMLElement
+ const row=el.closest<HTMLElement>('.bb-daily-transaction,.sp-summary')!,clone=row.cloneNode(true) as HTMLElement
  // Measure the final text in the actual row/flex/grid context. A metadata
  // item's current width is its old intrinsic width, not its available width.
  clone.style.cssText=`position:absolute;left:0;top:0;width:${row.getBoundingClientRect().width}px;visibility:hidden;pointer-events:none;transform:none;transition:none;border-top:${getComputedStyle(row).borderTop}`
