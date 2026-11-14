@@ -128,7 +128,8 @@ def test_fully_reimbursed_bill_is_not_hidden_by_a_later_saved_pull_day(bill, mon
 
 
 @pytest.mark.parametrize("actor,amount", [(B, "80.00"), (H, "72.08")])
-def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, monkeypatch, actor, amount):
+@pytest.mark.parametrize("display_name", ["PG&E", "Electricity"])
+def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, monkeypatch, actor, amount, display_name):
     from bookiebot.reports import expense_breakdown as reports
     from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
     bill.store.command(bill.owner, {**payment(bill.allocation, 7208), "date": "2026-11-02"})
@@ -137,7 +138,7 @@ def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, m
     monkeypatch.setattr(reports, "now_pacific", lambda: datetime(2026, 11, 13, tzinfo=PACIFIC_TZ))
     sheets = reports.ReportWorksheets(shared_expenses=InMemoryWorksheet([]),
         personal_budget=InMemoryWorksheet([["Monthly Income", "1000"], ["", "PG&E", amount]]),
-        bill_schedule=InMemoryWorksheet([bills.BILL_SCHEDULE_HEADERS, ["pge", "PG&E", "monthly", "22", "", "PG&E"]]))
+        bill_schedule=InMemoryWorksheet([bills.BILL_SCHEDULE_HEADERS, ["pge", display_name, "monthly", "22", "", "PG&E"]]))
     before = deepcopy(sheets.personal_budget._rows)
     result = reports.build_expense_breakdown_report(actor_key=actor,
         owner_name="Brian" if actor == B else "Hannah", persons=[], month=reports.BudgetMonth(2026, 11), worksheets=sheets)
@@ -145,6 +146,7 @@ def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, m
     assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == float(amount)
     assert payload["modeViews"]["projected"]["metrics"]["totalExpenses"] == float(amount)
     assert result.queued_bills == []
+    assert result.payments[0].label == display_name
     assert result.payments[0].date == "2026-11-01"
     event = next(e for e in payload["calendarEvents"] if e["kind"] == "bill")
     assert event["day"] == 1 and event["amount"] == float(amount)

@@ -955,7 +955,7 @@ def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], m
                 continue
             key = _normalize_label(display_label)
             timing = bill_payment_state(display_label, month.year, month.month, schedules, as_of=as_of,
-                recorded_on=(recorded_dates or {}).get((f"{month.year:04d}-{month.month:02d}", bill_label_key(display_label))))
+                recorded_on=(recorded_dates or {}).get((f"{month.year:04d}-{month.month:02d}", bill_label_key(value))))
             items_by_label[key] = PaymentItem(display_label, round(amount, 2), group,
                 status="paid" if timing.paid else "queued",
                 date=timing.withdrawal_date.isoformat() if timing.withdrawal_date else "")
