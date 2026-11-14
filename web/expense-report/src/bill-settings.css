@@ -134,3 +134,5 @@
 .bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=split] { grid-template-columns:minmax(0,1fr) }
 .bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=scope]>* { grid-column:1 }
 .bb-bills-current .bi-editor { margin-left:0 }
+
+.bb-bills-current-recovery { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px }

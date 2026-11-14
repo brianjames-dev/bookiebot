@@ -61,9 +61,10 @@ export function BillCurrentCharge({intent,ownerName,onDone}:{intent:CurrentBillI
  const accept=async(result:Result,command:Command)=>{
   if(result.state!=='done'){setError(result.detail||'Check saved status before another change.');return}
   setPending(null);sessionStorage.removeItem(storageKey)
+  window.dispatchEvent(new Event('bookiebot:reimbursements-changed'))
   if(!result.success){setError(result.detail||'The charge was not changed.');return}
   completed.current.add(command.operation)
-  window.dispatchEvent(new Event('bookiebot:transactions-changed'));window.dispatchEvent(new Event('bookiebot:reimbursements-changed'))
+  window.dispatchEvent(new Event('bookiebot:transactions-changed'))
   setRow(null);setReview(null);setReviewBody(null)
   // Release only the local in-flight flag; the completed owner claim remains
   // durable. Re-read canonical cash/shares before reviewing the next operation.
@@ -77,9 +78,9 @@ export function BillCurrentCharge({intent,ownerName,onDone}:{intent:CurrentBillI
   try{await accept(await billRequest('/app/transactions',command),command)}catch(e){if(alive.current){if(e instanceof RequestError&&[400,403,409].includes(e.status)){setPending(null);sessionStorage.removeItem(storageKey)}setError(e instanceof Error?e.message:'Check saved status before repeating this change.')}}
   finally{flight.current=false;if(alive.current)setBusy(false)}
  }
- const recover=async()=>{
+ const recover=async(retry=false)=>{
   if(flight.current||!pending?.requestId)return;flight.current=true;setBusy(true);setError('')
-  try{await accept(await billRequest(`/app/transactions/commands/${encodeURIComponent(pending.requestId)}`),pending)}catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not check saved status.')}
+  try{await accept(await billRequest(retry?'/app/transactions':`/app/transactions/commands/${encodeURIComponent(pending.requestId)}`,retry?pending:undefined),pending)}catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not check saved status.')}
   finally{flight.current=false;if(alive.current)setBusy(false)}
  }
  const summary=review&&row?{...review,title:row.title,date:row.date,category:row.categoryLabel,location:row.location,person:row.person,amountCents:row.amountCents,before:row.fields,after:review.after} as TransactionChangeSummary:null
@@ -94,7 +95,7 @@ export function BillCurrentCharge({intent,ownerName,onDone}:{intent:CurrentBillI
    {inline&&<InlineTransactionEditor embedded snapshot={inline} onField={(_,value)=>{setDraft(value);setReview(null)}} onCategory={()=>{}} onShare={(value,next)=>{setPayerCents(value);setMethod(next);setReview(null)}} onSplitInput={setSplitInput} onValidity={setValid} onReview={()=>void prepare()} onConfirm={()=>void save()} onBack={()=>setReview(null)} onCancel={onDone} onRemoveSplit={()=>{setOperation('cancel_split');setReview(null)}}/>}
    {!row&&!busy&&!pending&&<button type="button" className="bb-settings-action" onClick={()=>void load()}>Reload charge</button>}
    {busy&&!row&&<p role="status">Loading charge…</p>}
-   {pending&&<button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void recover()}>Check saved status</button>}
+   {pending&&<div className="bb-bills-current-recovery"><button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void recover()}>Check saved status</button><button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void recover(true)}>Retry same confirmation</button></div>}
   </>}
   {error&&<p className="bs-error" role="alert">{error}</p>}
   {!finished&&!inline&&!locked&&<footer className="bi-editor-footer"><button type="button" className="bi-cancel" onClick={onDone}>Close</button></footer>}
