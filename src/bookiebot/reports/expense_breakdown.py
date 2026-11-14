@@ -496,6 +496,7 @@ def build_expense_breakdown_report(
     received_reimbursements = [record.allocation for record in reimbursement_history.received_records]
     reimbursement_coverage = reimbursement_history.coverage_payload()
     canonical_bill_allocations = []
+    canonical_bill_events = []
     ledger_owner = recurring_owner
     from bookiebot.reimbursements import service as reimbursement_service
     if reimbursement_service.enabled():
@@ -504,6 +505,7 @@ def build_expense_breakdown_report(
         ledger_owner = owner
         ledger = reimbursement_service.snapshot(owner)
         canonical_bill_allocations = ledger["allocations"]
+        canonical_bill_events = ledger.get("events", [])
         allocations = [reimbursement_service.allocation_as_legacy(value) for value in ledger["allocations"]
                        if value["payerOwner"] == owner]
         shared_reimbursements = [value for value in allocations if _date_belongs_to_month(value.expense_date, month)]
@@ -517,7 +519,11 @@ def build_expense_breakdown_report(
     bill_schedule_rows = with_recorded_months(bill_schedule_rows, hidden_charges, canonical_bill_allocations,
         owner=ledger_owner, year=month.year)
     entries = _shared_expense_entries(shared_rows, persons, month)
-    entered_bills = _payment_items(personal_rows, bill_schedule_rows, month, as_of=generated_at.date())
+    from bookiebot.sheets.bill_payment_evidence import settled_bill_dates
+    paid_bill_dates = settled_bill_dates(canonical_bill_allocations, canonical_bill_events,
+        owner=ledger_owner, as_of=generated_at.date())
+    entered_bills = _payment_items(personal_rows, bill_schedule_rows, month, as_of=generated_at.date(),
+        recorded_dates=paid_bill_dates)
     payments = [item for item in entered_bills if item.status == "paid"]
     queued_bills = [item for item in entered_bills if item.status == "queued"]
     queued_total = round(sum(item.amount for item in queued_bills), 2)
@@ -578,6 +584,7 @@ def build_expense_breakdown_report(
         bill_schedule_rows,
         month,
         as_of=generated_at.date(),
+        recorded_dates=paid_bill_dates,
     )
     calendar_events = _calendar_events(
         month=month,
@@ -682,11 +689,13 @@ def build_expense_breakdown_report(
             budget_history, bill_schedule_rows, month,
             groups=frozenset({"rent", "bills_utilities", "static_bills_subscriptions_needs"}),
             as_of=generated_at.date(),
+            recorded_dates=paid_bill_dates,
         ),
         calendar_events=calendar_events,
         calendar_context=_calendar_adjacent_months(
             month, subscriptions, bill_schedule_rows, budget_history,
             income_projection_config, income_projection_reference, income_projection_receipts,
+            recorded_dates=paid_bill_dates,
         ),
         income_entries=income_entries,
         income_projection_config=income_projection_config,
@@ -909,8 +918,9 @@ def _entries_for_category(entries: list[ExpenseEntry], category: str) -> list[Ex
 
 
 def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], month: BudgetMonth,
-                   *, as_of: date | None = None) -> list[PaymentItem]:
-    from bookiebot.sheets.bills import bill_payment_state, bill_source_amount, list_bill_schedules
+                   *, as_of: date | None = None,
+                   recorded_dates: dict[tuple[str, str], date] | None = None) -> list[PaymentItem]:
+    from bookiebot.sheets.bills import bill_payment_state, bill_label_key, bill_source_amount, list_bill_schedules
 
     schedules = list_bill_schedules(bill_schedule_rows, period=f"{month.year:04d}-{month.month:02d}")
     as_of = as_of or now_pacific().date()
@@ -944,7 +954,8 @@ def _payment_items(rows: list[list[str]], bill_schedule_rows: list[list[str]], m
             if amount <= 0 and not recorded_zero:
                 continue
             key = _normalize_label(display_label)
-            timing = bill_payment_state(display_label, month.year, month.month, schedules, as_of=as_of)
+            timing = bill_payment_state(display_label, month.year, month.month, schedules, as_of=as_of,
+                recorded_on=(recorded_dates or {}).get((f"{month.year:04d}-{month.month:02d}", bill_label_key(display_label))))
             items_by_label[key] = PaymentItem(display_label, round(amount, 2), group,
                 status="paid" if timing.paid else "queued",
                 date=timing.withdrawal_date.isoformat() if timing.withdrawal_date else "")
@@ -1115,6 +1126,7 @@ def _calendar_adjacent_months(
     income_config: IncomeProjectionConfig,
     income_reference: PaymentItem | None,
     income_receipts: list[PaymentItem],
+    *, recorded_dates: dict[tuple[str, str], date] | None = None,
 ) -> list[CalendarMonth]:
     """Read-only context for a two-week grid, isolated from financial totals.
 
@@ -1137,11 +1149,11 @@ def _calendar_adjacent_months(
             config = _income_projection_config_with_history(_income_projection_config(rows), history, month)
             events = _calendar_events(
                 month=month, subscriptions=_current_month_subscription_items(subscriptions, month),
-                payments=_payment_items(rows, bill_rows, month), income_entries=entries, income_total=total,
+                payments=_payment_items(rows, bill_rows, month, recorded_dates=recorded_dates), income_entries=entries, income_total=total,
                 income_projection_config=config,
                 income_projection_reference=_prior_month_paycheck_reference(history, month, config),
                 income_projection_receipts=income_receipts,
-                utility_history=_utility_history_items(history, bill_rows, month),
+                utility_history=_utility_history_items(history, bill_rows, month, recorded_dates=recorded_dates),
                 bill_schedule_rows=bill_rows, personal_rows=rows,
             )
         elif future:
@@ -1207,7 +1219,7 @@ def _bill_calendar_events(
     personal_rows: list[list[str]],
     active_subscription_labels: set[str],
 ) -> list[CalendarEvent]:
-    if not bill_schedule_rows:
+    if not bill_schedule_rows and not any(payment.status == "paid" and payment.date for payment in payments):
         return []
     try:
         from bookiebot.sheets.bills import bill_payment_state, list_bill_schedules
@@ -1225,10 +1237,13 @@ def _bill_calendar_events(
             continue
         day = _bill_day_in_month(bill, month)
         timing = bill_payment_state(bill.source_label, month.year, month.month, bills, as_of=now_pacific().date())
-        if day is None or timing.withdrawal_date is None:
-            continue
         labels = [bill.source_label, bill.display_name, bill.bill_key]
         payment = next((entered[_bill_subscription_identity(label)] for label in labels if _bill_subscription_identity(label) in entered), None)
+        paid_date = _parse_date(payment.date) if payment and payment.status == "paid" else None
+        if paid_date and (paid_date.year, paid_date.month) == (month.year, month.month):
+            day = paid_date.day
+        elif day is None or timing.withdrawal_date is None:
+            continue
         amount = payment.amount if payment else 0.0
         amount_estimated = False
         if (
@@ -1260,6 +1275,13 @@ def _bill_calendar_events(
                 amount_estimated=amount_estimated,
             )
         )
+    represented = {_bill_subscription_identity(event.label) for event in events}
+    for payment in payments:
+        paid_date = _parse_date(payment.date) if payment.status == "paid" else None
+        if (paid_date and (paid_date.year, paid_date.month) == (month.year, month.month)
+                and _bill_subscription_identity(payment.label) not in represented
+                and _bill_subscription_identity(payment.label) not in active_subscription_labels):
+            events.append(CalendarEvent("bill", payment.label, payment.amount, paid_date.day, payment.group))
     return events
 
 
@@ -2303,6 +2325,7 @@ def _utility_history_items(
     *,
     groups: frozenset[str] = frozenset({"bills_utilities"}),
     as_of: date | None = None,
+    recorded_dates: dict[tuple[str, str], date] | None = None,
 ) -> list[UtilityHistoryItem]:
     history = sorted(
         (item for item in budget_history if item.month.year == selected_month.year and item.month.month <= selected_month.month),
@@ -2314,7 +2337,8 @@ def _utility_history_items(
     quarterly_months_by_label = _quarterly_bill_months_by_label(bill_schedule_rows)
     by_label: dict[str, dict[str, Any]] = {}
     for history_item in history:
-        monthly_items = _payment_items(history_item.rows, bill_schedule_rows, history_item.month, as_of=as_of)
+        monthly_items = _payment_items(history_item.rows, bill_schedule_rows, history_item.month, as_of=as_of,
+            recorded_dates=recorded_dates)
         monthly_amounts = {
             _normalize_label(item.label): item
             for item in monthly_items

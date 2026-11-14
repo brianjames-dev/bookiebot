@@ -11,6 +11,13 @@ list, totals, graph, search and pagination. On/after withdrawal it appears once
 in Current and Transactions, under the withdrawal date. An amount entered today
 for an already elapsed withdrawal date appears immediately.
 
+An active shared bill whose entire partner share has already been covered by
+confirmed, dated receipts keeps its original recorded bill date. A later saved
+recurring pull day cannot hide that settled occurrence from either person's
+Transactions, Current totals or Calendar. The original cash, gross, split and
+receipt records remain unchanged. Partial/pending/reversed/future receipts,
+cleared debt and ambiguous source evidence do not supply this exception.
+
 The amount remains in its existing monthly budget cell. Reads derive timing;
 there is no midnight financial writer, new transaction, new column, database
 migration or copying of amounts. Existing undated bill actions and manually
@@ -24,8 +31,9 @@ invalid, overlapping or off-cycle quarterly schedules leave the amount queued
 with no invented date. Those amounts remain in Projected and `queuedBills`,
 including in the read-only assistant's Projected commitments. Correct the saved
 schedule to resolve them. A day beyond the month's end clamps to its final day.
-The existing schedule is the date authority, so correcting it also corrects
-derived placements; no historical amount or saved action is rewritten.
+The existing schedule supplies timing when there is no confirmed settled
+occurrence. Correcting it corrects those derived placements; no historical
+amount or saved action is rewritten.
 
 Expected amounts without an entered monthly amount stay estimates even after
 their scheduled date passes. They never acquire recorded transaction actions.

@@ -90,6 +90,31 @@ def test_importing_legacy_bills_never_invents_a_saved_recurring_split():
     assert legacy_plans("brian", rows, [])[0].split_method == "none"
 
 
+def test_legacy_lowercase_split_keeps_zero_cash_recorded_and_its_actual_date(monkeypatch):
+    p = replace(plan(), id="pge_1234", kind="variable", name="PG&E", source_label="PG&E",
+                amount_cents=None, pull_day=22, monthly_source=True, version="v1")
+    client, _ = fixture([p])
+    client.http_client.rows["November"][0][2] = "0"
+    client.http_client.formulas["November"][0][2] = "0"
+    value = {"id": "allocation-1", "version": 3, "payerOwner": "brian", "partnerOwner": "hannah",
+             "sourceYear": 2026, "sourceWorksheet": "income", "sourceSheetTitle": "November",
+             "sourceValues": {"item": "pg&e"}, "expenseDate": "2026-11-01", "category": "pg&e",
+             "partnerShareCents": 6023, "settledCents": 6023, "lifecycle": "active"}
+    event = {"allocationId": value["id"], "status": "confirmed", "date": "2026-11-02", "amountCents": 6023}
+    monkeypatch.setattr("bookiebot.reimbursements.service.enabled", lambda: True)
+    monkeypatch.setattr("bookiebot.reimbursements.service.build_reimbursement_store",
+        lambda: SimpleNamespace(snapshot=lambda *a, **kw: {"allocations": [value], "events": [event]}))
+    source = storage.read_workbook(B, TODAY, client=client)
+    assert source.charge(p, "2026-11")["recorded"]
+    assert source.charge(p, "2026-11")["date"] == "2026-11-01"
+    assert source.settings.earliest_months[p.id] == "2026-12"
+    runtime, _, _ = runtime_tables("brian", source.rows[BILL_TAB], [], [])
+    from bookiebot.sheets.recurring_rows import with_recorded_months
+    runtime = with_recorded_months(runtime, [], [value], owner="brian", year=2026)
+    assert "2026-11" in runtime[1][runtime[0].index("recorded_months")]
+    assert not client.http_client.sent
+
+
 def test_zero_confirmed_cash_does_not_resurrect_an_estimated_bill(monkeypatch):
     from datetime import datetime
     from bookiebot.sheets.routing import PACIFIC_TZ

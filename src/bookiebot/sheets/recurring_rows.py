@@ -122,8 +122,10 @@ def legacy_plans(owner: str, bill_rows: list[list[str]], subscription_rows: list
         cadence = _parse_recurrence(item.get("recurrence", ""))
         if cadence is None:
             raise BillConflict("A bill has an invalid frequency. Check its schedule.")
-        kind = "fixed" if mode == "automatic" else "variable"
         normalized = re.sub(r"[^a-z0-9]", "", source.casefold())
+        # Rent's missing legacy tracking flag does not make its price variable.
+        # Classification alone does not enroll a schedule or invent an amount.
+        kind = "fixed" if mode == "automatic" or normalized == "rent" else "variable"
         category = "rent" if normalized == "rent" else "static_bills_subscriptions_needs" if kind == "fixed" else "bills_utilities"
         result.append(BillPlan(_identity(owner, BILL_TAB, item.get("bill_key") or source), kind, name, amount,
             cadence, _parse_day(item.get("pull_day", "")) or 0, _parse_pull_months(item.get("pull_months", "")),
@@ -279,6 +281,7 @@ def with_recorded_months(rows: list[list[str]], charges: list[list[str]], alloca
     if not rows:
         return rows
     from bookiebot.sheets.recurring_charges import decode_charges
+    from bookiebot.sheets.bills import bill_label_key
     names = header(rows)
     index = names.index("recorded_months") if "recorded_months" in names else len(names)
     result = [list(rows[0]) + (["recorded_months"] if index == len(names) else [])]
@@ -286,9 +289,10 @@ def with_recorded_months(rows: list[list[str]], charges: list[list[str]], alloca
     for item, raw in zip(fields(rows), (r for r in rows[1:] if any(str(v).strip() for v in r))):
         months = {c.month for c in recorded if c.recorded and c.plan_id == item.get("plan_id")}
         for value in allocations:
-            if (value["payerOwner"] == owner and value["sourceYear"] == year and value["sourceWorksheet"] == "income"
-                    and (value.get("billPlanId") and value["billPlanId"] == item.get("plan_id")
-                         or value.get("sourceValues", {}).get("item") == item.get("source_label"))):
+            if (value["payerOwner"] == owner and value.get("lifecycle", "active") == "active"
+                    and value["sourceYear"] == year and value["sourceWorksheet"] == "income"
+                    and (value["billPlanId"] == item.get("plan_id") if value.get("billPlanId") else
+                         bill_label_key(value.get("sourceValues", {}).get("item") or value.get("item") or value["category"]) == bill_label_key(item.get("source_label", "")))):
                 months.add(value["expenseDate"][:7])
         line = list(raw) + [""] * max(0, index + 1 - len(raw))
         line[index] = ",".join(sorted(months))

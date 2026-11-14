@@ -259,7 +259,8 @@ def _subscription_rows(actor: str, month: str, rows: list[list[str]], *, as_of: 
 
 
 def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[dict[str, Any]]:
-    from bookiebot.sheets.bills import bill_payment_state, list_bill_schedules
+    from bookiebot.sheets.bills import bill_payment_state, bill_label_key, list_bill_schedules
+    from bookiebot.sheets.bill_payment_evidence import settled_bill_dates
     as_of = now_pacific().date()
     key = (actor, month, as_of.isoformat())
     with _READ_LOCKS.setdefault(actor, threading.RLock()):
@@ -275,6 +276,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
             snapshot = shared.build_reimbursement_store().snapshot(owner, include_inactive=True)
             allocations, events = snapshot["allocations"], snapshot["events"]
         allocation_by_id = {value["id"]: value for value in allocations}
+        paid_bill_dates = settled_bill_dates(allocations, events, owner=owner, as_of=as_of)
         aliases = actor_key_aliases(actor)
         for year in years:
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
@@ -347,7 +349,9 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                         elif "incomePayerCents" in row["splitOptions"]:
                             row["splitOptions"]["payerCents"] = row["splitOptions"]["incomePayerCents"]
                     if row["kind"] == "payment":
-                        timing = bill_payment_state(a.metadata.get("exact_source_label") or row["category"], year, number, schedules, as_of=as_of)
+                        label = a.metadata.get("exact_source_label") or row["category"]
+                        timing = bill_payment_state(label, year, number, schedules, as_of=as_of,
+                            recorded_on=paid_bill_dates.get((period, bill_label_key(label))))
                         if not timing.paid and not a.metadata.get("bill_charge_date"):
                             continue
                         row["date"] = a.metadata.get("bill_charge_date") or (timing.withdrawal_date.isoformat() if timing.withdrawal_date else "")
