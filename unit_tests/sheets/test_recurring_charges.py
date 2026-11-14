@@ -1,4 +1,5 @@
-from dataclasses import replace
+from dataclasses import asdict, replace
+import json
 
 import pytest
 
@@ -20,6 +21,32 @@ def test_charge_sources_roundtrip_and_preserve_extra_columns():
     updated = encode_charges([replace(row, source_action_id="action-1")], values)
     assert updated[1][-1] == "keep me"
     assert decode_charges(updated) == [replace(row, source_action_id="action-1")]
+
+
+def test_old_charge_columns_stay_readable_when_occurrence_metadata_is_added():
+    from bookiebot.sheets.recurring_charges import CHARGE_HEADERS
+    original = charge()
+    rows = encode_charges([original], [])
+    old = [[row[i] for i in range(len(CHARGE_HEADERS))] for row in rows]
+    assert decode_charges(old) == [original]
+    upgraded = encode_charges([original], old)
+    assert upgraded[0][:len(CHARGE_HEADERS)] == list(CHARGE_HEADERS)
+    assert decode_charges(upgraded) == [original]
+
+
+def test_invalid_virtual_occurrence_identity_or_snapshot_is_rejected():
+    from unit_tests.sheets.test_recurring import plan
+    original = replace(charge(),source_row=0,virtual=True,
+        plan_snapshot=json.dumps(asdict(plan(id=charge().plan_id,kind='subscription',name='Music',source_label='Music',
+            category='subscriptions_wants',source_tab=SUBSCRIPTION_TAB,monthly_source=False,version='v1',
+            amount_cents=1299,pull_day=13))))
+    assert decode_charges(encode_charges([original],[])) == [original]
+    for key,value in [('id','another-plan'),('amount_cents',True),('pull_day',False)]:
+        malformed = json.loads(original.plan_snapshot);malformed[key]=value
+        with pytest.raises(BillConflict):
+            decode_charges(encode_charges([replace(original,plan_snapshot=json.dumps(malformed))],[]))
+    with pytest.raises(BillConflict):
+        decode_charges(encode_charges([replace(original,plan_snapshot='')],[]))
 
 
 def test_duplicate_and_changed_source_addresses_never_become_another_bill():

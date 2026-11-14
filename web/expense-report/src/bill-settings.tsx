@@ -25,7 +25,7 @@ export type Bill={id:string;type:'subscription'|'variable'|'fixed';name:string;a
 type Snapshot={month:string;today:string;settingsVersion:string;ownerName:string;partnerName:string;incomeBasisPoints:number;splitsEnabled:boolean;bills:Bill[];pendingCommand?:Command}
 type Form={name:string;type:Bill['type'];amount:string;cadence:Bill['cadence'];pullDay:string;firstMonth:number;category:string;account:string;effectiveFrom:string;stopFrom:string;splitMethod:Bill['splitMethod'];payerBasisPoints:number}
 type Command=Record<string,unknown>&{operation:string;requestId?:string;reviewVersion?:string}
-type Review={operation:string;reviewVersion:string;name?:string;amountCents?:number;month?:string;date?:string;effectiveFrom?:string;selectedStart?:string;before?:Bill|null;after?:Bill;share?:{method:string;payerName?:string;partnerName?:string;payerCents:number;partnerCents:number};replacesScheduledChanges?:boolean}
+type Review={operation:string;reviewVersion:string;name?:string;amountCents?:number;month?:string;date?:string;effectiveFrom?:string;before?:Bill|null;after?:Bill;share?:{method:string;payerName?:string;partnerName?:string;payerCents:number;partnerCents:number};replacesScheduledChanges?:boolean}
 type Result={state:string;success?:boolean;detail?:string;splitPending?:boolean;transaction?:{id:string;month:string}}
 type Mode='settings'|'amount'|'monthly'|'stop'|'adopt'|'split'|'offer'|'charge'
 type Draft={form:Form;mode:Mode;amount:string;review:Review|null;reviewBody:Command|null;splitInput:SplitInputDraft;valid:boolean;draftId:string;splitBefore:{method:Form['splitMethod'];basis:number}|null}
@@ -124,10 +124,8 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   let body:Command
   if(operation==='amount'||operation==='adopt')body={operation,id:selected?.id,month:snapshot.month,settingsVersion:snapshot.settingsVersion,chargeVersion:selected?.charge.version,...(operation==='amount'?{amount}: {})}
   else if(operation==='delete')body={...base,effectiveFrom:form.stopFrom}
-  else{const {firstMonth,stopFrom,...fields}=form;body={...base,bill:{...fields,pullDay:Number(fields.pullDay),effectiveFrom:[fields.effectiveFrom,selected?.earliestEffectiveMonth??snapshot.month].sort()[1],pullMonths:form.cadence==='monthly'?[]:form.cadence==='yearly'?[firstMonth]:[0,3,6,9].map(n=>(firstMonth-1+n)%12+1).sort((a,b)=>a-b)}}}
-  // Retain the chosen scope in the review scene without changing the server's
-  // protected recurring start or the immutable financial command.
-  try{const next=await request('/app/bills/review',body);if(alive.current){setReview({...next.review,selectedStart:operation==='create'||operation==='update'?form.effectiveFrom:undefined});setReviewBody(body)}}catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not review bill.')}
+  else{const {firstMonth,stopFrom,...fields}=form;body={...base,bill:{...fields,pullDay:Number(fields.pullDay),effectiveFrom:fields.effectiveFrom,pullMonths:form.cadence==='monthly'?[]:form.cadence==='yearly'?[firstMonth]:[0,3,6,9].map(n=>(firstMonth-1+n)%12+1).sort((a,b)=>a-b)}}}
+  try{const next=await request('/app/bills/review',body);if(alive.current){setReview(next.review);setReviewBody(body)}}catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not review bill.')}
   finally{flight.current=false;if(alive.current)setBusy(false)}
  }
  const accept=async(next:Result,command:Command)=>{
@@ -148,7 +146,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const save=async()=>{
   if(flight.current||pending||!review||!reviewBody||!confirmReady)return
   const command={...reviewBody,requestId:crypto.randomUUID(),reviewVersion:review.reviewVersion}
-  try{if(selected&&snapshot&&form&&command.operation==='update'&&form.effectiveFrom===snapshot.month&&currentBillHasHit(selected.charge,snapshot.month,snapshot.today,selected.amountCents)){const plan=review.after;const follow:CurrentBillIntent={id:selected.id,month:snapshot.month,name:plan?.name??form.name,amountCents:(plan?.type??form.type)==='variable'?null:plan?.amountCents??Math.round(Number(form.amount)*100),method:plan?.splitMethod??form.splitMethod,basis:plan?.payerBasisPoints??selectedIncome,requestId:command.requestId,stage:'configuration',offerCurrent:true,recordedAmountCents:selected.charge.virtual?selected.amountCents??0:selected.charge.amountCents,needsAdoption:selected.charge.virtual};sessionStorage.setItem(followKey,JSON.stringify(follow));setCurrentIntent(follow)};sessionStorage.setItem(storageKey,JSON.stringify(command))}catch{try{const follow=JSON.parse(sessionStorage.getItem(followKey)||'null');if(follow?.requestId===command.requestId)sessionStorage.removeItem(followKey)}catch{}setCurrentIntent(null);setError('Saved-status storage is unavailable. Reopen BookieBot before confirming this change.');return}
+  try{if(selected&&snapshot&&form&&command.operation==='update'&&form.effectiveFrom===snapshot.month&&currentBillHasHit(selected.charge,snapshot.month,snapshot.today,selected.amountCents)){const plan=review.after;const follow:CurrentBillIntent={id:selected.id,month:snapshot.month,name:plan?.name??form.name,amountCents:(plan?.type??form.type)==='variable'?null:plan?.amountCents??Math.round(Number(form.amount)*100),method:plan?.splitMethod??form.splitMethod,basis:plan?.payerBasisPoints??selectedIncome,requestId:command.requestId,stage:'configuration',offerCurrent:true,recordedAmountCents:selected.charge.virtual?selected.charge.billAmountCents??selected.amountCents??0:selected.charge.amountCents,needsAdoption:selected.charge.virtual};sessionStorage.setItem(followKey,JSON.stringify(follow));setCurrentIntent(follow)};sessionStorage.setItem(storageKey,JSON.stringify(command))}catch{try{const follow=JSON.parse(sessionStorage.getItem(followKey)||'null');if(follow?.requestId===command.requestId)sessionStorage.removeItem(followKey)}catch{}setCurrentIntent(null);setError('Saved-status storage is unavailable. Reopen BookieBot before confirming this change.');return}
   flight.current=true;setBusy(true);setPending(command);updateWork({label:'Bill changes',pending:true,uncertain:true})
   try{await accept(await request('/app/bills',command),command)}catch(e){if(alive.current){if(e instanceof BillRequestError&&[400,403,409].includes(e.status))await accept({state:'done',success:false,detail:e.message},command);else{if(e instanceof BillRequestError&&e.status===401){reset();setSnapshot(null)}setResult({state:'uncertain',detail:e instanceof Error?e.message:'Check saved status.'})}}}
   finally{flight.current=false;if(alive.current)setBusy(false)}
@@ -163,16 +161,11 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const locked=busy||Boolean(pending)||currentLocked,lastReview=useRef<Review|null>(null)
  if(review)lastReview.current=review
  const shownReview=review??lastReview.current
- const selectedStart=shownReview?.selectedStart??shownReview?.effectiveFrom
- const protectedStart=Boolean(shownReview?.after&&shownReview.operation!=='delete'&&selectedStart&&shownReview.effectiveFrom&&selectedStart<shownReview.effectiveFrom)
  const splitLabel=(bill:Pick<Bill,'splitMethod'|'payerBasisPoints'>)=>bill.splitMethod==='none'?'No split':bill.splitMethod==='income'?'By income':bill.splitMethod==='equal'?'50 / 50':bill.splitMethod==='fronted'?`100% ${snapshot?.partnerName}`:`${(bill.payerBasisPoints/100).toFixed(2)}% ${snapshot?.ownerName}`
  const reviewLines=shownReview?.after?[
   {label:shownReview.after.type==='variable'?'Estimate':'Recurring amount',before:shownReview.before?money(shownReview.before.amountCents):null,after:money(shownReview.after.amountCents)},
   {label:'Repeats',before:shownReview.before?`${shownReview.before.cadence} · day ${shownReview.before.pullDay}`:null,after:`${shownReview.after.cadence} · day ${shownReview.after.pullDay}`},
-  ...(protectedStart?[
-   {label:'Selected start',before:null,after:monthLabel(selectedStart!)},
-   {label:'Recurring charges',before:null,after:monthLabel(shownReview.effectiveFrom!)+' onward'},
-  ]:[{label:shownReview.operation==='delete'?'Stops':'Applies from',before:null,after:monthLabel(shownReview.effectiveFrom!)+' onward'}]),
+  {label:shownReview.operation==='delete'?'Stops':'Applies from',before:null,after:monthLabel(shownReview.effectiveFrom!)+' onward'},
   {label:'Recurring split',before:shownReview.before?splitLabel(shownReview.before):null,after:splitLabel(shownReview.after)},
  ]:shownReview?.share&&shownReview.share.method!=='none'?[
   {label:snapshot?.ownerName??'',before:null,after:money(shownReview.share.payerCents)},
@@ -218,8 +211,8 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const reviewView=shownReview&&<>
   <header className="sp-flow-heading bb-bill-heading"><h2>{shownReview.operation==='delete'?'Stop bill':shownReview.operation==='adopt'?'Edit recorded charge':shownReview.operation==='amount'?'Confirm amount':'Review bill'}</h2><p className="sp-flow-context bb-bills-review-context"><span title={shownReview.after?.name??shownReview.name??selected?.name}>{shownReview.after?.name??shownReview.name??selected?.name}</span>{shownReview.after&&<span> · {kindLabel[shownReview.after.type]}</span>}</p></header>
   {!shownReview.after&&<p className="bb-bills-review-amount">{money(shownReview.amountCents)}</p>}
-  <dl className="bi-review-changes" aria-label="Bill changes to review" data-protected-start={protectedStart||undefined}>{reviewLines.map(line=><div className="bi-review-change" key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new">{line.after}</span>}</dd></div>)}</dl>
-  {shownReview.after&&<p className="bi-footnote">{protectedStart&&selectedStart===snapshot?.month?`After saving, choose whether to update the recorded ${monthLabel(selectedStart!)} charge.`:'Recorded charges need a separate confirmation.'}</p>}
+  <dl className="bi-review-changes" aria-label="Bill changes to review">{reviewLines.map(line=><div className="bi-review-change" key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new">{line.after}</span>}</dd></div>)}</dl>
+  {shownReview.after&&<p className="bi-footnote">Recorded charges need a separate confirmation.</p>}
   {shownReview.replacesScheduledChanges&&<p className="bi-footnote">Replaces later scheduled changes for this bill.</p>}
   {shownReview.operation==='amount'&&<p className="bi-footnote">Appears in Transactions on the saved autopay date. Early repayments stay in Shared.</p>}
   {shownReview.operation==='adopt'&&<p className="bi-footnote">Prepares this recorded charge for editing here. The purchase total stays unchanged.</p>}

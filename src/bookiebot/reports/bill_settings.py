@@ -16,7 +16,7 @@ from bookiebot.sheets.recurring_changes import prepare_change
 from bookiebot.sheets.recurring_storage import (
     WorkbookSnapshot, SheetBatch, LOG_HEADERS, read_workbook, configuration_batch, row_for, cell, _add_to_subtotal,
 )
-from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, encode_charges, source_anchor
+from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, encode_charges, occurrence_plan, source_anchor
 from bookiebot.sheets.routing import now_pacific, get_user_config
 from bookiebot.sheets.repo import sheet_command_context
 
@@ -87,13 +87,16 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
     if plan is None:
         raise BillConflict("This bill is unavailable in the selected month.")
     info = snapshot.charge(plan, period)
+    original = next((c for c in decode_charges(snapshot.rows.get(CHARGES_TAB, [])) if c.plan_id == plan.id and c.month == period), None)
+    if original and original.plan_snapshot:
+        plan = occurrence_plan(original, plan)
     if plan.kind == "variable" and not info.get("canConfirmAmount", True):
         raise BillValidation("Only this bill's payer can confirm its invoice amount.")
     if plan.kind == "variable" and plan.due_date(period) is None:
         raise BillValidation("Set this bill's payment day and billing months before confirming its amount.")
     if not info.get("available") or body.get("chargeVersion") != info.get("version"):
         raise BillConflict("This charge changed. Refresh before entering an amount.")
-    if info.get("recorded"):
+    if info.get("recorded") and not (body.get("operation") == "adopt" and info.get("virtual")):
         raise BillConflict("This charge is already recorded. Open This month's bill in Bills to edit its amount or split.")
     operation = body["operation"]
     if operation == "scheduled":
@@ -219,6 +222,12 @@ def charge_batch(snapshot: WorkbookSnapshot, checked: dict[str, Any], request_id
         snapshot.properties[title]["sheetId"], row, column, source_anchor(plan.id, period), amount, True, "", request_id,
         now_pacific().isoformat(), snapshot.owner)
     existing = decode_charges(snapshot.rows.get(CHARGES_TAB, []))
+    prior = next((c for c in existing if c.plan_id == plan.id and c.month == period), None)
+    if prior and prior.virtual:
+        charge = replace(charge, plan_snapshot=prior.plan_snapshot, payment_date=prior.payment_date)
+        existing = [c for c in existing if c is not prior]
+    elif prior:
+        raise BillConflict("This bill occurrence is already recorded. Open its existing charge instead.")
     batch.table(CHARGES_TAB, encode_charges([*existing, charge], snapshot.rows.get(CHARGES_TAB, [])))
     if not plan.monthly_source:
         from bookiebot.sheets.recurring_rows import encode, managed

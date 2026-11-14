@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
-from datetime import date, timedelta
+from datetime import date
 import re
 from typing import Any
 
@@ -89,16 +89,9 @@ def prepare_change(snapshot: BillSnapshot, body: dict[str, Any], *, today: date)
             if other.id != after.id and other.source_label.casefold() == after.source_label.casefold():
                 raise BillValidation("A bill with that name already exists. Edit it instead.")
         if after.split_method != "none":
-            changed = (current is None or current.split_method != after.split_method
-                       or after.split_method == "custom" and current.payer_basis_points != after.payer_basis_points)
-            start = max(date.fromisoformat(after.effective_from + "-01"), today if current is None else today + timedelta(days=1))
-            after = replace(after, split_starts_on=start.isoformat() if changed or current is None else current.split_starts_on)
+            after = replace(after, split_starts_on=after.effective_from + "-01")
     minimum = snapshot.earliest_months.get(after.id, today.strftime("%Y-%m"))
-    timing_repair = bool(current and not current.pull_day and operation == "update" and replace(after,
-        pull_day=current.pull_day, pull_months=current.pull_months, effective_from=current.effective_from,
-        effective_until=current.effective_until, version=current.version, request_id=current.request_id,
-        split_starts_on=current.split_starts_on, monthly_source=current.monthly_source) == current)
-    if after.effective_from < minimum and not timing_repair:
+    if operation == "delete" and after.effective_from < minimum:
         raise BillValidation(f"This charge is already recorded. Start changes in {minimum} or later.")
     # The review binds the exact owner/source snapshot, before/after values and
     # internal split start. Clients never supply row addresses or authority.

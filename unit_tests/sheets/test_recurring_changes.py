@@ -39,13 +39,13 @@ def test_selected_starting_month_is_inclusive_and_continues_into_future_years(st
     assert source.plans[0].amount_cents == 6023
 
 
-def test_new_split_default_starts_after_existing_charge_and_carries_on_non_split_edits():
+def test_new_split_default_starts_in_the_selected_month_and_carries_on_non_split_edits():
     change = prepare_change(snapshot(), update(), today=TODAY)
-    assert change.after.split_starts_on == "2026-11-14"
+    assert change.after.split_starts_on == "2026-11-01"
     saved = replace(change.after, version="v2")
     state = replace(snapshot(), plans=(saved,))
     next_change = prepare_change(state, update(version="v2", bill=form(account="Other bank")), today=date(2026, 11, 15))
-    assert next_change.after.split_starts_on == "2026-11-14"
+    assert next_change.after.split_starts_on == "2026-11-01"
     assert next_change.after.monthly_source
 
 
@@ -65,8 +65,8 @@ def test_missing_payment_date_can_be_repaired_without_changing_recorded_money_or
     body = update(bill=form(splitMethod="none", pullDay=12))
     change = prepare_change(source, body, today=TODAY)
     assert change.after.pull_day == 12 and change.after.amount_cents == 6023
-    with pytest.raises(BillValidation, match="already recorded"):
-        prepare_change(source, update(bill=form(splitMethod="none", pullDay=12, amount="70.00")), today=TODAY)
+    changed = prepare_change(source, update(bill=form(splitMethod="none", pullDay=12, amount="70.00")), today=TODAY)
+    assert changed.after.effective_from == "2026-11" and changed.after.amount_cents == 7000
 
 
 @pytest.mark.parametrize("changes", [{"id": "foreign"}, {"settingsVersion": "stale"}, {"version": "stale"}, {"owner": "hannah"}, {"spreadsheetId": "foreign"}])

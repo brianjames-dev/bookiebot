@@ -208,7 +208,8 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
     mode = fields.get("tracking_mode", "").strip().lower() or "manual"
     if mode not in {"manual", "automatic"}:
         return None, BillScheduleWarning(source_range, "invalid tracking mode", (fields.get("display_name", ""), mode))
-    if mode == "automatic" and expected_amount is None:
+    if mode == "automatic" and expected_amount is None and not (fields.get("plan_id")
+            and fields.get("monthly_source", "").casefold() == "true"):
         return None, BillScheduleWarning(source_range, "automatic bill requires expected amount", (fields.get("display_name", ""),))
     if expected_amount is None and _row_is_blank_template(fields):
         return None, None
