@@ -158,14 +158,63 @@ def test_extra_formula_columns_survive_price_versioning():
     assert {"formulaValue": "=J2*2"} in values
 
 
-def test_existing_future_actual_requires_a_later_starting_month():
+def test_future_literal_is_preserved_without_pushing_the_configuration_start():
     client, loan = fixture()
     client.http_client.rows["December"][0][2] = "80"
     client.http_client.formulas["December"][0][2] = "80"
     source = storage.read_workbook(B, TODAY, client=client)
-    assert source.settings.earliest_months[loan.id] == "2027-01"
-    with pytest.raises(ValueError, match="already recorded"):
-        prepare_change(source.settings, update(source, loan), today=TODAY)
+    assert source.settings.earliest_months[loan.id] == "2026-12"
+    change = prepare_change(source.settings, update(source, loan), today=TODAY)
+    storage.configuration_batch(source, change, 'future-literal-123456', 'fp', '{}', today=TODAY).send()
+    assert client.http_client.rows['December'][0][2] == '80'
+
+
+def test_eligible_current_month_is_not_skipped_by_prefilled_future_months():
+    client, loan = fixture([replace(plan(), id='loan_1234', pull_day=22, monthly_source=True, version='v1')])
+    client.http_client.rows['December'][0][2] = client.http_client.formulas['December'][0][2] = '80'
+    source = storage.read_workbook(B, TODAY, client=client)
+    assert source.settings.earliest_months.get(loan.id, '2026-11') == '2026-11'
+    body = update(source, loan)
+    body['bill']['effectiveFrom'] = '2026-11'
+    change = prepare_change(source.settings, body, today=TODAY)
+    storage.configuration_batch(source, change, 'eligible-month-123456', 'fp', '{}', today=TODAY).send()
+    assert client.http_client.rows['November'][0][2] == '70.0'
+
+
+@pytest.mark.parametrize('kind', ['fixed', 'variable', 'subscription'])
+@pytest.mark.parametrize('from_wants', [False, True])
+def test_future_literal_survives_category_move_instead_of_becoming_the_schedule_price(kind, from_wants):
+    old_category = 'subscriptions_wants' if from_wants else 'static_bills_subscriptions_needs'
+    new_category = 'static_bills_subscriptions_needs' if from_wants else 'subscriptions_wants'
+    p = replace(plan(), id='literal_move_123', kind=kind, category=old_category,
+        split_method='none', monthly_source=True, version='v1')
+    client, _ = fixture([p])
+    old_column, new_column = (4, 3) if from_wants else (3, 4)
+    rows = [['', p.source_label, '' if from_wants else '80', '80' if from_wants else ''],
+        ['', '(Needs) Subtotal:', '=SUM(C1:C1)'], ['', '(Wants) Subtotal:', '', '=SUM(D1:D1)']]
+    for tables in (client.http_client.rows, client.http_client.formulas):
+        tables['December'] = deepcopy(rows)
+    source = storage.read_workbook(B, TODAY, client=client)
+    body = update(source, p, type=kind, category=new_category)
+    change = prepare_change(source.settings, body, today=TODAY)
+    storage.configuration_batch(source, change, 'category-literal-123456', 'fp', '{}', today=TODAY).send()
+    after = client.http_client.rows['December']
+    assert float(after[0][old_column - 1]) == 0
+    assert float(after[0][new_column - 1]) == 80
+    assert not client.http_client.formulas['December'][0][new_column - 1].startswith('=')
+    assert change.after.amount_cents == 7000
+
+
+def test_confirmed_future_charge_keeps_its_source_protection():
+    from bookiebot.sheets.recurring_charges import BillCharge, CHARGES_TAB, encode_charges, source_anchor
+    client, loan = fixture()
+    charge = BillCharge(loan.id, '2026-12', '2026-12-01', loan.source_label, loan.category,
+        1, 1, 3, source_anchor(loan.id, '2026-12'), 6023, True, payer_owner='brian')
+    for tables in (client.http_client.rows, client.http_client.formulas):
+        tables[CHARGES_TAB] = encode_charges([charge], [])
+    client.http_client.properties[CHARGES_TAB] = {'title':CHARGES_TAB, 'sheetId':99}
+    source = storage.read_workbook(B, TODAY, client=client)
+    assert source.settings.earliest_months[loan.id] == '2027-01'
 
 
 def test_category_change_moves_only_an_unrecorded_source_and_does_not_duplicate_a_subtotal():

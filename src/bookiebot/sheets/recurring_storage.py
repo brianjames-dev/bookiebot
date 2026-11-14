@@ -174,7 +174,8 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
                 for a in allocations)
             if recorded_split or (charge_month, bill_label_key(candidate.source_label)) in snapshot.settled_dates:
                 snapshot.recorded_plans.add((plan.id, charge_month))
-            if info.get("recorded") or recorded_split or manual_value or due and due <= today and (info.get("amountCents", 0) > 0 or info.get("virtual") and (candidate.amount_cents or 0) > 0):
+            if (info.get("recorded") or recorded_split or number == today.month and
+                    (manual_value or due and due <= today and (info.get("amountCents", 0) > 0 or info.get("virtual") and (candidate.amount_cents or 0) > 0))):
                 minimums[plan.id] = following_month(charge_month)
     snapshot.settings.earliest_months.update(minimums)
     return snapshot
@@ -411,15 +412,24 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
                         batch.values(title, row, column, [["=" + price_refs[plan.version] if plan.active and plan.due_date(period) else 0]], formulas=True)
                 continue  # Never regenerate a cleared/edited existing charge.
             old_column = 4 if prior and prior.category == "subscriptions_wants" else 3
+            moved_literal = False
             if prior and old_column != column and period >= start_month:
                 if snapshot.settings.earliest_months.get(plan.id, period) > period:
                     raise BillConflict("An existing charge keeps its budget category. Choose a later starting month.")
                 target = cell(rows, row, column)
                 if target and numeric(target) != 0:
                     raise BillConflict("The new budget column already contains an amount. Check that row before moving the bill.")
+                previous = cell(formulas, row, old_column)
+                if previous and not previous.startswith("="):
+                    # A category move changes the cash column, not an already
+                    # entered occurrence's amount (including a literal zero).
+                    batch.values(title, row, column, [[numeric(cell(rows, row, old_column))]])
+                    moved_literal = True
                 batch.values(title, row, old_column, [[0]])
                 extras[column].append(f"{'D' if column == 4 else 'C'}{row}")
             batch.anchor(title, row, column, plan.id, period)
+            if moved_literal:
+                continue
             formula = cell(formulas, row, column)
             protected = period < snapshot.settings.period or (period == snapshot.settings.period and snapshot.settings.earliest_months.get(plan.id, period) > period)
             if protected:

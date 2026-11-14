@@ -15,7 +15,7 @@ from bookiebot.sheets.recurring import (
 
 BILL_HEADERS = ("bill_key", "display_name", "recurrence", "pull_day", "pull_months", "source_label",
                 "account", "notes", "updated_at", "expected_amount", "tracking_mode", "source_range")
-SUB_HEADERS = ("cadence", "name", "amount", "pull_day", "pull_month", "source_range", "updated_at", "kind", "account", "source_label")
+SUB_HEADERS = ("cadence", "name", "amount", "pull_day", "pull_month", "source_range", "updated_at", "kind", "account", "source_label", "pull_months")
 
 
 def header(rows: list[list[str]]) -> list[str]:

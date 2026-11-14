@@ -13,6 +13,36 @@ from unit_tests.sheets.test_recurring_storage import fixture, B, TODAY
 from bookiebot.sheets import recurring_storage as storage
 
 
+def test_quarterly_subscription_reaches_reports_transactions_and_reminders_once(monkeypatch):
+    monkeypatch.setattr('bookiebot.reports.phone_history.now_pacific', lambda: datetime(2027,3,1))
+    from bookiebot.sheets.recurring import normalize_plan
+    from bookiebot.sheets.subscriptions import list_subscription_schedules, next_pull_date
+    from unit_tests.sheets.test_recurring import form
+    p = normalize_plan(form(type='subscription', name='Quarterly service', cadence='quarterly', pullMonths=[2,5,8,11],
+        category='subscriptions_wants', splitMethod='none'), current=None, today=TODAY, plan_id='quarter_sub_123')
+    p = replace(p, version='quarter-v1')
+    rows = encode([p], SUBSCRIPTION_TAB, [])
+    assert next_pull_date(list_subscription_schedules(rows, period='2026-11')[0], TODAY) == date(2026,11,30)
+    for period, as_of, expected in [('2026-11', date(2026,11,30), '2026-11-30'),
+                                    ('2026-12', date(2026,12,31), None), ('2027-02', date(2027,2,28), '2027-02-28')]:
+        _, virtual, _ = runtime_tables('brian', [], rows, [])
+        items = transactions._subscription_rows(B, period, virtual, as_of=as_of)
+        assert [item['date'] for item in items] == ([expected] if expected else [])
+        assert sum(item['amountCents'] for item in items) == (6023 if expected else 0)
+        year, month = map(int, period.split('-'))
+        overview = report._current_month_subscription_items(report._subscription_items(virtual), report.BudgetMonth(year, month))
+        assert len(overview) == (1 if expected else 0)
+        assert round(sum(item.amount for item in overview), 2) == (60.23 if expected else 0)
+
+
+@pytest.mark.parametrize('kind', ['fixed', 'variable'])
+def test_wants_bill_reads_only_its_d_column(kind):
+    p = replace(plan(), id='wants_bill_123', kind=kind, category='subscriptions_wants', monthly_source=True, version='v1')
+    runtime, _, _ = runtime_tables('brian', encode([p], BILL_TAB, []), [], [])
+    items = report._payment_items([['',p.source_label,'999','60.23']], runtime, report.BudgetMonth(2026,11), as_of=date(2026,11,30))
+    assert len(items) == 1 and items[0].amount == 60.23 and items[0].group == 'subscriptions_wants'
+
+
 def sub(**changes):
     baseline = replace(plan(), id="subscription_123", kind="subscription", name="Xfinity", source_label="Xfinity", source_tab=SUBSCRIPTION_TAB,
                    version="v1", amount_cents=1000, pull_day=2, monthly_source=False)

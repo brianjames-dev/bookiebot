@@ -1,7 +1,7 @@
 import {useLayoutEffect,useRef,useState,type ReactNode} from 'react'
 import {EditorExpansion} from './transaction-editor-workspace'
 
-// A small opaque lift changes bill context; full slides remain within an editor.
+// Move both opaque surfaces inside one stable clipped viewport.
 export const billSelectionMotion={duration:440,easing:'cubic-bezier(.2,.8,.25,1)'}
 type Entry={id:string;order:number;isNew:boolean;node:ReactNode}
 type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode}
@@ -20,7 +20,7 @@ function BillEditorEntry({entry,open,wide,locked,onClosed}:{entry:Entry;open:boo
   const settle=()=>{node.dataset.billMoving='false';node.style.transform='none';if(!open&&wide)latest.current.onClosed()}
   if(!wide||folded||matchMedia('(prefers-reduced-motion: reduce)').matches||(!changed&&!newVisit)){settle();return}
   node.dataset.billMoving='true'
-  const from=newVisit?'translateY(12px)':transform,to=open?'translateY(0px)':'translateY(-12px)'
+  const from=newVisit?'translateX(100%)':transform,to=open?'translateX(0%)':'translateX(-100%)'
   const animation=node.animate([{transform:from},{transform:to}],{...billSelectionMotion,fill:'both'})
   motion.current=animation
   animation.finished.then(()=>{if(s.generation!==generation)return;node.style.transform=to;animation.cancel();motion.current=null;settle()}).catch(()=>{})

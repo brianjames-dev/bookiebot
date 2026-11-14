@@ -1,5 +1,13 @@
 # Agent Decisions
 
+## 2026-11-14 — Explicit Bills month, compatible quarterly cycles and stable pane motion
+
+Restore Applies from for recurring configuration: default to the current month, or retain an explicitly scheduled upcoming version's month. Review still resolves the safe actual start against recorded charge/allocation protection. A successfully saved change requested from the current month offers the separate canonical current-charge review; a future-only selection does not. Stop retains a separate safe eligible date draft, so cancelling it cannot change the configuration month. Copied future literal cells cannot move the entire rule's minimum month, but projection still preserves their values, transferring the entered amount intact when an eligible Needs/Wants category move changes its column. Explicit native future charges and allocations retain their existing protection. This supersedes the no-start-picker decision; it never silently rewrites a recorded Rent amount or a repayment.
+
+All bill types support Quarterly. Persist subscription cycles in trailing `pull_months`, retaining legacy leading columns/yearly reads and unknown fields. New subscription writes permit Needs/Wants only; old unusual category records remain readable. Fixed/variable bills also permit Wants through the existing D-column source/projection. Keep payment day as raw digit text while editing and normalize only at Review; empty text cannot become a forced zero or a valid write.
+
+Open bill selection moves opaque surfaces through one clipped viewport using native 440ms easing; the viewport owns the grid placement and dock clearance. Preserve mounted draft/review continuity, simultaneous closed expansion/collapse, rapid switching, folding and reduced-motion settling. This replaces the exposed 12px vertical overlap. Reuse the actual Category Mix filter, always interactive while retaining the active row anchor; native refresh preserves drafts and rotates its icon while in flight. Acceptance: STATUS checklist 292.
+
 ## 2026-11-14 — Bills amount clarity and direct recurring splits
 
 A future variable-bill rule must retain the current known amount in the list, including recorded zero. Otherwise show the verified future/current prediction; use Amount needed only when neither exists. The split configuration is independent of that amount label. Keep fixed/subscription future configured-price behavior and backend source/prediction safeguards.
