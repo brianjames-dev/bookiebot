@@ -42,13 +42,13 @@ async function shot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdir
    await sample(page);await main.locator('.bb-bills-row').nth(1).evaluate(n=>n.click());const frames=await page.evaluate(()=>window.__billSamples);
    if(wide){
     const cross=frames.filter(f=>f.slots.length===2);
-    assert(cross.length>8,'Both bill surfaces remain mounted through the crossfade');
-    assert(cross.some(f=>f.time>400&&f.slots.every(s=>s.moving==='true')),'The fade remains visibly in progress beyond 400 ms');
-    assert(cross.filter(f=>f.time>100&&f.time<450).every(f=>f.slots.every(s=>s.opacity>0&&s.opacity<1)),'Outgoing and incoming fade together');
-    assert(cross.every(f=>f.slots.every(s=>s.transform==='none')),'Bill selection never slides');
+    assert(cross.length>8,'Both bill surfaces remain mounted through the eased switch');
+    assert(cross.some(f=>f.time>200&&f.slots.every(s=>s.moving==='true')),'Both retained surfaces ease during the switch');
+    assert(cross.every(f=>f.slots.every(s=>s.opacity===1)),'Bill surfaces stay opaque without a fade');
+    assert(cross.some(f=>f.slots.some(s=>s.transform!=='none')),'Bill selection uses a subtle transform');
     const animations=cross.flatMap(f=>f.slots.flatMap(s=>s.animations));
-    assert(animations.length>0&&animations.every(a=>a.duration===600&&a.easing==='cubic-bezier(0.45, 0, 0.55, 1)'),'Selection uses the deliberate 600 ms easing');
-    assert.equal(frames.at(-1).slots.length,1,'Outgoing surfaces are removed after fading');
+    assert(animations.length>0&&animations.every(a=>a.duration===440&&a.easing==='cubic-bezier(0.2, 0.8, 0.25, 1)'),'Selection uses the standard 440 ms easing');
+    assert.equal(frames.at(-1).slots.length,1,'Outgoing surfaces are removed after easing');
     const geometry=await main.evaluate(n=>{const list=n.querySelector('.bb-bills-list'),rows=n.querySelector('.bb-bills-rows'),host=n.querySelector('[data-open=true]'),nav=document.querySelector('.bb-navigation-pane'),box=e=>e.getBoundingClientRect().toJSON(),s=getComputedStyle(rows);return {list:box(list),rows:box(rows),host:box(host),nav:box(nav),scrollWidth:s.scrollbarWidth,scrollColor:s.scrollbarColor,document:document.documentElement.scrollWidth,viewport:innerWidth}});
     assert(Math.abs(geometry.rows.right-geometry.list.right-8)<1,'Scroll track uses Transactions’ outer 8px gutter');assert.equal(geometry.scrollWidth,'thin');assert.equal(geometry.document,geometry.viewport);
     await main.locator('.bb-bills-rows').evaluate(n=>n.scrollTop=400);assert(await main.locator('.bb-bills-rows').evaluate(n=>n.scrollTop)>0);assert.equal(await active(page).evaluate(n=>n.getBoundingClientRect().y),geometry.host.y,'Only left rows scroll');await main.locator('.bb-bills-rows').evaluate(n=>n.scrollTop=0);

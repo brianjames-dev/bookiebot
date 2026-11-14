@@ -48,7 +48,7 @@ async function tap(page,button){await button.evaluate(n=>n.scrollIntoView({block
   await tap(page,loan);await panel.getByRole('textbox',{name:'Recurring amount',exact:true}).fill('70.00');
   const host=panel.locator('.bb-bills-editor');await host.evaluate(n=>window.__billWorkspace=n);
   await tap(page,panel.getByRole('button',{name:/^Recurring split/}));
-  await panel.getByRole('checkbox',{name:'Split future charges'}).check();await page.waitForTimeout(80);
+  await page.waitForTimeout(80);
   await panel.getByRole('textbox',{name:"Brian's share percentage",exact:true}).fill('30.25');await tap(page,panel.getByRole('button',{name:'Split by income',exact:true}));
   assert.equal(await panel.getByRole('textbox',{name:"Brian's share percentage",exact:true}).inputValue(),'64.73');
   await page.setViewportSize({width:width<800?867:382,height:width<800?openHeight:669});await page.waitForTimeout(540);assert(await host.evaluate(n=>window.__billWorkspace===n),'Folding retains the same workspace');assert.equal(await panel.getByRole('textbox',{name:"Brian's share percentage",exact:true}).inputValue(),'64.73');

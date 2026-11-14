@@ -35,8 +35,6 @@
 .bb-bills .bb-bill-edit-heading>.bb-bills-stop { position:absolute;top:0;right:0;display:grid;place-items:center;width:44px;min-width:44px;height:44px;padding:0;border:0;background:transparent;color:hsl(var(--destructive)) }
 .bb-bills-form { row-gap:var(--bb-bill-gap) }
 .bb-bills-short-label { display:none }
-.bb-bills .bb-bills-toggle { display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;color:hsl(var(--foreground)) }
-.bb-bills .bb-bills-toggle input { appearance:auto;width:20px;height:20px;min-height:20px;margin:0;padding:0;border:0;accent-color:hsl(var(--primary)) }
 .bb-bills .bi-editor .bb-bills-split-action { display:flex;align-items:center;justify-content:space-between;align-self:end;grid-column:1 / -1;width:100%;height:46px;min-height:46px;padding-inline:0;gap:10px;border:0;border-bottom:1px solid hsl(var(--border) / .6);border-radius:0;text-align:left;background:transparent }
 .bb-bills-split-action>span { display:flex;align-items:center;justify-content:space-between;flex:1;gap:10px;min-width:0 }
 .bb-bills-split-action small { margin:0;text-align:right;color:hsl(var(--muted-foreground));font-size:12px }
@@ -75,7 +73,8 @@
 .bb-bills[data-wide=true] .bb-bills-rows { display:block;position:relative;isolation:isolate;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:hsl(var(--border)) transparent;margin-right:-8px;padding-right:8px;padding-bottom:12px }
 .bb-bills[data-wide=true] .bb-bills-row-stack { position:relative;isolation:isolate;z-index:0 }
 .bb-bills[data-wide=true] .bb-bills-editor { grid-column:2;grid-row:1 / 3;min-height:0;overflow:hidden;margin-inline:var(--bb-duo-right-inset);padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 8px) }
-.bb-bills[data-wide=true] .bb-bills-editor[data-bill-moving=true] { will-change:opacity }
+.bb-bills[data-wide=true] .bb-bills-editor[data-bill-moving=true] { will-change:transform }
+.bb-bills[data-wide=true] .bb-bills-editor[data-open=true] { z-index:1 }
 .bb-bills[data-wide=true] .bb-bills-editor .bi-expansion::before { display:none }
 .bb-bills[data-wide=true] .bb-bills-editor .bi-editor { margin-left:0;margin-bottom:0 }
 .bb-bills[data-wide=true] .bb-bills-editor[data-present=true]>.bi-expansion,
@@ -124,18 +123,20 @@
 .bb-bills[data-wide=true] .bb-bills-current .bi-fields { flex:1;min-height:0;display:flex;flex-direction:column }
 .bb-bills[data-wide=true] .bb-bills-current .bi-editor-footer { margin-top:auto }
 
-/* Native 76px circles/44px slider and editable shares in the compact split. */
-.bb-bills[data-wide=true] .sp-management .bs-split { display:grid;grid-template-columns:76px minmax(0,1fr) 76px;grid-template-rows:46px 44px;column-gap:4px }
+/* Match the native split: circles and income reset above full-width controls. */
+.bb-bills[data-wide=true] .sp-management .bs-split { display:grid;grid-template-columns:1fr 44px 1fr;grid-template-rows:84px auto 44px;column-gap:8px;row-gap:4px }
 .bb-bills[data-wide=true] .sp-management :is(.bs-central,.bs-allocation) { display:contents }
-.bb-bills[data-wide=true] .sp-management .bs-orb { grid-row:1 / 3;align-self:center }
+.bb-bills[data-wide=true] .sp-management .bs-orb { grid-row:1;align-self:center }
 .bb-bills[data-wide=true] .sp-management .bs-orb[data-person=payer] { grid-column:1 }
 .bb-bills[data-wide=true] .sp-management .bs-orb[data-person=partner] { grid-column:3 }
-.bb-bills[data-wide=true] .sp-management .bs-shares { grid-row:1;grid-column:2;column-gap:44px }
-.bb-bills[data-wide=true] .sp-management .bs-share-name>span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.bb-bills[data-wide=true] .sp-management .bs-context { grid-row:1;grid-column:2;height:44px;margin:0;z-index:2;pointer-events:none }
-.bb-bills[data-wide=true] .sp-management .bs-context>.bs-income-reset { top:0;pointer-events:auto }
-.bb-bills[data-wide=true] .sp-management .bs-slider { grid-row:2;grid-column:2;margin:0 }
-.bb-bills[data-wide=true] .sp-management .bs-error { grid-row:3;grid-column:1 / -1 }
+.bb-bills[data-wide=true] .sp-management .bs-context { grid-row:1;grid-column:2;height:44px;align-self:center;margin:0;z-index:2 }
+.bb-bills[data-wide=true] .sp-management .bs-context>.bs-income-reset { top:0 }
+.bb-bills[data-wide=true] .sp-management .bs-shares { grid-row:2;grid-column:1 / -1;column-gap:60px }
+.bb-bills[data-wide=true] .sp-management .bs-slider { grid-row:3;grid-column:1 / -1;margin:0 }
+.bb-bills[data-wide=true] .sp-management .bs-error { grid-row:4;grid-column:1 / -1 }
+.bb-bills .bb-bills-remove-split { position:absolute;top:0;right:0;min-height:44px;padding:4px 0;color:hsl(var(--destructive)) }
+.bb-bill-edit-heading:has(.bb-bills-remove-split) { padding-right:100px }
+.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=split] { row-gap:8px }
 @media(max-height:600px) {
  .bb-bills[data-wide=true] { --bb-bill-padding:8px 16px;row-gap:0 }
  .bb-bills[data-wide=true] .bi-step-edit>.bb-bill-edit-heading { margin-bottom:0 }
