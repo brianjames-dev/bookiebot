@@ -2286,7 +2286,7 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
 export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel, graphOpen, graphControls, graphStatus, graphBusy = false }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
-  total: number
+  total?: number
   filter: DailySpendingFilter
   detailsOpen: boolean
   detailsId: string
@@ -2303,11 +2303,13 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
   return <div className="bb-chart-layout">
     {graphOpen === undefined ? plot : <div id={`${detailsId}-graph`} className="bb-recorded-graph-reveal" data-open={graphOpen} aria-hidden={!graphOpen} inert={!graphOpen}><div className="bb-recorded-graph-clip" aria-busy={graphBusy}>{graphControls}{graphStatus || plot}</div></div>}
     <div className="bb-chart-side bb-daily-summary">
-      <div className="bb-chart-kicker">{metricLabel}</div>
-      <div className="bb-daily-amount-row" data-open={detailsOpen}>
-        <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
-        {transactionControl ?? <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}><span>Transactions</span><ChevronDown aria-hidden="true" /></button>}
-      </div>
+      {total === undefined ? transactionControl : <>
+        <div className="bb-chart-kicker">{metricLabel}</div>
+        <div className="bb-daily-amount-row" data-open={detailsOpen}>
+          <MetricAmount className="bb-chart-total">{formatMoney(total)}</MetricAmount>
+          {transactionControl ?? <button type="button" className="bb-details-toggle bb-daily-transactions-toggle" aria-expanded={detailsOpen} aria-controls={detailsId} onClick={onToggleDetails}><span>Transactions</span><ChevronDown aria-hidden="true" /></button>}
+        </div>
+      </>}
     </div>
   </div>
 }

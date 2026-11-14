@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-14 — Transactions single-row toolbar
+
+Remove the Transactions headline total and its Spent/Income/Saved labels entirely. Search, the existing category/scope chooser and compact graph toggle share one row; open DUO retains its existing right graph/editor pane and gains list height. Show the full search placeholder only when its actual font measurement fits the input, while retaining the magnifier, accessible name, typed query and clear action. Keep standalone report totals, daily/row amounts, chart/filter/month semantics and financial commands unchanged. Native acceptance: STATUS checklist 295.
+
 ## 2026-11-14 — Inclusive recurring month with independent recorded occurrences
 
 Selecting November must save an actual November recurring rule and show November in the existing Applies from review row. Remove the frontend clamp, backend update deferral and UI-only two-start labels. This supersedes the selected-month labelling workaround below and the earlier rule that deferred a recorded month's configuration. Stop retains its independent recorded-source guard. Split defaults begin on the selected month's first day for eligible new occurrences, including an elapsed due date; recorded amounts/splits still require the existing separate post-save canonical confirmation.

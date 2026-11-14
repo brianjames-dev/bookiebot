@@ -46,7 +46,9 @@
 
 .bb-transactions { --bb-recorded-roundness:8px; --bb-recorded-day-height:72px; }
 .bb-transactions .bb-daily-transaction { position:relative; z-index:1; background:hsl(var(--background)); padding-block:6px; }
-.bb-recorded-search { display:flex; align-items:center; gap:9px; height:44px; padding:0 12px; margin:20px 0 0; background:hsl(var(--foreground) / .035); border:1px solid hsl(var(--border) / .75); border-radius:13px; color:hsl(var(--muted-foreground)); }
+.bb-recorded-toolbar { display:flex;align-items:center;gap:8px;min-width:0;width:100%; }
+.bb-recorded-search { position:relative;display:flex;flex:1;min-width:54px;align-items:center;gap:9px;height:44px;padding:0 12px;margin:0;background:hsl(var(--foreground) / .035);border:1px solid hsl(var(--border) / .75);border-radius:13px;color:hsl(var(--muted-foreground)); }
+.bb-recorded-search-hint { position:absolute;visibility:hidden;pointer-events:none;width:max-content;font:inherit;font-size:16px; }
 .bb-recorded-search>svg { flex:0 0 17px; width:17px; height:17px; }
 .bb-recorded-search input { min-width:0; width:100%; border:0; background:transparent; color:hsl(var(--foreground)); font:inherit; font-size:16px; height:100%; padding:0; }
 .bb-recorded-search button { flex:0 0 30px; width:30px; min-height:40px; padding:6px; border:0; background:transparent; color:inherit; }
@@ -56,8 +58,7 @@
    A percentage height can stretch both grid rows to the whole workspace. */
 .bb-transactions .bb-chart-layout { display:flex; flex-direction:column; gap:0; min-height:0; height:auto; margin-bottom:0; }
 .bb-transactions .bb-chart-side.bb-daily-summary { order:-1; border:0; padding:0; min-height:0; margin-bottom:0; }
-.bb-transactions .bb-daily-amount-row { gap:10px; }
-.bb-recorded-summary-controls { display:flex; align-items:center; flex:none; min-width:0; max-width:55%; gap:8px; }
+.bb-recorded-summary-controls { display:flex; align-items:center; flex:none; min-width:0; max-width:60%; gap:8px; }
 .bb-transactions .bb-recorded-summary-controls .bb-category-mix-filter { flex:0 1 auto; min-width:64px; max-width:calc(100% - 52px); grid-template-columns:minmax(0,1fr); }
 .bb-recorded-graph-toggle { display:grid; place-items:center; flex:none; width:44px; height:44px; min-height:44px; padding:0; border:1px solid hsl(var(--border)); border-radius:50%; color:hsl(var(--muted-foreground)); background:hsl(var(--primary) / .08); -webkit-tap-highlight-color:transparent; transition:background-color 180ms ease,color 180ms ease; }
 .bb-recorded-graph-toggle[aria-expanded="true"] { color:hsl(var(--primary)); background:hsl(var(--primary) / .16); }

@@ -25,7 +25,7 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
  for(const [next,amount]of[['initial','152.08'],['partial','132.08'],['settled','80.00']]){
   state=next;if(next!=='initial')await page.evaluate(()=>window.dispatchEvent(new Event('bookiebot:reimbursements-changed')))
   await page.waitForFunction(expected=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false'&&document.querySelector('.bb-daily-transaction')?.textContent.includes('$'+expected),amount)
-  assert((await page.locator('.bb-daily-summary').innerText()).replace(/\s+/g,'').includes('$'+amount),'Total Spent matches bill cash')
+  assert((await page.locator('.bb-daily-day-total').innerText()).replace(/\s+/g,'').includes('$'+amount),'Day total matches bill cash');assert.equal(await page.locator('.bb-chart-total,.bb-chart-kicker').count(),0)
   assert.equal(await page.locator('.bb-recorded-swipe').count(),1)
  }
  const probe=await page.evaluate(()=>window.probe);assert.equal(probe.fallbackDay,80);assert.equal(probe.chart,80);assert.equal(probe.feedback.amountCents,16208);assert.equal(probe.feedback.displayAmountCents,9000)
@@ -41,6 +41,6 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
  await page.screenshot({path:`/private/tmp/net-bill-${engine.name()}-${dark?'dark':'light'}.png`,fullPage:true})
  state='zero';await page.evaluate(()=>window.dispatchEvent(new Event('bookiebot:reimbursements-changed')))
  await page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false'&&document.querySelector('.bb-daily-transaction')?.textContent.includes('$0.00'))
- assert((await page.locator('.bb-daily-summary').innerText()).replace(/\s+/g,'').includes('$0.00'));assert.equal(await page.locator('.bb-recorded-swipe').count(),1)
+ assert((await page.locator('.bb-daily-day-total').innerText()).replace(/\s+/g,'').includes('$0.00'));assert.equal(await page.locator('.bb-recorded-swipe').count(),1)
  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);await page.close();cases++
  }}finally{await browser.close()}}console.log(JSON.stringify({cases,status:'passed',viewport:'390x844',financialWrites:0}))})().catch(e=>{console.error(e);process.exitCode=1})
