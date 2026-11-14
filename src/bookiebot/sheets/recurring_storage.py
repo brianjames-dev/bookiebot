@@ -6,15 +6,16 @@ share one Sheets batch with the saved request receipt.
 from __future__ import annotations
 
 import calendar
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date
+import json
 from typing import Any
 
 from gspread.utils import absolute_range_name
 
 from bookiebot.sheets.recurring import BILL_TAB, SUBSCRIPTION_TAB, SETTINGS_LOG_TAB, BillConflict, BillPlan, fingerprint, selected
 from bookiebot.sheets.recurring_changes import BillSnapshot, BillChange
-from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, following_month, source_anchor
+from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, encode_charges, following_month, occurrence_plan, source_anchor
 from bookiebot.sheets.recurring_rows import decode, encode, header, legacy_plans, managed
 from bookiebot.sheets.bills import bill_label_key
 from bookiebot.sheets.bill_payment_evidence import settled_bill_dates, BillDates
@@ -94,26 +95,51 @@ class WorkbookSnapshot:
         if int(month[:4]) != self.year or title not in self.rows or not plan.effective_from <= month < plan.effective_until:
             return {"available": False, "month": month}
         charge = next((c for c in decode_charges(self.rows.get(CHARGES_TAB, [])) if c.plan_id == plan.id and c.month == month), None)
+        original_version = plan.version
+        if charge and charge.plan_snapshot:
+            plan = occurrence_plan(charge, plan)
         label = charge.source_label if charge else plan.source_label
-        row = row_for(self.rows[title], label)
+        row = None if charge and charge.virtual else row_for(self.rows[title], label)
         column = charge.amount_column if charge else 4 if plan.category == "subscriptions_wants" else 3
         value = cell(self.rows[title], row or 0, column)
         due = self.settled_dates.get((month, bill_label_key(label))) or plan.due_date(month)
-        when = (due.isoformat() if due else None) if plan.kind == "variable" else charge.charge_date if charge else due.isoformat() if due else None
+        when = due.isoformat() if due else None
+        if charge and charge.plan_snapshot:
+            when = charge.payment_date or charge.charge_date
+        elif charge and plan.kind != "variable":
+            when = charge.charge_date
         recorded = bool(charge and charge.recorded) or (plan.id, month) in self.recorded_plans
         amount = round(numeric(value) * 100)
         known = recorded or amount > 0
         related = [a for a in self.bill_allocations(plan, month) if a['sourceYear'] == self.year and a['sourceSheetTitle'] == title]
-        gross = related[0].get('grossCents') if len(related) == 1 and related[0]['payerOwner'] == self.owner else amount
+        gross = amount
+        if charge and charge.virtual:
+            gross = charge.initial_amount_cents
+        elif not charge and not plan.monthly_source:
+            gross = plan.amount_cents
+        elif len(related) == 1 and related[0]['payerOwner'] == self.owner:
+            gross = related[0].get('grossCents')
         return {"available": True, "month": month, "row": row, "amountColumn": column,
                 "amountCents": amount, "billAmountCents": gross, "date": when,
                 "status": "paid" if known and when and when <= (self.as_of or now_pacific().date()).isoformat() else "confirmed" if known else "unconfirmed",
                 "paymentPolicy": "autopay", "canConfirmAmount": self.responsible_owner(plan, month) == self.owner,
                 "splitPending": bool(charge and charge.recorded and charge.payer_owner == self.owner and plan.split_method != "none" and not related),
                 "recorded": recorded, "sourceLabel": label,
-                "virtual": not plan.monthly_source and not charge,
-                "version": fingerprint([plan.version, month, charge, row, value, cell(self.formulas[title], row or 0, column)] if charge is None
-                    else [plan.version, month, charge.__dict__, row, value, cell(self.formulas[title], row or 0, column)])}
+                "virtual": charge.virtual if charge else not plan.monthly_source,
+                "version": fingerprint([original_version, month, charge, row, value, cell(self.formulas[title], row or 0, column)] if charge is None
+                    else [original_version, month, charge.__dict__, row, value, cell(self.formulas[title], row or 0, column)])}
+
+    def protects_occurrence(self, plan: BillPlan, month: str, today: date) -> bool:
+        info = self.charge(plan, month)
+        if info.get("recorded"):
+            return True
+        if month != today.strftime("%Y-%m"):
+            return False
+        due = plan.due_date(month)
+        literal = info.get("amountCents", 0) > 0 and not cell(self.formulas.get(calendar.month_name[today.month], []),
+            info.get("row") or 0, info.get("amountColumn", 3)).startswith("=")
+        return bool(literal or due and due <= today and
+            (info.get("amountCents", 0) > 0 or info.get("virtual") and (plan.amount_cents or 0) > 0))
 
 
 def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSnapshot:
@@ -149,6 +175,7 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
     snapshot = WorkbookSnapshot(actor, owner, today.year, identity, client, props, metadata.get("namedRanges", []), rows, formulas,
         BillSnapshot(owner, tuple(plans), fingerprint([owner, identity, rows, formulas, metadata.get("namedRanges", [])]), period, {}))
     minimums = {}
+    protected_periods = []
     from bookiebot.reimbursements import service as reimbursements
     ledger = reimbursements.build_reimbursement_store().snapshot(owner, include_inactive=True) if reimbursements.enabled() else {}
     allocations = ledger.get("allocations", [])
@@ -163,10 +190,7 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
             candidate = next((p for p in selected(plans, charge_month, include_inactive=True) if p.id == plan.id), None)
             if candidate is None:
                 continue
-            info = snapshot.charge(candidate, charge_month)
-            due = candidate.due_date(charge_month)
             title = calendar.month_name[number]
-            manual_value = info.get("amountCents", 0) > 0 and not cell(formulas.get(title, []), info.get("row") or 0, info.get("amountColumn", 3)).startswith("=")
             recorded_split = any(a["payerOwner"] == owner and a.get("lifecycle", "active") == "active"
                 and a["sourceYear"] == today.year and a["sourceWorksheet"] == "income"
                 and a.get("sourceSheetTitle") == title and (a.get("billPlanId") == plan.id if a.get("billPlanId")
@@ -174,10 +198,11 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
                 for a in allocations)
             if recorded_split or (charge_month, bill_label_key(candidate.source_label)) in snapshot.settled_dates:
                 snapshot.recorded_plans.add((plan.id, charge_month))
-            if (info.get("recorded") or recorded_split or number == today.month and
-                    (manual_value or due and due <= today and (info.get("amountCents", 0) > 0 or info.get("virtual") and (candidate.amount_cents or 0) > 0))):
+            if snapshot.protects_occurrence(candidate, charge_month, today):
                 minimums[plan.id] = following_month(charge_month)
+                protected_periods.append((plan.id, charge_month))
     snapshot.settings.earliest_months.update(minimums)
+    snapshot.settings = replace(snapshot.settings, version=fingerprint([snapshot.settings.version, sorted(protected_periods)]))
     return snapshot
 
 
@@ -232,8 +257,8 @@ class SheetBatch:
                   for i in range(max(len(rows), len(old)))]
         from bookiebot.sheets.recurring_rows import BILL_HEADERS, SUB_HEADERS
         from bookiebot.sheets.recurring import VERSION_HEADERS
-        from bookiebot.sheets.recurring_charges import CHARGE_HEADERS
-        known = set(CHARGE_HEADERS if title == CHARGES_TAB else (*BILL_HEADERS, *SUB_HEADERS, *VERSION_HEADERS))
+        from bookiebot.sheets.recurring_charges import CHARGE_HEADERS, OCCURRENCE_HEADERS
+        known = set((*CHARGE_HEADERS, *OCCURRENCE_HEADERS) if title == CHARGES_TAB else (*BILL_HEADERS, *SUB_HEADERS, *VERSION_HEADERS))
         names = header(rows)
         # Extra source columns are not editable by an app request. Preserve
         # their existing formulas; app-editable names/notes remain literals.
@@ -292,6 +317,53 @@ def _add_to_subtotal(batch: SheetBatch, title: str, formulas: list[list[str]], c
     batch.values(title, row, column, [[original.replace(match, replacement)]], formulas=True)
 
 
+def _preserved_occurrences(snapshot: WorkbookSnapshot, change: BillChange, today: date) -> list[BillCharge]:
+    """Snapshot recorded occurrences; the recurring rule keeps its real start.
+
+    This writes identity/settings metadata only. Cash, allocations, receipts
+    and original charge/action identities remain authoritative.
+    """
+    charges = decode_charges(snapshot.rows.get(CHARGES_TAB, []))
+    by_month = {(c.plan_id, c.month): c for c in charges}
+    for number in range(today.month, 13):
+        period, title = f"{today.year:04d}-{number:02d}", calendar.month_name[number]
+        if period < change.after.effective_from or title not in snapshot.rows:
+            continue
+        prior = next((p for p in selected(list(snapshot.settings.plans), period, include_inactive=True)
+                      if p.id == change.after.id), None)
+        if prior is None or not snapshot.protects_occurrence(prior, period, today):
+            continue
+        existing = by_month.get((prior.id, period))
+        if existing and existing.plan_snapshot:
+            continue
+        info = snapshot.charge(prior, period)
+        new_due = change.after.due_date(period)
+        when = info.get("date") or (new_due.isoformat() if new_due else None)
+        if not when or not info.get("virtual") and info.get("row") is None:
+            raise BillConflict("The recorded bill's source or payment date needs review before changing its settings.")
+        # Repair a missing legacy date from the explicitly reviewed date,
+        # without changing that occurrence's amount or split.
+        frozen = prior if prior.pull_day else replace(prior, pull_day=date.fromisoformat(when).day)
+        saved = json.dumps(asdict(frozen), sort_keys=True, separators=(",", ":"))
+        if existing:
+            charge = replace(existing, plan_snapshot=saved, recorded=True, payment_date=when)
+            charges[charges.index(existing)] = charge
+        else:
+            related = [a for a in snapshot.bill_allocations(prior, period)
+                       if a["sourceYear"] == today.year and a["sourceSheetTitle"] == title and a["payerOwner"] == snapshot.owner]
+            entered_on = related[0].get("expenseDate", when) if len(related) == 1 else when
+            gross = info.get("billAmountCents")
+            initial = (prior.amount_cents or 0) if info.get("virtual") else int(gross if gross is not None else info.get("amountCents", 0))
+            charge = BillCharge(prior.id, period, entered_on, prior.source_label, prior.category,
+                snapshot.properties[title]["sheetId"], info.get("row") or 0, info["amountColumn"], source_anchor(prior.id, period),
+                initial, True,
+                source_action_id=related[0].get("sourceActionId", "") if len(related) == 1 else "", created_at=today.isoformat(),
+                payer_owner=snapshot.responsible_owner(prior, period) or "", plan_snapshot=saved, virtual=bool(info.get("virtual")), payment_date=when)
+            charges.append(charge)
+        by_month[(prior.id, period)] = charge
+    return charges
+
+
 def configuration_batch(snapshot: WorkbookSnapshot, change: BillChange, request_id: str, request_fingerprint: str,
                         result_json: str, *, today: date) -> SheetBatch:
     plans = change.rows(request_id)
@@ -300,8 +372,11 @@ def configuration_batch(snapshot: WorkbookSnapshot, change: BillChange, request_
     encoded = encode(plans, tab, original)
     batch = SheetBatch(snapshot)
     batch.table(tab, encoded)
+    charges = _preserved_occurrences(snapshot, change, today)
+    if charges != decode_charges(snapshot.rows.get(CHARGES_TAB, [])):
+        batch.table(CHARGES_TAB, encode_charges(charges, snapshot.rows.get(CHARGES_TAB, [])))
     tables = {t: encoded if t == tab else snapshot.rows.get(t, []) for t in (BILL_TAB, SUBSCRIPTION_TAB)}
-    project_sources(batch, plans, tables, start_month=change.after.effective_from, today=today)
+    project_sources(batch, plans, tables, start_month=change.after.effective_from, today=today, charges=charges)
     batch.values(SETTINGS_LOG_TAB, 1, 1, [LOG_HEADERS], hidden=True)
     logrow = max(2, len(snapshot.rows.get(SETTINGS_LOG_TAB, [])) + 1)
     batch.values(SETTINGS_LOG_TAB, logrow, 1, [[request_id, request_fingerprint, result_json, today.isoformat()]], hidden=True)
@@ -333,7 +408,8 @@ def project_subscription_summaries(batch: SheetBatch, plans: list[BillPlan], tab
     if not managed(tables.get(SUBSCRIPTION_TAB, [])):
         return set()
     price_refs = _price_references(tables)
-    adopted = {(c.plan_id, c.month) for c in (charges if charges is not None else decode_charges(snapshot.rows.get(CHARGES_TAB, [])))}
+    occurrences = charges if charges is not None else decode_charges(snapshot.rows.get(CHARGES_TAB, []))
+    adopted = {(c.plan_id, c.month) for c in occurrences if not c.virtual}
     handled = set()
     for number in range(1, 13):
         title, period = calendar.month_name[number], f"{snapshot.year:04d}-{number:02d}"
@@ -353,21 +429,31 @@ def project_subscription_summaries(batch: SheetBatch, plans: list[BillPlan], tab
                 if period < max(start_month, snapshot.settings.period):
                     batch.values(title, r, col, [[numeric(cell(rows, r, col))]])
                 else:
-                    virtual = [p for p in current if not p.monthly_source and p.active and p.category == category
+                    frozen = {c.plan_id: c for c in occurrences if c.virtual and c.month == period}
+                    virtual = [p for p in current if p.id not in frozen and not p.monthly_source and p.active and p.category == category
                                and p.due_date(period) and (p.id, period) not in adopted]
                     if not all(p.version in price_refs for p in virtual):
                         raise BillConflict("The subscription summary needs refreshed price references before saving.")
                     refs = [price_refs[p.version] for p in virtual]
-                    batch.values(title, r, col, [["=SUM(" + ",".join(refs or ["0"]) + ")"]], formulas=True)
+                    frozen_refs = [f"{c.initial_amount_cents / 100:.2f}" for c in frozen.values() if c.category == category]
+                    refs.extend(frozen_refs)
+                    formula = "=SUM(" + ",".join(refs or ["0"]) + ")"
+                    if frozen_refs:
+                        # Keep the managed-summary marker after a paid virtual
+                        # price is frozen, so later explicit adoption can still
+                        # remove it from this summary atomically.
+                        formula += f'+N("{SUBSCRIPTION_TAB}")'
+                    batch.values(title, r, col, [[formula]], formulas=True)
                     handled.add(category)
     return handled
 
 
 def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, list[list[str]]], *, start_month: str, today: date,
-                    update_existing: bool = True):
+                    update_existing: bool = True, charges: list[BillCharge] | None = None):
     """Project authorized plans into existing months; never create a month tab."""
     snapshot = batch.snapshot
     price_refs = _price_references(tables)
+    occurrences = {(c.plan_id, c.month): c for c in (charges if charges is not None else decode_charges(snapshot.rows.get(CHARGES_TAB, [])))}
     # Baseline versions in the other, unenrolled source stay unchanged.
     for number in range(1, 13):
         title, period = calendar.month_name[number], f"{snapshot.year:04d}-{number:02d}"
@@ -378,13 +464,18 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
         append_row = max(len(rows), len(formulas)) + 2
         extras: dict[int, list[str]] = {3: [], 4: []}
         for plan in current:
+            recorded = occurrences.get((plan.id, period))
+            if recorded and recorded.plan_snapshot:
+                if recorded.virtual:
+                    continue
+                plan = replace(occurrence_plan(recorded, plan), monthly_source=True)
             row = row_for(rows, plan.source_label)
             existed = row is not None
             column = 4 if plan.category == "subscriptions_wants" else 3
             if not plan.monthly_source:
                 continue
             prior = next((p for p in selected(list(snapshot.settings.plans), period, include_inactive=True) if p.id == plan.id), None)
-            if row and period >= start_month and (prior is None or not prior.monthly_source):
+            if row and period >= start_month and (prior is None or not prior.monthly_source) and not (recorded and recorded.plan_snapshot):
                 raise BillConflict(f"{plan.source_label} is already a budget row. Use a different bill name before adding a separate source.")
             if row and period < start_month:
                 # A legacy SUMIF over all price versions would change history.
@@ -397,6 +488,12 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
                 batch.values(title, row, 2, [[plan.source_label]])
                 extras[column].append(f"{'D' if column == 4 else 'C'}{row}")
             if row is None:
+                continue
+            if recorded and recorded.plan_snapshot:
+                batch.anchor(title, row, column, plan.id, period)
+                formula = cell(formulas, row, column)
+                if formula.startswith("=") and (BILL_TAB in formula or SUBSCRIPTION_TAB in formula):
+                    batch.values(title, row, column, [[numeric(cell(rows, row, column))]])
                 continue
             if existed and not update_existing:
                 batch.anchor(title, row, column, plan.id, period)
@@ -420,9 +517,11 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
                 if target and numeric(target) != 0:
                     raise BillConflict("The new budget column already contains an amount. Check that row before moving the bill.")
                 previous = cell(formulas, row, old_column)
-                if previous and not previous.startswith("="):
+                if previous and not previous.startswith("=") and numeric(cell(rows, row, old_column)) != 0:
                     # A category move changes the cash column, not an already
-                    # entered occurrence's amount (including a literal zero).
+                    # entered nonzero occurrence's amount. Recorded zeroes are
+                    # protected by their occurrence metadata above; a plain
+                    # unrecorded zero remains eligible for the reviewed rule.
                     batch.values(title, row, column, [[numeric(cell(rows, row, old_column))]])
                     moved_literal = True
                 batch.values(title, row, old_column, [[0]])
@@ -446,4 +545,4 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
                 batch.values(title, row, column, [["=" + price_refs[plan.version] if plan.active and due else 0]], formulas=True)
         for column, refs in extras.items():
             _add_to_subtotal(batch, title, formulas, column, refs)
-    project_subscription_summaries(batch, plans, tables, start_month=start_month, update_existing=update_existing)
+    project_subscription_summaries(batch, plans, tables, start_month=start_month, update_existing=update_existing, charges=charges)

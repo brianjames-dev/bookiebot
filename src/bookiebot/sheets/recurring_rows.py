@@ -215,44 +215,33 @@ def runtime_tables(owner: str, bill_rows: list[list[str]], subscription_schedule
     for plan in [*bills, *subs]:
         enrolled = bill_managed if plan.source_tab == BILL_TAB else sub_managed
         view = replace(plan, source_range="billplan:" + plan.id) if enrolled else plan
-        if plan.monthly_source:
-            adopted = [c for c in charges if c.plan_id == plan.id and plan.effective_from <= c.month < plan.effective_until]
-            portions = [replace(view, source_tab=BILL_TAB)]
-            for charge in sorted(adopted, key=lambda c: c.month):
-                end = following_month(charge.month)
-                remaining = []
-                for part in portions:
-                    if charge.month >= part.effective_until or end <= part.effective_from:
-                        remaining.append(part)
-                        continue
-                    if part.effective_from < charge.month:
-                        remaining.append(replace(part, effective_until=charge.month))
-                    if end < part.effective_until:
-                        remaining.append(replace(part, effective_from=end))
-                portions = remaining
-                monthly.append(replace(view, source_tab=BILL_TAB, effective_from=charge.month, effective_until=end,
-                    pull_day=plan.pull_day if plan.kind == "variable" else date.fromisoformat(charge.charge_date).day,
-                    cadence="monthly", pull_months=()))
-            monthly.extend(portions)
-        else:
-            portions = [view]
-            for charge in sorted((c for c in charges if c.plan_id == plan.id and
-                                  plan.effective_from <= c.month < plan.effective_until), key=lambda c: c.month):
-                end = following_month(charge.month)
-                remaining = []
-                for part in portions:
-                    if charge.month >= part.effective_until or end <= part.effective_from:
-                        remaining.append(part)
-                        continue
-                    if part.effective_from < charge.month:
-                        remaining.append(replace(part, effective_until=charge.month))
-                    if end < part.effective_until:
-                        remaining.append(replace(part, effective_from=end))
-                portions = remaining
-                monthly.append(replace(view, source_tab=BILL_TAB, monthly_source=True,
-                    effective_from=charge.month, effective_until=end, pull_day=date.fromisoformat(charge.charge_date).day,
-                    cadence="monthly", pull_months=(), source_label=charge.source_label, category=charge.category))
-            virtual.extend(replace(p, source_tab=SUBSCRIPTION_TAB) for p in portions)
+        portions = [view]
+        adopted = sorted((c for c in charges if c.plan_id == plan.id and
+                          plan.effective_from <= c.month < plan.effective_until), key=lambda c: c.month)
+        for charge in adopted:
+            from bookiebot.sheets.recurring_charges import occurrence_plan
+            end = following_month(charge.month)
+            remaining = []
+            for part in portions:
+                if charge.month >= part.effective_until or end <= part.effective_from:
+                    remaining.append(part)
+                    continue
+                if part.effective_from < charge.month:
+                    remaining.append(replace(part, effective_until=charge.month))
+                if end < part.effective_until:
+                    remaining.append(replace(part, effective_from=end))
+            portions = remaining
+            recorded = occurrence_plan(charge, view)
+            day = (date.fromisoformat(charge.payment_date or charge.charge_date).day if charge.plan_snapshot
+                   else plan.pull_day if plan.kind == "variable" else date.fromisoformat(charge.charge_date).day)
+            occurrence = replace(recorded, source_tab=SUBSCRIPTION_TAB if charge.virtual else BILL_TAB,
+                source_range=view.source_range, monthly_source=not charge.virtual,
+                effective_from=charge.month, effective_until=end, pull_day=day, cadence="monthly", pull_months=(),
+                source_label=charge.source_label, category=charge.category,
+                amount_cents=charge.initial_amount_cents if charge.virtual else recorded.amount_cents)
+            (virtual if charge.virtual else monthly).append(occurrence)
+        (monthly if plan.monthly_source else virtual).extend(
+            replace(p, source_tab=BILL_TAB if plan.monthly_source else SUBSCRIPTION_TAB) for p in portions)
     for charge in charges:
         if any(p.id == charge.plan_id for p in [*bills, *subs]):
             continue
