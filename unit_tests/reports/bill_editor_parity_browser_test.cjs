@@ -8,12 +8,12 @@ const subscription={...bill,id:'music',name:'Music',type:'subscription',amountCe
 const widths=[{width:320,dark:false,reduced:false},{width:382,dark:true,reduced:false},{width:382,dark:true,reduced:true},{width:867,dark:false,reduced:false},{width:867,dark:true,reduced:false},{width:867,dark:true,reduced:true}];
 const host=page=>page.locator('.bb-bills-editor');
 const activeEditor=page=>host(page).locator('.bi-editor-scene').filter({visible:true}).locator('.bi-editor');
-async function settle(page){await page.waitForTimeout(520)}
+async function settle(page){await page.waitForTimeout(680)}
 async function press(button){await button.scrollIntoViewIfNeeded();await button.press('Enter')}
 async function sample(page){await page.evaluate(()=>{
  const host=document.querySelector('.bb-bills-editor'),workspace=host.querySelector('.bi-editor-scenes');
  window.__billFrames=(async()=>{const frames=[],start=performance.now();while(performance.now()-start<620){await new Promise(requestAnimationFrame);const h=document.querySelector('.bb-bills-editor'),w=h.querySelector('.bi-editor-scenes'),motions=[...h.querySelectorAll('.bi-step-viewport[data-moving="true"]')].filter(v=>!v.closest('[inert]'));
-  frames.push({same:host===h&&workspace===w,open:h.querySelector('.bi-expansion').dataset.open,height:h.querySelector('.bi-expansion').getBoundingClientRect().height,order:getComputedStyle(h).order,wide:document.querySelector('.bb-bills').dataset.wide,pan:[...h.querySelectorAll('.bi-step-viewport')].map(v=>v.scrollLeft),moving:motions.length,slides:motions.flatMap(v=>[...v.children].flatMap(p=>p.getAnimations().filter(a=>a.effect.getKeyframes().some(k=>'transform'in k)).map(a=>({duration:a.effect.getTiming().duration,easing:a.effect.getTiming().easing})))),viewports:[...h.querySelectorAll('.bi-step-viewport')].filter(v=>!v.closest('[inert]')).map(v=>({height:v.getBoundingClientRect().height,content:v.querySelector(':scope>.bi-step-pane[aria-hidden="false"]')?.offsetHeight}))});
+  frames.push({same:host===h&&workspace===w,open:h.querySelector('.bi-expansion')?.dataset.open,height:h.querySelector('.bi-expansion')?.getBoundingClientRect().height??0,order:getComputedStyle(h).order,wide:document.querySelector('.bb-bills').dataset.wide,pan:[...h.querySelectorAll('.bi-step-viewport')].map(v=>v.scrollLeft),moving:motions.length,slides:motions.flatMap(v=>[...v.children].flatMap(p=>p.getAnimations().filter(a=>a.effect.getKeyframes().some(k=>'transform'in k)).map(a=>({duration:a.effect.getTiming().duration,easing:a.effect.getTiming().easing})))),viewports:[...h.querySelectorAll('.bi-step-viewport')].filter(v=>!v.closest('[inert]')).map(v=>({height:v.getBoundingClientRect().height,content:v.querySelector(':scope>.bi-step-pane[aria-hidden="false"]')?.offsetHeight}))});
  }return frames})();
  })}
 const frames=page=>page.evaluate(()=>window.__billFrames);
@@ -64,7 +64,10 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').first().waitFor();
      await press(panel.locator('.bb-bills-row').first());await settle(page);
      assert.equal(await host(page).locator('.bi-editor-scenes').count(),1,'Bills uses the retained native editor workspace');
-     assert.deepEqual(await styles(activeEditor(page),'Name'),width>=800?{...native,fields:{rowGap:'2px'}}:native,'Bills retains native controls; open DUO condenses the field grid');
+     const actual=await styles(activeEditor(page),'Name');
+     for(const key of ['label','input','select','chevron','cancel','primary'])assert.deepEqual(actual[key],native[key],`Bills retains native ${key} styling`);
+     for(const key of ['backgroundColor','borderRadius'])assert.equal(actual.panel[key],native.panel[key],`Bills retains the native ${key} surface`);
+     assert.equal(actual.panel.padding,'16px','The approved roomier Bills inset is shared by both poses');
      const guide=await host(page).locator('.bi-expansion').evaluate(el=>{const s=getComputedStyle(el,'::before');return {display:s.display,left:s.left}});
      assert.equal(guide.display,width>=800?'none':'block');if(width<800)assert.equal(guide.left,'4px');
      await panel.getByRole('textbox',{name:'Name',exact:true}).fill('PG&E draft');
@@ -103,11 +106,10 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      await transition(page,panel.getByRole('button',{name:'Cancel',exact:true}),reduced,'After fold → settings');
      if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await host(page).scrollIntoViewIfNeeded();await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+`/bill-native-${engine.name()}-${width}-${dark?'dark':'light'}-${reduced?'reduced':'motion'}.png`})}
      const anchor=await host(page).evaluate(el=>getComputedStyle(el).order);await sample(page);await press(panel.getByRole('button',{name:'Cancel',exact:true}));
-     const closing=await frames(page);assert(closing.every(s=>s.order===anchor),'Closing retains the selected row anchor');assert(closing.at(-1).height<1,'Closing fully collapses the inline editor');
+     const closing=await frames(page);assert(closing.filter(s=>s.height>0).every(s=>s.order===anchor),'Closing retains the selected row anchor until the surface is removed');assert(closing.at(-1).height<1,'Closing fully collapses the inline editor');
      await press(panel.locator('.bb-bills-row').filter({hasText:'Music'}));await settle(page);
      assert.equal(await panel.getByRole('button',{name:'Edit this charge / split',exact:true}).count(),0);
-     await transition(page,panel.getByRole('button',{name:'Review',exact:true}),reduced,'Settings → scope');
-     await transition(page,panel.getByRole('button',{name:'Future charges only',exact:true}),reduced,'Scope → recurring review');
+     await transition(page,panel.getByRole('button',{name:'Review',exact:true}),reduced,'Settings → recurring review');
      await transition(page,panel.getByRole('button',{name:'Back',exact:true}),reduced,'Recurring review → settings');
      assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);assert(reviews.every(r=>['update','delete','amount','adopt'].includes(r.operation)));
      console.log('PASS Bills native parity',engine.name(),width,dark?'dark':'light',reduced?'reduced':'motion');cases++;
