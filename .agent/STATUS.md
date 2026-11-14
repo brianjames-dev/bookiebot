@@ -474,7 +474,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: CI/review/merge/deploy verified real inclusive current-month Bills starts (checklist 294), then native acceptance. November is the actual rule start; protect recorded occurrences and separate current-charge confirmation.
+First: native acceptance of real inclusive current-month Bills starts (checklist 294); PR #175 tracks required CI/review/merge/live evidence. November is the actual rule start; protect recorded occurrences and separate current-charge confirmation.
 
 Retain PR #174's accepted pane continuity and checklist 293's motion checks. Checklist 294 supersedes its separate selected/recurring month labels.
 
