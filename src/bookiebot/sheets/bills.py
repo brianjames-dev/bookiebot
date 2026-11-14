@@ -63,6 +63,7 @@ class BillSchedule:
     effective_from: str = "0001-01"
     effective_until: str = "9999-12"
     recorded_months: str = ""
+    bill_type: str = ""
 
 
 @dataclass(frozen=True)
@@ -248,6 +249,7 @@ def _bill_from_fields(fields: dict[str, str], source_range: str) -> tuple[BillSc
             plan_id=fields.get("plan_id", ""),
             effective_from=fields.get("effective_from", "0001-01"), effective_until=fields.get("effective_until", "9999-12"),
             recorded_months=fields.get("recorded_months", ""),
+            bill_type=fields.get("bill_type") or ("fixed" if mode == "automatic" or bill_label_key(source_label) in {"rent", "studentloan"} else "variable"),
         ),
         None,
     )

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { CalendarDays, Rows2, CreditCard, DollarSign, Droplets, GraduationCap, House, Repeat, ShieldCheck, Wifi, Zap } from 'lucide-react'
+import { CalendarDays, Rows2, CreditCard, DollarSign, Droplets, GraduationCap, House, Repeat, ShieldCheck, Sparkles, Wifi, Zap } from 'lucide-react'
+import {BillPredictionInfo} from './bill-prediction-info'
 import { companyLogo } from './company-logo'
 import { MetricAmount } from './amount-appearance'
 import { calendarActivityStatus } from './report-activity'
@@ -33,6 +34,7 @@ export function CompanyMedallion({ event, aliases }: { event: CalendarEvent; ali
           onLoad={() => setLoaded(logo.src)} onError={() => setFailed(logo.src)} />}
       </span>
       <span className="bb-cf-kind-dot" />
+      {event.prediction&&<span className="bb-cf-prediction-mark"><Sparkles aria-hidden="true"/></span>}
     </span>
   </span>
 }
@@ -47,7 +49,9 @@ export function CashflowCalendar({ year, month, events, context = [], aliases, p
   const animations = useRef<Animation[]>([])
   const today = pacificToday()
   const dates = calendarDates(year, month, mode, today)
-  const days = dates.map(date => ({ date, ...eventsForDate(date, year, month, events, context) }))
+  const shownEvents = events.filter(event=>projected||!event.prediction)
+  const shownContext = context.map(item=>({...item,events:item.events.filter(event=>projected||!event.prediction)}))
+  const days = dates.map(date => ({ date, ...eventsForDate(date, year, month, shownEvents, shownContext) }))
   const visible = days.filter(day => mode === 'weeks' || day.date.getUTCMonth() === month - 1)
   // Keep Current/Projected summary semantics; schedules remain visible in either
   // mode, as in the existing calendar. Calendar context never changes Spent.
@@ -108,7 +112,7 @@ export function CashflowCalendar({ year, month, events, context = [], aliases, p
               <button type="button" className="bb-cf-date" aria-current={isToday ? 'date' : undefined}
                 aria-label={`${dateLabel.format(date)}${isToday ? ', today' : ''}${available ? `: ${items.length} ${items.length === 1 ? 'event' : 'events'}` : ': schedule unavailable'}`}
                 disabled={!available || items.length === 0} onClick={() => inspect(date, items)}>
-                <span>{date.getUTCDate()}</span>{date.getUTCDate() === 1 && <small>{date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })}</small>}
+                <span>{date.getUTCDate()}</span>{mode==='month'&&items.some(item=>item.prediction)&&<Sparkles className="bb-cf-date-prediction" aria-hidden="true"/>}{date.getUTCDate() === 1 && <small>{date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })}</small>}
               </button>
               {mode === 'weeks' ? <>
                 <div className="bb-cf-icons">{shown.map((item, index) => <button type="button" className="bb-cf-event" key={`${item.kind}-${item.label}-${index}`}
@@ -141,8 +145,8 @@ export function CalendarDayDetails({ selection, aliases }: { selection: Calendar
       {totals.incoming > 0 && <span><small>Incoming</small><strong>{money.format(totals.incoming)}</strong></span>}</div>
     <ul>{selection.events.map((event, i) => <li key={`${event.kind}-${event.label}-${i}`}>
       <CompanyMedallion event={event} aliases={aliases} /><span><strong>{event.label}</strong>
-        <small>{event.kind === 'subscription' ? (event.group === 'subscriptions_wants' ? 'Subs (Wants)' : 'Subs (Needs)') : event.kind === 'income' ? 'Income' : 'Bill'} · {calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}{event.amountEstimated ? ' · Estimated' : ''}</small></span>
-      <b>{event.amountUnknown ? 'Not entered' : money.format(event.amount)}</b>
+        <small>{event.kind === 'subscription' ? (event.group === 'subscriptions_wants' ? 'Subs (Wants)' : 'Subs (Needs)') : event.kind === 'income' ? 'Income' : 'Bill'} · {calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}{event.amountEstimated&&!event.prediction ? ' · Estimated' : ''}</small></span>
+      <b>{event.amountUnknown ? 'Not entered' : money.format(event.amount)}{event.prediction&&<BillPredictionInfo items={[{label:event.label,prediction:event.prediction}]}/>}</b>
     </li>)}</ul>
     <p>Scheduled dates do not confirm bank posting.{totals.unknown ? ' Bills without an entered amount are not included in totals.' : ''}</p>
   </div>

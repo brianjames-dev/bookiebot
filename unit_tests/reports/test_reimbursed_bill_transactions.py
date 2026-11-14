@@ -108,6 +108,14 @@ def test_receipts_do_not_release_queued_bill_before_its_withdrawal(bill):
     assert tx.listing(bill.actor, {"month": "2026-11", "fresh": "1"})["items"] == []
 
 
+def test_variable_estimates_never_create_actual_transaction_rows(bill, monkeypatch):
+    monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED", "false")
+    bill.personal[0][2] = "0"
+    bill.history.clear()
+    result = tx.listing(bill.actor, {"month": "2026-11", "fresh": "1", "view": "daily", "scope": "spending"})
+    assert result["items"] == [] and result["totalAmountCents"] == 0
+
+
 @pytest.mark.parametrize("bill", [(B, category, logged) for category in ("PG&E", "Recology", "Water")
                                   for logged in (True, False)], indirect=True)
 def test_fully_reimbursed_bill_is_not_hidden_by_a_later_saved_pull_day(bill, monkeypatch):

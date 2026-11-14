@@ -126,6 +126,7 @@ class CalendarEvent:
     projected_only: bool = False
     amount_estimated: bool = False
     amount_unknown: bool = False
+    prediction: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -598,6 +599,7 @@ def build_expense_breakdown_report(
         utility_history=utility_history,
         bill_schedule_rows=bill_schedule_rows,
         personal_rows=personal_rows,
+        bill_predictions=_variable_bill_predictions(bill_schedule_rows, budget_history, month),
     )
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
     itemized_shared_totals = _entry_totals_by_category(entries)
@@ -824,13 +826,14 @@ def _optional_budget_history(actor_key: str, month: BudgetMonth) -> tuple[Budget
 def _optional_previous_year_budget_history(
     actor_key: str,
     month: BudgetMonth,
+    *, client: Any = None,
 ) -> tuple[BudgetHistoryRows, ...]:
     try:
         from bookiebot.sheets.auth import get_gspread_client
         from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user
 
         spreadsheet_id = get_budget_spreadsheet_id_for_user(actor_key, month.year - 1)
-        spreadsheet = get_gspread_client().open_by_key(spreadsheet_id)
+        spreadsheet = (client or get_gspread_client()).open_by_key(spreadsheet_id)
         return _budget_history_from_spreadsheet(spreadsheet, BudgetMonth(month.year - 1, 12))
     except Exception:
         return ()
@@ -1081,6 +1084,13 @@ def _is_completed_month(month: BudgetMonth) -> bool:
     return now_pacific().date() > last_day
 
 
+def _variable_bill_predictions(rows: list[list[str]], history: tuple[BudgetHistoryRows, ...],
+                               month: BudgetMonth) -> dict[str, Any]:
+    from bookiebot.reports.bill_predictions import scheduled_predictions
+    return scheduled_predictions(rows, [(f"{item.month.year:04d}-{item.month.month:02d}", item.rows) for item in history],
+                                 f"{month.year:04d}-{month.month:02d}", as_of=now_pacific().date())
+
+
 def _calendar_events(
     *,
     month: BudgetMonth,
@@ -1094,6 +1104,7 @@ def _calendar_events(
     utility_history: list[UtilityHistoryItem],
     bill_schedule_rows: list[list[str]],
     personal_rows: list[list[str]],
+    bill_predictions: dict[str, Any] | None = None,
 ) -> list[CalendarEvent]:
     elapsed_days = _elapsed_days_for_month(month)
     events: list[CalendarEvent] = []
@@ -1104,6 +1115,7 @@ def _calendar_events(
     events.extend(_bill_calendar_events(
         payments, utility_history, bill_schedule_rows, month, elapsed_days, personal_rows,
         active_subscription_labels,
+        bill_predictions=bill_predictions,
     ))
     events.extend(
         _income_calendar_events(
@@ -1130,11 +1142,11 @@ def _calendar_adjacent_months(
 ) -> list[CalendarMonth]:
     """Read-only context for a two-week grid, isolated from financial totals.
 
-    Reuse already-read historical rows. Future cells use explicit recurring
-    schedules, never copied actual payments or inferred utility averages.
-    Unknown bill amounts are represented honestly and excluded from sums.
+    Reuse already-read historical rows. Future variable bills may use a marked
+    historical estimate; unknown amounts remain excluded from sums. Neither
+    kind of schedule is an actual payment or changes the selected totals.
     """
-    from bookiebot.sheets.bills import list_bill_schedules
+    from bookiebot.sheets.bills import bill_label_key, list_bill_schedules
 
     now = now_pacific()
     result = []
@@ -1144,6 +1156,7 @@ def _calendar_adjacent_months(
         month = BudgetMonth(year, zero_month + 1)
         rows = next((item.rows for item in history if item.month == month), None)
         future = (month.year, month.month) > (now.year, now.month)
+        predictions = _variable_bill_predictions(bill_rows, history, month)
         if rows is not None:
             entries, total = _income_entries(rows)
             config = _income_projection_config_with_history(_income_projection_config(rows), history, month)
@@ -1155,6 +1168,7 @@ def _calendar_adjacent_months(
                 income_projection_receipts=income_receipts,
                 utility_history=_utility_history_items(history, bill_rows, month, recorded_dates=recorded_dates),
                 bill_schedule_rows=bill_rows, personal_rows=rows,
+                bill_predictions=predictions,
             )
         elif future:
             events = _subscription_calendar_events(subscriptions, month, 0)
@@ -1170,18 +1184,22 @@ def _calendar_adjacent_months(
             bills = list_bill_schedules(bill_rows, period=f"{month.year:04d}-{month.month:02d}") if bill_rows else []
             counts: dict[str, int] = defaultdict(int)
             for bill in bills:
-                counts[_normalize_label(bill.source_label)] += 1
+                counts[bill_label_key(bill.source_label)] += 1
             for bill in bills:
                 day = _bill_day_in_month(bill, month)
                 labels = {_bill_subscription_identity(bill.source_label), _bill_subscription_identity(bill.display_name)}
-                if day is None or labels & present:
+                if day is None or labels & present or f"{month.year:04d}-{month.month:02d}" in bill.recorded_months.split(","):
                     continue
-                known = bill.expected_amount is not None and counts[_normalize_label(bill.source_label)] == 1
-                amount = float(bill.expected_amount or 0) if known else 0.0
+                prediction = predictions.get(bill_label_key(bill.source_label))
+                unentered = rows is None or _unentered_bill_source_present(rows, bill.source_label,
+                    amount_column=4 if bill.category == "subscriptions_wants" else None)
+                known = (prediction is not None or bill.expected_amount is not None) and counts[bill_label_key(bill.source_label)] == 1 and unentered
+                amount = prediction.amount_cents / 100 if prediction and known else float(bill.expected_amount or 0) if known else 0.0
                 events.append(CalendarEvent(
                     "bill", bill.display_name or bill.source_label or bill.bill_key, amount, day,
-                    _payment_group_for_label(_normalize_label(bill.source_label)) or "bills_utilities",
+                    bill.category or _payment_group_for_label(_normalize_label(bill.source_label)) or "bills_utilities",
                     projected_only=True, amount_estimated=known, amount_unknown=not known,
+                    prediction=prediction.public() if prediction and known else None,
                 ))
         result.append(CalendarMonth(month, sorted(events, key=lambda item: (item.day, item.kind, item.label.lower()))))
     return result
@@ -1218,11 +1236,12 @@ def _bill_calendar_events(
     elapsed_days: int,
     personal_rows: list[list[str]],
     active_subscription_labels: set[str],
+    *, bill_predictions: dict[str, Any] | None = None,
 ) -> list[CalendarEvent]:
     if not bill_schedule_rows and not any(payment.status == "paid" and payment.date for payment in payments):
         return []
     try:
-        from bookiebot.sheets.bills import bill_payment_state, list_bill_schedules
+        from bookiebot.sheets.bills import bill_payment_state, bill_label_key, list_bill_schedules
     except Exception:
         return []
 
@@ -1231,7 +1250,7 @@ def _bill_calendar_events(
     bills = list_bill_schedules(bill_schedule_rows, period=f"{month.year:04d}-{month.month:02d}")
     source_counts: dict[str, int] = defaultdict(int)
     for bill in bills:
-        source_counts[_normalize_label(bill.source_label)] += 1
+        source_counts[bill_label_key(bill.source_label)] += 1
     for bill in bills:
         if not bill.active:
             continue
@@ -1246,19 +1265,21 @@ def _bill_calendar_events(
             continue
         amount = payment.amount if payment else 0.0
         amount_estimated = False
+        prediction = (bill_predictions or {}).get(bill_label_key(bill.source_label))
         if (
             amount <= 0
             and payment is None
-            and bill.expected_amount is not None
+            and (bill.expected_amount is not None or prediction is not None)
             and not _is_completed_month(month)
-            and source_counts[_normalize_label(bill.source_label)] == 1
+            and source_counts[bill_label_key(bill.source_label)] == 1
             and not {
                 _bill_subscription_identity(bill.source_label),
                 _bill_subscription_identity(bill.display_name),
             } & active_subscription_labels
-            and _unentered_bill_source_present(personal_rows, bill.source_label)
+            and _unentered_bill_source_present(personal_rows, bill.source_label,
+                amount_column=4 if bill.category == "subscriptions_wants" else None)
         ):
-            amount = bill.expected_amount
+            amount = prediction.amount_cents / 100 if prediction is not None else bill.expected_amount or 0.0
             amount_estimated = True
         if amount <= 0:
             continue
@@ -1273,6 +1294,7 @@ def _bill_calendar_events(
                 group=group,
                 projected_only=amount_estimated or (payment.status == "queued" if payment else day > elapsed_days),
                 amount_estimated=amount_estimated,
+                prediction=prediction.public() if amount_estimated and prediction is not None else None,
             )
         )
     represented = {_bill_subscription_identity(event.label) for event in events}
@@ -1290,11 +1312,11 @@ def _bill_subscription_identity(label: str) -> str:
     return "student loan" if normalized == "student loan payment" else normalized
 
 
-def _unentered_bill_source_present(rows: list[list[str]], source_label: str) -> bool:
+def _unentered_bill_source_present(rows: list[list[str]], source_label: str, *, amount_column: int | None = None) -> bool:
     """Only forecast a unique, dedicated source row with a blank or zero actual."""
     from bookiebot.sheets.bills import bill_source_amount
 
-    return bill_source_amount(rows, source_label) == 0
+    return bill_source_amount(rows, source_label, amount_column=amount_column) == 0
 
 
 def _bill_day_in_month(bill: Any, month: BudgetMonth) -> int | None:
@@ -2894,7 +2916,7 @@ def _report_mode_view_from_payload(
         "categorySpending": category_spending,
         "breakdown": breakdown,
         "burnRate": burn_rate,
-        "calendarEvents": list(payload["calendarEvents"]),
+        "calendarEvents": [event for event in payload["calendarEvents"] if projected or not event.get("prediction")],
         "utilityHistory": list(payload["utilityHistory"]),
         "billComparisonHistory": list(payload.get("billComparisonHistory", payload["utilityHistory"])),
     }
@@ -3199,6 +3221,8 @@ def _calendar_event_payload(item: CalendarEvent) -> dict[str, Any]:
         payload["amountEstimated"] = True
     if item.amount_unknown:
         payload["amountUnknown"] = True
+    if item.prediction is not None:
+        payload["prediction"] = item.prediction
     return payload
 
 

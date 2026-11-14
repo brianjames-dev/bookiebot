@@ -52,6 +52,8 @@ Bill logging accepts affirmative requests such as `Log rent $2100`, `I paid $210
 
 Entered bill amounts stay queued in Calendar/Projected until their saved withdrawal/autopay date. On that date they count as paid in Current and Transactions using the existing source identity. Missing/ambiguous schedules stay queued; unentered estimates never become actuals. See [Bill payment timing](docs/BILL_PAYMENT_TIMING.md).
 
+Unentered variable bills use an average of available prior personal bill amounts in Bills and Projected Overview/Calendar, marked by a small explanation icon. Manually entering the actual replaces the prediction; Current and Transactions never count a prediction. [Prediction basis and safeguards](docs/BILLS.md#variable-bill-predictions).
+
 Recurring subscriptions also appear in Transactions once their saved withdrawal date arrives, using Current's existing monthly/yearly schedule amounts. Future charges remain in Calendar/Projected. Subscription occurrences show company logos and Needs/Wants colors, with schedule-controlled amounts rather than ordinary purchase editing. See [Transactions](docs/TRANSACTIONS.md).
 
 Web and Discord reconciliation keep bank matching separate from shared repayment. A healthy 10 AM Pacific Discord digest offers **Reconcile Now** and **View Inbox**; a failed bank connection instead offers only **Refresh bank connection**. Eligible matched shared payments in the private inbox offer an optional repayment choice, with a shortcut after matching a shared bill. Review the partner’s share, actual receipt amount/date and a separate received confirmation; the app also exposes matched entries under Checked. Matching never marks a repayment received. See [Shared reimbursements](docs/REIMBURSEMENTS.md).

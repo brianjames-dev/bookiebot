@@ -79,6 +79,15 @@ export interface SubscriptionItem extends AmountRow {
 
 export type CalendarEventKind = "subscription" | "bill" | "income"
 
+export interface BillPrediction {
+  amountCents: number
+  source: 'history' | 'configured'
+  sampleCount: number
+  basis: 'personal_bill_amount'
+  firstMonth?: string
+  lastMonth?: string
+}
+
 export interface CalendarEvent {
   kind: CalendarEventKind
   label: string
@@ -88,6 +97,7 @@ export interface CalendarEvent {
   projectedOnly: boolean
   amountEstimated?: boolean
   amountUnknown?: boolean
+  prediction?: BillPrediction
 }
 
 export interface CalendarMonth {

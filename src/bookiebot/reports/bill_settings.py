@@ -41,11 +41,32 @@ def listing(actor: str) -> dict[str, Any]:
     from bookiebot.sheets.collaboration import split_amounts, partner_owner_key
     from bookiebot.reimbursements.service import enabled
     income_basis = round(split_amounts(100, "income", snapshot.owner)[0] * 100)
+    import calendar
+    from bookiebot.reports.bill_predictions import predict_bill
+    from bookiebot.sheets.bills import bill_label_key
+    from bookiebot.reports.expense_breakdown import BudgetMonth, _optional_previous_year_budget_history
+    prior = _optional_previous_year_budget_history(actor, BudgetMonth(snapshot.year, today.month), client=snapshot.client)
+    history = [(f"{item.month.year:04d}-{item.month.month:02d}", item.rows) for item in prior]
+    history.extend((f"{snapshot.year:04d}-{number:02d}", snapshot.rows[title])
+                   for number, title in enumerate(calendar.month_name) if number and title in snapshot.rows)
+
+    def public(plan: BillPlan, period: str) -> dict[str, Any]:
+        value = plan.public(period, as_of=today)
+        info = snapshot.charge(plan, period)
+        prediction = (predict_bill(plan.source_label, history, period, as_of=today,
+            override_cents=plan.amount_cents, amount_column=4 if plan.category == "subscriptions_wants" else 3)
+            if plan.kind == "variable" and plan.active and info.get("available")
+            and not info.get("recorded") and not info.get("amountCents")
+            and sum(bill_label_key(other.source_label) == bill_label_key(plan.source_label)
+                    for other in selected(list(snapshot.settings.plans), period, include_inactive=True)) == 1 else None)
+        value["prediction"] = prediction.public() if prediction else None
+        return value
+
     return {"month": snapshot.settings.period, "today": today.isoformat(), "settingsVersion": snapshot.settings.version,
             "ownerName": snapshot.owner.title(), "partnerName": partner_owner_key(snapshot.owner).title(),
             "incomeBasisPoints": income_basis, "splitsEnabled": enabled(),
-            "bills": [{**p.public(snapshot.settings.period, as_of=today),
-                "nextChange": next((future.public(snapshot.settings.period, as_of=today)
+            "bills": [{**public(p, snapshot.settings.period),
+                "nextChange": next((public(future, future.effective_from)
                     for future in sorted(snapshot.settings.plans, key=lambda value: value.effective_from)
                     if future.id == p.id and future.effective_from > snapshot.settings.period), None),
                 "earliestEffectiveMonth": snapshot.settings.earliest_months.get(p.id, snapshot.settings.period) if p.pull_day else snapshot.settings.period,

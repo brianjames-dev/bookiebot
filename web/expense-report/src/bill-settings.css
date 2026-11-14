@@ -21,6 +21,10 @@
 .bb-bills-row-text strong { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500 }
 .bb-bills-row small { display:block;color:hsl(var(--muted-foreground));font-size:12px;margin-top:4px }
 .bb-bills-row-amount { flex:none;text-align:right;font-size:14px;font-variant-numeric:tabular-nums }
+.bb-bills-row-shell { position:relative;min-width:0;width:100% }
+.bb-bills-row[data-predicted=true] { position:relative;padding-right:62px }
+.bb-bills-row[data-predicted=true]>svg { position:absolute;right:0;top:calc(50% - 9px) }
+.bb-bills-row-shell>.bb-bill-prediction-info { position:absolute;right:18px;top:calc(50% - 22px) }
 
 /* Native transaction fields/materials, with one presentation in both poses. */
 .bb-bills-editor .bi-editor:not(.bi-editor-embedded) { padding:var(--bb-bill-padding) }
