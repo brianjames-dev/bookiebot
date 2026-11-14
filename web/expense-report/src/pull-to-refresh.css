@@ -38,6 +38,11 @@ html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-pull-refresh:has(:focus-visible) { opacity: 1; transform: translate(-50%, 0); }
 .bb-pull-refresh[data-blocked="true"] { visibility: hidden; }
+.bb-page[data-bills-open=true]>.bb-pull-refresh-space>.bb-pull-refresh { top:86px }
+.bb-page[data-bills-open=true] .bb-pull-refresh[data-phase=idle] { opacity:0 }
+.bb-page[data-bills-open=true] .bb-pull-refresh[data-phase=idle] .bb-pull-refresh-button { pointer-events:none }
+.bb-page[data-bills-open=true] .bb-pull-refresh[data-phase=idle]:has(:focus-visible) { opacity:1 }
+.bb-page[data-bills-open=true] .bb-pull-refresh[data-phase=idle]:has(:focus-visible) .bb-pull-refresh-button { pointer-events:auto }
 @media (hover: hover) and (pointer: fine) { .bb-pull-refresh[data-phase="idle"] { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes bb-pull-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes bb-pull-release { from { translate: 0 calc(-1 * var(--bb-release-overscroll, 0px)); } to { translate: 0 0; } }

@@ -6,7 +6,7 @@ const source={id:'pge-fixture',type:'variable',name:'PG&E',amountCents:null,cade
 ;(async()=>{let count=0;
 for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){
  const browser=await engine.launch({headless:true});try{
- for(const dark of [false,true])for(const width of [320,382,867]){
+ for(const dark of [false,true])for(const width of [320,382,867].filter(w=>!process.env.ONLY_WIDTH||w===Number(process.env.ONLY_WIDTH))){
   const commands=[],reviews=[],saved=new Map();let bills=[structuredClone(source)],revision=0,lose=true;
   const {page,errors,unexpected}=await fixture(browser,width,width<800?657:669,dark,false,false,0,{transactions:route=>{
    const url=new URL(route.request().url());assert.equal(route.request().method(),'GET');
@@ -47,7 +47,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   await tap(page,panel.getByRole('button',{name:'Add bill',exact:true}));
   await panel.getByLabel('Name',{exact:true}).fill('Insurance');await panel.getByLabel('Type',{exact:true}).selectOption('fixed');
   await panel.getByRole('textbox',{name:'Recurring amount',exact:true}).fill('42.30');await panel.getByLabel('Payment day',{exact:true}).fill('15');
-  await panel.getByLabel('Applies from',{exact:true}).fill('2026-12');await tap(page,panel.getByRole('button',{name:/^Recurring split/}));await panel.getByRole('checkbox',{name:'Split future charges',exact:true}).check();
+  assert.equal(await panel.getByLabel('Applies from',{exact:true}).count(),0);await tap(page,panel.getByRole('button',{name:/^Recurring split/}));await panel.getByRole('checkbox',{name:'Split future charges',exact:true}).check();
   await panel.getByLabel("Brian's share percentage",{exact:true}).fill('42.25');await panel.getByRole('button',{name:'Split by income',exact:true}).click();
   assert.equal(await panel.getByLabel("Brian's share percentage",{exact:true}).inputValue(),'64.73');
   assert(!(await panel.getByRole('slider').getAttribute('aria-valuetext')).includes('$'),'Recurring defaults are percentages');
@@ -61,7 +61,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   else assert.equal(geometry.list.x,geometry.editor.x,'Closed editor uses the normal content width');
   if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+`/bills-editor-${engine.name()}-${width}-${dark?'dark':'light'}.png`,fullPage:true})}
   await tap(page,panel.getByRole('button',{name:'Review',exact:true}));await panel.getByRole('heading',{name:'Review bill',exact:true}).waitFor();
-  assert.equal(reviews.at(-1).bill.splitMethod,'income');assert.equal(reviews.at(-1).bill.effectiveFrom,'2026-12');
+  assert.equal(reviews.at(-1).bill.splitMethod,'income');assert.equal(reviews.at(-1).bill.effectiveFrom,'2026-11','An eligible new bill starts with the current month');
   await tap(page,panel.getByRole('button',{name:'Confirm',exact:true}));await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});
   assert.equal(commands.length,2);assert.equal(new Set(commands.map(c=>c.requestId)).size,2);
   await tap(page,panel.locator('.bb-bills-row').filter({hasText:'Insurance'}));

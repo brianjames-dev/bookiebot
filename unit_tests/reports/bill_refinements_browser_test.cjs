@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
 const {fixture,tap:nativeTap,engines}=require('./duo_layout_browser_test.cjs');
 const base={id:'pge',name:'PG&E',type:'variable',amountCents:null,cadence:'monthly',pullDay:22,pullMonths:[],category:'bills_utilities',account:'Checking',active:true,effectiveFrom:'0001-01',effectiveUntil:'9999-12',earliestEffectiveMonth:'2026-11',splitMethod:'none',payerBasisPoints:10000,version:'v1',nextDate:'2026-11-22',needsSetup:false,charge:{available:true,recorded:false,amountCents:0,month:'2026-11',date:'2026-11-22',version:'charge-v1'}};
 async function tap(page,button){await button.scrollIntoViewIfNeeded();await nativeTap(page,button)}
-const settle=page=>page.waitForTimeout(540);
+const settle=page=>page.waitForTimeout(680);
 async function geometry(page){return page.evaluate(()=>{
  const rect=selector=>{const el=document.querySelector(selector),r=el?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
  return {brand:rect('.bb-report-brand'),word:rect('.bb-wordmark'),avatar:rect('.bb-app-avatar'),header:rect('.bb-page>.bb-report-header'),title:rect('.bb-report-header:not([hidden]) h1'),settings:rect('main[aria-label="Settings"]>.bb-settings-heading h1'),main:rect('main[aria-label="Settings"]'),section:rect('main[aria-label="Settings"]>.bb-settings-section')};
@@ -29,10 +29,10 @@ async function geometry(page){return page.evaluate(()=>{
  if(width<800){assert.equal(await panel.locator('.bb-bills').evaluate(el=>getComputedStyle(el).paddingBottom),'0px','No duplicate dock clearance in the list');}
  await tap(page,pge);await settle(page);await panel.getByRole('combobox',{name:'Type',exact:true}).selectOption('fixed');await panel.getByRole('textbox',{name:'Recurring amount',exact:true}).fill('98.43');await panel.getByRole('textbox',{name:'Name',exact:true}).fill('PG&E fixed');
  if(width>=800){
-  const retained=await panel.locator('.bb-bills-editor').evaluate(el=>(window.__billEditor=el,true));assert(retained);
+  const retained=await panel.locator('.bb-bill-editor-workspace').evaluate(el=>(window.__billEditor=el,true));assert(retained);
   await tap(page,icloud);await settle(page);assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'iCloud Storage');
   await tap(page,pge);await settle(page);assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'PG&E fixed');assert.equal(await panel.getByRole('combobox',{name:'Type',exact:true}).inputValue(),'fixed');
-  assert(await panel.locator('.bb-bills-editor').evaluate(el=>el===window.__billEditor),'Changing bills retains the slide workspace');
+  assert(await panel.locator('.bb-bill-editor-workspace').evaluate(el=>el===window.__billEditor),'Changing bills retains the workspace while bill surfaces crossfade');
  }
  const reviewButton=panel.getByRole('button',{name:'Review',exact:true});await reviewButton.scrollIntoViewIfNeeded();await tap(page,reviewButton);
  // A native double-tap must not spill through to confirmation while the review

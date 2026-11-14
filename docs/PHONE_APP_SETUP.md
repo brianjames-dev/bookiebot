@@ -70,7 +70,7 @@ Turn the preference off to use the standard responsive layout. After updating fr
 
 ## Bills
 
-Settings → Bills opens subscriptions, variable bills and fixed bills. Configure a starting month and optional split for new charges, enter monthly variable amounts, or open a recorded charge in the native Transactions editor. Stop/restart schedules from a chosen month while preserving earlier months. Closed DUO uses an inline editor; open landscape uses equal list/editor panes. See [Bills](BILLS.md).
+Settings → Bills opens subscriptions, variable bills and fixed bills. Configure recurring amounts and splits for eligible current/future charges onward, or enter monthly variable amounts. After a successful recurring save, an already-hit current charge gets its own optional review inside Bills. The connected Back/title capsule follows the current Settings page. Closed DUO uses concurrent inline editor expansion and pull-to-refresh; open landscape uses a slower bill-selection crossfade, independently scrolling left rows, a full-height right editor and Refresh beside Add bill. The native right strip stays clear. See [Bills](BILLS.md).
 
 ## Optional phone notifications
 

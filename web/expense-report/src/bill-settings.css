@@ -1,19 +1,18 @@
-.bb-bills { width:100%;min-width:0;color:hsl(var(--foreground));padding-bottom:0 }
-.bb-bills-refresh {display:grid;place-items:center;min-width:44px;min-height:44px;border:0;background:transparent;color:hsl(var(--primary)) }
+.bb-bills { --bb-bill-padding:16px;--bb-bill-gap:12px;width:100%;min-width:0;color:hsl(var(--foreground));padding-bottom:0 }
 .bb-bills-panes { min-width:0 }
 .bb-bills[data-wide=false] .bb-bills-panes { display:flex;flex-direction:column;gap:0 }
-.bb-bills[data-wide=false] .bb-bills-list { display:contents }
+.bb-bills[data-wide=false] :is(.bb-bills-list,.bb-bills-rows,.bb-bills-row-stack) { display:contents }
 .bb-bills[data-wide=false] .bb-bills-toolbar { order:0 }
-.bb-bills[data-wide=false] .bb-bills-editor>.bb-bills-empty { display:none }
+.bb-bills[data-wide=false] .bb-bills-editor-empty { display:none }
 .bb-bills-list,.bb-bills-editor { min-width:0 }
+.bb-bill-editor-workspace { display:contents }
 .bb-bills-toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px }
-.bb-bills-toolbar .bb-bills-refresh { flex:none }
-.bb-bills-toolbar .bb-bills-add { margin-left:auto }
-.bb-bills-toolbar select { width:auto;max-width:58%;min-height:44px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:inherit;font:inherit;padding:10px 12px }
+.bb-bills-toolbar select { width:auto;max-width:58%;min-width:0;min-height:44px;border:1px solid hsl(var(--border));border-radius:12px;background:transparent;color:inherit;font:inherit;padding:10px 12px }
 .bb-bills button { font:inherit;cursor:pointer }
 .bb-bills button:disabled { opacity:.5;cursor:default }
-.bb-bills-add { display:flex;align-items:center;gap:6px;border:0;background:transparent;color:hsl(var(--primary));padding:8px 0;white-space:nowrap }
-.bb-bills :is(.bb-bills-row,.bb-bills-add,.bb-bills-refresh,.bb-bills-charge-actions) svg { width:18px;height:18px;flex:none }
+.bb-bills-toolbar>.bb-bills-add { display:flex;align-items:center;justify-content:center;flex:none;gap:6px;min-height:44px;margin-left:auto;padding:8px 14px;border:0;border-radius:10px;background:hsl(var(--primary) / .14);color:hsl(var(--primary));font-size:13px;font-weight:500;white-space:nowrap }
+.bb-bills-refresh { display:grid;place-items:center;flex:none;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:hsl(var(--primary)) }
+.bb-bills :is(.bb-bills-row,.bb-bills-add,.bb-bills-refresh,.bb-bills-stop,.bb-bills-charge-actions) svg { width:18px;height:18px;flex:none }
 .bb-bills-row { display:flex;align-items:center;gap:10px;width:100%;border:0;border-bottom:1px solid hsl(var(--border));background:transparent;color:inherit;padding:16px 0;text-align:left;min-height:72px }
 .bb-bills-row>.bb-transaction-icon { flex:none }
 .bb-bills-row[aria-pressed=true] { color:hsl(var(--primary)) }
@@ -23,20 +22,22 @@
 .bb-bills-row small { display:block;color:hsl(var(--muted-foreground));font-size:12px;margin-top:4px }
 .bb-bills-row-amount { flex:none;text-align:right;font-size:14px;font-variant-numeric:tabular-nums }
 
-/* Fields, surfaces, guides, review rows and footers use the native transaction
-   editor rules. Only Bills' row/pane placement and its own controls live here. */
-.bb-bills[data-wide=true] .bb-bills-editor .bi-expansion::before,
+/* Native transaction fields/materials, with one presentation in both poses. */
+.bb-bills-editor .bi-editor:not(.bi-editor-embedded) { padding:var(--bb-bill-padding) }
 .bb-bills-editor[data-new=true] .bi-expansion::before { display:none }
-.bb-bills[data-wide=true] .bb-bills-editor .bi-editor,
 .bb-bills-editor[data-new=true] .bi-editor { margin-left:0 }
-.bb-bills .bb-bill-heading { padding-right:0 }
-.bb-bill-heading h2:last-child { margin-bottom:8px }
+.bb-bill-edit-heading { position:relative;display:flex;align-items:center;min-height:44px;padding-right:44px;margin-bottom:12px }
+.bb-bill-edit-heading>h2 { margin:0 }
+.bb-bills .bb-bill-edit-heading>.bb-bills-stop { position:absolute;top:0;right:0;display:grid;place-items:center;width:44px;min-width:44px;height:44px;padding:0;border:0;background:transparent;color:hsl(var(--destructive)) }
+.bb-bills-form { row-gap:var(--bb-bill-gap) }
+.bb-bills-short-label { display:none }
 .bb-bills .bb-bills-toggle { display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;color:hsl(var(--foreground)) }
 .bb-bills .bb-bills-toggle input { appearance:auto;width:20px;height:20px;min-height:20px;margin:0;padding:0;border:0;accent-color:hsl(var(--primary)) }
-.bb-bills-charge-actions { display:grid;gap:0;padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid hsl(var(--border) / .55) }
-.bb-bills-charge-actions>.bi-footnote { margin:0 }
-.bb-bills .bb-bills-charge-actions button { justify-content:space-between;padding-inline:0;background:transparent;color:hsl(var(--primary)) }
-.bb-bills .bb-bills-charge-actions .bb-bills-stop { justify-content:flex-start;color:hsl(var(--destructive)) }
+.bb-bills .bi-editor .bb-bills-split-action { display:flex;align-items:center;justify-content:space-between;align-self:end;grid-column:1 / -1;width:100%;height:46px;min-height:46px;padding-inline:0;gap:10px;border:0;border-bottom:1px solid hsl(var(--border) / .6);border-radius:0;text-align:left;background:transparent }
+.bb-bills-split-action>span { display:flex;align-items:center;justify-content:space-between;flex:1;gap:10px;min-width:0 }
+.bb-bills-split-action small { margin:0;text-align:right;color:hsl(var(--muted-foreground));font-size:12px }
+.bb-bills-charge-actions { grid-column:1 / -1 }
+.bb-bills .bb-bills-charge-actions button { width:100%;justify-content:space-between;padding-inline:0;background:transparent;color:hsl(var(--primary)) }
 .bb-bills-review-amount { margin:0 0 8px;font-size:24px;line-height:1.2;font-weight:500;font-variant-numeric:tabular-nums }
 .bb-bills-review-context { display:flex;gap:4px;min-width:0 }
 .bb-bills-review-context>span:first-child { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
@@ -45,57 +46,81 @@
 .bb-bills-error { color:hsl(var(--destructive));font-size:14px }
 .bb-bills-status,.bb-bills-recovery { font-size:14px;line-height:1.5 }
 .bb-bills-recovery .bb-bills-primary { min-height:44px;padding:8px 16px;border:0;border-radius:10px;background:hsl(var(--primary) / .14);color:hsl(var(--primary));font-size:13px;font-weight:500 }
-@media(max-width:360px) { .bb-bills-row { gap:7px }.bb-bills-row>svg:first-child { display:none } }
+.bb-bills-current-offer { display:flex;flex-direction:column;gap:12px;min-width:0 }
+.bb-bills-current-offer>.bi-footnote { margin:0 }
+.bb-bills-current-offer>.bi-editor-footer { flex-wrap:wrap }
+.bb-bills-current .bi-editor { margin-left:0 }
+.bb-bills-current-recovery { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px }
 
-.bb-bills-rows,.bb-bills-notices { display:contents }
-.bb-bills-short-label { display:none }
-/* The closing expansion retains its bill ID and content. Move the divider
-   with that expansion, then restore the row's own line once it is empty. */
+/* Each closing row owns its guide and bottom divider until it is empty. */
 .bb-bills[data-wide=false] .bb-bills-editor { position:relative }
 .bb-bills[data-wide=false]:has(.bb-bills-editor .bi-expansion-clip:not(:empty)) .bb-bills-row[data-editor-anchor=true] { border-bottom-color:transparent }
 .bb-bills[data-wide=false] .bb-bills-editor:has(.bi-expansion-clip:not(:empty))::after { content:"";position:absolute;inset:auto 0 0;height:1px;z-index:3;background:hsl(var(--border));pointer-events:none }
 
-/* Open DUO owns one fixed stage. Only the left-hand list scrolls. The dock
-   remains on its existing body-level viewport surface. */
-.bb-page.bb-app-shell[data-duo-bills=true] { display:grid;grid-template-rows:var(--bb-duo-masthead) minmax(0,1fr);padding:0 var(--bb-duo-overlay) 0 0;overflow:clip }
-.bb-app-shell[data-duo-bills=true]>.bb-shell-masthead { grid-row:1;grid-column:1 / -1;width:100%;height:var(--bb-duo-masthead);min-height:var(--bb-duo-masthead);margin:0;padding-inline:var(--bb-duo-inset) }
-.bb-app-shell[data-duo-bills=true]>.bb-shell-bills { grid-row:2;width:100%;min-height:0;max-width:none;margin:0;padding:0 0 16px;gap:0;overflow:clip }
-.bb-bills[data-wide=true] { display:grid;grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:4px 0;height:100%;min-height:0;padding-bottom:0;overflow:hidden }
-.bb-bills[data-wide=true] .bb-bills-refresh { grid-row:1;grid-column:3;position:static }
+/* Transactions' fold/strip equation and scroll track; only left rows scroll. */
+.bb-page.bb-app-shell[data-duo-bills=true] { display:grid;grid-template-rows:80px minmax(0,1fr);padding:0 var(--bb-duo-overlay) 0 0;overflow:clip }
+.bb-app-shell[data-duo-bills=true]>.bb-shell-masthead { grid-row:1;grid-column:1 / -1;width:100%;height:80px;min-height:80px;margin:0;padding-inline:var(--bb-duo-inset) }
+.bb-app-shell[data-duo-bills=true]>.bb-shell-bills { grid-row:2;width:100%;min-height:0;max-width:none;margin:0;padding:0;gap:0;overflow:clip;display:block }
+.bb-bills[data-wide=true] { display:grid;grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:4px 0;height:100%;min-height:0;overflow:hidden }
 .bb-bills[data-wide=true] .bb-bills-panes { display:contents }
+.bb-bills-notices { display:contents }
 .bb-bills[data-wide=true] .bb-bills-notices { display:flex;flex-direction:column;gap:4px;grid-column:1;grid-row:1;min-height:0;margin-inline:var(--bb-duo-inset) }
 .bb-bills[data-wide=true] .bb-bills-notices p { margin:0 }
-.bb-bills[data-wide=true] .bb-bills-list { grid-column:1;grid-row:2;display:grid;grid-template-rows:44px minmax(0,1fr);gap:8px;min-height:0;margin-inline:var(--bb-duo-inset) }
+.bb-bills[data-wide=true] .bb-bills-list { grid-column:1;grid-row:2;display:grid;grid-template-rows:44px minmax(0,1fr);gap:8px;min-height:0;margin:0 var(--bb-duo-inset) 16px }
 .bb-bills[data-wide=true] .bb-bills-toolbar { margin-bottom:0 }
-.bb-bills[data-wide=true] .bb-bills-rows { display:block;position:relative;isolation:isolate;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-bottom:12px }
+.bb-bills[data-wide=true] .bb-bills-rows { display:block;position:relative;isolation:isolate;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:hsl(var(--border)) transparent;margin-right:-8px;padding-right:8px;padding-bottom:12px }
+.bb-bills[data-wide=true] .bb-bills-row-stack { position:relative;isolation:isolate;z-index:0 }
 .bb-bills[data-wide=true] .bb-bills-editor { grid-column:2;grid-row:1 / 3;min-height:0;overflow:hidden;margin-inline:var(--bb-duo-right-inset);padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 8px) }
-.bb-bills[data-wide=true] .bb-bills-editor .bi-editor { margin-bottom:0 }
-.bb-bills[data-wide=true] .bi-step-edit>.bb-bill-heading { min-height:44px;margin-bottom:4px }
-.bb-bills[data-wide=true] .bi-step-edit:has(>.bb-bills-form>.bb-bills-charge-actions button)>.bb-bill-heading { padding-right:172px }
-.bb-bills[data-wide=true] .bb-bills-charge-actions { position:absolute;top:0;right:0;display:flex;align-items:center;gap:4px;margin:0;padding:0;border:0 }
-.bb-bills[data-wide=true] .bb-bills-charge-actions>.bi-footnote { display:none }
-.bb-bills[data-wide=true] .bb-bills-full-label { display:none }
-.bb-bills[data-wide=true] .bb-bills-short-label { display:inline }
-.bb-bills[data-wide=true] .bb-bills-charge-actions .bb-bills-stop { justify-content:center;min-width:44px;width:44px;padding:0 }
-.bb-bills[data-wide=true] .bb-bills-form { grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 12px }
+.bb-bills[data-wide=true] .bb-bills-editor[data-bill-moving=true] { will-change:opacity }
+.bb-bills[data-wide=true] .bb-bills-editor .bi-expansion::before { display:none }
+.bb-bills[data-wide=true] .bb-bills-editor .bi-editor { margin-left:0;margin-bottom:0 }
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true]>.bi-expansion,
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true]>.bi-expansion>.bi-expansion-clip,
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor-scenes,
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor-scene,
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor:not(.bi-editor-embedded) { height:100%;min-height:0 }
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor-scenes>.bi-step-viewport,
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor:not(.bi-editor-embedded)>.bi-step-viewport { height:100%!important }
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor-scenes>.bi-step-viewport>.bi-step-pane,
+.bb-bills[data-wide=true] .bb-bills-editor[data-present=true] .bi-editor:not(.bi-editor-embedded)>.bi-step-viewport>.bi-step-pane { height:100%;min-height:0 }
+.bb-bills[data-wide=true] .bi-step-edit:has(>.bb-bills-form) { display:flex;flex-direction:column;padding:0;container-type:size }
+.bb-bills[data-wide=true] .bi-step-edit>.bb-bill-edit-heading { flex:none;min-height:44px;margin-bottom:12px }
+.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings] { flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(5,minmax(46px,1fr)) 44px;gap:min(12px,max(0px,calc((100cqh - 56px - 274px)/5))) 18px;align-items:end }
 .bb-bills[data-wide=true] .bb-bills-form>.bi-secondary-fields { display:contents }
-.bb-bills[data-wide=true] [data-bill-field=name] { order:0;grid-column:span 2 }
+.bb-bills[data-wide=true] [data-bill-field=name] { order:0;grid-column:1 / -1 }
+.bb-bills[data-wide=true] .bb-bills-charge-actions { order:-1 }
 .bb-bills[data-wide=true] [data-bill-field=type] { order:1 }
 .bb-bills[data-wide=true] [data-bill-field=amount] { order:2 }
 .bb-bills[data-wide=true] [data-bill-field=cadence] { order:3 }
 .bb-bills[data-wide=true] [data-bill-field=day] { order:4 }
 .bb-bills[data-wide=true] [data-bill-field=category] { order:5 }
 .bb-bills[data-wide=true] [data-bill-field=account] { order:6 }
-.bb-bills[data-wide=true] [data-bill-field=billing-month] { order:7 }
-.bb-bills[data-wide=true] [data-bill-field=starting-month] { order:8;grid-column:span 2 }
-.bb-bills[data-wide=true] [data-bill-field=split] { order:9;grid-column:span 1 }
-.bb-bills[data-wide=true] .bb-bills-form>.sp-management { order:10;grid-column:1 / -1 }
-.bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { order:11;grid-column:1 / -1 }
-.bb-bills[data-wide=true] .bb-bills-form>.bi-footnote,
-.bb-bills[data-wide=true] .bb-bills-form>label:not([data-bill-field]),
-.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=stop]>label { grid-column:1 / -1 }
-/* Keep the native 76px circles and 44px slider, with editable shares between
-   the circles instead of a separate row underneath them. */
+.bb-bills[data-wide=true] [data-bill-field=billing-month] { order:7;grid-column:1 / -1 }
+.bb-bills[data-wide=true] [data-bill-field=starting-month] { order:8;grid-column:1 / -1 }
+.bb-bills[data-wide=true] [data-bill-field=split] { order:9 }
+.bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { order:11;grid-column:1 / -1;align-self:end;margin-top:0 }
+.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings]:has([data-bill-field=billing-month]),
+.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings]:has(>.bb-bills-charge-actions) { grid-template-rows:repeat(6,minmax(46px,1fr)) 44px;row-gap:min(12px,max(0px,calc((100cqh - 56px - 320px)/6))) }
+.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings]:has(>.bb-bills-charge-actions):has([data-bill-field=billing-month]) { grid-template-rows:repeat(7,minmax(46px,1fr)) 44px;row-gap:min(12px,max(0px,calc((100cqh - 56px - 366px)/7))) }
+.bb-bills[data-wide=true] .bb-bills-form:not([data-editor-mode=settings]) { flex:1;min-height:0;align-content:start }
+.bb-bills[data-wide=true] .bb-bills-form>.sp-management { grid-column:1 / -1 }
+.bb-bills[data-wide=true] .bb-bills-form:not([data-editor-mode=settings])>.bi-editor-footer { margin-top:auto }
+.bb-bills[data-wide=true] .bi-step-review:has(>.bb-bill-heading) { display:flex;flex-direction:column;padding:0 }
+.bb-bills[data-wide=true] .bi-step-review:has(>.bb-bill-heading)>.bi-editor-footer { margin-top:auto }
+.bb-bills[data-wide=true] .bb-bills-current-offer { height:100% }
+.bb-bills[data-wide=true] .bb-bills-current-offer>.bi-editor-footer { margin-top:auto }
+.bb-bills[data-wide=true] .bi-step-edit:has(>.bb-bills-current-offer) { padding:0 }
+/* Give the canonical charge editor the remaining space, rather than a
+   percentage of its own content height (which collapses its native slides). */
+.bb-bills[data-wide=true] .bb-bills-current { display:flex;flex-direction:column;gap:8px }
+.bb-bills[data-wide=true] .bb-bills-current>:is(header,p,.bb-bills-current-recovery) { flex:none;margin:0 }
+.bb-bills[data-wide=true] .bb-bills-current>.bi-editor-embedded { flex:1;min-height:0 }
+.bb-bills[data-wide=true] .bb-bills-current>.bi-editor-embedded>.bi-step-viewport { height:100%!important }
+.bb-bills[data-wide=true] .bb-bills-current>.bi-editor-embedded>.bi-step-viewport>.bi-step-pane { height:100%;min-height:0;display:flex;flex-direction:column }
+.bb-bills[data-wide=true] .bb-bills-current .bi-fields { flex:1;min-height:0;display:flex;flex-direction:column }
+.bb-bills[data-wide=true] .bb-bills-current .bi-editor-footer { margin-top:auto }
+
+/* Native 76px circles/44px slider and editable shares in the compact split. */
 .bb-bills[data-wide=true] .sp-management .bs-split { display:grid;grid-template-columns:76px minmax(0,1fr) 76px;grid-template-rows:46px 44px;column-gap:4px }
 .bb-bills[data-wide=true] .sp-management :is(.bs-central,.bs-allocation) { display:contents }
 .bb-bills[data-wide=true] .sp-management .bs-orb { grid-row:1 / 3;align-self:center }
@@ -107,32 +132,28 @@
 .bb-bills[data-wide=true] .sp-management .bs-context>.bs-income-reset { top:0;pointer-events:auto }
 .bb-bills[data-wide=true] .sp-management .bs-slider { grid-row:2;grid-column:2;margin:0 }
 .bb-bills[data-wide=true] .sp-management .bs-error { grid-row:3;grid-column:1 / -1 }
-@media(max-height:640px) {
- .bb-bills[data-wide=true] { row-gap:0 }
- .bb-bills[data-wide=true] .bi-step-edit>.bb-bill-heading { margin-bottom:0 }
- .bb-bills[data-wide=true] .bb-bills-form { grid-template-columns:repeat(4,minmax(0,1fr));row-gap:0 }
- .bb-bills[data-wide=true] [data-bill-field=starting-month] { order:7;grid-column:span 2 }
- .bb-bills[data-wide=true] [data-bill-field=billing-month] { order:8 }
- .bb-bills[data-wide=true] [data-bill-field=split] { grid-column:span 2 }
- .bb-bills[data-wide=true] .bb-bills-form:has([data-bill-field=billing-month]) [data-bill-field=split] { grid-column:span 1 }
- .bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { margin-top:4px }
+@media(max-height:600px) {
+ .bb-bills[data-wide=true] { --bb-bill-padding:8px 16px;row-gap:0 }
+ .bb-bills[data-wide=true] .bi-step-edit>.bb-bill-edit-heading { margin-bottom:0 }
+ .bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings] { grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(46px,1fr)) 44px;gap:0 8px }
+ .bb-bills[data-wide=true] [data-bill-field=name] { grid-column:span 2;order:0 }
+ .bb-bills[data-wide=true] [data-bill-field=type] { grid-column:span 2;order:1 }
+ .bb-bills[data-wide=true] [data-bill-field=cadence] { grid-column:span 2;order:2 }
+ .bb-bills[data-wide=true] [data-bill-field=day] { order:3 }
+ .bb-bills[data-wide=true] [data-bill-field=amount] { order:4 }
+ .bb-bills[data-wide=true] [data-bill-field=category] { grid-column:span 2;order:5 }
+ .bb-bills[data-wide=true] [data-bill-field=account] { grid-column:span 2;order:6 }
+ .bb-bills[data-wide=true] [data-bill-field=billing-month] { grid-column:span 2;order:7 }
+ .bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings]:has([data-bill-field=billing-month]),
+ .bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings]:has(>.bb-bills-charge-actions):has([data-bill-field=billing-month]) { grid-template-rows:repeat(5,minmax(46px,1fr)) 44px;row-gap:0 }
+ .bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=settings]:has(>.bb-bills-charge-actions):not(:has([data-bill-field=billing-month])) { grid-template-rows:repeat(4,minmax(46px,1fr)) 44px;row-gap:0 }
+ .bb-bills[data-wide=true] .bb-bills-charge-actions { position:absolute;top:0;right:44px;width:auto;max-width:calc(100% - 116px) }
+ .bb-bills[data-wide=true] .bb-bills-charge-actions .bb-bills-full-label { display:none }
+ .bb-bills[data-wide=true] .bb-bills-charge-actions .bb-bills-short-label { display:inline }
 }
 @media(max-height:520px) {
- .bb-page.bb-app-shell[data-duo-bills=true] { --bb-duo-masthead:68px }
- .bb-bills[data-wide=true] .bb-bills-editor .bi-editor { padding-block:0 }
- .bb-bills[data-wide=true] .bi-editor>.bi-step-viewport>.bi-step-pane { padding-block:0 }
- .bb-bills[data-wide=true] .bi-step-edit>.bb-bill-heading>.sp-flow-context { margin-bottom:0 }
- .bb-bills[data-wide=true] .bb-bills-form>.bi-editor-footer { margin-top:0 }
+ .bb-bills[data-wide=true] { --bb-bill-padding:4px 16px }
  .bb-bills[data-wide=true] .bi-review-change { padding-block:5px;gap:2px }
+ .bb-bills[data-wide=true] .bi-step-edit,.bb-bills[data-wide=true] .bi-step-review { padding-block:0 }
 }
-
-.bb-bills .bb-bills-split-action { display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;min-height:52px }
-.bb-bills-split-action small { display:block;color:hsl(var(--muted-foreground));font-size:12px;margin-top:3px }
-.bb-bills-scope-options { display:grid;gap:8px }
-.bb-bills-scope-options button { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;text-align:left }
-.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=scope],
-.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=split] { grid-template-columns:minmax(0,1fr) }
-.bb-bills[data-wide=true] .bb-bills-form[data-editor-mode=scope]>* { grid-column:1 }
-.bb-bills-current .bi-editor { margin-left:0 }
-
-.bb-bills-current-recovery { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px }
+@media(max-width:360px) { .bb-bills-row { gap:7px } }

@@ -11,7 +11,7 @@ It leverages agentic AI to understand natural language commands, update a Google
 - Supports dozens of intents including burn rate calculation, category breakdowns, and daily/weekly insights.
 - Sends proactive subscription pull-date reminders 7, 3, and 1 day before expected charges.
 - Fully integrated with Google Sheets for persistent, transparent data storage.
-- Manage subscriptions, variable and fixed bills from phone Settings, with effective-month changes, monthly amounts and recurring splits. [Bills guide](docs/BILLS.md).
+- Manage subscriptions, variable and fixed bills from phone Settings, with recurring changes from the earliest eligible month onward, optional reviewed current-charge updates, monthly amounts and recurring splits. [Bills guide](docs/BILLS.md).
 - Optional Gas merchant/location across logging, transaction editing, search and logos; [schema and migration notes](docs/GAS_LOCATION.md).
 - Asynchronous and scalable, with clear error handling and feedback messages.
 

@@ -118,5 +118,13 @@
 .bb-settings-masthead-title { position:fixed;z-index:60;top:max(18px,env(safe-area-inset-top,0px));left:max(var(--bb-page-gutter),calc((100vw - var(--bb-content-max))/2),env(safe-area-inset-left,0px));display:flex;align-items:center;gap:14px;max-width:calc(100% - 150px);min-width:0 }
 .bb-settings-masthead-title h1 { margin:0;min-width:0;font-family:var(--bb-display-font);font-size:clamp(25px,5vw,36px);font-weight:400;line-height:44px;letter-spacing:-.025em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .bb-settings-masthead-title .bb-shell-icon>svg { width:26px;height:26px }
+.bb-settings-masthead-title>.bb-settings-title-pane { flex:0 1 auto;width:auto;max-width:100%;border-radius:999px }
+.bb-settings-title-pane>.bb-settings-back-capsule { display:flex;align-items:center;gap:8px;width:auto;max-width:100%;min-width:44px;height:44px;padding:0 14px;border-radius:inherit }
+.bb-settings-back-capsule>svg { flex:none }
+.bb-settings-back-capsule>span { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--bb-display-font);font-size:clamp(25px,5vw,36px);font-weight:400;line-height:44px;letter-spacing:-.025em }
+.bb-settings-masthead-title>.bb-settings-screen-heading { position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap }
+.bb-page[data-screen=settings]>.bb-shell-masthead { min-height:80px;height:80px;margin-bottom:0 }
+.bb-page[data-screen=settings]>.bb-shell-settings { min-width:0;grid-template-columns:minmax(0,1fr) }
+.bb-page[data-screen=settings]>.bb-shell-settings>div { min-width:0 }
 .bb-page[data-duo-landscape=true] .bb-settings-masthead-title { left:var(--bb-duo-inset);max-width:calc(var(--bb-duo-fold) - 2 * var(--bb-duo-inset)) }
 @media(max-width:360px) { .bb-settings-masthead-title { gap:8px }.bb-settings-masthead-title h1 { font-size:24px } }
