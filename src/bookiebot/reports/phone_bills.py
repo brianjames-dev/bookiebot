@@ -58,7 +58,7 @@ async def _bills(request: web.Request) -> web.Response:
                         raise BillValidation('Choose a bill check-in action.')
                     checkin_now = bill_checkin.now_pacific()
                     eligible = await asyncio.to_thread(bill_checkin.candidates, actor, current=checkin_now) if body['action'] == 'claim' else {}
-                    result = await asyncio.to_thread(lambda: bill_checkin.build_store().day(session.owner_key, body['token'], body['action'], checkin_now)) if body['action'] != 'claim' or eligible.get('bills') else {'day': checkin_now.strftime('%Y-%m-%d'), 'claimed': False}
+                    result = await asyncio.to_thread(lambda: bill_checkin.build_store().day(session.owner_key, body['token'], body['action'], checkin_now)) if body['action'] != 'claim' or eligible.get('bills') else {'day': checkin_now.strftime('%Y-%m-%d'), 'claimed': False, 'reason': 'no_bills'}
                     if result.get('claimed'):
                         result['bills'] = eligible['bills']
             else:

@@ -61,8 +61,10 @@ class BillCheckinStore:
                 return {'day': day, 'shown': False}
             if action != 'claim':
                 raise BillValidation("Choose a bill check-in action.")
-            if row and (row['state'] == 'shown' or row['expires_at'] > stamp and row['token'] != token):
-                return {'day': day, 'claimed': False}
+            if row and row['state'] == 'shown':
+                return {'day': day, 'claimed': False, 'reason': 'shown'}
+            if row and row['expires_at'] > stamp and row['token'] != token:
+                return {'day': day, 'claimed': False, 'reason': 'reserved', 'retryAfterSeconds': row['expires_at'] - stamp}
             db.execute("""INSERT INTO app_bill_checkin_days(owner_key,local_day,token,state,expires_at) VALUES(?,?,?,'reserved',?)
                 ON CONFLICT(owner_key,local_day) DO UPDATE SET token=excluded.token,state='reserved',expires_at=excluded.expires_at""",
                 (owner, day, token, stamp + LEASE_SECONDS))

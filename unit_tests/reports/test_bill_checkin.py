@@ -26,11 +26,13 @@ def store(access):
 def test_claim_ack_and_later_are_once_per_person_pacific_day(store):
     token, other = 'first-device-token', 'second-device-token'
     assert store.day('brian', token, 'claim', NOW)['claimed']
-    assert not store.day('brian', other, 'claim', NOW)['claimed']
+    denied = store.day('brian', other, 'claim', NOW)
+    assert not denied['claimed'] and denied['reason'] == 'reserved' and denied['retryAfterSeconds'] == checkin.LEASE_SECONDS
     assert not store.day('hannah', token, 'shown', NOW)['shown']
     assert store.day('brian', token, 'shown', NOW)['shown']
     assert store.day('brian', token, 'shown', NOW)['shown']  # Lost ack is idempotent.
-    assert not store.day('brian', other, 'claim', NOW + timedelta(hours=11))['claimed']
+    denied = store.day('brian', other, 'claim', NOW + timedelta(hours=11))
+    assert not denied['claimed'] and denied['reason'] == 'shown'
     assert not store.day('brian', other, 'claim', datetime(2026, 11, 16, 7, tzinfo=timezone.utc))['claimed']
     assert store.day('hannah', other, 'claim', NOW)['claimed']
     assert store.day('brian', other, 'claim', NOW + timedelta(days=1))['claimed']
@@ -115,7 +117,23 @@ def test_recorded_zero_is_confirmed_without_inventing_a_payment_or_new_invoice(s
     snapshot = checkin.read_workbook(B, NOW.date())
     info = snapshot.charge(bill, '2026-11')
     assert info['recorded'] and info['status'] == 'confirmed'
-    assert info['date'] == '2026-11-22' and info['billAmountCents'] == 15208
+    assert info['date'] == '2026-11-22' and info['billAmountCents'] == 0
+    assert not source.client.http_client.sent
+
+
+def test_unsplit_invoice_correction_displays_current_source_not_initial_charge_amount(source):
+    from bookiebot.sheets.recurring_charges import BillCharge, CHARGES_TAB, encode_charges, source_anchor
+    bill = source.bill
+    charge = BillCharge(bill.id, '2026-11', '2026-11-15', bill.source_label, bill.category,
+                       1, 1, 3, source_anchor(bill.id, '2026-11'), 12567, True, payer_owner='brian')
+    for tables in (source.client.http_client.rows, source.client.http_client.formulas):
+        tables[CHARGES_TAB] = encode_charges([charge], [])
+        tables['November'][0][2] = '126.78'
+    source.client.http_client.properties[CHARGES_TAB] = {'title':CHARGES_TAB,'sheetId':20}
+    snapshot = checkin.read_workbook(B, NOW.date())
+    info = snapshot.charge(bill, '2026-11')
+    assert info['amountCents'] == info['billAmountCents'] == 12678
+    assert info['status'] == 'confirmed' and info['date'] == '2026-11-22'
     assert not source.client.http_client.sent
 
 

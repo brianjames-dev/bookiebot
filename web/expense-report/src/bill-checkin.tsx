@@ -5,7 +5,7 @@ import './bill-checkin.css'
 
 export type BillAmountRequest={id:string;month:string;nonce:string}
 type DueBill={id:string;name:string;month:string;date:string;overdue:boolean}
-type Checkin={day:string;claimed?:boolean;bills:DueBill[];token?:string}
+type Checkin={day:string;claimed?:boolean;reason?:'shown'|'reserved'|'no_bills';retryAfterSeconds?:number;bills:DueBill[];token?:string}
 const pacificDay=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
 async function checkinRequest(body?:{action:string;token:string},signal?:AbortSignal):Promise<Checkin>{
  const response=await fetch('/app/bills/check-in',{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',mode:'same-origin',redirect:'error',referrerPolicy:'same-origin',headers:{'Content-Type':'application/json','X-BookieBot-App':'1'},body:body?JSON.stringify(body):undefined,signal})
@@ -20,6 +20,7 @@ export function BillCheckin({owner,enabled,blocked,onEnter}:{owner:string;enable
  const work=useAppWorkGuard(),dialog=useRef<HTMLDialogElement>(null)
  const [wake,setWake]=useState(0),[offer,setOffer]=useState<Checkin|null>(null)
  const acknowledged=useRef(''),checked=useRef(''),flight=useRef(false),previousFocus=useRef<HTMLElement|null>(null)
+ const retryTimer=useRef<number|null>(null)
  const safe=useRef(false)
  safe.current=enabled&&!blocked&&!work.pending&&!work.uncertain&&!work.dirty&&document.visibilityState==='visible'
  useEffect(()=>{
@@ -28,7 +29,7 @@ export function BillCheckin({owner,enabled,blocked,onEnter}:{owner:string;enable
   const changed=()=>{checked.current='';resume()}
   const observer=new MutationObserver(resume);observer.observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['open']})
   document.addEventListener('visibilitychange',resume);window.addEventListener('pageshow',resume);window.addEventListener('focus',resume);window.addEventListener('bookiebot:transactions-changed',changed)
-  return()=>{observer.disconnect();document.removeEventListener('visibilitychange',resume);window.removeEventListener('pageshow',resume);window.removeEventListener('focus',resume);window.removeEventListener('bookiebot:transactions-changed',changed)}
+  return()=>{if(retryTimer.current!==null)window.clearTimeout(retryTimer.current);observer.disconnect();document.removeEventListener('visibilitychange',resume);window.removeEventListener('pageshow',resume);window.removeEventListener('focus',resume);window.removeEventListener('bookiebot:transactions-changed',changed)}
  },[owner])
  useEffect(()=>{
   const day=pacificDay()
@@ -47,7 +48,15 @@ export function BillCheckin({owner,enabled,blocked,onEnter}:{owner:string;enable
     reserved=true
     const next=await checkinRequest({action:'claim',token},controller.signal)
     reserved=next.claimed===true
-    if(!reserved){checked.current=next.day;return}
+    if(!reserved){
+     if(next.reason==='reserved'){
+      if(retryTimer.current!==null)window.clearTimeout(retryTimer.current)
+      const seconds=Number.isFinite(next.retryAfterSeconds)?Math.max(1,Math.min(120,next.retryAfterSeconds!)):120
+      retryTimer.current=window.setTimeout(()=>{retryTimer.current=null;setWake(n=>n+1)},seconds*1000+250)
+     }else if(next.reason==='shown')acknowledged.current=next.day
+     else if(next.reason==='no_bills')checked.current=next.day
+     return
+    }
     if(!safe.current||controller.signal.aborted||document.querySelector('dialog[open]'))return
     setOffer({...next,token})
     reserved=false

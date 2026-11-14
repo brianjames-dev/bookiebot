@@ -104,7 +104,7 @@ class WorkbookSnapshot:
         amount = round(numeric(value) * 100)
         known = recorded or amount > 0
         related = [a for a in self.bill_allocations(plan, month) if a['sourceYear'] == self.year and a['sourceSheetTitle'] == title]
-        gross = related[0].get('grossCents') if len(related) == 1 and related[0]['payerOwner'] == self.owner else charge.initial_amount_cents if charge and charge.payer_owner == self.owner else amount
+        gross = related[0].get('grossCents') if len(related) == 1 and related[0]['payerOwner'] == self.owner else amount
         return {"available": True, "month": month, "row": row, "amountColumn": column,
                 "amountCents": amount, "billAmountCents": gross, "date": when,
                 "status": "paid" if known and when and when <= (self.as_of or now_pacific().date()).isoformat() else "confirmed" if known else "unconfirmed",
