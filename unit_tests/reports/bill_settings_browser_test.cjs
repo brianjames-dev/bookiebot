@@ -47,7 +47,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   await tap(page,panel.getByRole('button',{name:'Add bill',exact:true}));
   await panel.getByLabel('Name',{exact:true}).fill('Insurance');await panel.getByLabel('Type',{exact:true}).selectOption('fixed');
   await panel.getByRole('textbox',{name:'Recurring amount',exact:true}).fill('42.30');await panel.getByLabel('Payment day',{exact:true}).fill('15');
-  assert.equal(await panel.getByLabel('Applies from',{exact:true}).count(),0);await tap(page,panel.getByRole('button',{name:/^Recurring split/}));
+  assert.equal(await panel.getByLabel('Applies from',{exact:true}).count(),1);await tap(page,panel.getByRole('button',{name:/^Recurring split/}));
   await panel.getByLabel("Brian's share percentage",{exact:true}).fill('42.25');await panel.getByRole('button',{name:'Split by income',exact:true}).click();
   assert.equal(await panel.getByLabel("Brian's share percentage",{exact:true}).inputValue(),'64.73');
   assert(!(await panel.getByRole('slider').getAttribute('aria-valuetext')).includes('$'),'Recurring defaults are percentages');

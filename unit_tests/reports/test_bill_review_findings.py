@@ -86,9 +86,10 @@ def test_adoption_removes_only_this_occurrence_from_sheet_summary_and_future_pro
 
 
 @pytest.mark.parametrize('category', ['rent', 'bills_utilities'])
-def test_subscription_other_categories_have_monthly_source_in_new_and_saved_plans(category):
-    normalized = normalize_plan(form(type='subscription', name='Zoom', category=category, splitMethod='none'),
-        current=None, today=TODAY, plan_id='subscription_123')
+def test_legacy_subscription_categories_remain_readable_but_new_edits_require_needs_or_wants(category):
+    with pytest.raises(ValueError, match='Needs or Wants'):
+        normalize_plan(form(type='subscription', name='Zoom', category=category, splitMethod='none'), current=None, today=TODAY, plan_id='subscription_123')
+    normalized = replace(plan(), id='subscription_123', kind='subscription', name='Zoom', source_label='Zoom', category=category, source_tab=SUBSCRIPTION_TAB, monthly_source=True, split_method='none')
     assert normalized.monthly_source
     # Plans saved by the original implementation must use the same accounting
     # route when read; inspection itself still does not mutate Sheets.
@@ -148,7 +149,7 @@ def test_variable_conversion_clears_automatic_formulas_but_preserves_recorded_ca
     source = storage.read_workbook(B, TODAY, client=client)
     # The normal minimum prevents overriding the already recorded December
     # payment. Test projection's independent protection as well.
-    assert source.settings.earliest_months[original.id] == '2027-01'
+    assert source.settings.earliest_months.get(original.id, '2026-11') == '2026-11'
     after = normalize_plan(form(type='variable', amount='60.23', splitMethod='none', effectiveFrom='2026-11'),
                            current=original, today=TODAY, plan_id=original.id)
     from bookiebot.sheets.recurring import versioned

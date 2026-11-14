@@ -11,7 +11,7 @@ global.IS_REACT_ACT_ENVIRONMENT = true
 
 // Exercise the real disclosure, dropdown, table and chart button. Only the
 // chart's drawing surface is replaced; no browser or financial service is used.
-const source = fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")
+const source = (fs.readFileSync("web/expense-report/src/report-app.tsx", "utf8")+"\n"+fs.readFileSync("web/expense-report/src/category-filter-control.tsx", "utf8"))
 const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const names = new Set([
   "money", "formatMoney", "DailySpendingSection", "DailySpendingChart", "MemoizedDailySpendingChart", "DailyEntriesTable",

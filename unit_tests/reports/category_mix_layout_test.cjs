@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const req=createRequire(require('node:path').resolve('web/expense-report/package.json'))
 const ts=req('typescript'),React=req('react'),Renderer=req('react-test-renderer')
 global.IS_REACT_ACT_ENVIRONMENT=true
-const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
+const source=(fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')+'\n'+fs.readFileSync('web/expense-report/src/category-filter-control.tsx','utf8'))
 const ast=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
 const names=new Set(['CategoryFilterControl','CategoryMixFilterControl','DailySpendingFilterControl','DAILY_SPENDING_FILTERS','CATEGORY_MIX_FILTERS','PIE_METRIC_START_ANGLE','PIE_METRIC_END_ANGLE'])
 const declarations=ast.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(item=>names.has(item.name.getText(ast))))

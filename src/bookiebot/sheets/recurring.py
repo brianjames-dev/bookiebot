@@ -155,8 +155,6 @@ def normalize_plan(body: dict[str, Any], *, current: BillPlan | None, today: dat
     kind, cadence = body.get("type"), body.get("cadence")
     if not isinstance(kind, str) or not isinstance(cadence, str) or kind not in KINDS or cadence not in CADENCES:
         raise BillValidation("Choose a bill type and billing frequency.")
-    if kind == "subscription" and cadence == "quarterly":
-        raise BillValidation("Subscriptions can repeat monthly or yearly.")
     name = text(body.get("name"), "bill name", required=True)
     account = text(body.get("account", ""), "account", maximum=80)
     amount = money_cents(body.get("amount"), optional=kind == "variable")
@@ -177,8 +175,8 @@ def normalize_plan(body: dict[str, Any], *, current: BillPlan | None, today: dat
     category = body.get("category")
     if not isinstance(category, str) or category not in CATEGORIES:
         raise BillValidation("Choose a Needs or Wants category.")
-    if kind != "subscription" and category == "subscriptions_wants":
-        raise BillValidation("Variable and fixed bills belong to Needs.")
+    if kind == "subscription" and category not in VIRTUAL_SUBSCRIPTION_CATEGORIES:
+        raise BillValidation("Subscriptions belong to Needs or Wants.")
     effective = month_key(body.get("effectiveFrom"))
     if effective >= LAST_MONTH:
         raise BillValidation("Choose an earlier starting month.")

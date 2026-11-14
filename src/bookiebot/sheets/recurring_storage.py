@@ -174,7 +174,8 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
                 for a in allocations)
             if recorded_split or (charge_month, bill_label_key(candidate.source_label)) in snapshot.settled_dates:
                 snapshot.recorded_plans.add((plan.id, charge_month))
-            if info.get("recorded") or recorded_split or manual_value or due and due <= today and (info.get("amountCents", 0) > 0 or info.get("virtual") and (candidate.amount_cents or 0) > 0):
+            if (info.get("recorded") or recorded_split or number == today.month and
+                    (manual_value or due and due <= today and (info.get("amountCents", 0) > 0 or info.get("virtual") and (candidate.amount_cents or 0) > 0))):
                 minimums[plan.id] = following_month(charge_month)
     snapshot.settings.earliest_months.update(minimums)
     return snapshot

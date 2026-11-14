@@ -78,6 +78,17 @@ def test_invalid_configuration_never_becomes_a_plan(changes):
         normalize_plan(form(**changes), current=plan(), today=date(2026, 11, 13), plan_id="loan")
 
 
+def test_quarterly_subscriptions_and_bill_wants_are_valid_configuration():
+    for kind in ('subscription', 'variable', 'fixed'):
+        value = normalize_plan(form(type=kind, cadence='quarterly', pullMonths=[2,5,8,11], category='subscriptions_wants'),
+                               current=None, today=date(2026,11,13), plan_id='quarterly-plan')
+        assert value.due_date('2027-02') == date(2027,2,28)
+        assert value.due_date('2026-12') is None
+    for category in ('rent', 'bills_utilities'):
+        with pytest.raises(BillValidation, match='Needs or Wants'):
+            normalize_plan(form(type='subscription', category=category), current=None, today=date(2026,11,13), plan_id='invalid-sub')
+
+
 def test_source_identity_is_server_owned_and_variable_estimate_optional():
     renamed = normalize_plan(form(name="Federal loan"), current=plan(), today=date(2026, 11, 13), plan_id="loan")
     assert renamed.source_label == "Student Loan" and renamed.name == "Federal loan"
