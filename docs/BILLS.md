@@ -3,10 +3,20 @@
 Open **Settings → Bills → Manage bills & subscriptions**. Filter by Subscriptions, Variable bills or Fixed bills, or choose **Add bill**.
 
 - **Subscription:** a monthly or yearly charge, under Needs or Wants.
-- **Variable bill:** enter an optional estimate when setting it up, then use **Enter monthly amount** for the actual payment. Estimates stay in Projected until an amount is recorded.
+- **Variable bill:** the app predicts an unentered amount from past bills. Use **Enter monthly amount** when the actual arrives; it replaces the prediction. An optional configured estimate overrides the historical average.
 - **Fixed bill:** a known amount repeating monthly, quarterly or yearly. It follows the saved payment date as an automatic budget expense.
 
 Legacy Rent is classified as Fixed even if its older schedule has no automatic-tracking flag. This classification does not change an amount, enroll a schedule, or infer a recurring split.
+
+## Variable bill predictions
+
+Bills and Projected Overview/Calendar mark predictions with a small sparkle icon. Tap it for the amount, history count and month range; Projected Spent uses the same marker in its existing explanation button. Current excludes these variable predictions, and Transactions stays actual-only.
+
+The baseline is the arithmetic mean, rounded to cents, of positive personal bill amounts in available completed months before the selected month. Reads include the annual workbook and its available previous-year history. Blank/zero placeholders, refunds, spreadsheet errors, duplicate sources/periods, current/future months and other predictions do not train the estimate. Quarterly/yearly bills forecast only in their configured billing months. A bill without usable history or a configured estimate stays unknown.
+
+The source is your recorded personal budget amount, which may already reflect historical split repayments; it is not a newly quoted full purchase price or a repayment promise. Predictions do not create transactions, change splits, enroll settings or write budget cells. Saved estimates retain their existing explicit override behavior. Enter the actual purchase/payment amount through the normal reviewed monthly-amount flow; its existing split defaults and recorded date remain authoritative. A recorded zero after reimbursement also suppresses the prediction.
+
+Bills and Overview use the same calculation. Opening a prediction explanation preserves an editor draft. Folding, native refresh and editor animations retain their existing behavior; the explanation closes when the view changes. Already-entered amounts retain the normal queued/recorded timing, and never get replaced by an average.
 
 An already recorded bill whose partner share has been fully repaid keeps its original bill date, even if its recurring pull day is later. Transactions, Current totals and Calendar retain the existing cash amounts for both people. Pending or reversed receipts, future records and cleared debt do not supply that payment evidence. Browsing never logs the bill or repayment again. Transactions remains actual-only, independently of Overview's Current/Projected selection.
 

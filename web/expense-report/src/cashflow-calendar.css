@@ -39,6 +39,11 @@
 .bb-cf-medallion[data-logo-ready="true"] .bb-cf-logo { opacity:1; }
 .bb-cf-kind-dot { position:absolute; display:none; right:1px; bottom:1px; width:6px; height:6px; border-radius:50%; background:var(--cf-event); }
 .bb-cf-medallion[data-logo-ready="true"] .bb-cf-kind-dot { display:block; }
+.bb-cf-prediction-mark { position:absolute;top:-2px;right:-3px;display:grid;place-items:center;width:16px;height:16px;border-radius:50%;background:hsl(var(--background));color:hsl(var(--primary));pointer-events:none }
+.bb-cf-prediction-mark svg { width:11px;height:11px }
+.bb-cf-date:has(.bb-cf-date-prediction) { position:relative }
+.bb-cf-date .bb-cf-date-prediction { position:absolute;left:calc(50% + 8px);top:4px;width:10px;height:10px;color:hsl(var(--primary));pointer-events:none }
+.bb-cf-details li b:has(.bb-bill-prediction-info) { display:flex;align-items:center;gap:0 }
 .bb-cf-overflow .bb-cf-medallion-face { font-size:10px; background:hsl(var(--foreground) / .095); color:hsl(var(--foreground)); }
 .bb-cf-day[data-past="true"] .bb-cf-icons { opacity:.66; }
 .bb-cf-day-totals { display:flex; flex-direction:column; justify-content:flex-end; gap:2px; flex:none; width:calc(100% + 4px); min-height:38px; margin:auto -2px 0; padding:4px 0 0; border:0; background:transparent; font:inherit; font-size:11px; font-variant-numeric:tabular-nums; letter-spacing:-.03em; cursor:pointer; }

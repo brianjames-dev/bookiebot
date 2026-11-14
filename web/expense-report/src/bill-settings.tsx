@@ -13,10 +13,12 @@ import {BillCurrentOffer} from './bill-current-offer'
 import {BillEditorWorkspace} from './bill-editor-workspace'
 import {currentBillHasHit,recurringStartMonth} from './bill-settings-model'
 import {usePageRefresh,usePageRefreshRegistry} from './page-refresh'
+import {BillPredictionInfo} from './bill-prediction-info'
+import type {BillPrediction} from './types'
 import './bill-settings.css'
 
 type Charge={available:boolean;month:string;amountCents?:number;recorded?:boolean;virtual?:boolean;date?:string|null;version?:string}
-export type Bill={id:string;type:'subscription'|'variable'|'fixed';name:string;amountCents:number|null;cadence:'monthly'|'quarterly'|'yearly';pullDay:number|null;pullMonths:number[];category:string;account:string;active:boolean;effectiveFrom:string;effectiveUntil:string;splitMethod:'none'|SplitMethod;payerBasisPoints:number;version:string;nextDate:string|null;needsSetup:boolean;earliestEffectiveMonth:string;charge:Charge;nextChange?:Bill|null}
+export type Bill={id:string;type:'subscription'|'variable'|'fixed';name:string;amountCents:number|null;cadence:'monthly'|'quarterly'|'yearly';pullDay:number|null;pullMonths:number[];category:string;account:string;active:boolean;effectiveFrom:string;effectiveUntil:string;splitMethod:'none'|SplitMethod;payerBasisPoints:number;version:string;nextDate:string|null;needsSetup:boolean;earliestEffectiveMonth:string;charge:Charge;nextChange?:Bill|null;prediction?:BillPrediction|null}
 type Snapshot={month:string;today:string;settingsVersion:string;ownerName:string;partnerName:string;incomeBasisPoints:number;splitsEnabled:boolean;bills:Bill[];pendingCommand?:Command}
 type Form={name:string;type:Bill['type'];amount:string;cadence:Bill['cadence'];pullDay:number;firstMonth:number;category:string;account:string;effectiveFrom:string;splitMethod:Bill['splitMethod'];payerBasisPoints:number}
 type Command=Record<string,unknown>&{operation:string;requestId?:string;reviewVersion?:string}
@@ -201,7 +203,18 @@ export function BillSettings({active,ownerName,aliases}:{active:boolean;ownerNam
   {snapshot&&<div className="bb-bills-panes">
    <section className="bb-bills-list" aria-label="Your bills">
     <div className="bb-bills-toolbar"><select aria-label="Bill type" disabled={locked||Boolean(form)} value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">All bills</option><option value="subscription">Subscriptions</option><option value="variable">Variable bills</option><option value="fixed">Fixed bills</option></select><button type="button" className="bb-bills-add" aria-busy={newRequested} onClick={addBill}><Plus aria-hidden="true"/>Add bill</button>{wide&&<button type="button" className="bb-bills-refresh" aria-label="Refresh bills" disabled={locked} onClick={()=>{setResult(null);void refreshRegistry?.refresh('settings')}}><RefreshCw aria-hidden="true"/></button>}</div>
-    <div className="bb-bills-rows"><div className="bb-bills-row-stack">{visible.map((bill,index)=>{const configured=bill.nextChange??bill;return <button style={{order:index*2+2}} type="button" className="bb-bills-row" aria-pressed={bill.id===selected?.id} data-bill-id={bill.id} data-editor-anchor={bill.id===placement.current.billId} disabled={locked} key={bill.id} onClick={()=>choose(bill)}><TransactionIcon entry={{date:bill.nextDate??'',category:bill.category==='bills_utilities'?'Bills & Utilities':bill.category==='rent'?'Rent':bill.category==='subscriptions_wants'?'Subs (Wants)':'Static Bills & Subscriptions',amount:(bill.amountCents??0)/100,person:ownerName,item:configured.name,location:configured.name}} aliases={aliases}/><span className="bb-bills-row-text"><strong>{configured.name}</strong><small>{!configured.active?'Stopped':configured.needsSetup?'Finish setup':`${kindLabel[configured.type]} · ${configured.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span><span className="bb-bills-row-amount">{configured.amountCents===null?'Not set':money(configured.amountCents)}{configured.type==='variable'&&configured.amountCents!==null&&<small>estimate</small>}</span><ChevronRight aria-hidden="true"/></button>})}
+    <div className="bb-bills-rows"><div className="bb-bills-row-stack">{visible.map((bill,index)=>{
+     const configured=bill.nextChange??bill,prediction=configured.prediction??undefined
+     const value=configured.type==='variable'&&!bill.nextChange&&(bill.charge.recorded||bill.charge.amountCents)?bill.charge.amountCents??0:prediction?.amountCents??configured.amountCents
+     return <div className="bb-bills-row-shell" style={{order:index*2+2}} key={bill.id}>
+      <button type="button" className="bb-bills-row" data-predicted={Boolean(prediction)} aria-pressed={bill.id===selected?.id} data-bill-id={bill.id} data-editor-anchor={bill.id===placement.current.billId} disabled={locked} onClick={()=>choose(bill)}>
+       <TransactionIcon entry={{date:bill.nextDate??'',category:bill.category==='bills_utilities'?'Bills & Utilities':bill.category==='rent'?'Rent':bill.category==='subscriptions_wants'?'Subs (Wants)':'Static Bills & Subscriptions',amount:(value??0)/100,person:ownerName,item:configured.name,location:configured.name}} aliases={aliases}/>
+       <span className="bb-bills-row-text"><strong>{configured.name}</strong><small>{!configured.active?'Stopped':configured.needsSetup?'Finish setup':`${kindLabel[configured.type]} · ${configured.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span>
+       <span className="bb-bills-row-amount">{money(value)}</span><ChevronRight aria-hidden="true"/>
+      </button>
+      {prediction&&<BillPredictionInfo items={[{label:configured.name,prediction}]}/>}
+     </div>
+    })}
     {!visible.length&&<p className="bb-bills-empty">No bills here yet.</p>}</div></div>
    </section>
    <BillEditorWorkspace billId={selected?.id??'new'} order={placement.current.order} isNew={placement.current.isNew} open={Boolean(form)} wide={wide} locked={busy||Boolean(pending)}>

@@ -14,7 +14,8 @@ import {
   type RefObject,
 } from "react"
 import { createPortal } from "react-dom"
-import { ChevronDown, SlidersHorizontal, X } from "lucide-react"
+import { ChevronDown, SlidersHorizontal, Sparkles, X } from "lucide-react"
+import {BillPredictionSummary} from './bill-prediction-info'
 import { billLabelKey, comparisonItems, priorBillAverage, useBillSelection } from "./bill-comparison"
 import { Popover } from "konsta/react"
 import { useCategoryContour, CategoryContourCallouts } from "./category-mix-contour"
@@ -643,7 +644,7 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.income, key: "income", view: activeReport}) : undefined}
             value={activeReport.metrics.monthlyIncome}
           />
-          <MetricCard label="Spent" value={spentTotal} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, value: spentTotal, key: "spent", view: activeReport}) : undefined} />
+          <MetricCard label="Spent" value={spentTotal} predicted={projectionActive&&activeReport.calendarEvents.some(event=>event.prediction)} onExplain={metricDetails ? () => setMetricInspection({...metricDetails.spent, value: spentTotal, key: "spent", view: activeReport}) : undefined} />
           <MetricCard
             label="Left"
             onExplain={metricDetails ? () => setMetricInspection({...metricDetails.left, key: "left", view: activeReport}) : undefined}
@@ -1001,6 +1002,7 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
       {component.date && <small>{component.date}</small>}{component.source === "scheduled" && <small>Scheduled estimate</small>}</dt>
       <dd>{formatMoney(component.amount)}</dd></div>)}</dl>
     {key === "income" && detail.notes.map((note,index)=><p className="bb-activity-footnote" key={index}>{note}</p>)}
+    {key === "spent" && view.calendarEvents?.some(event=>event.prediction) && <BillPredictionSummary items={view.calendarEvents.flatMap(event=>event.prediction?[{label:event.label,prediction:event.prediction}]:[])}/>}
   </div>
 }
 
@@ -1579,6 +1581,7 @@ function MetricCard({
   value,
   description,
   accent = false,
+  predicted = false,
   control,
   onExplain,
   children,
@@ -1588,6 +1591,7 @@ function MetricCard({
   value: number | null | undefined
   description?: string
   accent?: boolean
+  predicted?: boolean
   control?: ReactNode
   children?: ReactNode
 }) {
@@ -1596,7 +1600,7 @@ function MetricCard({
   return (
     <div className="bb-metric-card" data-accent={accent || undefined}>
       <div className="bb-metric-head">
-        <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label={`Explain ${label}`} onClick={onExplain}>{label}<span aria-hidden="true">ⓘ</span></button> : label}</div>
+        <div className="bb-metric-label">{onExplain ? <button type="button" className="bb-metric-explain" aria-label={`Explain ${label}${predicted?', includes predicted bills':''}`} onClick={onExplain}>{label}<span aria-hidden="true">{predicted?<Sparkles className="bb-prediction-glyph"/>:'ⓘ'}</span></button> : label}</div>
         {control}
       </div>
       <MetricAmount className={negative ? "bb-metric-value bb-negative" : positive ? "bb-metric-value bb-positive" : "bb-metric-value"}>
@@ -2975,6 +2979,7 @@ function CalendarAnalyticsPanel({ year, month, events, context, aliases, project
   collapseKey: number
 }) {
   const [selection, setSelection] = useState<CalendarSelection | null>(null)
+  useEffect(()=>setSelection(null),[year,month,projected,events,context])
   return <div className="bb-cashflow-panel">
     <CashflowCalendar year={year} month={month} events={events} context={context} aliases={aliases}
       projected={projected} onInspect={setSelection} />

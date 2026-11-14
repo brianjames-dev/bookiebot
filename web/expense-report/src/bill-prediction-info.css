@@ -1,0 +1,18 @@
+.bb-bill-prediction-info { display:inline-flex;align-items:center;justify-content:center;flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border:0;background:transparent;color:hsl(var(--primary));cursor:pointer;vertical-align:middle }
+.bb-bill-prediction-info svg,.bb-prediction-glyph { width:14px!important;height:14px!important;flex:none;color:hsl(var(--primary)) }
+.bb-bill-prediction-popover { position:fixed!important;left:var(--prediction-left,16px)!important;top:var(--prediction-top,16px)!important;transform:none!important;width:var(--prediction-width,280px)!important;max-width:calc(100vw - 32px);max-height:var(--prediction-max-height,80dvh);overflow:auto;margin:0!important;padding:0!important;border:1px solid hsl(var(--border));border-radius:16px!important;background:hsl(var(--card))!important;color:hsl(var(--card-foreground));box-shadow:0 12px 32px rgb(0 0 0 / .2);z-index:100;font:400 13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;transition:opacity 160ms ease,scale 160ms ease }
+.bb-bill-prediction-popover[aria-hidden=true] { opacity:0;scale:.97;pointer-events:none }
+.bb-bill-prediction-popover[aria-hidden=false] { opacity:1;scale:1 }
+.bb-bill-prediction-popover>.k-glass { opacity:1;translate:none;transition:none;background:transparent!important;box-shadow:none;border-radius:0;overflow:visible;backdrop-filter:none }
+.bb-bill-prediction-popover>.k-glass>div { padding:14px 16px }
+.bb-bill-prediction-popover header { display:flex;align-items:center;justify-content:space-between;gap:8px }
+.bb-bill-prediction-popover h3 { margin:0;font-size:16px;font-weight:500 }
+.bb-bill-prediction-popover header button { display:grid;place-items:center;width:44px;min-width:44px;height:44px;margin:-8px -10px -4px 0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer }
+.bb-bill-prediction-summary { font-size:13px;line-height:1.45;text-align:left }
+.bb-bill-prediction-summary dl { margin:12px 0 }
+.bb-bill-prediction-summary dl>div { display:flex;align-items:start;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid hsl(var(--border) / .6) }
+.bb-bill-prediction-summary dt { min-width:0;font-weight:500;overflow-wrap:anywhere }
+.bb-bill-prediction-summary dd { flex:none;margin:0;font-variant-numeric:tabular-nums }
+.bb-bill-prediction-summary small { display:block;margin-top:3px;color:hsl(var(--muted-foreground));font-size:12px;font-weight:400 }
+.bb-bill-prediction-summary p { margin:10px 0 0;color:hsl(var(--muted-foreground)) }
+@media(prefers-reduced-motion:reduce) { .bb-bill-prediction-popover { transition-duration:0ms } }

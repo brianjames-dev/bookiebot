@@ -7,6 +7,7 @@ const sessionStorage={getItem:key=>storage.get(key)??null,setItem(key,value){if(
 const cache=new Map();
 function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;
  const modules={
+  './bill-prediction-info':{BillPredictionInfo:()=>null},
   './daily-transactions':{TransactionIcon:()=>null},'./app-navigation':{useAppNavigation:()=>({duoLandscape:wide})},'./app-work-guard':{useAppWorkGuard:()=>({pending:false,uncertain:false}),useAppWorkStatus:value=>{work=value;return next=>{work=next}}},
   './transaction-split-control':{NotchedSplitControl:()=>null},'./transaction-inline-editor':{transactionMotion:{duration:440}},'./transaction-editor-workspace':{EditorScenes:({children})=>children},'./transaction-step-motion':{StepMotion:({review,edit,confirm})=>review?confirm:edit},'./bill-editor-workspace':{BillEditorWorkspace:({children})=>children},
   './bill-current-charge':{BillCurrentCharge:props=>{charge=props;return h('article',null,'Canonical current charge')}},'./bill-current-offer':{BillCurrentOffer:props=>{offer=props;return h('article',null,h('button',{onClick:props.onKeep},'Keep current'),h('button',{onClick:props.onReview},'Review charge'))}},
