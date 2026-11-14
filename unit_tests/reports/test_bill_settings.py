@@ -49,6 +49,37 @@ def test_configuration_review_is_read_only_and_confirm_is_exactly_once(saved):
     assert saved.commands.saved(H, body["requestId"]) is None
 
 
+def test_current_charge_inspection_exposes_only_the_canonical_public_row(saved, monkeypatch):
+    from bookiebot.reports import transactions
+    source = bills.read_workbook(B, TODAY)
+    row = {"id": "2026-11:recorded-loan", "month": "2026-11", "date": "2026-11-01",
+           "billPlanId": saved.loan.id, "version": "recorded-v1", "kind": "payment",
+           "fields": {"amount": "60.23"}, "capabilities": {"update": True},
+           "_logged": object(), "_manual": True}
+    reader = Mock(return_value=[row])
+    monkeypatch.setattr(transactions, "load_transactions", reader)
+    value = bills.charge_transaction(B, saved.loan.id, source.settings.period)
+    reader.assert_called_once_with(B, "2026-11", fresh=True)
+    assert value["transaction"]["id"] == row["id"]
+    assert value["item"]["fields"] == {"amount": "60.23"}
+    assert value["item"]["capabilities"]["update"]
+    assert not any(key.startswith("_") for key in value["item"])
+    assert not saved.client.http_client.sent
+
+
+def test_current_charge_inspection_never_selects_another_bill_or_an_ambiguous_source(saved, monkeypatch):
+    from bookiebot.reports import transactions
+    with pytest.raises(BillConflict, match="unavailable"):
+        bills.charge_transaction(B, "another-owners-bill", "2026-11")
+    row = {"id": "2026-11:loan", "date": "2026-11-01", "billPlanId": saved.loan.id,
+           "kind": "payment", "fields": {"amount": "60.23"}}
+    for rows in ([], [row, dict(row)]):
+        monkeypatch.setattr(transactions, "load_transactions", lambda *a, **kw: rows)
+        with pytest.raises(BillConflict, match="not recorded"):
+            bills.charge_transaction(B, saved.loan.id, "2026-11")
+    assert not saved.client.http_client.sent
+
+
 def test_stale_review_and_owner_injection_are_guaranteed_no_write(saved):
     body = command(saved, reviewVersion="stale")
     result = saved.commands.command(B, body)

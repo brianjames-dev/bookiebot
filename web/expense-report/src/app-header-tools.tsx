@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode, type Ref } from "react"
 import { Glass, Toolbar } from "konsta/react"
-import { MessageCircle, Settings } from "lucide-react"
+import { ChevronLeft, MessageCircle, Settings } from "lucide-react"
 import { GlassIcon } from "./glass-icon"
 import { useGlassContact } from "./glass-contact"
 
@@ -44,4 +44,8 @@ export function AppHeaderTools({ askRef, askOpen, settingsOpen, askDisabled, set
       </button>
     </ToolSurface>
   </Toolbar>
+}
+
+export function AppHeaderBack({onBack, disabled}: {onBack:()=>void; disabled:boolean}) {
+  return <ToolSurface disabled={disabled}><button type="button" className="bb-shell-icon" aria-label="Back" disabled={disabled} onClick={onBack}><ChevronLeft strokeWidth={1.7} aria-hidden="true" /></button></ToolSurface>
 }

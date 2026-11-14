@@ -38,7 +38,7 @@ const respondGoals=(request,goals,status=200)=>act(async()=>request.resolve({ok:
   assert.equal(requests[0].options.credentials,'omit','Public source fetch needs no account credentials')
   assert.equal(requests[0].options.redirect,'error')
   assert.ok(button('Loading script…').props.disabled)
-  assert.equal(tree.root.findAllByType('button').filter(node=>text(node)==='Back to Settings').length,2)
+  assert.equal(tree.root.findAllByType('button').filter(node=>text(node)==='Back to Settings').length,1,'The contextual glass Back is owned by the app shell')
   assert.equal(tree.root.findAllByType('ol').length,1)
   assert.equal(tree.root.findByType('ol').findAllByType('li').length,3,'Setup remains three short steps')
   assert.equal(tree.root.findAllByType('details').length,0,'Disclosures use shared animated motion')

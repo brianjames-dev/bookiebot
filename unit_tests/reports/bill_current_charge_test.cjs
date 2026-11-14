@@ -1,0 +1,42 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {createRequire}=require('node:module'),req=createRequire(path.resolve('web/expense-report/package.json'));
+const React=req('react'),Renderer=req('react-test-renderer'),ts=req('typescript'),{act}=Renderer;
+global.IS_REACT_ACT_ENVIRONMENT=true;
+const requests=[],storage=new Map(),timers=new Map();let editor,work,tree,serial=0;
+const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},dispatchEvent(){}};
+const exportsFixture={};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/bill-current-charge.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText,{
+ exports:exportsFixture,window:win,AbortController,Date,Intl,Event,Error,crypto:{randomUUID:()=>`canonical-bill-current-${++serial}`},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),require:name=>name==='./transaction-inline-editor'?{transactionMotion:{duration:440},InlineTransactionEditor:props=>{editor=props;return React.createElement('section',null,'Native editor')}}:name==='./transaction-split-model'?{allocate:(total,basis)=>Math.round(total*basis/10000)}:name==='./app-work-guard'?{useAppWorkStatus:value=>{work=value}}:req(name)
+});
+const {BillCurrentCharge}=exportsFixture;
+const intent={id:'loan',month:'2026-11',name:'Loan',amountCents:20125,method:'custom',basis:5000};
+const row={id:'2026-11:source',month:'2026-11',version:'source-v1',title:'Loan',date:'2026-11-01',location:'',person:'Brian',category:'bills_utilities',categoryLabel:'Bills',amountCents:20125,fields:{amount:'201.25'},split:'',editableFields:['amount'],capabilities:{update:true,split:true,cancel_split:true},reasons:{},splitOptions:{custom:true,payerName:'Brian',partnerName:'Hannah',payerBasisPoints:10000,incomePayerCents:13027}};
+const flush=async()=>{for(let n=0;n<30;n++)await Promise.resolve()};
+const run=fn=>act(async()=>{fn();await flush()});
+const latest=()=>requests.at(-1),body=()=>JSON.parse(latest().options.body);
+const respond=(data,status=200)=>run(()=>latest().resolve({ok:status<400,status,json:async()=>data}));
+const tick=()=>run(()=>{for(const [id,t] of [...timers])if(t.ms===440){timers.delete(id);t.fn()}});
+const mount=async (value=intent)=>{editor=null;await run(()=>{tree=Renderer.create(React.createElement(BillCurrentCharge,{intent:value,ownerName:'Brian',onDone(){}}))})};
+const text=n=>typeof n==='string'?n:n?.children?n.children.map(text).join(''):'';
+const button=name=>tree.root.findAllByType('button').find(n=>text(n)===name);
+(async()=>{
+ await mount();assert.match(latest().url,/loan\/charge\?month=2026-11$/);await respond({item:row});
+ assert.equal(editor.snapshot.operation,'split');await run(()=>editor.onShare(12345,'custom'));await run(()=>{editor.onReview();editor.onReview()});
+ assert.equal(body().payerShareCents,12345,'An exact cent share is not rounded through basis points');assert(!('payerBasisPoints' in body()));
+ const reviewRequest=latest(),postCount=requests.filter(r=>r.options.method==='POST').length;
+ await respond({review:{operation:'split',reviewVersion:'review-v1',after:row.fields,share:{method:'custom',payerCents:12345,partnerCents:7780}}});
+ await run(()=>editor.onConfirm());assert.equal(requests.filter(r=>r.options.method==='POST').length,postCount,'Confirmation cannot race the review slide');
+ await tick();await run(()=>editor.onConfirm());const command=body();assert.equal(command.reviewVersion,'review-v1');assert.equal(command.payerShareCents,12345);assert(command.requestId);assert.equal(latest().url,'/app/transactions');
+ await run(()=>latest().reject(new Error('lost response')));assert(work.uncertain);assert(storage.size);const count=requests.length;
+ await run(()=>tree.unmount());await mount();assert.equal(requests.length,count,'Remount does not repeat a canonical writer');
+ await run(()=>button('Check saved status').props.onClick());assert(latest().url.endsWith(command.requestId));await respond({error:'No saved request exists.'},404);assert(work.uncertain,'A missing receipt stays recoverable with the original confirmation');await run(()=>button('Retry same confirmation').props.onClick());assert.equal(latest().url,'/app/transactions');assert.equal(JSON.stringify(body()),JSON.stringify(command),'Retry retains the exact frozen command and request ID');await respond({state:'done',success:true});assert.equal(latest().options.method,'GET');
+ await respond({item:{...row,version:'source-v2',split:'custom',splitOptions:{...row.splitOptions,payerBasisPoints:6134,payerCents:12345}}});assert.equal(storage.size,0);assert(text(tree.toJSON()).includes('This month is up to date'));
+ assert.equal(requests.filter(r=>r.url==='/app/transactions'&&r.options.method==='POST').length,2,'The retry uses one immutable command identity');assert.equal(new Set(requests.filter(r=>r.url==='/app/transactions'&&r.options.method==='POST').map(r=>JSON.parse(r.options.body).requestId)).size,1);
+ await run(()=>tree.unmount());requests.length=0;
+ await mount({...intent,method:'none'});await respond({item:row});assert(text(tree.toJSON()).includes('This month is up to date'));assert.equal(requests.length,1,'An unchanged unsplit charge never sends cancel_split');await run(()=>tree.unmount());
+ requests.length=0;await mount({...intent,amountCents:9999,method:'none'});await respond({item:row});for(const value of ['1e2','1.001','0','-1','201.25']){await run(()=>editor.onField('amount',value));assert.equal(editor.snapshot.canReview,false);await run(()=>editor.onReview());assert.equal(requests.length,1,'Invalid or unchanged amounts cannot prepare a current-charge write')}await run(()=>tree.unmount());
+ requests.length=0;await mount({...intent,amountCents:9999,method:'none'});await respond({item:{...row,capabilities:{...row.capabilities,update:false},reasons:{update:'Recorded repayment needs correction first.'}}});assert.equal(editor.snapshot.canReview,false);assert(text(tree.toJSON()).includes('Recorded repayment needs correction first.'));await run(()=>editor.onReview());assert.equal(requests.length,1,'Bill configuration cannot bypass a recorded-charge guard');await run(()=>tree.unmount());
+ requests.length=0;await mount({...intent,amountCents:null,method:'none'});await respond({item:row});assert.equal(requests.length,1);assert(text(tree.toJSON()).includes('This month is up to date'),'A variable estimate never replaces the recorded actual');await run(()=>tree.unmount());
+ requests.length=0;await mount();await respond({item:{...row,month:'2026-10'}});assert.equal(editor,null);assert(text(tree.toJSON()).includes('could not be read'));await run(()=>tree.unmount());
+ console.log('Bills current-charge canonical review, exact cents, slide guard, lost-response recovery, no-op, permission and month contracts passed');
+})().catch(error=>{console.error(error);process.exitCode=1});

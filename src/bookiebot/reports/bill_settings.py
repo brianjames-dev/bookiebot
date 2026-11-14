@@ -407,7 +407,7 @@ def build_commands() -> BillCommands:
 
 
 def charge_transaction(actor: str, identity: str, period: str) -> dict[str, Any]:
-    from bookiebot.reports.transactions import load_transactions
+    from bookiebot.reports.transactions import load_transactions, public_row
     snapshot = read_workbook(actor, now_pacific().date())
     plan = next((p for p in snapshot.settings.plans if p.id == identity and p.effective_from <= month_key(period) < p.effective_until), None)
     if not plan:
@@ -416,4 +416,5 @@ def charge_transaction(actor: str, identity: str, period: str) -> dict[str, Any]
                or r.get("kind") == "payment" and r["fields"].get("item", r.get("title")) == plan.source_label]
     if len(matches) != 1:
         raise BillConflict("This charge is not recorded yet. Refresh Bills to check its amount.")
-    return {"transaction": {"month": period, "id": matches[0]["id"], "date": matches[0]["date"]}}
+    return {"transaction": {"month": period, "id": matches[0]["id"], "date": matches[0]["date"]},
+            "item": public_row(matches[0])}
