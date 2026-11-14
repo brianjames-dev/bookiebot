@@ -181,6 +181,30 @@ def test_eligible_current_month_is_not_skipped_by_prefilled_future_months():
     assert client.http_client.rows['November'][0][2] == '70.0'
 
 
+@pytest.mark.parametrize('kind', ['fixed', 'variable', 'subscription'])
+@pytest.mark.parametrize('from_wants', [False, True])
+def test_future_literal_survives_category_move_instead_of_becoming_the_schedule_price(kind, from_wants):
+    old_category = 'subscriptions_wants' if from_wants else 'static_bills_subscriptions_needs'
+    new_category = 'static_bills_subscriptions_needs' if from_wants else 'subscriptions_wants'
+    p = replace(plan(), id='literal_move_123', kind=kind, category=old_category,
+        split_method='none', monthly_source=True, version='v1')
+    client, _ = fixture([p])
+    old_column, new_column = (4, 3) if from_wants else (3, 4)
+    rows = [['', p.source_label, '' if from_wants else '80', '80' if from_wants else ''],
+        ['', '(Needs) Subtotal:', '=SUM(C1:C1)'], ['', '(Wants) Subtotal:', '', '=SUM(D1:D1)']]
+    for tables in (client.http_client.rows, client.http_client.formulas):
+        tables['December'] = deepcopy(rows)
+    source = storage.read_workbook(B, TODAY, client=client)
+    body = update(source, p, type=kind, category=new_category)
+    change = prepare_change(source.settings, body, today=TODAY)
+    storage.configuration_batch(source, change, 'category-literal-123456', 'fp', '{}', today=TODAY).send()
+    after = client.http_client.rows['December']
+    assert float(after[0][old_column - 1]) == 0
+    assert float(after[0][new_column - 1]) == 80
+    assert not client.http_client.formulas['December'][0][new_column - 1].startswith('=')
+    assert change.after.amount_cents == 7000
+
+
 def test_confirmed_future_charge_keeps_its_source_protection():
     from bookiebot.sheets.recurring_charges import BillCharge, CHARGES_TAB, encode_charges, source_anchor
     client, loan = fixture()
