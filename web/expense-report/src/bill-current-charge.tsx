@@ -6,7 +6,7 @@ import {allocate,type SplitMethod} from './transaction-split-model'
 import type {SplitInputDraft} from './transaction-split-control'
 import {useAppWorkStatus} from './app-work-guard'
 
-export type CurrentBillIntent={id:string;month:string;name:string;amountCents:number|null;method:'none'|SplitMethod;basis:number;requestId?:string;stage?:'configuration'|'adopt'|'charge';needsAdoption?:boolean}
+export type CurrentBillIntent={id:string;month:string;name:string;amountCents:number|null;method:'none'|SplitMethod;basis:number;requestId?:string;stage?:'configuration'|'offer'|'adopt'|'charge';needsAdoption?:boolean;offerCurrent?:boolean;recordedAmountCents?:number}
 type Command={operation:TransactionOperation;id:string;month:string;version:string;updates?:{amount:number};method?:SplitMethod;payerShareCents?:number;requestId?:string;reviewVersion?:string}
 type Checked={reviewVersion:string;operation:TransactionOperation;after:Record<string,string>;share?:TransactionChangeSummary['share']}
 type Result={state:string;success?:boolean;detail?:string}

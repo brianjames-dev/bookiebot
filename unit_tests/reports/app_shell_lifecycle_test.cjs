@@ -92,7 +92,7 @@ const response = (data, status = 200) => ({ status, ok: status < 400, json: asyn
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const visible = node => { for (let current = node; current; current = current.parent) if (current.props.hidden || current.props['aria-hidden'] === true || current.props.inert === true || current.props.inert === '') return false; return true }
 const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : node.children.map(text).join('')
-const button = (tree, label) => tree.root.findAllByType('button').filter(visible).find(node => node.props['aria-label'] === label || text(node) === label)
+const button = (tree, label) => tree.root.findAllByType('button').filter(visible).find(node => (node.props['aria-label'] || text(node)) === label)
 const tap = (tree, label) => run(() => { const node = button(tree, label); assert.ok(node, `Missing ${label}`); assert.ok(!node.props.disabled, `${label} is disabled`); node.props.onClick({ currentTarget: { blur() {}, focus() {} }, preventDefault() {} }) })
 const input = (tree, label) => tree.root.findAllByType('label').filter(visible).find(node => text(node).startsWith(label)).findByType('input')
 const fill = (tree, label, value) => run(() => input(tree, label).props.onChange({ target: { value } }))
@@ -210,7 +210,8 @@ async function main() {
   assert.ok(visible(tools), 'Header tools remain accessible on Settings')
   assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Settings','The top layer names the active Settings screen')
   assert.equal(tree.root.findAllByProps({className:'bb-report-brand'}).filter(visible).length,0,'Settings replaces the BookieBot brand')
-  assert.equal(button(tree,'Back').props.className,'bb-shell-icon','Back shares the header tool control')
+  assert.ok(button(tree,'Back').props.className.includes('bb-shell-icon'),'Back shares the header tool control')
+  assert.equal(text(button(tree,'Back')),'Settings','The connected capsule includes the contextual screen title')
   // Widget setup is a temporary view, not a document navigation or form reset.
   await tap(tree, 'Pair a widget'); await fill(tree, 'Widget name', 'Private widget draft')
   const widgetReadsBeforeGuide = widgetReads, financialReadsBeforeGuide = { ...reads }

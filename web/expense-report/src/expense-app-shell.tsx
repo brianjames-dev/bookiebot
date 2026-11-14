@@ -215,14 +215,15 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       data-duo-enabled={duo.enabled || undefined}
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
       data-duo-bills={duo.landscape && screen === "settings" && billsOpen || undefined}
+      data-bills-open={screen === 'settings'&&billsOpen || undefined}
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
-      <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen || billsOpen} />
+      <PullToRefresh screen={screen} label={billsOpen?'Bills':undefined} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen || billsOpen&&duo.landscape} />
       <header className="bb-masthead bb-shell-masthead">
-        {screen === 'settings' ? <div className="bb-settings-masthead-title"><AppHeaderBack disabled={billsOpen&&(guard.pending||guard.uncertain)} onBack={()=>{
+        {screen === 'settings' ? <div className="bb-settings-masthead-title"><AppHeaderBack label={billsOpen?'Bills':widgetGuideOpen?'Widget setup':'Settings'} disabled={billsOpen&&(guard.pending||guard.uncertain)} onBack={()=>{
           if(billsOpen){widgetGuideRef.current=false;setBillsOpen(false)}
           else if(widgetGuideOpen)selectScreen('settings')
           else selectScreen(lastMain)
-        }}/><h1>{billsOpen?'Bills':widgetGuideOpen?'Widget setup':'Settings'}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"} />}
+        }}/><h1 className="bb-settings-screen-heading">{billsOpen?'Bills':widgetGuideOpen?'Widget setup':'Settings'}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)}
           onSettings={() => selectScreen(screen === "settings" && !widgetGuideOpen && !billsOpen ? lastMain : "settings")} />
@@ -263,8 +264,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           <AmountAppearanceSettings />
         </section>
         <section className="bb-settings-section"><h2>Bills</h2><button type="button" className="bb-settings-action" onClick={()=>{positions.current.settings=readPageScroll().y;widgetGuideRef.current=true;setBillsOpen(true);window.dispatchEvent(new CustomEvent('bookiebot:screen-change'))}}>Manage bills &amp; subscriptions</button></section>
-        <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded /></div>
-        <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} />
+        <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded refreshActive={!billsOpen} /></div>
+        <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} refreshActive={!billsOpen} />
         <section className="bb-settings-section" aria-labelledby="bb-account-title"><h2 id="bb-account-title">Account</h2>
           <div className="bb-setting-row"><span>Signed in as</span><strong>{report.ownerName}</strong></div>
           {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}

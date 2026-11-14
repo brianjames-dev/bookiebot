@@ -15,7 +15,7 @@ function routes(reviews){return {bills:route=>{
  return route.fulfill({json:{review:{operation:body.operation,reviewVersion:'isolated-review',before,after,name:before?.name,amountCents:9843,effectiveFrom:body.bill?.effectiveFrom??body.effectiveFrom,share:{method:'income',payerCents:6371,partnerCents:3472}}}});
 }}}
 const panel=page=>page.locator('main[aria-label="Bills"]');
-async function press(button){await button.scrollIntoViewIfNeeded();await button.press('Enter');await new Promise(resolve=>setTimeout(resolve,490))}
+async function press(button){await button.scrollIntoViewIfNeeded();await button.press('Enter');await new Promise(resolve=>setTimeout(resolve,680))}
 async function enter(page){await tap(page,page.getByRole('button',{name:'Settings',exact:true}));const manage=page.getByRole('button',{name:'Manage bills & subscriptions',exact:true});await manage.scrollIntoViewIfNeeded();await tap(page,manage);await panel(page).locator('.bb-bills-row').first().waitFor()}
 async function scroll(page,element,engine){
  // Mobile WebKit does not expose mouse wheel input. Exercise its native

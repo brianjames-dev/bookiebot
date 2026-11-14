@@ -48,7 +48,7 @@ export function pushKeyBytes(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(raw, (character) => character.charCodeAt(0))
 }
 
-export function PhoneNotifications({ embedded = false }: { embedded?: boolean } = {}) {
+export function PhoneNotifications({ embedded = false, refreshActive = true }: { embedded?: boolean; refreshActive?: boolean } = {}) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [preferences, setPreferences] = useState<Preferences>({ weekly: true, upcoming: false, showAmounts: false, hour: 10 })
   const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null)
@@ -116,7 +116,7 @@ export function PhoneNotifications({ embedded = false }: { embedded?: boolean } 
     }
   }
 
-  usePageRefresh("settings", { disabled: busy || preparing, refresh: async () => {
+  usePageRefresh(refreshActive ? "settings" : null, { disabled: busy || preparing, refresh: async () => {
     const action = beginOperation()
     if (!action) return false
     try {

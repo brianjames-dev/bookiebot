@@ -10,7 +10,7 @@ type WidgetMode = "current" | "projected"
 interface Connection { id: string; label: string; mode: WidgetMode; status: "pending" | "active"; createdAt: string; expiresAt: string; lastUsedAt: string | null }
 interface Pairing { id: string; setupCode: string; expiresAt: string }
 interface Settings { connections: Connection[]; scriptUrl: string; setupInstructionsUrl: string }
-interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void }
+interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void; refreshActive?: boolean }
 const endpoint = "/app/widgets/settings"
 const isDate = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value))
 const isMode = (value: unknown): value is WidgetMode => value === "current" || value === "projected"
@@ -72,7 +72,7 @@ export function WidgetSettings(props: WidgetSettingsProps) {
   return <WidgetSettingsContent key={props.ownerName} {...props} />
 }
 
-function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSettingsProps) {
+function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshActive = true }: WidgetSettingsProps) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -138,7 +138,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide }: WidgetSe
     }
   }
 
-  const pageRefresh = usePageRefresh("settings", { refresh: () => run(), disabled: busy || loading })
+  const pageRefresh = usePageRefresh(refreshActive ? "settings" : null, { refresh: () => run(), disabled: busy || loading })
 
   useEffect(() => {
     mounted.current = true

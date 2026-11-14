@@ -21,7 +21,7 @@ function excludedTarget(target: EventTarget | null) {
   // surfaces made the indicator depend on where the same pull happened to start.
   // Fixed glass controls own their complete hold/drag gesture, including travel
   // outside the control. Exclude its origin rather than blocking native panning.
-  if (target.closest("input,textarea,select,[contenteditable=true],[role=slider],.bb-bottom-navigation,.bb-shell-header-actions")) return true
+  if (target.closest("input,textarea,select,[contenteditable=true],[role=slider],.bb-bottom-navigation,.bb-shell-header-actions,.bb-settings-masthead-title")) return true
   // An inner scroller owns its own gesture, even when it has reached its edge.
   for (let element: Element | null = target; element && element !== document.body && element !== document.documentElement; element = element.parentElement) {
     if (element === pageScrollSurface()) continue
@@ -31,7 +31,7 @@ function excludedTarget(target: EventTarget | null) {
   return false
 }
 
-export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; blocked?: boolean }) {
+export function PullToRefresh({ screen, blocked = false, label }: { screen: AppScreen; blocked?: boolean;label?:string }) {
   const registry = usePageRefreshRegistry()!
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot)
   const [phase, setPhase] = useState<Phase>("idle"), [distance, setDistance] = useState(0)
@@ -63,7 +63,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
     if (!mounted.current) return
     if (state.current.screen !== selected) { reset(); return }
     setPhase(success ? "done" : "error")
-    setMessage(success ? `${screenTitles[selected]} refreshed` : `Couldn’t refresh ${screenTitles[selected]}. Pull down to try again.`)
+    setMessage(success ? `${label??screenTitles[selected]} refreshed` : `Couldn’t refresh ${label??screenTitles[selected]}. Pull down to try again.`)
     timer.current = window.setTimeout(() => {
       if (!success) { reset(); return }
       // Keep the successful glyph while the page and indicator ease home.
@@ -180,7 +180,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       "--bb-pull-scale": tracking ? .72 + .36 * ratio : 1,
       "--bb-release-overscroll": `${releaseOverscroll}px`,
     } as CSSProperties}>
-    <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${screenTitles[screen]}`} title={`Refresh ${screenTitles[screen]}`} disabled={!available || running.current}
+    <button type="button" className="bb-pull-refresh-button" aria-label={`Refresh ${label??screenTitles[screen]}`} title={`Refresh ${label??screenTitles[screen]}`} disabled={!available || running.current}
       aria-busy={phase === "refreshing"} onClick={() => void refresh()}>
       <span className="bb-pull-disc" aria-hidden="true"><span className="bb-pull-spinner"><svg viewBox="0 0 32 32">
         <circle className="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - progress} />
@@ -192,7 +192,7 @@ export function PullToRefresh({ screen, blocked = false }: { screen: AppScreen; 
       <svg className="bb-pull-burst" viewBox="0 0 64 64">{["M32 7V2", "m49.7 14.3 3.5-3.5", "M57 32h5", "m49.7 49.7 3.5 3.5", "M32 57v5", "m14.3 49.7-3.5 3.5", "M7 32H2", "m14.3 14.3-3.5-3.5"].map(d => <path key={d} d={d} />)}</svg></span>
     </button>
     {(phase === "pulling" || phase === "armed") && <span className="sr-only" role="progressbar" aria-label="Pull to refresh" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} />}
-    <span className="sr-only" role="status" aria-live="polite">{phase === "armed" ? "Release to refresh" : phase === "refreshing" ? `Refreshing ${screenTitles[refreshScreen.current ?? screen]}` : message}</span>
+    <span className="sr-only" role="status" aria-live="polite">{phase === "armed" ? "Release to refresh" : phase === "refreshing" ? `Refreshing ${label??screenTitles[refreshScreen.current ?? screen]}` : message}</span>
     </div>
   </div>
 }

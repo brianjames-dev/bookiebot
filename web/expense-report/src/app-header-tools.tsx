@@ -4,12 +4,12 @@ import { ChevronLeft, MessageCircle, Settings } from "lucide-react"
 import { GlassIcon } from "./glass-icon"
 import { useGlassContact } from "./glass-contact"
 
-function ToolSurface({ disabled, children }: { disabled: boolean; children: ReactNode }) {
+function ToolSurface({ disabled, children, className="" }: { disabled: boolean; children: ReactNode; className?:string }) {
   const ref = useRef<HTMLDivElement>(null), pointer = useRef<number | null>(null)
   const contact = useGlassContact(ref)
   const release = () => { pointer.current = null; contact.release() }
   useLayoutEffect(() => { if (disabled) release() }, [disabled])
-  return <Glass ref={ref} highlight={false} className="bb-shell-toolbar-pane bb-glass-control"
+  return <Glass ref={ref} highlight={false} className={`bb-shell-toolbar-pane bb-glass-control ${className}`}
     onPointerDown={event => {
       if (disabled || event.button !== 0 || pointer.current !== null) return
       pointer.current = event.pointerId; contact.start(event.clientX, event.clientY)
@@ -46,6 +46,6 @@ export function AppHeaderTools({ askRef, askOpen, settingsOpen, askDisabled, set
   </Toolbar>
 }
 
-export function AppHeaderBack({onBack, disabled}: {onBack:()=>void; disabled:boolean}) {
-  return <ToolSurface disabled={disabled}><button type="button" className="bb-shell-icon" aria-label="Back" disabled={disabled} onClick={onBack}><ChevronLeft strokeWidth={1.7} aria-hidden="true" /></button></ToolSurface>
+export function AppHeaderBack({onBack, disabled, label}: {onBack:()=>void; disabled:boolean;label?:string}) {
+  return <ToolSurface disabled={disabled} className={label?'bb-settings-title-pane':''}><button type="button" className={`bb-shell-icon${label?' bb-settings-back-capsule':''}`} aria-label="Back" disabled={disabled} onClick={onBack}><ChevronLeft strokeWidth={1.7} aria-hidden="true" />{label&&<span aria-hidden="true">{label}</span>}</button></ToolSurface>
 }
