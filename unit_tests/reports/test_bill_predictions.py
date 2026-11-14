@@ -133,6 +133,53 @@ def test_wants_forecast_uses_its_own_column_and_retains_the_future_category(monk
     assert next(e for e in future["events"] if e["kind"] == "bill")["group"] == "subscriptions_wants"
 
 
+def test_aliased_duplicate_sources_cannot_bypass_forecast_guard_via_configured_estimates(monkeypatch):
+    from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS
+    from unit_tests.reports.test_expected_bill_reports import _report
+    schedule = [BILL_SCHEDULE_HEADERS,
+        ["one", "Electricity", "monthly", "22", "", "PG&E", "", "", "", "80"],
+        ["two", "Other electricity", "monthly", "22", "", "PGE", "", "", "", "90"]]
+    _, payload = _report(monkeypatch, [["PG&E", "0"], ["PGE", "0"]], month=11, schedule=schedule)
+    assert payload["modeViews"]["projected"]["metrics"]["totalExpenses"] == 0
+    assert not any(e.get("amountEstimated") for e in payload["calendarEvents"])
+    future = next(m for m in payload["calendarContext"] if m["month"] == 12)
+    assert not any(e.get("amountEstimated") for e in future["events"] if e["kind"] == "bill")
+    from datetime import datetime
+    from bookiebot.reports import bill_settings as bills
+    from bookiebot.sheets import recurring_storage as storage
+    from unit_tests.sheets.test_recurring import plan
+    from unit_tests.sheets.test_recurring_storage import fixture, B
+    first = replace(plan(), id="first_utility", kind="variable", name="Electricity", source_label="PG&E",
+                    amount_cents=8000, monthly_source=True, split_method="none", version="v1")
+    second = replace(first, id="second_utility", name="Other electricity", source_label="PGE", amount_cents=9000)
+    client, _ = fixture([first, second])
+    client.http_client.rows["November"][0][2] = client.http_client.formulas["November"][0][2] = "0"
+    monkeypatch.setenv("BOOKIEBOT_REIMBURSEMENTS_ENABLED", "false")
+    monkeypatch.setattr(bills, "now_pacific", lambda: datetime(2026, 11, 13, 12))
+    monkeypatch.setattr(bills, "read_workbook", lambda actor, today: storage.read_workbook(actor, today, client=client))
+    assert all(b["prediction"] is None for b in bills.listing(B)["bills"])
+    assert not client.http_client.sent
+
+
+@pytest.mark.parametrize("actual", ["-20", "#REF!", "duplicate", "missing", "", "0"])
+def test_existing_future_sources_are_not_overridden_by_a_forecast(monkeypatch, actual):
+    from bookiebot.reports import expense_breakdown as reports
+    from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS
+    from unit_tests.reports.test_expected_bill_reports import _report
+    future = ([["", "PG&E", "0"], ["", "PG&E", "0"]] if actual == "duplicate"
+              else [] if actual == "missing" else [["", "PG&E", actual]])
+    history = (reports.BudgetHistoryRows(reports.BudgetMonth(2026, 8), [["", "PG&E", "100"]]),
+               reports.BudgetHistoryRows(reports.BudgetMonth(2026, 12), future))
+    _, payload = _report(monkeypatch, [["", "PG&E", "0"]], month=11,
+        schedule=[BILL_SCHEDULE_HEADERS, ["pge", "PG&E", "monthly", "22", "", "PG&E"]], history=history)
+    december = next(m for m in payload["calendarContext"] if m["month"] == 12)
+    bills = [e for e in december["events"] if e["kind"] == "bill"]
+    if actual in {"", "0"}:
+        assert len(bills) == 1 and bills[0]["amount"] == 100 and bills[0]["prediction"]
+    else:
+        assert all(not e.get("amountEstimated") and not e.get("prediction") for e in bills)
+
+
 def test_bills_and_overview_use_identical_baseline_and_actual_zero_suppresses_prediction(monkeypatch):
     from datetime import datetime
     from bookiebot.reports import bill_settings as bills, expense_breakdown as reports

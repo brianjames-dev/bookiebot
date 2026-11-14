@@ -1146,7 +1146,7 @@ def _calendar_adjacent_months(
     historical estimate; unknown amounts remain excluded from sums. Neither
     kind of schedule is an actual payment or changes the selected totals.
     """
-    from bookiebot.sheets.bills import list_bill_schedules
+    from bookiebot.sheets.bills import bill_label_key, list_bill_schedules
 
     now = now_pacific()
     result = []
@@ -1184,15 +1184,16 @@ def _calendar_adjacent_months(
             bills = list_bill_schedules(bill_rows, period=f"{month.year:04d}-{month.month:02d}") if bill_rows else []
             counts: dict[str, int] = defaultdict(int)
             for bill in bills:
-                counts[_normalize_label(bill.source_label)] += 1
+                counts[bill_label_key(bill.source_label)] += 1
             for bill in bills:
                 day = _bill_day_in_month(bill, month)
                 labels = {_bill_subscription_identity(bill.source_label), _bill_subscription_identity(bill.display_name)}
                 if day is None or labels & present or f"{month.year:04d}-{month.month:02d}" in bill.recorded_months.split(","):
                     continue
-                from bookiebot.sheets.bills import bill_label_key
                 prediction = predictions.get(bill_label_key(bill.source_label))
-                known = (prediction is not None or bill.expected_amount is not None) and counts[_normalize_label(bill.source_label)] == 1
+                unentered = rows is None or _unentered_bill_source_present(rows, bill.source_label,
+                    amount_column=4 if bill.category == "subscriptions_wants" else None)
+                known = (prediction is not None or bill.expected_amount is not None) and counts[bill_label_key(bill.source_label)] == 1 and unentered
                 amount = prediction.amount_cents / 100 if prediction and known else float(bill.expected_amount or 0) if known else 0.0
                 events.append(CalendarEvent(
                     "bill", bill.display_name or bill.source_label or bill.bill_key, amount, day,
@@ -1249,7 +1250,7 @@ def _bill_calendar_events(
     bills = list_bill_schedules(bill_schedule_rows, period=f"{month.year:04d}-{month.month:02d}")
     source_counts: dict[str, int] = defaultdict(int)
     for bill in bills:
-        source_counts[_normalize_label(bill.source_label)] += 1
+        source_counts[bill_label_key(bill.source_label)] += 1
     for bill in bills:
         if not bill.active:
             continue
@@ -1270,7 +1271,7 @@ def _bill_calendar_events(
             and payment is None
             and (bill.expected_amount is not None or prediction is not None)
             and not _is_completed_month(month)
-            and source_counts[_normalize_label(bill.source_label)] == 1
+            and source_counts[bill_label_key(bill.source_label)] == 1
             and not {
                 _bill_subscription_identity(bill.source_label),
                 _bill_subscription_identity(bill.display_name),

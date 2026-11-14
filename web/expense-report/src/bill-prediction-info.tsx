@@ -12,7 +12,7 @@ const month=(value:string)=>new Date(value+'-01T12:00:00').toLocaleDateString('e
 export function BillPredictionSummary({items}:{items:Item[]}){
  return <div className="bb-bill-prediction-summary">
   <dl>{items.map(({label,prediction:p})=><div key={label}><dt>{label}<small>{p.source==='configured'?'Configured estimate':`Average of ${p.sampleCount} past ${p.sampleCount===1?'bill':'bills'}`}{p.firstMonth&&p.lastMonth?` · ${month(p.firstMonth)}${p.firstMonth===p.lastMonth?'':` – ${month(p.lastMonth)}`}`:''}</small></dt><dd>{money(p.amountCents)}</dd></div>)}</dl>
-  <p>Based on your recorded bill amounts. Enter the actual amount when it arrives; it replaces the prediction.</p>
+  <p>{items.some(item=>item.prediction.source==='history')?'Historical averages use your recorded bill amounts. ':''}Enter the actual amount when it arrives; it replaces the prediction.</p>
  </div>
 }
 

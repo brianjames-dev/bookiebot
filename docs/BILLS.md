@@ -14,6 +14,8 @@ Bills and Projected Overview/Calendar mark predictions with a small sparkle icon
 
 The baseline is the arithmetic mean, rounded to cents, of positive personal bill amounts in available completed months before the selected month. Reads include the annual workbook and its available previous-year history. Blank/zero placeholders, refunds, spreadsheet errors, duplicate sources/periods, current/future months and other predictions do not train the estimate. Quarterly/yearly bills forecast only in their configured billing months. A bill without usable history or a configured estimate stays unknown.
 
+Existing future worksheets also require one verified blank/zero source before showing an estimate. Errors, refunds, missing or ambiguous rows stay unknown. Duplicate checks use the same bill identity across spelling/punctuation aliases, including explicit configured estimates.
+
 The source is your recorded personal budget amount, which may already reflect historical split repayments; it is not a newly quoted full purchase price or a repayment promise. Predictions do not create transactions, change splits, enroll settings or write budget cells. Saved estimates retain their existing explicit override behavior. Enter the actual purchase/payment amount through the normal reviewed monthly-amount flow; its existing split defaults and recorded date remain authoritative. A recorded zero after reimbursement also suppresses the prediction.
 
 Bills and Overview use the same calculation. Opening a prediction explanation preserves an editor draft. Folding, native refresh and editor animations retain their existing behavior; the explanation closes when the view changes. Already-entered amounts retain the normal queued/recorded timing, and never get replaced by an average.

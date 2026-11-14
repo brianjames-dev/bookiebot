@@ -43,6 +43,7 @@ def listing(actor: str) -> dict[str, Any]:
     income_basis = round(split_amounts(100, "income", snapshot.owner)[0] * 100)
     import calendar
     from bookiebot.reports.bill_predictions import predict_bill
+    from bookiebot.sheets.bills import bill_label_key
     from bookiebot.reports.expense_breakdown import BudgetMonth, _optional_previous_year_budget_history
     prior = _optional_previous_year_budget_history(actor, BudgetMonth(snapshot.year, today.month), client=snapshot.client)
     history = [(f"{item.month.year:04d}-{item.month.month:02d}", item.rows) for item in prior]
@@ -55,7 +56,9 @@ def listing(actor: str) -> dict[str, Any]:
         prediction = (predict_bill(plan.source_label, history, period, as_of=today,
             override_cents=plan.amount_cents, amount_column=4 if plan.category == "subscriptions_wants" else 3)
             if plan.kind == "variable" and plan.active and info.get("available")
-            and not info.get("recorded") and not info.get("amountCents") else None)
+            and not info.get("recorded") and not info.get("amountCents")
+            and sum(bill_label_key(other.source_label) == bill_label_key(plan.source_label)
+                    for other in selected(list(snapshot.settings.plans), period, include_inactive=True)) == 1 else None)
         value["prediction"] = prediction.public() if prediction else None
         return value
 
