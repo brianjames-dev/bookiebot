@@ -6,6 +6,17 @@ from bookiebot.sheets.recurring import BILL_TAB, SUBSCRIPTION_TAB, BillConflict,
 from bookiebot.sheets.recurring_rows import BILL_HEADERS, SUB_HEADERS, decode, encode, header, legacy_plans, managed, runtime_tables
 
 
+def test_legacy_rent_is_fixed_without_enrolling_or_inventing_a_price():
+    rows = [["bill_key", "display_name", "recurrence", "pull_day", "source_label", "tracking_mode"],
+            ["rent", "Rent", "monthly", "1", "Rent", "manual"],
+            ["pge", "PG&E", "monthly", "22", "PG&E", "manual"]]
+    original = [r[:] for r in rows]
+    rent, utility = legacy_plans("brian", rows, [])
+    assert rent.kind == "fixed" and rent.category == "rent" and rent.amount_cents is None
+    assert utility.kind == "variable"
+    assert rows == original and not managed(rows)
+
+
 BILLS = [list(BILL_HEADERS), ["loan", "Student Loan", "monthly", "12", "", "Student Loan", "Checking", "Keep note", "old", "60.23", "automatic"],
          ["water", "Water", "quarterly", "", "", "Water", "Checking", "Not configured", "old"]]
 SUBS = [["cadence", "name", "amount", "pull_day", "pull_month", "kind", "source_range"],

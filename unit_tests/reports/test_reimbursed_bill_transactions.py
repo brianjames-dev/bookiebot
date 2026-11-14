@@ -108,6 +108,72 @@ def test_receipts_do_not_release_queued_bill_before_its_withdrawal(bill):
     assert tx.listing(bill.actor, {"month": "2026-11", "fresh": "1"})["items"] == []
 
 
+@pytest.mark.parametrize("bill", [(B, category, logged) for category in ("PG&E", "Recology", "Water")
+                                  for logged in (True, False)], indirect=True)
+def test_fully_reimbursed_bill_is_not_hidden_by_a_later_saved_pull_day(bill, monkeypatch):
+    read = tx.read_workbook_tabs
+    def later_schedule(client, book, titles):
+        result = read(client, book, titles)
+        if book == "personal":
+            result["_BookieBot Bill Schedule"][1][3] = "22"
+        return result
+    monkeypatch.setattr(tx, "read_workbook_tabs", later_schedule)
+    bill.clock[0] = datetime(2026, 11, 13, tzinfo=PACIFIC_TZ)
+    assert tx.listing(bill.actor, {"month": "2026-11", "fresh": "1"})["items"] == []
+    bill.store.command(bill.owner, {**payment(bill.allocation, 7208), "date": "2026-11-02"})
+    result = listing(bill, 8000)
+    assert result["items"][0]["date"] == "2026-11-01"
+    assert result["items"][0]["repayment"]["outstandingCents"] == 0
+    assert result["days"][0]["date"] == "2026-11-01"
+
+
+@pytest.mark.parametrize("actor,amount", [(B, "80.00"), (H, "72.08")])
+@pytest.mark.parametrize("display_name", ["PG&E", "Electricity"])
+def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, monkeypatch, actor, amount, display_name):
+    from bookiebot.reports import expense_breakdown as reports
+    from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
+    bill.store.command(bill.owner, {**payment(bill.allocation, 7208), "date": "2026-11-02"})
+    ledger = {**bill.store.snapshot("brian" if actor == B else "hannah"), "projectionPending": False}
+    monkeypatch.setattr(service, "snapshot", lambda _: ledger)
+    monkeypatch.setattr(reports, "now_pacific", lambda: datetime(2026, 11, 13, tzinfo=PACIFIC_TZ))
+    sheets = reports.ReportWorksheets(shared_expenses=InMemoryWorksheet([]),
+        personal_budget=InMemoryWorksheet([["Monthly Income", "1000"], ["", "PG&E", amount]]),
+        bill_schedule=InMemoryWorksheet([bills.BILL_SCHEDULE_HEADERS, ["pge", display_name, "monthly", "22", "", "PG&E"]]))
+    before = deepcopy(sheets.personal_budget._rows)
+    result = reports.build_expense_breakdown_report(actor_key=actor,
+        owner_name="Brian" if actor == B else "Hannah", persons=[], month=reports.BudgetMonth(2026, 11), worksheets=sheets)
+    payload = reports.expense_breakdown_client_payload(result)
+    assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == float(amount)
+    assert payload["modeViews"]["projected"]["metrics"]["totalExpenses"] == float(amount)
+    assert result.queued_bills == []
+    assert result.payments[0].label == display_name
+    assert result.payments[0].date == "2026-11-01"
+    event = next(e for e in payload["calendarEvents"] if e["kind"] == "bill")
+    assert event["day"] == 1 and event["amount"] == float(amount)
+    assert not event["projectedOnly"]
+    assert sheets.personal_budget._rows == before
+
+
+def test_recipient_recorded_bill_is_not_lost_after_full_repayment(bill, monkeypatch):
+    bill.store.command(bill.owner, {**payment(bill.allocation, 7208), "date": "2026-11-02"})
+    bill.personal[0][2] = "72.08"
+    read = tx.read_workbook_tabs
+    def later_schedule(client, book, titles):
+        result = read(client, book, titles)
+        if book == "personal":
+            result["_BookieBot Bill Schedule"][1][3] = "22"
+        return result
+    monkeypatch.setattr(tx, "read_workbook_tabs", later_schedule)
+    bill.clock[0] = datetime(2026, 11, 13, tzinfo=PACIFIC_TZ)
+    before = deepcopy([bill.personal, bill.history, bill.store.snapshot("hannah")])
+    result = tx.listing(H, {"month": "2026-11", "fresh": "1", "view": "daily", "scope": "spending"})
+    assert result["total"] == 1 and result["totalAmountCents"] == 7208
+    row = result["items"][0]
+    assert row["date"] == "2026-11-01"
+    assert not row.get("contextOnly") and not row["capabilities"]["split"]
+    assert [bill.personal, bill.history, bill.store.snapshot("hannah")] == before
+
+
 def test_confirmed_zero_exposure_keeps_the_paid_bill_and_its_identity(bill):
     # A valid all-partner custom bill; a missing manual log must not lose it
     # merely because the projected payer cell becomes zero.

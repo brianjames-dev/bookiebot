@@ -73,16 +73,20 @@ class BillPaymentState:
     reason: str = ""
 
 
+def bill_label_key(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]", "", value.casefold())
+    return "studentloan" if normalized == "studentloanpayment" else normalized
+
+
 def bill_payment_state(
     label: str, year: int, month: int, schedules: list[BillSchedule], *, as_of: date,
+    recorded_on: date | None = None,
 ) -> BillPaymentState:
-    def key(value: str) -> str:
-        normalized = re.sub(r"[^a-z0-9]", "", value.casefold())
-        return "studentloan" if normalized == "studentloanpayment" else normalized
-
-    target = key(label)
+    if recorded_on and recorded_on <= as_of and (recorded_on.year, recorded_on.month) == (year, month):
+        return BillPaymentState(recorded_on, True, "confirmed_repayment")
+    target = bill_label_key(label)
     matches = [bill for bill in schedules if target and target in {
-        key(bill.bill_key), key(bill.display_name), key(bill.source_label),
+        bill_label_key(bill.bill_key), bill_label_key(bill.display_name), bill_label_key(bill.source_label),
     }]
     if len(matches) != 1:
         return BillPaymentState(None, False, "ambiguous_schedule" if matches else "missing_schedule")

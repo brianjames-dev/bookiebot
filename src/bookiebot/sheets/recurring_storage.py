@@ -16,6 +16,8 @@ from bookiebot.sheets.recurring import BILL_TAB, SUBSCRIPTION_TAB, SETTINGS_LOG_
 from bookiebot.sheets.recurring_changes import BillSnapshot, BillChange
 from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, following_month, source_anchor
 from bookiebot.sheets.recurring_rows import decode, encode, header, legacy_plans, managed
+from bookiebot.sheets.bills import bill_label_key
+from bookiebot.sheets.bill_payment_evidence import settled_bill_dates, BillDates
 from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user, get_user_config
 
 LOG_HEADERS = ["request_id", "fingerprint", "result_json", "created_at"]
@@ -61,6 +63,7 @@ class WorkbookSnapshot:
     formulas: dict[str, list[list[str]]]
     settings: BillSnapshot
     recorded_plans: set[tuple[str, str]] = field(default_factory=set)
+    settled_dates: BillDates = field(default_factory=dict)
 
     def charge(self, plan: BillPlan, month: str) -> dict[str, Any]:
         title = calendar.month_name[int(month[5:])]
@@ -71,7 +74,7 @@ class WorkbookSnapshot:
         row = row_for(self.rows[title], label)
         column = charge.amount_column if charge else 4 if plan.category == "subscriptions_wants" else 3
         value = cell(self.rows[title], row or 0, column)
-        due = plan.due_date(month)
+        due = self.settled_dates.get((month, bill_label_key(label))) or plan.due_date(month)
         return {"available": True, "month": month, "row": row, "amountColumn": column,
                 "amountCents": round(numeric(value) * 100), "date": charge.charge_date if charge else due.isoformat() if due else None,
                 "recorded": bool(charge and charge.recorded) or (plan.id, month) in self.recorded_plans, "sourceLabel": label,
@@ -114,8 +117,9 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
         BillSnapshot(owner, tuple(plans), fingerprint([owner, identity, rows, formulas, metadata.get("namedRanges", [])]), period, {}))
     minimums = {}
     from bookiebot.reimbursements import service as reimbursements
-    allocations = (reimbursements.build_reimbursement_store().snapshot(owner, include_inactive=True)["allocations"]
-                   if reimbursements.enabled() else [])
+    ledger = reimbursements.build_reimbursement_store().snapshot(owner, include_inactive=True) if reimbursements.enabled() else {}
+    allocations = ledger.get("allocations", [])
+    snapshot.settled_dates = settled_bill_dates(allocations, ledger.get("events", []), owner=owner, as_of=today)
     if allocations:
         snapshot.settings = replace(snapshot.settings, version=fingerprint([snapshot.settings.version,
             [(a["id"], a["version"]) for a in allocations]]))
@@ -129,10 +133,12 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
             due = candidate.due_date(charge_month)
             title = calendar.month_name[number]
             manual_value = info.get("amountCents", 0) > 0 and not cell(formulas.get(title, []), info.get("row") or 0, info.get("amountColumn", 3)).startswith("=")
-            recorded_split = any(a["payerOwner"] == owner and a["sourceYear"] == today.year and a["sourceWorksheet"] == "income"
-                and a.get("sourceSheetTitle") == title and (a.get("billPlanId") == plan.id or a.get("sourceValues", {}).get("item") == candidate.source_label)
+            recorded_split = any(a["payerOwner"] == owner and a.get("lifecycle", "active") == "active"
+                and a["sourceYear"] == today.year and a["sourceWorksheet"] == "income"
+                and a.get("sourceSheetTitle") == title and (a.get("billPlanId") == plan.id if a.get("billPlanId")
+                    else bill_label_key(a.get("sourceValues", {}).get("item") or a.get("item") or a["category"]) == bill_label_key(candidate.source_label))
                 for a in allocations)
-            if recorded_split:
+            if recorded_split or (charge_month, bill_label_key(candidate.source_label)) in snapshot.settled_dates:
                 snapshot.recorded_plans.add((plan.id, charge_month))
             if info.get("recorded") or recorded_split or manual_value or due and due <= today and (info.get("amountCents", 0) > 0 or info.get("virtual") and (candidate.amount_cents or 0) > 0):
                 minimums[plan.id] = following_month(charge_month)
