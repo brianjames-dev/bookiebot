@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-14 — Bills amount clarity and direct recurring splits
+
+A future variable-bill rule must retain the current known amount in the list, including recorded zero. Otherwise show the verified future/current prediction; use Amount needed only when neither exists. The split configuration is independent of that amount label. Keep fixed/subscription future configured-price behavior and backend source/prediction safeguards.
+
+Opening Recurring split initializes a By income draft only when the current rule is unsplit; existing methods/raw input persist. Remove the redundant checkbox, retain Cancel’s original state and offer Remove split within the editor. Use split/removal only modifies the configuration draft; Review/Confirm remains the write boundary. Open DUO uses the native circles with income reset centered between them and full-width values/slider below, fitting 480px including validation. Closed styling stays native. Replace the prior 600ms fade with opaque 12px vertical movement at the app’s standard 440ms easing. Keep simultaneous closed collapse/expansion, retained outgoing entries, draft/review continuity on rapid selection/folding and reduced-motion settling. This supersedes the previous crossfade decision; no financial API/storage changes. Acceptance: STATUS checklist 291.
+
 ## 2026-11-14 — Invoice confirmation and saved-autopay timing
 
 The user clarified that November utilities were known invoices reimbursed in advance, and chose automatic posting on the saved autopay date. This supersedes the November 13 inference that full repayment proves the payer paid the utility on the entry date. Preserve invoice/source/action identities, gross/personal amounts, allocations and receipts. Confirming an invoice replaces its read-only prediction; Current/Transactions include that source on/after the effective saved payment date. Projected/Calendar retain it on that date beforehand. Recipient repayments keep confirmed receipt timing and cannot advance the payer's withdrawal. Fixed Rent stays fixed. There is no midnight financial writer or bank/manual-paid gate.
