@@ -1,7 +1,7 @@
 import {useLayoutEffect,useRef,useState,type ReactNode} from 'react'
 import {EditorExpansion} from './transaction-editor-workspace'
 
-// Move both opaque surfaces inside one stable clipped viewport.
+// Preserve presentation positions and one material through pane handoffs.
 export const billSelectionMotion={duration:440,easing:'cubic-bezier(.2,.8,.25,1)'}
 type Entry={id:string;order:number;isNew:boolean;node:ReactNode}
 type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode}
@@ -17,16 +17,23 @@ function BillEditorEntry({entry,open,wide,locked,onClosed}:{entry:Entry;open:boo
   motion.current?.cancel();motion.current=null
   const changed=s.initialized&&s.open!==open,newVisit=!s.initialized
   const folded=s.initialized&&s.wide!==wide;s.initialized=true;s.open=open;s.wide=wide
-  const settle=()=>{node.dataset.billMoving='false';node.style.transform='none';if(!open&&wide)latest.current.onClosed()}
+  const settle=()=>{node.dataset.billMoving='false';if(!open&&wide){node.style.visibility='hidden';latest.current.onClosed()}else{node.style.visibility='visible';node.style.transform='none'}}
   if(!wide||folded||matchMedia('(prefers-reduced-motion: reduce)').matches||(!changed&&!newVisit)){settle();return}
   node.dataset.billMoving='true'
-  const from=newVisit?'translateX(100%)':transform,to=open?'translateX(0%)':'translateX(-100%)'
+  node.style.visibility='visible'
+  const viewport=node.parentElement!,incoming=viewport.querySelector<HTMLElement>('[data-bill-slot][data-open=true]')
+  // A returning pane can be entering from the left. Its outgoing neighbour
+  // must then exit right, so their edges stay together throughout a reversal.
+  const backward=incoming&&incoming.getBoundingClientRect().left<viewport.getBoundingClientRect().left-.5
+  const from=newVisit?'translateX(100%)':transform,to=open?'translateX(0%)':`translateX(${backward?100:-100}%)`
   const animation=node.animate([{transform:from},{transform:to}],{...billSelectionMotion,fill:'both'})
   motion.current=animation
   animation.finished.then(()=>{if(s.generation!==generation)return;node.style.transform=to;animation.cancel();motion.current=null;settle()}).catch(()=>{})
-  return()=>{++s.generation;animation.cancel()}
+  // React runs cleanup before the next layout effect. Commit the current
+  // presentation before cancelling, so reversals do not restart at zero.
+  return()=>{++s.generation;node.style.transform=getComputedStyle(node).transform;animation.cancel()}
  },[open,wide])
- useLayoutEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)'),settle=()=>{if(!media.matches)return;motion.current?.cancel();motion.current=null;const node=element.current;if(node){node.dataset.billMoving='false';node.style.transform='none'}if(!latest.current.open)latest.current.onClosed()};media.addEventListener('change',settle);return()=>media.removeEventListener('change',settle)},[])
+ useLayoutEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)'),settle=()=>{if(!media.matches)return;motion.current?.cancel();motion.current=null;const node=element.current;if(node){node.dataset.billMoving='false';node.style.visibility=latest.current.open?'visible':'hidden';if(latest.current.open)node.style.transform='none'}if(!latest.current.open)latest.current.onClosed()};media.addEventListener('change',settle);return()=>media.removeEventListener('change',settle)},[])
  return <section ref={element} className="bb-bills-editor" aria-label="Bill editor" aria-hidden={!open} data-bill-slot={entry.id} data-new={entry.isNew} data-open={open} data-present="true" inert={!open||locked} style={{order:entry.order}}>
   <EditorExpansion open={wide||open&&ready} onCollapsed={()=>{if(!latest.current.open)latest.current.onClosed()}}>{entry.node}</EditorExpansion>
  </section>
@@ -45,7 +52,7 @@ export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,childre
   const list=root.current?.closest('.bb-bills')
   for(const row of list?.querySelectorAll<HTMLElement>('.bb-bills-row[data-bill-id]')??[])row.dataset.editorAnchor=String(records.current.has(row.dataset.billId!))
  })
- return <div className="bb-bill-editor-workspace" ref={root}>
+ return <div className="bb-bill-editor-workspace" ref={root} data-present={records.current.size>0}>
   {[...records.current.values()].map(entry=><BillEditorEntry key={entry.id} entry={entry} open={open&&entry.id===billId} wide={wide} locked={locked} onClosed={()=>remove(entry.id)}/>)}
   {!records.current.size&&<section className="bb-bills-editor bb-bills-editor-empty" aria-label="Bill editor" data-open="false"><p className="bb-bills-empty">Choose a bill to manage it.</p></section>}
  </div>
