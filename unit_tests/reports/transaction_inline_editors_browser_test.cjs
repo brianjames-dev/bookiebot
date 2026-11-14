@@ -46,7 +46,7 @@ const money=c=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).
    })
    await page.goto('https://transactions.test/fixture')
    const screen=page.getByRole('region',{name:'Recorded transactions',exact:true}),ready=()=>page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false'),group=screen.locator('.bb-daily-day-group').first()
-   await screen.locator('.bb-chart-total').waitFor();await ready();await group.locator('.bb-daily-day-header').click();await page.waitForFunction(()=>document.querySelector('.bb-daily-day-group').dataset.moving==='false')
+   await screen.locator('.bb-recorded-toolbar').waitFor();await ready();await group.locator('.bb-daily-day-header').click();await page.waitForFunction(()=>document.querySelector('.bb-daily-day-group').dataset.moving==='false')
    const open=async(merchant,action)=>{const access=group.getByRole('button',{name:'Show actions for '+merchant,exact:true});await access.press('ArrowLeft');await group.getByRole('button',{name:action+' '+merchant,exact:true}).click();await group.locator('.bi-expansion[data-open="true"]').waitFor();await page.waitForTimeout(reduced?20:400)}
    await open('Starbucks Coffee Company','Update')
    const editor=group.getByRole('region',{name:'Edit transaction',exact:true})

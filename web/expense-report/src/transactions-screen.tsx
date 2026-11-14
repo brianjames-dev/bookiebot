@@ -36,6 +36,22 @@ interface Change { id: string; month: string; version?: string; operation: Opera
 interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: TransactionChangeSummary["share"]; restoration?: TransactionChangeSummary["restoration"] }
 interface Result { state: "running" | "done" | "uncertain"; success?: boolean; detail?: string; undo?: {month: string; id: string}; summary?: TransactionChangeSummary }
 const categories: Record<string, string> = {grocery: "Grocery", gas: "Gas", food: "Food", shopping: "Shopping", need_expenses: "Other needs"}
+
+function TransactionSearch({value,disabled,onChange}:{value:string;disabled:boolean;onChange:(value:string)=>void}) {
+  const input=useRef<HTMLInputElement>(null),hint=useRef<HTMLSpanElement>(null)
+  const [fits,setFits]=useState(false)
+  useLayoutEffect(()=>{
+    const field=input.current,text=hint.current
+    if(!field||!text)return
+    const measure=()=>{if(field.clientWidth>0)setFits(text.getBoundingClientRect().width<=field.clientWidth)}
+    measure()
+    const observer=new ResizeObserver(measure)
+    observer.observe(field);observer.observe(text)
+    return()=>observer.disconnect()
+  },[])
+  return <label className="bb-recorded-search"><Search aria-hidden="true"/><span ref={hint} className="bb-recorded-search-hint" aria-hidden="true">Search transactions</span><input ref={input} type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder={fits?'Search transactions':''} maxLength={200} value={value} disabled={disabled} onChange={event=>onChange(event.target.value)}/>{value&&<button type="button" aria-label="Clear search" disabled={disabled} onClick={()=>onChange('')}><X aria-hidden="true"/></button>}</label>
+}
+
 class RequestError extends Error { constructor(message: string, readonly status: number) { super(message) } }
 async function request(path: string, body?: unknown, signal?: AbortSignal): Promise<any> {
   const controller = new AbortController()
@@ -385,8 +401,6 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const filtersList=[{value:'all',label:'All'},{value:'needs',label:'Needs'},{value:'wants',label:'Wants'},{value:'shared',label:'Shared'},...Object.entries(categoryOptions).map(([value,label])=>({value:'category:'+value,label:spendingCategories[value]??label})),{value:'income',label:'Income'},{value:'savings',label:'Savings'}]
   const changeFilter=(value:string)=>{if(locked||operation||notice)return;manager.current.close?.();setDay('');setFilter(value)}
   const displayedFilter=displayScope.filter,graphFilter=historyEnabled?filter:displayedFilter
-  const metricLabel=displayedFilter==='income'?'Total Income':displayedFilter==='savings'?'Total Saved':'Total Spent'
-  const total=listing?.totalAmountCents??listing?.items.reduce((sum,row)=>sum+accountedAmount(row),0)??0
   useEffect(()=>{manager.current.close?.(true);setDay('')},[month,search,active])
   const inspectGraphDay=(value:string)=>{
     if(locked||operation||notice)return
@@ -448,9 +462,8 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     {headerActions && createPortal(<button type="button" className="bb-transaction-all-months" aria-label="All recorded months" aria-pressed={month==='all'} disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>{setDay('');setMonth(month==='all'?initialMonth:'all')}}>All months</button>,headerActions)}
     {navigation?.monthHeader?<div className="bb-transaction-period bb-transaction-scope"><span>{periodMonth==='all'?'All months':new Date(periodMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}</span></div>:
     <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>}
-    {listing && <DailySpendingChart graphOpen={graphOpen} graphControls={graphControls} graphStatus={graphStatus} graphBusy={graphPending} data={chart} total={total/100} filter={graphFilter==='needs'||graphFilter==='wants'?graphFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={inspectGraphDay} metricLabel={metricLabel} legendLabel={graphFilter==='income'?'Income':graphFilter==='savings'?'Savings':undefined}
-      transactionControl={<div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div>}/>}
-    <label className="bb-recorded-search"><Search aria-hidden="true"/><input type="text" role="searchbox" enterKeyHint="search" aria-label="Search transactions" placeholder="Search transactions" maxLength={200} value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>setSearch(event.target.value)}/>{search&&<button type="button" aria-label="Clear search" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>setSearch('')}><X aria-hidden="true"/></button>}</label>
+    {listing && <DailySpendingChart graphOpen={graphOpen} graphControls={graphControls} graphStatus={graphStatus} graphBusy={graphPending} data={chart} filter={graphFilter==='needs'||graphFilter==='wants'?graphFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={inspectGraphDay} legendLabel={graphFilter==='income'?'Income':graphFilter==='savings'?'Savings':undefined}
+      transactionControl={<div className="bb-recorded-toolbar"><TransactionSearch value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={setSearch}/><div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div></div>}/>}
     {day&&<button type="button" className="bb-recorded-day-chip" aria-label={'Clear date filter '+recordedDateLabel(day,true)} onClick={()=>setDay('')}>{recordedDateLabel(day,true)}<X aria-hidden="true"/></button>}
     <div className="bb-recorded-results">
     {(!duoWide||!selected)&&status}

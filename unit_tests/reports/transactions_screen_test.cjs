@@ -57,6 +57,8 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  assert.equal(updates.at(-1),loadedAt,'A failed refresh retains the last successful update time')
  await click('Refresh transactions');await respond(listing());assert.equal(updates.at(-1),now)
  assert.equal(tree.root.findByProps({'data-graph-open':false}).props['data-graph-open'],false)
+ assert.equal(tree.root.findByType(presentation['./report-app'].DailySpendingChart).props.total,undefined,'Transactions no longer passes a headline total to the shared chart')
+ assert.equal(tree.root.findByProps({className:'bb-recorded-toolbar'}).findAllByProps({'aria-label':'Search transactions'}).length,1,'Search shares the filter/graph toolbar')
  const beforeGraph=requests.length;await click('Show spending graph');assert.equal(button('Hide spending graph').props['aria-expanded'],true);assert.equal(tree.root.findByProps({'data-graph-open':true}).props['data-graph-open'],true);await click('Hide spending graph');assert.equal(requests.length,beforeGraph,'Graph disclosure is presentation-only and cannot request or mutate financial data')
  await change('Search transactions','cable');await tick();await respond(listing())
  await click('Update');assert.equal(button('Clear search').props.disabled,true,'The search clear control cannot detach an active inline editor');assert.equal(work.dirty,true);assert.equal(button('Review change').props.disabled,true,'Unchanged edits cannot request a review')
@@ -190,13 +192,12 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  const beforeRange=requests.length;await run(()=>tree.root.findByProps({'aria-label':'Graph period'}).props.onChange({target:{value:'6'}}));await tick();assert.equal(requests.length,beforeRange,'Changing the trailing window reuses complete daily aggregates')
  assert.deepEqual(Array.from(graphProps().data,row=>row.label),['2026-07-20','2026-08-20','2026-09-20','2026-10-20'])
  assert.equal(text(tree.root.findByProps({className:'bb-transaction-list bb-daily-transactions'})).includes('Fixture cable'),true,'Changing graph scope preserves the list')
- const graphBeforeDay=graphProps().data,periodTotal=graphProps().total
+ const graphBeforeDay=graphProps().data
  await run(()=>graphProps().onInspectDay('2026-09-20'));await tick()
  assert.match(latest().url,/month=2026-10/,'A day chip retains the selected report month')
  assert.match(latest().url,/day=2026-09-20/,'The list independently requests the inspected day before pagination')
  await respond(listing([{...row,id:'september-row',month:'2026-09',date:'2026-09-20'}],{month:'2026-10',days:listing().days}))
  assert.equal(graphProps().data,graphBeforeDay,'A historical day filter must not rebuild or re-anchor the graph')
- assert.equal(graphProps().total,periodTotal,'Day inspection retains the original period total')
  assert.equal(tree.root.findByProps({'aria-label':'Graph period'}).props.value,6)
  const chip=tree.root.findByProps({className:'bb-recorded-day-chip'})
  assert.match(text(chip),/Sep.*20.*2026/);assert.match(chip.props['aria-label'],/Clear date filter/)
@@ -214,11 +215,12 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  assert.equal(graphProps().data,graphBeforeDay)
  const historical={...row,id:'september-row',month:'2026-09',date:'2026-09-20',fields:{...row.fields,date:'2026-09-20'}}
  await click('Refresh transactions');await respond(listing([historical],{days:listing().days,listDays:[{date:historical.date,month:historical.month,count:41,totalCents:5000,needsCents:5000,wantsCents:0}],totalAmountCents:1234}))
+ const graphBeforeHistoricalEdit=graphProps().data
  await click('Update');await change('Amount','13.34');await submit();assert.equal(body().month,'2026-09','Financial reviews retain the inspected row’s canonical source month')
  await respond(review(body(),historical));await click('Confirm update')
  const historicalSummary={operation:'update',title:historical.title,date:historical.date,category:historical.categoryLabel,location:historical.location,person:historical.person,amountCents:1234,before:historical.fields,after:{...historical.fields,amount:'13.34'}}
  await respond({state:'done',success:true,summary:historicalSummary,undo:{month:historical.month,id:historical.id}})
- assert.equal(graphProps().total,12.34,'Optimistic feedback for another month cannot change the retained period total')
+ assert.equal(graphProps().data,graphBeforeHistoricalEdit,'Optimistic feedback for another month cannot change the retained period graph')
  assert.equal(plans.at(-1).from['day:2026-9-20:amount'],'$50.00');assert.equal(plans.at(-1).to['day:2026-9-20:amount'],'$51.00','Day-header feedback uses the complete inspected-day metadata')
  await respond(listing([{...historical,amountCents:1334,fields:historicalSummary.after}],{days:listing().days,listDays:[{date:historical.date,month:historical.month,count:41,totalCents:5100,needsCents:5100,wantsCents:0}],totalAmountCents:1234}))
  await click('Dismiss undo');await tick();if(latest().url.includes('month=all'))await respond(listing([],{days:historyDays}))

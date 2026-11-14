@@ -24,7 +24,7 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace {
   grid-column:1; grid-row:2; display:grid; min-height:0;
   grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);
-  grid-template-rows:max(44px,var(--bb-duo-heading)) 20px 70px 58px auto minmax(0,1fr);
+  grid-template-rows:max(44px,var(--bb-duo-heading)) 20px 58px auto minmax(0,1fr);
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transactions-heading {
   grid-column:1; grid-row:1; min-width:0; margin-inline:35px; align-items:center;
@@ -37,14 +37,11 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-daily-summary {
   grid-column:1; grid-row:3; margin:0 35px; justify-content:center; min-height:0;
  }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-search {
-  grid-column:1; grid-row:4; margin:0 35px; align-self:center;
- }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-day-chip {
-  grid-column:1; grid-row:5; margin:0 35px 8px; min-height:44px; justify-self:start;
+  grid-column:1; grid-row:4; margin:0 35px 8px; min-height:44px; justify-self:start;
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-results {
-  display:block; grid-column:1; grid-row:6; margin:0 27px 0 35px; padding-right:8px; min-height:0;
+  display:block; grid-column:1; grid-row:5; margin:0 27px 0 35px; padding-right:8px; min-height:0;
   position:relative; isolation:isolate;
   overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
   scrollbar-width:thin; scrollbar-color:hsl(var(--border)) transparent;
@@ -55,7 +52,7 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-summary-controls { max-width:55%; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-summary-controls .bb-category-mix-filter { max-width:100%; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-reveal {
-  grid-column:2; grid-row:1 / 7; display:grid; grid-template-rows:minmax(0,1fr);
+  grid-column:2; grid-row:1 / -1; display:grid; grid-template-rows:minmax(0,1fr);
   min-height:0; opacity:1; margin:0 16px;
   padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
   transition:none;
@@ -73,7 +70,7 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-daily-legend { margin:0; padding:2px 0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-workspace[data-duo-pane="editor"] .bb-recorded-graph-reveal { visibility:hidden; opacity:0; pointer-events:none; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-action-pane {
-  grid-column:2; grid-row:1 / 7; z-index:3; min-width:0; min-height:0;
+  grid-column:2; grid-row:1 / -1; z-index:3; min-width:0; min-height:0;
   display:grid; grid-template-rows:var(--bb-duo-heading) minmax(0,1fr); margin:0 16px;
   padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
   background:hsl(var(--background));
@@ -103,7 +100,7 @@
 }
 
 @media(min-width:600px) {
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-transaction-workspace { grid-column:2; grid-row:1 / 7; z-index:3; min-width:0; min-height:0; margin:0 16px; padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px); }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-transaction-workspace { grid-column:2; grid-row:1 / -1; z-index:3; min-width:0; min-height:0; margin:0 16px; padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px); }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-transaction-workspace .bb-duo-action-pane { height:100%; margin:0; padding-bottom:0; }
  .bb-duo-transaction-workspace>.bi-editor-scenes,.bi-editor-scenes[data-fill="true"]>.bi-step-viewport,.bi-editor-scenes[data-fill="true"]>.bi-step-viewport>.bi-step-pane,.bi-editor-scenes[data-fill="true"] .bi-editor-scene { height:100%; }
  .bi-editor-scenes[data-fill="true"]>.bi-step-viewport { height:100%!important; }

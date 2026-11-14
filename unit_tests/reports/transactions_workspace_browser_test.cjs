@@ -9,14 +9,14 @@ const money=c=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).
 async function chartSpacing(page,screen){
  const measure=()=>screen.evaluate(root=>{
   const rect=selector=>root.querySelector(selector).getBoundingClientRect(),layout=rect('.bb-chart-layout'),plot=rect('.bb-recorded-graph-reveal'),summary=rect('.bb-daily-summary'),search=rect('.bb-recorded-search'),summaryStyle=getComputedStyle(root.querySelector('.bb-daily-summary')),open=root.querySelector('.bb-recorded-graph-toggle').getAttribute('aria-expanded')==='true'
-  return{height:layout.height,plotHeight:plot.height,summaryHeight:summary.height,summaryPad:summaryStyle.paddingTop,summaryBorder:summaryStyle.borderTopWidth,summaryAbove:summary.bottom<=plot.top+1,searchGap:search.top-layout.bottom,open}
+  return{height:layout.height,plotHeight:plot.height,summaryHeight:summary.height,summaryPad:summaryStyle.paddingTop,summaryBorder:summaryStyle.borderTopWidth,summaryAbove:summary.bottom<=plot.top+1,searchGap:search.top-summary.top,open}
  })
  const check=g=>{
   assert(Math.abs(g.height-g.plotHeight-g.summaryHeight)<1,`Natural content height must not stretch with the list: ${JSON.stringify(g)}`)
   assert.equal(g.summaryPad,'0px','Shared mobile summary padding must not override the approved draft');assert.equal(g.summaryBorder,'0px','The draft has no divider above its metric')
-  assert(g.summaryAbove,`Total/filter stay above the optional plot: ${JSON.stringify(g)}`)
+  assert(g.summaryAbove,`Search/filter toolbar stays above the optional plot: ${JSON.stringify(g)}`)
   assert(g.open?g.plotHeight>250:g.plotHeight<1,`Disclosure owns graph height: ${JSON.stringify(g)}`)
-  assert(g.searchGap>=19&&g.searchGap<=21,`Search retains its normal gap: ${JSON.stringify(g)}`)
+  assert(Math.abs(g.searchGap)<1&&g.summaryHeight===44,`Search occupies the single toolbar row: ${JSON.stringify(g)}`)
  }
  check(await measure())
  await screen.locator('.bb-recorded-search').scrollIntoViewIfNeeded();await page.evaluate(()=>new Promise(requestAnimationFrame));check(await measure())
@@ -44,9 +44,9 @@ async function noFocusChrome(screen){
  const failures=await screen.evaluate(root=>{const failures=[];for(const el of root.querySelectorAll('button,input,select,summary,[tabindex]')){
   if(el.disabled||el.closest('[inert]')||!el.getClientRects().length)continue
   const border=getComputedStyle(el).borderColor;el.focus({preventScroll:true});if(document.activeElement!==el)continue
-  for(const target of[el,el.closest('.bb-category-mix-filter')].filter(Boolean)){const s=getComputedStyle(target);if(s.outlineStyle!=='none'&&s.outlineWidth!=='0px'||s.boxShadow!=='none')failures.push(el.getAttribute('aria-label')||el.textContent)}
+  for(const target of[el,el.closest('.bb-category-mix-filter')].filter(Boolean)){const s=getComputedStyle(target);const nativeEditorRing=target.matches('.bi-editor :is(.sp-cue,.bi-cancel,.bi-primary,.bs-income-reset)')&&s.outlineStyle==='solid'&&s.outlineWidth==='2px';if(!nativeEditorRing&&s.outlineStyle!=='none'&&s.outlineWidth!=='0px'||s.boxShadow!=='none')failures.push(el.getAttribute('aria-label')||el.textContent)}
   if(getComputedStyle(el).borderColor!==border)failures.push('focus changed border: '+el.tagName);el.blur()
- }return failures});assert.deepEqual(failures,[],'Keyboard focus must not add visible borders, outlines or shadows')
+ }return failures});assert.deepEqual(failures,[],'Controls retain the existing editor focus rings without adding other focus chrome')
 }
 async function swipeMotion(page,first){
  const access=first.getByRole('button',{name:'Show actions for Starbucks Coffee Company',exact:true}),shell=access.locator('..')
@@ -80,8 +80,8 @@ for(const engine of[chromium,webkit].filter(engine=>!process.env.ONLY_ENGINE||en
    commands.push({url:url.href,method:request.method()});return route.abort()
   })
   await page.goto('https://transactions.test/fixture');const screen=page.getByRole('region',{name:'Recorded transactions',exact:true}),ready=()=>page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false')
-  await screen.locator('.bb-chart-total').waitFor().catch(async error=>{console.error(await page.locator('body').innerText());await page.screenshot({path:'/private/tmp/inline-workspace-failure.png'});throw error});await ready()
-  const filter=screen.getByRole('combobox',{name:'Filter transactions',exact:true}),total=screen.locator('.bb-chart-total')
+  await screen.locator('.bb-recorded-toolbar').waitFor().catch(async error=>{console.error(await page.locator('body').innerText());await page.screenshot({path:'/private/tmp/inline-workspace-failure.png'});throw error});await ready()
+  const filter=screen.getByRole('combobox',{name:'Filter transactions',exact:true}),total={innerText:async()=>money(await screen.locator('.bb-daily-day-total').evaluateAll(nodes=>nodes.reduce((sum,n)=>sum+Math.round(Number(n.textContent.replace(/[^0-9.-]/g,''))*100),0)))}
   assert.equal(await screen.getByRole('button',{name:'Show spending graph',exact:true}).getAttribute('aria-expanded'),'false')
   assert.equal(await screen.locator('.bb-recorded-graph-reveal').getAttribute('aria-hidden'),'true')
   assert.equal(await screen.locator('.bb-recorded-graph-reveal').evaluate(el=>el.inert),true)
@@ -91,9 +91,9 @@ for(const engine of[chromium,webkit].filter(engine=>!process.env.ONLY_ENGINE||en
   for(let reversal=0;reversal<3;reversal++){await screen.locator('.bb-recorded-graph-toggle').click();await page.waitForTimeout(40)}
   await page.waitForTimeout(470);assert.equal(await screen.locator('.bb-recorded-graph-toggle').getAttribute('aria-expanded'),'false');await chartSpacing(page,screen)
   assert(await plot.evaluate(el=>el===document.querySelector('.bb-daily-plot')),'Disclosure keeps the native chart mounted')
-  assert.equal(await total.innerText(),money(fixture.results.all.totalAmountCents));assert.equal(await screen.getByRole('combobox').count(),1);assert.equal(await screen.locator('.bb-daily-single-day').count(),1)
-  const geometry=await screen.evaluate(el=>{const single=el.querySelector('.bb-daily-single-day .bb-daily-day-total'),regular=el.querySelector('.bb-daily-day-header .bb-daily-day-total'),a=el.querySelector('.bb-chart-total').getBoundingClientRect(),f=el.querySelector('.bb-category-mix-filter').getBoundingClientRect(),search=el.querySelector('.bb-recorded-search').getBoundingClientRect();return{singleRight:single.getBoundingClientRect().right,regularRight:regular.getBoundingClientRect().right,singleSize:getComputedStyle(single).fontSize,regularSize:getComputedStyle(regular).fontSize,beside:a.right<f.left,above:f.bottom<search.top,overflow:document.documentElement.scrollWidth>innerWidth}})
-  assert(Math.abs(geometry.singleRight-geometry.regularRight)<1&&geometry.singleSize===geometry.regularSize&&geometry.beside&&geometry.above&&!geometry.overflow,JSON.stringify(geometry))
+  assert.equal(await total.innerText(),money(fixture.results.all.totalAmountCents));assert.equal(await screen.locator('.bb-chart-total,.bb-chart-kicker').count(),0);assert.equal(await screen.getByRole('combobox').count(),1);assert.equal(await screen.locator('.bb-daily-single-day').count(),1)
+  const geometry=await screen.evaluate(el=>{const single=el.querySelector('.bb-daily-single-day .bb-daily-day-total'),regular=el.querySelector('.bb-daily-day-header .bb-daily-day-total'),a=el.querySelector('.bb-recorded-search').getBoundingClientRect(),f=el.querySelector('.bb-category-mix-filter').getBoundingClientRect(),search=el.querySelector('.bb-recorded-search').getBoundingClientRect();return{singleRight:single.getBoundingClientRect().right,regularRight:regular.getBoundingClientRect().right,singleSize:getComputedStyle(single).fontSize,regularSize:getComputedStyle(regular).fontSize,beside:a.right<f.left,inline:Math.abs(f.y+f.height/2-search.y-search.height/2)<1,overflow:document.documentElement.scrollWidth>innerWidth}})
+  assert(Math.abs(geometry.singleRight-geometry.regularRight)<1&&geometry.singleSize===geometry.regularSize&&geometry.beside&&geometry.inline&&!geometry.overflow,JSON.stringify(geometry))
   assert((await screen.locator('.bb-daily-day-group').last().locator('.bb-daily-day-header').getAttribute('aria-label')).includes('45 entries'))
   const single=screen.locator('.bb-daily-single-day .bb-recorded-swipe')
   assert.equal(await single.evaluate(el=>getComputedStyle(el).borderTopWidth),'0px','A flat single-entry day must not have a second divider above its text')

@@ -24,14 +24,15 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
   return route.abort()
  })
  await page.goto('https://subscriptions.test/fixture')
+ const dayTotal=async()=>page.locator('.bb-daily-day-total').evaluateAll(nodes=>nodes.reduce((sum,n)=>sum+Math.round(Number(n.textContent.replace(/[^0-9.-]/g,''))*100),0));
  const screen=page.locator('.bb-transactions'),ready=()=>page.waitForFunction(()=>document.querySelector('.bb-transactions')?.getAttribute('aria-busy')==='false')
- await ready();assert((await page.locator('.bb-daily-summary').innerText()).replace(/\s/g,'').includes('$2,693.07'))
+ await screen.locator('.bb-recorded-toolbar').waitFor();await ready();assert.equal(await dayTotal(),269307);assert.equal(await page.locator('.bb-chart-total,.bb-chart-kicker').count(),0)
  assert.equal(await page.getByText('YouTube Premium',{exact:true}).count(),0,'Future charges stay outside the recorded list')
  for(const[name,asset,category,token]of[['Xfinity','xfinity','Subs (Needs)','subs-needs'],['Slate Digital All Access','slate-digital','Subs (Wants)','subs-wants']]){
   const source=fixture.results.all.items.find(row=>row.title===name),row=page.locator('[data-entry-id="'+source.id+'"]')
   assert.equal(await row.locator('.bb-daily-transaction-category').textContent(),category)
   assert((await row.locator('img').getAttribute('src')).includes('company-logo-'+asset+'-'))
-  assert.equal(await row.getByRole('button').count(),0,'Recurring rows have no purchase action rail')
+  assert.equal(await row.locator('.bb-recorded-swipe-actions').count(),0,'Recurring rows have no purchase action rail; their existing read-only detail trigger remains')
   assert.equal(await row.locator('.bb-daily-transaction-category').evaluate(el=>el.style.color),'hsl(var(--category-'+token+'))')
   const bounds=await row.boundingBox();await page.mouse.move(bounds.x+bounds.width*.8,bounds.y+bounds.height/2);await page.mouse.down();await page.mouse.move(bounds.x+15,bounds.y+bounds.height/2,{steps:8});await page.mouse.up();await page.waitForTimeout(460)
   assert.equal(await row.locator('.bb-recorded-swipe-actions').count(),0)
@@ -41,11 +42,10 @@ const bundlePromise=req('esbuild').build({stdin:{resolveDir:frontend,loader:'tsx
  const filter=screen.getByRole('combobox',{name:'Filter transactions',exact:true})
  for(const[value,key]of[['wants','wants'],['needs','needs'],['category:subscriptions_wants','category'],['all','all']]){
   await filter.selectOption(value);await ready()
-  const expected=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(fixture.results[key].totalAmountCents/100)
-  assert((await page.locator('.bb-daily-summary').innerText()).replace(/\s/g,'').includes(expected))
+  assert.equal(await dayTotal(),fixture.results[key].totalAmountCents)
  }
  await screen.getByRole('searchbox',{name:'Search transactions',exact:true}).fill('slate');await page.waitForTimeout(300);await ready()
- assert.equal(await page.locator('.bb-daily-transaction').count(),1);assert((await page.locator('.bb-daily-summary').innerText()).replace(/\s/g,'').includes('$14.99'))
+ assert.equal(await page.locator('.bb-daily-transaction').count(),1);assert.equal(await dayTotal(),1499)
  await screen.getByRole('button',{name:'Clear search',exact:true}).click();await ready()
  await screen.getByRole('button',{name:'Hide spending graph',exact:true}).click();await page.waitForTimeout(470)
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);assert.deepEqual(writes,[])
