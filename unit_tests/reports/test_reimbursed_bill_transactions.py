@@ -118,7 +118,7 @@ def test_variable_estimates_never_create_actual_transaction_rows(bill, monkeypat
 
 @pytest.mark.parametrize("bill", [(B, category, logged) for category in ("PG&E", "Recology", "Water")
                                   for logged in (True, False)], indirect=True)
-def test_fully_reimbursed_bill_is_not_hidden_by_a_later_saved_pull_day(bill, monkeypatch):
+def test_fully_reimbursed_bill_waits_for_its_saved_autopay_day(bill, monkeypatch):
     read = tx.read_workbook_tabs
     def later_schedule(client, book, titles):
         result = read(client, book, titles)
@@ -129,10 +129,12 @@ def test_fully_reimbursed_bill_is_not_hidden_by_a_later_saved_pull_day(bill, mon
     bill.clock[0] = datetime(2026, 11, 13, tzinfo=PACIFIC_TZ)
     assert tx.listing(bill.actor, {"month": "2026-11", "fresh": "1"})["items"] == []
     bill.store.command(bill.owner, {**payment(bill.allocation, 7208), "date": "2026-11-02"})
+    assert tx.listing(bill.actor, {"month": "2026-11", "fresh": "1"})["items"] == []
+    bill.clock[0] = datetime(2026, 11, 22, tzinfo=PACIFIC_TZ)
     result = listing(bill, 8000)
-    assert result["items"][0]["date"] == "2026-11-01"
+    assert result["items"][0]["date"] == "2026-11-22"
     assert result["items"][0]["repayment"]["outstandingCents"] == 0
-    assert result["days"][0]["date"] == "2026-11-01"
+    assert result["days"][0]["date"] == "2026-11-22"
 
 
 @pytest.mark.parametrize("actor,amount", [(B, "80.00"), (H, "72.08")])
@@ -151,20 +153,21 @@ def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, m
     result = reports.build_expense_breakdown_report(actor_key=actor,
         owner_name="Brian" if actor == B else "Hannah", persons=[], month=reports.BudgetMonth(2026, 11), worksheets=sheets)
     payload = reports.expense_breakdown_client_payload(result)
-    assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == float(amount)
+    assert payload["modeViews"]["current"]["metrics"]["totalExpenses"] == (float(amount) if actor == H else 0)
     assert payload["modeViews"]["projected"]["metrics"]["totalExpenses"] == float(amount)
-    assert result.queued_bills == []
-    assert result.payments[0].label == display_name
-    assert result.payments[0].date == "2026-11-01"
+    payment_row = (result.payments if actor == H else result.queued_bills)[0]
+    assert payment_row.label == display_name
+    assert payment_row.date == ("2026-11-02" if actor == H else "2026-11-22")
     event = next(e for e in payload["calendarEvents"] if e["kind"] == "bill")
-    assert event["day"] == 1 and event["amount"] == float(amount)
-    assert not event["projectedOnly"]
+    assert event["day"] == (2 if actor == H else 22) and event["amount"] == float(amount)
+    assert event["projectedOnly"] == (actor == B)
     assert sheets.personal_budget._rows == before
 
 
-def test_recipient_recorded_bill_is_not_lost_after_full_repayment(bill, monkeypatch):
-    bill.store.command(bill.owner, {**payment(bill.allocation, 7208), "date": "2026-11-02"})
-    bill.personal[0][2] = "72.08"
+@pytest.mark.parametrize('receipt', [2000, 7208])
+def test_recipient_recorded_bill_keeps_actual_partial_or_full_receipt_date(bill, monkeypatch, receipt):
+    bill.store.command(bill.owner, {**payment(bill.allocation, receipt), "date": "2026-11-02"})
+    bill.personal[0][2] = f"{receipt / 100:.2f}"
     read = tx.read_workbook_tabs
     def later_schedule(client, book, titles):
         result = read(client, book, titles)
@@ -175,9 +178,9 @@ def test_recipient_recorded_bill_is_not_lost_after_full_repayment(bill, monkeypa
     bill.clock[0] = datetime(2026, 11, 13, tzinfo=PACIFIC_TZ)
     before = deepcopy([bill.personal, bill.history, bill.store.snapshot("hannah")])
     result = tx.listing(H, {"month": "2026-11", "fresh": "1", "view": "daily", "scope": "spending"})
-    assert result["total"] == 1 and result["totalAmountCents"] == 7208
+    assert result["total"] == 1 and result["totalAmountCents"] == receipt
     row = result["items"][0]
-    assert row["date"] == "2026-11-01"
+    assert row["date"] == "2026-11-02"
     assert not row.get("contextOnly") and not row["capabilities"]["split"]
     assert [bill.personal, bill.history, bill.store.snapshot("hannah")] == before
 

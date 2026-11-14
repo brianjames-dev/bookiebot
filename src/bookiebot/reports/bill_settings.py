@@ -87,10 +87,14 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
     if plan is None:
         raise BillConflict("This bill is unavailable in the selected month.")
     info = snapshot.charge(plan, period)
+    if plan.kind == "variable" and not info.get("canConfirmAmount", True):
+        raise BillValidation("Only this bill's payer can confirm its invoice amount.")
+    if plan.kind == "variable" and plan.due_date(period) is None:
+        raise BillValidation("Set this bill's payment day and billing months before confirming its amount.")
     if not info.get("available") or body.get("chargeVersion") != info.get("version"):
         raise BillConflict("This charge changed. Refresh before entering an amount.")
     if info.get("recorded"):
-        raise BillConflict("This charge is already recorded. Open it in Transactions to edit its amount or split.")
+        raise BillConflict("This charge is already recorded. Open This month's bill in Bills to edit its amount or split.")
     operation = body["operation"]
     if operation == "scheduled":
         due = plan.due_date(period)
@@ -112,7 +116,7 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
     else:
         amount = money_cents(body.get("amount")) or 0
         if plan.kind != "variable" or amount <= 0 or info.get("amountCents", 0) > 0:
-            raise BillValidation("Enter a new variable bill amount, or edit the recorded charge in Transactions.")
+            raise BillValidation("Enter a new variable bill amount, or edit the confirmed charge in Bills.")
         method = plan.split_method
     share = split_preview(plan, amount, snapshot.owner) if method != "none" else {"method": "none", "payerCents": amount, "partnerCents": 0}
     if method != "none":
@@ -126,7 +130,7 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
     version = fingerprint([snapshot.owner, snapshot.settings.version, operation, asdict(reviewed_plan), info["version"], amount, share, charge_date.isoformat()])
     return {"plan": reviewed_plan, "info": info, "amount": amount, "date": charge_date.isoformat(),
             "review": {"operation": operation, "name": plan.name, "amountCents": amount, "month": period,
-                       "date": charge_date.isoformat(), "share": share, "reviewVersion": version}}
+                       "date": charge_date.isoformat(), "paymentDate": info.get("date"), "share": share, "reviewVersion": version}}
 
 
 def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | None = None) -> dict[str, Any]:
@@ -256,8 +260,8 @@ def record_charge(actor: str, checked: dict[str, Any], charge: BillCharge, reque
                 expense_date=date.fromisoformat(charge.charge_date),
                 **({"custom_payer_basis_points": plan.payer_basis_points} if plan.split_method == "custom" else {}))
             if not success:
-                return {"success": True, "detail": "Amount recorded. Open the charge in Transactions to finish its split.", "splitPending": True}
-        return {"success": True, "detail": "Charge recorded.", "transaction": {"month": charge.month, "id": charge.month + ":" + action_id}}
+                return {"success": True, "detail": "Amount confirmed. Reopen this month's bill in Bills to review its split.", "splitPending": True}
+        return {"success": True, "detail": "Bill amount confirmed." if plan.kind == "variable" else "Charge recorded.", "transaction": {"month": charge.month, "id": charge.month + ":" + action_id}}
 
 
 class BillCommands:
@@ -433,7 +437,7 @@ def charge_transaction(actor: str, identity: str, period: str) -> dict[str, Any]
     plan = next((p for p in snapshot.settings.plans if p.id == identity and p.effective_from <= month_key(period) < p.effective_until), None)
     if not plan:
         raise BillConflict("This bill is unavailable in that month.")
-    matches = [r for r in load_transactions(actor, period, fresh=True) if r.get("billPlanId") == plan.id
+    matches = [r for r in load_transactions(actor, period, fresh=True, include_scheduled=True) if r.get("billPlanId") == plan.id
                or r.get("kind") == "payment" and r["fields"].get("item", r.get("title")) == plan.source_label]
     if len(matches) != 1:
         raise BillConflict("This charge is not recorded yet. Refresh Bills to check its amount.")

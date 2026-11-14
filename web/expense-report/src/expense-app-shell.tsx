@@ -14,6 +14,7 @@ import { Investments } from "./investments"
 import { PhoneNotifications } from "./phone-notifications"
 import { WidgetSettings } from "./widget-settings"
 import { BillSettings } from "./bill-settings"
+import { BillCheckin, type BillAmountRequest } from "./bill-checkin"
 import { WidgetSetupGuide } from "./widget-setup-guide"
 import { AskBookieBotPanel } from "./ask-bookiebot-panel"
 import { AppUpdatePrompt } from "./app-update-prompt"
@@ -54,6 +55,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
   const [widgetGuideOpen, setWidgetGuideOpen] = useState(false)
   const [billsOpen, setBillsOpen] = useState(false)
+  const [billAmountRequest,setBillAmountRequest]=useState<BillAmountRequest|null>(null)
+  const consumeBillAmount=useCallback(()=>setBillAmountRequest(null),[])
   const [askOpen, setAskOpen] = useState(false)
   const [sourceRequest, setSourceRequest] = useState<{ section: string; id: number; scope: string } | null>(null)
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
@@ -277,7 +280,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </section>
         </>}
       </main>
-      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen==='settings'&&billsOpen}/></main>}
+      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen==='settings'&&billsOpen} amountRequest={billAmountRequest} onAmountConsumed={consumeBillAmount}/></main>}
       {screen === "settings" && widgetGuideOpen && <main className="bb-shell-settings bb-main" aria-label="Widget setup">
         <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
       </main>}
@@ -290,6 +293,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </NavigationViewport>
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
+      <BillCheckin key={owner} owner={owner} enabled={Boolean(report)&&monthlyReady} blocked={askOpen||widgetGuideOpen||keyboardOpen||signingOut||reportBusy} onEnter={request=>{setBillAmountRequest(request);setWidgetGuideOpen(false);selectScreen('settings');setBillsOpen(true)}}/>
     </div>
   </AppNavigationContext.Provider>
 }

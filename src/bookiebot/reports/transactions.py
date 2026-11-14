@@ -31,7 +31,7 @@ from bookiebot.sheets.routing import (
 )
 
 logger = logging.getLogger(__name__)
-_CACHE: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]]]] = {}
+_CACHE: dict[tuple[str, str, str, bool], tuple[float, list[dict[str, Any]]]] = {}
 _CACHE_LOCK = threading.RLock()
 _READ_LOCKS: dict[str, Any] = {}
 _factory_lock = threading.Lock()
@@ -258,11 +258,11 @@ def _subscription_rows(actor: str, month: str, rows: list[list[str]], *, as_of: 
     return result
 
 
-def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[dict[str, Any]]:
+def load_transactions(actor: str, month: str, *, fresh: bool = False, include_scheduled: bool = False) -> list[dict[str, Any]]:
     from bookiebot.sheets.bills import bill_payment_state, bill_label_key, list_bill_schedules
     from bookiebot.sheets.bill_payment_evidence import settled_bill_dates
     as_of = now_pacific().date()
-    key = (actor, month, as_of.isoformat())
+    key = (actor, month, as_of.isoformat(), include_scheduled)
     with _READ_LOCKS.setdefault(actor, threading.RLock()):
         with _CACHE_LOCK:
             if not fresh and key in _CACHE and time.monotonic() - _CACHE[key][0] < 30:
@@ -352,9 +352,9 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False) -> list[di
                         label = a.metadata.get("exact_source_label") or row["category"]
                         timing = bill_payment_state(label, year, number, schedules, as_of=as_of,
                             recorded_on=paid_bill_dates.get((period, bill_label_key(label))))
-                        if not timing.paid and not a.metadata.get("bill_charge_date"):
+                        if not timing.paid and not include_scheduled:
                             continue
-                        row["date"] = a.metadata.get("bill_charge_date") or (timing.withdrawal_date.isoformat() if timing.withdrawal_date else "")
+                        row["date"] = timing.withdrawal_date.isoformat() if timing.withdrawal_date else ""
                         row["version"] = digest([row["version"], row["date"]])
                     if row["amountCents"] > 0:
                         result.append(row)
@@ -570,7 +570,7 @@ def _accepted_split_row(actor: str, month: str, body: dict[str, Any]) -> dict[st
     if body.get("operation") != "split" or not shared.enabled():
         return None
     with _CACHE_LOCK:
-        candidates = [rows for (cached_actor, cached_month, _day), (_time, rows) in _CACHE.items()
+        candidates = [rows for (cached_actor, cached_month, *_scope), (_time, rows) in _CACHE.items()
                       if cached_actor == actor and cached_month in {month, "all"}]
         row = next((row for rows in candidates for row in rows if row["id"] == body.get("id")
                     and row["month"] == month and row["version"] == body.get("version")
@@ -593,7 +593,7 @@ def review(actor: str, body: dict[str, Any], *, fresh_source: bool = False) -> d
         raise TransactionValidation("Choose the transaction's recorded month.")
     accepted = None if fresh_source else _accepted_split_row(actor, month, body)
     row = accepted or (_undo_review_row(actor, month, str(body.get("id", "")).removeprefix(month + ":")) if body.get("operation") == "undo" else
-           next((row for row in load_transactions(actor, month, fresh=True) if row["id"] == body.get("id")), None))
+           next((row for row in load_transactions(actor, month, fresh=True, include_scheduled=True) if row["id"] == body.get("id")), None))
     if row is None:
         raise TransactionConflict("This transaction is no longer available. Reload Transactions.")
     if body.get("version") != row["version"] and not (body.get("operation") == "undo" and body.get("version") is None):

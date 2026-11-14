@@ -18,7 +18,7 @@ from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_c
 from bookiebot.sheets.recurring_rows import decode, encode, header, legacy_plans, managed
 from bookiebot.sheets.bills import bill_label_key
 from bookiebot.sheets.bill_payment_evidence import settled_bill_dates, BillDates
-from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user, get_user_config
+from bookiebot.sheets.routing import get_budget_spreadsheet_id_for_user, get_user_config, now_pacific
 
 LOG_HEADERS = ["request_id", "fingerprint", "result_json", "created_at"]
 
@@ -64,6 +64,30 @@ class WorkbookSnapshot:
     settings: BillSnapshot
     recorded_plans: set[tuple[str, str]] = field(default_factory=set)
     settled_dates: BillDates = field(default_factory=dict)
+    allocations: list[dict[str, Any]] = field(default_factory=list)
+    as_of: date | None = None
+
+    def bill_allocations(self, plan: BillPlan, month: str) -> list[dict[str, Any]]:
+        def matches(value: dict[str, Any]) -> bool:
+            if value.get("sourceWorksheet") != "income" or value.get("lifecycle", "active") != "active":
+                return False
+            period = f"{value['sourceYear']:04d}-{list(calendar.month_name).index(value['sourceSheetTitle']):02d}" if value.get("sourceSheetTitle") in calendar.month_name[1:] else ""
+            if not period or period > month:
+                return False
+            if value.get("payerOwner") == self.owner:
+                return (value.get("billPlanId") == plan.id if value.get("billPlanId") else
+                    bill_label_key(value.get("sourceValues", {}).get("item") or value.get("item") or value["category"]) == bill_label_key(plan.source_label))
+            return value.get("partnerOwner") == self.owner and bill_label_key(value.get("partnerSourceLabel") or value["category"]) == bill_label_key(plan.source_label)
+        values = [a for a in self.allocations if matches(a)]
+        latest = max(((a['sourceYear'], list(calendar.month_name).index(a['sourceSheetTitle'])) for a in values), default=None)
+        return [a for a in values if (a['sourceYear'], list(calendar.month_name).index(a['sourceSheetTitle'])) == latest]
+
+    def responsible_owner(self, plan: BillPlan, month: str) -> str | None:
+        roles = {a["payerOwner"] for a in self.bill_allocations(plan, month)}
+        charge = next((c for c in decode_charges(self.rows.get(CHARGES_TAB, [])) if c.plan_id == plan.id and c.month == month), None)
+        if charge and charge.payer_owner:
+            roles.add(charge.payer_owner)
+        return next(iter(roles)) if len(roles) == 1 else None if roles else self.owner
 
     def charge(self, plan: BillPlan, month: str) -> dict[str, Any]:
         title = calendar.month_name[int(month[5:])]
@@ -75,9 +99,18 @@ class WorkbookSnapshot:
         column = charge.amount_column if charge else 4 if plan.category == "subscriptions_wants" else 3
         value = cell(self.rows[title], row or 0, column)
         due = self.settled_dates.get((month, bill_label_key(label))) or plan.due_date(month)
+        when = (due.isoformat() if due else None) if plan.kind == "variable" else charge.charge_date if charge else due.isoformat() if due else None
+        recorded = bool(charge and charge.recorded) or (plan.id, month) in self.recorded_plans
+        amount = round(numeric(value) * 100)
+        known = recorded or amount > 0
+        related = [a for a in self.bill_allocations(plan, month) if a['sourceYear'] == self.year and a['sourceSheetTitle'] == title]
+        gross = related[0].get('grossCents') if len(related) == 1 and related[0]['payerOwner'] == self.owner else amount
         return {"available": True, "month": month, "row": row, "amountColumn": column,
-                "amountCents": round(numeric(value) * 100), "date": charge.charge_date if charge else due.isoformat() if due else None,
-                "recorded": bool(charge and charge.recorded) or (plan.id, month) in self.recorded_plans, "sourceLabel": label,
+                "amountCents": amount, "billAmountCents": gross, "date": when,
+                "status": "paid" if known and when and when <= (self.as_of or now_pacific().date()).isoformat() else "confirmed" if known else "unconfirmed",
+                "paymentPolicy": "autopay", "canConfirmAmount": self.responsible_owner(plan, month) == self.owner,
+                "splitPending": bool(charge and charge.recorded and charge.payer_owner == self.owner and plan.split_method != "none" and not related),
+                "recorded": recorded, "sourceLabel": label,
                 "virtual": not plan.monthly_source and not charge,
                 "version": fingerprint([plan.version, month, charge, row, value, cell(self.formulas[title], row or 0, column)] if charge is None
                     else [plan.version, month, charge.__dict__, row, value, cell(self.formulas[title], row or 0, column)])}
@@ -119,6 +152,7 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
     from bookiebot.reimbursements import service as reimbursements
     ledger = reimbursements.build_reimbursement_store().snapshot(owner, include_inactive=True) if reimbursements.enabled() else {}
     allocations = ledger.get("allocations", [])
+    snapshot.allocations, snapshot.as_of = allocations, today
     snapshot.settled_dates = settled_bill_dates(allocations, ledger.get("events", []), owner=owner, as_of=today)
     if allocations:
         snapshot.settings = replace(snapshot.settings, version=fingerprint([snapshot.settings.version,

@@ -80,9 +80,9 @@ async function screenshot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs
    await press(row);await panel(page).getByRole('textbox',{name:'Name',exact:true}).fill('Retained draft');await icon.click();await explanation(page);assert.equal(await panel(page).getByRole('textbox',{name:'Name',exact:true}).inputValue(),'Retained draft');
    await screenshot(page,`prediction-${engine.name()}-${c.width}`);
    await press(panel(page).getByRole('button',{name:/^(Enter monthly amount|Monthly amount)$/,exact:false}));
-   await panel(page).getByRole('textbox',{name:'Amount paid',exact:true}).fill('125.67');await press(panel(page).getByRole('button',{name:'Review',exact:true}));
+   await panel(page).getByRole('textbox',{name:'Bill amount',exact:true}).fill('125.67');await press(panel(page).getByRole('button',{name:'Review',exact:true}));
    assert.equal(reviews,1);assert.equal(confirms,0,'Review never records the actual');
-   const record=panel(page).getByRole('button',{name:'Record amount',exact:true});await record.waitFor();await page.waitForTimeout(470);await press(record);
+   const record=panel(page).getByRole('button',{name:'Confirm amount',exact:true});await record.waitFor();await page.waitForTimeout(470);await press(record);
    await page.waitForFunction(()=>!document.querySelector('.bb-bills-row[data-predicted=true]'));assert.equal(confirms,1);assert.match(await row.innerText(),/\$125\.67/);assert.equal(await shell.locator('.bb-bill-prediction-info').count(),0,'Actual replaces the icon and forecast');
    await page.setViewportSize({width:c.width>=800?382:951,height:c.width>=800?740:648});await page.waitForTimeout(520);assert.match(await row.innerText(),/\$125\.67/);
    await page.getByRole('button',{name:'Back',exact:true}).click();await page.getByRole('button',{name:'Back',exact:true}).click();

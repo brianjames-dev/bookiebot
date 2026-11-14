@@ -2,6 +2,10 @@
 
 User scope: simplify Settings, especially notification explanations. Add Bills to configure Subscriptions, Variable bills (manually entered monthly amounts), and Fixed bills, with create/update/delete and recurring split settings. Confirmed answers: choose a starting month, preserve previous months; include monthly amount entry here. A third answer explicitly confirmed recurring splits affect new charges; existing charges open the existing split editor separately. Implement/deploy by standing repo protocol, with isolated financial tests only.
 
+## November 14 invoice lifecycle
+
+A variable amount can be confirmed before payment and reimbursed in advance. Retain that source and its canonical split while using the saved autopay date for the payer's Current/Transactions; recipient cash follows confirmed receipts. Daily grouped payer-only check-ins open the native amount Review/Confirm scene, with per-bill lead/Off and owner/Pacific-day visible acknowledgement. Keep preferences/leases operational and financial authority in the existing hidden sheets. Current prepared billing month only; no future worksheet creation or guessed transaction writes. Scheduled corrections and split recovery stay in Bills through canonical editors. See Decisions, docs/BILLS.md and STATUS checklist 290.
+
 ## Verified audit
 
 - Brian personal 2026: `_BookieBot Bill Schedule` A:K, headers bill_key/display_name/recurrence/pull_day/pull_months/source_label/account/notes/updated_at/expected_amount/tracking_mode. Student Loan is automatic; Rent/PG&E/Recology/Water manual. Hannah has A:I templates with missing dates.

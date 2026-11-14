@@ -79,12 +79,12 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      assert(await panel.getByRole('button',{name:'Use split',exact:true}).isDisabled(),'Invalid split draft survives folds');
      await panel.getByRole('textbox',{name:"Brian's share percentage",exact:true}).fill('42.25');await transition(page,panel.getByRole('button',{name:'Use split',exact:true}),reduced,'Recurring split → settings');
      await transition(page,panel.getByRole('button',{name:'Enter monthly amount',exact:true}),reduced,'Settings → monthly amount');
-     await panel.getByRole('textbox',{name:'Amount paid',exact:true}).fill('98.43');
+     await panel.getByRole('textbox',{name:'Bill amount',exact:true}).fill('98.43');
      await transition(page,panel.getByRole('button',{name:'Review',exact:true}),reduced,'Monthly amount → review');
      await fold(page,width>=800?382:867);await fold(page,width);
-     await panel.getByRole('button',{name:'Record amount',exact:true}).waitFor();assert.equal(reviews.at(-1).amount,'98.43');
+     await panel.getByRole('button',{name:'Confirm amount',exact:true}).waitFor();assert.equal(reviews.at(-1).amount,'98.43');
      await transition(page,panel.getByRole('button',{name:'Back',exact:true}),reduced,'Monthly review → amount');
-     assert.equal(await panel.getByRole('textbox',{name:'Amount paid',exact:true}).inputValue(),'98.43');
+     assert.equal(await panel.getByRole('textbox',{name:'Bill amount',exact:true}).inputValue(),'98.43');
      await transition(page,panel.getByRole('button',{name:'Cancel',exact:true}),reduced,'Monthly amount → settings');
      assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'PG&E draft');assert.equal(await panel.getByRole('spinbutton',{name:'Payment day',exact:true}).inputValue(),'23');
      await transition(page,panel.getByRole('button',{name:/^Recurring split/}),reduced,'Settings → saved split');

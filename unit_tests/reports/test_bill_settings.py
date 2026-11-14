@@ -59,7 +59,7 @@ def test_current_charge_inspection_exposes_only_the_canonical_public_row(saved, 
     reader = Mock(return_value=[row])
     monkeypatch.setattr(transactions, "load_transactions", reader)
     value = bills.charge_transaction(B, saved.loan.id, source.settings.period)
-    reader.assert_called_once_with(B, "2026-11", fresh=True)
+    reader.assert_called_once_with(B, "2026-11", fresh=True, include_scheduled=True)
     assert value["transaction"]["id"] == row["id"]
     assert value["item"]["fields"] == {"amount": "60.23"}
     assert value["item"]["capabilities"]["update"]

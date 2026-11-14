@@ -52,7 +52,7 @@ Bill logging accepts affirmative requests such as `Log rent $2100`, `I paid $210
 
 Entered bill amounts stay queued in Calendar/Projected until their saved withdrawal/autopay date. On that date they count as paid in Current and Transactions using the existing source identity. Missing/ambiguous schedules stay queued; unentered estimates never become actuals. See [Bill payment timing](docs/BILL_PAYMENT_TIMING.md).
 
-Unentered variable bills use an average of available prior personal bill amounts in Bills and Projected Overview/Calendar, marked by a small explanation icon. Manually entering the actual replaces the prediction; Current and Transactions never count a prediction. [Prediction basis and safeguards](docs/BILLS.md#variable-bill-predictions).
+Unentered variable bills use an average of available prior personal bill amounts in Bills and Projected Overview/Calendar, marked by a small explanation icon. Confirming the bill amount replaces its prediction; it enters Current and Transactions on the saved autopay date. Early reimbursement stays separate. A payer-only daily in-app check-in opens the native amount editor near payment day, with per-bill timing and Later. [Prediction basis and safeguards](docs/BILLS.md#variable-bill-predictions).
 
 Recurring subscriptions also appear in Transactions once their saved withdrawal date arrives, using Current's existing monthly/yearly schedule amounts. Future charges remain in Calendar/Projected. Subscription occurrences show company logos and Needs/Wants colors, with schedule-controlled amounts rather than ordinary purchase editing. See [Transactions](docs/TRANSACTIONS.md).
 

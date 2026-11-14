@@ -231,7 +231,8 @@ def runtime_tables(owner: str, bill_rows: list[list[str]], subscription_schedule
                         remaining.append(replace(part, effective_from=end))
                 portions = remaining
                 monthly.append(replace(view, source_tab=BILL_TAB, effective_from=charge.month, effective_until=end,
-                    pull_day=date.fromisoformat(charge.charge_date).day, cadence="monthly", pull_months=()))
+                    pull_day=plan.pull_day if plan.kind == "variable" else date.fromisoformat(charge.charge_date).day,
+                    cadence="monthly", pull_months=()))
             monthly.extend(portions)
         else:
             portions = [view]

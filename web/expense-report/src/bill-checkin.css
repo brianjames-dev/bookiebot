@@ -1,0 +1,14 @@
+.bb-bill-checkin { inset-inline-end:var(--bb-duo-overlay,0px);width:min(440px,calc(100% - var(--bb-duo-overlay,0px) - 32px)); }
+.bb-bill-checkin-list { display:grid;gap:4px;margin:0 0 12px; }
+.bb-bill-checkin-list button { display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:10px 0;color:hsl(var(--foreground));background:transparent;border:0;border-bottom:1px solid hsl(var(--border));text-align:left;cursor:pointer; }
+.bb-bill-checkin-list button>svg { width:20px;height:20px;flex:none;color:hsl(var(--primary)); }
+.bb-bill-checkin-list button>span { flex:1;min-width:0; }
+.bb-bill-checkin-list strong { display:block;font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.bb-bill-checkin-list small { display:block;color:hsl(var(--muted-foreground));font-size:13px;margin-top:4px; }
+.bb-bills-month-status { display:flex;align-items:center;gap:8px;color:hsl(var(--muted-foreground));font-size:13px;margin:0; }
+.bb-bills-month-status svg { width:16px;height:16px;flex:none;color:hsl(var(--primary)); }
+.bb-bills-month-amount { font-size:28px;margin:0;line-height:1.2; }
+.bb-bills-reminder { margin-top:4px; }
+.bb-bills-scheduled-icon { position:absolute;inset-inline-end:28px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:44px;height:44px;border:0;background:transparent;color:hsl(var(--muted-foreground)); }
+.bb-bills-scheduled-icon svg { width:14px;height:14px; }
+.bb-bills-row-shell:has(.bb-bills-scheduled-icon) .bb-bills-row-amount { margin-inline-end:44px; }

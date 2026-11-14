@@ -19,37 +19,45 @@ def event(**changes):
             "status": "confirmed", "date": "2026-11-02", **changes}
 
 
-@pytest.mark.parametrize("owner", ["brian", "hannah"])
-def test_confirmed_bill_uses_its_original_date_for_both_people(owner):
-    result = settled_bill_dates([evidence()], [event()], owner=owner, as_of=date(2026, 11, 13))
-    assert result == {("2026-11", "pge"): date(2026, 11, 1)}
+def test_repayment_retains_recipient_cash_date_without_paying_the_utility():
+    assert not settled_bill_dates([evidence()], [event()], owner="brian", as_of=date(2026, 11, 13))
+    result = settled_bill_dates([evidence()], [event()], owner="hannah", as_of=date(2026, 11, 13))
+    assert result == {("2026-11", "pge"): date(2026, 11, 2)}
     state = bill_payment_state("PG&E", 2026, 11, [], as_of=date(2026, 11, 13),
                               recorded_on=result["2026-11", "pge"])
-    assert state.paid and state.withdrawal_date == date(2026, 11, 1)
+    assert state.paid and state.withdrawal_date == date(2026, 11, 2)
 
 
 @pytest.mark.parametrize("change", [
-    {"settledCents": 4900}, {"clearedCents": 1}, {"lifecycle": "cancelled"},
+    {"settledCents": 4900}, {"settledCents": 0}, {"lifecycle": "cancelled"},
     {"sourceWorksheet": "expense"}, {"sourceSheetTitle": "October"},
     {"expenseDate": "2026-11-30"}, {"sourceYear": 2025}, {"partnerShareCents": 0},
 ])
 def test_incomplete_future_or_unrelated_evidence_cannot_release_a_bill(change):
-    assert not settled_bill_dates([evidence(**change)], [event()], owner="brian", as_of=date(2026, 11, 13))
+    assert not settled_bill_dates([evidence(**change)], [event()], owner="hannah", as_of=date(2026, 11, 13))
 
 
 @pytest.mark.parametrize("change", [{"status": "pending"}, {"status": "reversed"},
                                     {"amountCents": 4900}, {"date": "2026-11-30"}, {"date": "unknown"}])
 def test_only_confirmed_effective_receipts_establish_settlement(change):
-    assert not settled_bill_dates([evidence()], [event(**change)], owner="brian", as_of=date(2026, 11, 13))
+    assert not settled_bill_dates([evidence()], [event(**change)], owner="hannah", as_of=date(2026, 11, 13))
 
 
 def test_ambiguous_sources_do_not_infer_a_payment_date():
     assert not settled_bill_dates([evidence(), evidence(id="other-bill")],
-        [event(), event(allocationId="other-bill")], owner="brian", as_of=date(2026, 11, 13))
+        [event(), event(allocationId="other-bill")], owner="hannah", as_of=date(2026, 11, 13))
     assert not settled_bill_dates([evidence()], [event()], owner="other", as_of=date(2026, 11, 13))
 
 
 def test_recipient_qualified_source_does_not_match_another_personal_bill():
     result = settled_bill_dates([evidence(partnerSourceLabel="Brian · Student Loan")], [event()],
         owner="hannah", as_of=date(2026, 11, 13))
-    assert result == {("2026-11", "brianstudentloan"): date(2026, 11, 1)}
+    assert result == {("2026-11", "brianstudentloan"): date(2026, 11, 2)}
+
+
+@pytest.mark.parametrize('cleared', [0, 3000])
+def test_partial_confirmed_cash_keeps_its_receipt_date_without_a_payer_override(cleared):
+    allocation = evidence(settledCents=2000, clearedCents=cleared)
+    receipt = event(amountCents=2000)
+    assert settled_bill_dates([allocation], [receipt], owner='hannah', as_of=date(2026,11,13)) == {('2026-11','pge'):date(2026,11,2)}
+    assert not settled_bill_dates([allocation], [receipt], owner='brian', as_of=date(2026,11,13))
