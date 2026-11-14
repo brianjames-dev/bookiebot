@@ -27,6 +27,18 @@ def test_review_is_pure_and_changes_future_only():
     assert change.public()["reviewVersion"] == change.review_version
 
 
+@pytest.mark.parametrize("starts", ["2026-11", "2026-12"])
+def test_selected_starting_month_is_inclusive_and_continues_into_future_years(starts):
+    source = snapshot()
+    change = prepare_change(source, update(bill=form(amount="70.00", effectiveFrom=starts)), today=TODAY)
+    versions = change.rows("recurring-from-selected-month")
+    assert selected(versions, "2026-10")[0].amount_cents == 6023
+    assert selected(versions, starts)[0].amount_cents == 7000
+    for month in ("2026-12", "2027-01", "2027-11"):
+        assert selected(versions, month)[0].amount_cents == 7000
+    assert source.plans[0].amount_cents == 6023
+
+
 def test_new_split_default_starts_after_existing_charge_and_carries_on_non_split_edits():
     change = prepare_change(snapshot(), update(), today=TODAY)
     assert change.after.split_starts_on == "2026-11-14"

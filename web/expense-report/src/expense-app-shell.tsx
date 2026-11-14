@@ -1,10 +1,9 @@
 import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
-import { ArrowLeft } from "lucide-react"
 import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationDock } from "./app-navigation-bar"
 import { NavigationViewport } from "./navigation-viewport"
 import { observePageScroll, readPageScroll, scrollPageTo } from "./page-scroll"
-import { AppHeaderTools } from "./app-header-tools"
+import { AppHeaderBack, AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
 import { expenseReportIdentity } from "./expense-app-session"
@@ -55,7 +54,6 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
   const [widgetGuideOpen, setWidgetGuideOpen] = useState(false)
   const [billsOpen, setBillsOpen] = useState(false)
-  const [billTransaction, setBillTransaction] = useState<{month:string;id:string;date?:string}|null>(null)
   const [askOpen, setAskOpen] = useState(false)
   const [sourceRequest, setSourceRequest] = useState<{ section: string; id: number; scope: string } | null>(null)
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
@@ -212,7 +210,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
-  return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape, monthHeader:true, billTransaction, consumeBillTransaction:()=>setBillTransaction(null) }}>
+  return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape, monthHeader:true }}>
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
       data-duo-enabled={duo.enabled || undefined}
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
@@ -220,7 +218,11 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
       <PullToRefresh screen={screen} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen || billsOpen} />
       <header className="bb-masthead bb-shell-masthead">
-        <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"} />
+        {screen === 'settings' ? <div className="bb-settings-masthead-title"><AppHeaderBack disabled={billsOpen&&(guard.pending||guard.uncertain)} onBack={()=>{
+          if(billsOpen){widgetGuideRef.current=false;setBillsOpen(false)}
+          else if(widgetGuideOpen)selectScreen('settings')
+          else selectScreen(lastMain)
+        }}/><h1>{billsOpen?'Bills':widgetGuideOpen?'Widget setup':'Settings'}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)}
           onSettings={() => selectScreen(screen === "settings" && !widgetGuideOpen && !billsOpen ? lastMain : "settings")} />
@@ -254,7 +256,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <ReconciliationScreen controller={reconciliation} embeddedHeader />}
       </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen || billsOpen}>
-        {report && <><div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={() => selectScreen(lastMain)}><ArrowLeft aria-hidden="true" />Back</button><h1>Settings</h1></div>
+        {report && <>
         <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
           <div className="bb-setting-row"><span>Duo landscape layout</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Duo landscape layout" aria-checked={duo.enabled} onClick={duo.toggle}><span /></button></div>
           <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
@@ -274,7 +276,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         </section>
         </>}
       </main>
-      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen==='settings'&&billsOpen} onBack={()=>{widgetGuideRef.current=false;setBillsOpen(false)}} onTransaction={target=>{setBillTransaction(target);selectScreen('transactions')}}/></main>}
+      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen==='settings'&&billsOpen}/></main>}
       {screen === "settings" && widgetGuideOpen && <main className="bb-shell-settings bb-main" aria-label="Widget setup">
         <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
       </main>}

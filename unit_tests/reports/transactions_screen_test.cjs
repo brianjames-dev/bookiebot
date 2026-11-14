@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm')
 const {createRequire}=require('node:module'),req=createRequire(path.resolve('web/expense-report/package.json'))
 const React=req('react'),Renderer=req('react-test-renderer'),ts=req('typescript'),{act}=Renderer
-const plans=[],requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map()
+const plans=[],requests=[],timers=new Map(),events=[],storage=new Map(),statuses=new Map(),cache=new Map(),listeners=new Map()
 let serial=0,tree,work,duoWide=false,now=Date.UTC(2026,10,11,12)
 const updates=[],onUpdated=time=>updates.push(time)
 class TestDate extends Date { constructor(...args){super(...(args.length?args:[now]))} static now(){return now} }
@@ -16,7 +16,7 @@ const presentation={
  './report-app':{DailySpendingChart:props=>React.createElement('div',{'data-graph-open':props.graphOpen},props.metricLabel,props.total,props.transactionControl,props.graphControls,props.graphStatus),CategoryFilterControl:props=>React.createElement('select',{'aria-label':props.label,value:props.filter,onChange:event=>props.onFilterChange(event.target.value)},props.filters.map(option=>React.createElement('option',{key:option.value,value:option.value},option.label)))}
 }
 const update=()=>{const all=[...statuses.values()];work={pending:all.some(v=>v.pending),uncertain:all.some(v=>v.uncertain),dirty:all.some(v=>v.dirty)}}
-const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(){},removeEventListener(){},dispatchEvent(e){events.push(e.type)},matchMedia(){return {matches:true,addEventListener(){},removeEventListener(){}}}}
+const win={setTimeout(fn,ms){timers.set(++serial,{fn,ms});return serial},clearTimeout(id){timers.delete(id)},addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(fn)},removeEventListener(type,fn){listeners.get(type)?.delete(fn)},dispatchEvent(e){events.push(e.type);for(const fn of listeners.get(e.type)||[])fn(e)},matchMedia(){return {matches:true,addEventListener(){},removeEventListener(){}}}}
 global.IS_REACT_ACT_ENVIRONMENT=true
 function load(file){
  if(cache.has(file))return cache.get(file)
@@ -100,6 +100,15 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  await click('Refresh transactions');await respond(listing());await click('Delete');await submit();await respond(review(body()));await click('Confirm delete');const deleted=body();await reject();await run(()=>tree.unmount());assert.ok(storage.size)
  const posts=requests.filter(r=>r.options.body).length;await run(()=>{tree=Renderer.create(fixture(false))});assert.equal(requests.filter(r=>r.options.body).length,posts)
  await click('Check saved status');assert.match(latest().url,new RegExp('/commands/'+deleted.requestId+'$'));await respond({state:'done',success:true});await respond(listing());assert.equal(storage.size,0);assert.equal(work.uncertain,false);await run(()=>tree.unmount())
+ // A Bills follow-up may resolve a request restored by the hidden Transactions
+ // tab. Only its exact authenticated command receipt may release that guard.
+ storage.set('bookiebot:transaction-request:Brian',JSON.stringify(deleted));
+ await run(()=>{tree=Renderer.create(fixture(false))});const externalPosts=requests.filter(r=>r.options.body).length;
+ await run(()=>win.dispatchEvent({type:'bookiebot:reimbursements-changed'}));assert.match(latest().url,new RegExp('/commands/'+deleted.requestId+'$'));
+ await respond({state:'uncertain'});assert.equal(work.uncertain,true,'An unrelated success event cannot clear an unresolved request');
+ await run(()=>win.dispatchEvent({type:'bookiebot:reimbursements-changed'}));await respond({state:'done',success:true});
+ assert.equal(work.uncertain,false,'A verified external receipt releases the retained tab guard');assert.equal(storage.size,0);
+ assert.equal(requests.filter(r=>r.options.body).length,externalPosts,'Cross-tab recovery never repeats a writer');await run(()=>tree.unmount());
  for(const editing of[false,true]){
   const customRow={...row,capabilities:{...row.capabilities,cancel_split:editing},split:editing?'custom':'',splitOptions:{...row.splitOptions,incomePayerCents:799,...(editing?{payerCents:411,payerBasisPoints:3333}:{})}}
   await run(()=>{tree=Renderer.create(fixture(true))});await tick();await respond(listing([customRow]));await click(editing?'Edit split':'Split')

@@ -42,7 +42,7 @@ Bills editors share Transactions' fields, spacing, surfaces, footer buttons and 
 
 Open Bills uses a compact fixed editor above the dock with independently scrolling bill rows; closed layout retains its native spacing and places the divider after the expanded editor.
 
-Bills refinements retain native merchant logos, editable effective-month type changes, direct open-pane selection and separate guarded review/confirmation. Adopted virtual charges are removed from spreadsheet summaries atomically; nonstandard subscription categories receive physical sources. Definitively rejected preparation retries without replaying successful or unknown writers. Settings header/content insets follow Overview.
+Bills refinements retain native merchant logos, editable effective-month type changes, direct open-pane selection and separate guarded review/confirmation. Adopted virtual charges are removed from spreadsheet summaries atomically; nonstandard subscription categories receive physical sources. Definitively rejected preparation retries without replaying successful or unknown writers. Settings uses a contextual title and shared glass Back control. Bills uses Transactions’ fold-aware pane geometry; recurring split editing stays within Bills and recorded-current-month changes require an explicit opt-in plus canonical review.
 
 Track the dates that bills and subscriptions usually pull money from the bank, then send proactive Discord reminders.
 

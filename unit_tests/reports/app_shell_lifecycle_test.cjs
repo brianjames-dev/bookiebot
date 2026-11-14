@@ -208,6 +208,9 @@ async function main() {
   await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
   assert.equal(button(tree, 'Settings').props['aria-current'], 'page')
   assert.ok(visible(tools), 'Header tools remain accessible on Settings')
+  assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Settings','The top layer names the active Settings screen')
+  assert.equal(tree.root.findAllByProps({className:'bb-report-brand'}).filter(visible).length,0,'Settings replaces the BookieBot brand')
+  assert.equal(button(tree,'Back').props.className,'bb-shell-icon','Back shares the header tool control')
   // Widget setup is a temporary view, not a document navigation or form reset.
   await tap(tree, 'Pair a widget'); await fill(tree, 'Widget name', 'Private widget draft')
   const widgetReadsBeforeGuide = widgetReads, financialReadsBeforeGuide = { ...reads }
@@ -223,7 +226,7 @@ async function main() {
   assert.equal(widgetWrites.length, 1)
   win.scrollY = 700; await tap(tree, 'Setup & widgets'); await tap(tree, 'Settings')
   assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'The gear returns from setup without leaving Settings or replacing its code')
-  await tap(tree, 'Setup & widgets'); win.scrollY = 360; await tap(tree, 'Transactions'); await tap(tree, 'Settings')
+  await tap(tree, 'Setup & widgets'); assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Widget setup'); win.scrollY = 360; await tap(tree, 'Transactions'); await tap(tree, 'Settings')
   assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'A tab detour returns to the original Settings position, not guide scroll')
   await tap(tree, 'Setup & widgets'); await tap(tree, 'Get a setup code')
   assert.equal(widgetFocuses, 1); assert.equal(widgetScrolls, 1); assert.equal(win.scrollY, 480)

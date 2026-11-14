@@ -18,16 +18,16 @@ async function geometry(page){return page.evaluate(()=>{
  }});
  await settle(page);const overview=await geometry(page);
  await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await page.locator('main[aria-label="Settings"]:visible').waitFor();await settle(page);
- const settings=await geometry(page);for(const part of ['brand','word','avatar'])for(const axis of ['x','y'])assert(Math.abs(overview[part][axis]-settings[part][axis])<1,`${engine.name()} ${width}: ${part} ${axis} matches Overview`);
+ const settings=await geometry(page);assert.equal(await page.locator('.bb-report-brand:visible').count(),0);assert.equal(await page.locator('.bb-settings-masthead-title h1').innerText(),'Settings');
  assert(Math.abs(settings.main.x-overview.title.x)<1,'Settings content starts at the Overview inset');
- assert(Math.abs(settings.settings.y-overview.title.y)<1,'Settings title shares the month baseline: '+JSON.stringify({overview,settings}));
+ assert(await page.getByRole('button',{name:'Back',exact:true}).isVisible(),'Settings exposes its contextual glass Back');
  assert(settings.section.x>=settings.main.x-.5,'Cards do not bleed outside the content inset');
  await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').first().waitFor();
  const pge=panel.locator('.bb-bills-row').filter({hasText:'PG&E'}),icloud=panel.locator('.bb-bills-row').filter({hasText:'iCloud Storage'});
  assert.equal(await pge.locator('.bb-transaction-icon').getAttribute('data-merchant'),'pge','Reuse the actual company logo resolver');
  assert.notEqual(await icloud.locator('.bb-transaction-icon').getAttribute('data-merchant'),'fallback');
  if(width<800){assert.equal(await panel.locator('.bb-bills').evaluate(el=>getComputedStyle(el).paddingBottom),'0px','No duplicate dock clearance in the list');}
- await tap(page,pge);await settle(page);await panel.getByRole('combobox',{name:'Type',exact:true}).selectOption('fixed');await panel.getByRole('textbox',{name:'Amount',exact:true}).fill('98.43');await panel.getByRole('textbox',{name:'Name',exact:true}).fill('PG&E fixed');
+ await tap(page,pge);await settle(page);await panel.getByRole('combobox',{name:'Type',exact:true}).selectOption('fixed');await panel.getByRole('textbox',{name:'Recurring amount',exact:true}).fill('98.43');await panel.getByRole('textbox',{name:'Name',exact:true}).fill('PG&E fixed');
  if(width>=800){
   const retained=await panel.locator('.bb-bills-editor').evaluate(el=>(window.__billEditor=el,true));assert(retained);
   await tap(page,icloud);await settle(page);assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'iCloud Storage');

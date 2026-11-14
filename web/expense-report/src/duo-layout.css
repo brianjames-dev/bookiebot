@@ -45,8 +45,6 @@ body:has(.bb-page[data-duo-enabled="true"]) { height: 100%; overflow: hidden; ov
 }
 .bb-page[data-duo-landscape="true"][data-screen="settings"]>.bb-shell-settings:not(.bb-shell-bills) { width:calc(100% - var(--bb-duo-inset) - var(--bb-duo-right-inset));max-width:none;margin-inline:var(--bb-duo-inset) var(--bb-duo-right-inset); }
 .bb-page[data-duo-landscape="true"][data-screen="settings"]>.bb-shell-masthead { width:100%; }
-.bb-page[data-duo-landscape="true"][data-screen="settings"]>.bb-shell-settings:not(.bb-shell-bills)>.bb-settings-heading { grid-template-rows:var(--bb-duo-heading);padding:0; }
-.bb-page[data-duo-landscape="true"][data-screen="settings"]>.bb-shell-settings:not(.bb-shell-bills)>.bb-settings-heading>h1 { font-size:34px; }
 .bb-app-shell[data-duo-landscape="true"] .bb-bottom-navigation {
   left: calc(var(--bb-duo-fold) + var(--bb-duo-right-width) / 2);
   width: min(404px, var(--bb-duo-right-width));

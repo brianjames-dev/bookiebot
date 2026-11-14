@@ -46,17 +46,18 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});assert.equal(commands.length,1);
   await tap(page,panel.getByRole('button',{name:'Add bill',exact:true}));
   await panel.getByLabel('Name',{exact:true}).fill('Insurance');await panel.getByLabel('Type',{exact:true}).selectOption('fixed');
-  await panel.getByLabel('Amount',{exact:true}).fill('42.30');await panel.getByLabel('Payment day',{exact:true}).fill('15');
-  await panel.getByLabel('Starting month',{exact:true}).fill('2026-12');await panel.getByRole('checkbox',{name:'Split new charges',exact:true}).check();
+  await panel.getByRole('textbox',{name:'Recurring amount',exact:true}).fill('42.30');await panel.getByLabel('Payment day',{exact:true}).fill('15');
+  await panel.getByLabel('Applies from',{exact:true}).fill('2026-12');await tap(page,panel.getByRole('button',{name:/^Recurring split/}));await panel.getByRole('checkbox',{name:'Split future charges',exact:true}).check();
   await panel.getByLabel("Brian's share percentage",{exact:true}).fill('42.25');await panel.getByRole('button',{name:'Split by income',exact:true}).click();
   assert.equal(await panel.getByLabel("Brian's share percentage",{exact:true}).inputValue(),'64.73');
   assert(!(await panel.getByRole('slider').getAttribute('aria-valuetext')).includes('$'),'Recurring defaults are percentages');
   await page.setViewportSize({width:width<800?867:382,height:669});
   assert.equal(await panel.getByLabel('Name',{exact:true}).inputValue(),'Insurance','Folding retains the form');
   await page.setViewportSize({width,height:width<800?657:669});
+  await tap(page,panel.getByRole('button',{name:'Use split',exact:true}));
   const geometry=await panel.evaluate(p=>{const list=p.querySelector('.bb-bills-toolbar').getBoundingClientRect(),editor=p.querySelector('.bb-bills-editor').getBoundingClientRect();return {list:{x:list.x,width:list.width},editor:{x:editor.x,width:editor.width},overflow:document.documentElement.scrollWidth-innerWidth}});
   assert(geometry.overflow<=1,'Bills does not overflow');
-  if(width>=800){assert(Math.abs(geometry.list.width-geometry.editor.width)<2,'Open DUO uses equal panes');assert(geometry.editor.x>geometry.list.x+geometry.list.width)}
+  if(width>=800){assert(geometry.list.width>0&&geometry.editor.width>0,'Both usable panes have content width');assert(geometry.editor.x>geometry.list.x+geometry.list.width)}
   else assert.equal(geometry.list.x,geometry.editor.x,'Closed editor uses the normal content width');
   if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+`/bills-editor-${engine.name()}-${width}-${dark?'dark':'light'}.png`,fullPage:true})}
   await tap(page,panel.getByRole('button',{name:'Review',exact:true}));await panel.getByRole('heading',{name:'Review bill',exact:true}).waitFor();
@@ -70,11 +71,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
   if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+`/bills-${engine.name()}-${width}-${dark?'dark':'light'}.png`,fullPage:true})}
   await tap(page,panel.locator('.bb-bills-row').filter({hasText:'PG&E'}));
-  await tap(page,panel.getByRole('button',{name:'Edit this charge / split',exact:true}));
-  await page.locator('.bi-editor[data-operation="split"]:visible').waitFor();
-  assert.equal(await page.locator('.bb-transactions .bb-daily-day-header').getAttribute('aria-expanded'),'true','Bill handoff opens the selected transaction day');
-  await page.setViewportSize({width:width<800?867:382,height:669});await page.locator('.bi-editor[data-operation="split"]:visible').waitFor();
-  assert.equal(commands.length,3,'Opening an existing split never changes it');assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
+  assert.equal(await panel.getByRole('button',{name:'Edit this charge / split',exact:true}).count(),0,'Recurring setup does not navigate to Transactions');
   await page.close();count++;
  }
  }finally{await browser.close()}

@@ -154,7 +154,7 @@ export function WidgetSetupGuide({ onBack, onPair }: { onBack: () => void; onPai
   }
 
   return <div className="bb-widget-guide">
-    <div className="bb-settings-heading"><button type="button" className="bb-settings-back" onClick={onBack}><ArrowLeft aria-hidden="true" />Back to Settings</button><h1>Widget setup</h1></div>
+
     <ol className="bb-widget-guide-steps">
       <li><h2>Copy to Scriptable</h2><p>Install <a href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer">Scriptable</a>, tap <strong>+</strong>, paste the script and name it <strong>BookieBot</strong>.</p>
         <div className="bb-widget-actions"><button type="button" className="bb-toolbar-button" disabled={loading || !source} onClick={() => void copyScript()}>{loading ? "Loading script…" : "Copy script"}</button></div>

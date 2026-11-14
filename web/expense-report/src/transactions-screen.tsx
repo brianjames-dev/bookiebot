@@ -93,7 +93,6 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const manager=useRef<{close?:(instant?:boolean)=>void}>({})
   const [listing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
   const [displayScope, setDisplayScope] = useState({filter:"all",month:initialMonth,day:''})
-  const billLoad = useRef('')
   const [selected, setSelected] = useState<RecordedTransaction | null>(null)
   const [repaymentOpen,setRepaymentOpen]=useState(false),splitOrigin=useRef<'row'|'repayment'>('row')
   const [operation, setOperation] = useState<Operation | null>(null), [draft, setDraft] = useState<Record<string, string>>({})
@@ -187,10 +186,22 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     return()=>{live=false;window.clearTimeout(timer);controller.abort()}
   },[active,historyEnabled,historyKey])
   useEffect(() => {
-    const refresh = () => { if(ownChange.current)return; freshNext.current=true; setRevision(value => value + 1) }
+    let live=true
+    const refresh = () => {
+      if(ownChange.current)return
+      freshNext.current=true; setRevision(value => value + 1)
+      // Bills can finish a canonical request recovered by this retained tab.
+      // Verify that exact owner-scoped receipt before releasing its old guard;
+      // a successful change elsewhere is not itself proof of this outcome.
+      if(pending&&!inFlight.current)void request(`/app/transactions/commands/${encodeURIComponent(pending.requestId)}`).then(next=>{
+        if(!live||!mounted.current||next?.state!=='done')return
+        setPending(null);setResult(next)
+        try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved?.requestId===pending.requestId)sessionStorage.removeItem(storageKey)}catch{}
+      }).catch(()=>{/* Keep an unresolved claim until its receipt is readable. */})
+    }
     window.addEventListener("bookiebot:reimbursements-changed", refresh)
-    return () => window.removeEventListener("bookiebot:reimbursements-changed", refresh)
-  }, [])
+    return () => {live=false;window.removeEventListener("bookiebot:reimbursements-changed", refresh)}
+  }, [pending?.requestId,storageKey])
   const changed = () => { ownChange.current=true; window.dispatchEvent(new Event("bookiebot:transactions-changed")); window.dispatchEvent(new Event("bookiebot:reimbursements-changed")); ownChange.current=false }
   const begin = (row: RecordedTransaction, op: Operation, origin:'row'|'repayment'='row') => {
     splitOrigin.current=origin;setRepaymentOpen(Boolean(row.repayment&&(op==='split'||op==='cancel_split')))
@@ -199,26 +210,6 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     setDestination(row.category); setMethod((row.split || 'income') as SplitMethod); setReview(null); setReviewBody(null); setError(""); setResult(null);setNotice(null)
     setSplitInput(null);setCustomValid(true); setPayerShareCents(row.splitOptions?.payerCents ?? (row.split==='fronted'?0:row.split==='custom'?allocate(row.amountCents,row.splitOptions?.payerBasisPoints??5000):row.split==='equal'?allocate(row.amountCents,5000):row.splitOptions?.incomePayerCents??allocate(row.amountCents,5000)))
   }
-  useEffect(()=>{
-    const target=navigation?.billTransaction
-    if(!active||!target||busy||pending)return
-    const targetDay=target.date||'Undated'
-    if(month!==target.month||day!==targetDay||search||filter!=='all'){discard();setSearch('');setFilter('all');setDay(targetDay);setMonth(target.month);return}
-    if(loading||displayScope.month!==target.month||displayScope.day!==targetDay||!listing)return
-    const row=listing.items.find(item=>item.id===target.id)
-    if(!row){
-      const attempt=target.id+':'+listing.nextOffset
-      if(listing.nextOffset!==null&&billLoad.current!==attempt){billLoad.current=attempt;void load(listing.nextOffset,true);return}
-      setError('Refresh Transactions to find this bill charge.');navigation?.consumeBillTransaction?.();return
-    }
-    const header=product.current?.querySelector<HTMLButtonElement>('.bb-daily-day-header')
-    if(header?.getAttribute('aria-expanded')==='false')header.click()
-    if(duoWide)setDuoGraphOpen(false)
-    if(row.capabilities.split)begin(row,'split')
-    else if(row.capabilities.update)begin(row,'update')
-    else setSelected(row)
-    navigation?.consumeBillTransaction?.()
-  },[active,navigation?.billTransaction,month,day,search,filter,listing,loading,displayScope.month,displayScope.day,busy,pending])
   const preview = async (undo?: {id: string; month: string}, directUndo=false) => {
     if (inFlight.current || uncertain || commit) return
     const row = selected
