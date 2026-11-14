@@ -38,6 +38,7 @@ function load(file) {
   if (cache.has(file)) return cache.get(file)
   const exports = {}; cache.set(file, exports)
   const requireModule = name => {
+    if(name==='./bill-checkin')return {BillCheckin:()=>null}
     if (name.endsWith('.css')) return {}
     if (name === 'konsta/react') return konsta.exports
     if (name === 'react-dom') return {...req(name),createPortal:(children,target)=>{assert.equal(target,doc.body,'Duo dock portals to the viewport outside page content');return children}}

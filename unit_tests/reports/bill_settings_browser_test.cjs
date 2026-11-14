@@ -36,11 +36,11 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
   const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').waitFor();
   await tap(page,panel.locator('.bb-bills-row').first());
   await tap(page,panel.getByRole('button',{name:'Enter monthly amount',exact:true}));
-  await panel.getByLabel('Amount paid',{exact:true}).fill('98.43');
+  await panel.getByLabel('Bill amount',{exact:true}).fill('98.43');
   await tap(page,panel.getByRole('button',{name:'Review',exact:true}));
-  await panel.getByRole('heading',{name:'Record amount',exact:true}).waitFor();
+  await panel.getByRole('heading',{name:'Confirm amount',exact:true}).waitFor();
   assert.equal(commands.length,0,'Review never records an amount');
-  await tap(page,panel.getByRole('button',{name:'Record amount',exact:true}));
+  await tap(page,panel.getByRole('button',{name:'Confirm amount',exact:true}));
   await panel.getByRole('button',{name:'Check saved status',exact:true}).waitFor();
   await tap(page,panel.getByRole('button',{name:'Check saved status',exact:true}));
   await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});assert.equal(commands.length,1);

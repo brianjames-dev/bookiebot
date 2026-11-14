@@ -51,13 +51,15 @@ def test_managed_empty_subscriptions_do_not_resurrect_visible_sheet_subtotals():
     assert report._subscription_breakdown_totals([["Static Bills & Subscriptions (Needs)", "100"]], [], [], month, managed=True) == (0, 0)
 
 
-def test_variable_entry_uses_actual_entry_date_and_wants_sources_use_d_column():
+def test_variable_entry_keeps_saved_autopay_date_and_wants_sources_use_d_column():
     p = replace(plan(), id="variable_123", kind="variable", name="Water", source_label="Water", amount_cents=None,
                 pull_day=22, monthly_source=True, version="v1")
     c = BillCharge(p.id, "2026-11", "2026-11-13", p.name, p.category, 1, 1, 3, source_anchor(p.id, "2026-11"), 6301, True)
     bills, _, _ = runtime_tables("brian", encode([p], BILL_TAB, []), [], [], encode_charges([c], []))
     payments = report._payment_items([["", "Water", "63.01"]], bills, report.BudgetMonth(2026, 11), as_of=TODAY)
-    assert [(p.amount, p.date, p.status) for p in payments] == [(63.01, "2026-11-13", "paid")]
+    assert [(p.amount, p.date, p.status) for p in payments] == [(63.01, "2026-11-22", "queued")]
+    elapsed = report._payment_items([["", "Water", "63.01"]], bills, report.BudgetMonth(2026, 11), as_of=date(2026, 11, 22))
+    assert [(p.amount, p.date, p.status) for p in elapsed] == [(63.01, "2026-11-22", "paid")]
     wanted = sub(monthly_source=True, category="subscriptions_wants")
     bills, _, _ = runtime_tables("brian", [], encode([wanted], SUBSCRIPTION_TAB, []), [])
     rows = [["", "Xfinity", "999", "10"]]
@@ -90,7 +92,7 @@ def test_importing_legacy_bills_never_invents_a_saved_recurring_split():
     assert legacy_plans("brian", rows, [])[0].split_method == "none"
 
 
-def test_legacy_lowercase_split_keeps_zero_cash_recorded_and_its_actual_date(monkeypatch):
+def test_legacy_lowercase_split_keeps_zero_cash_recorded_and_its_autopay_date(monkeypatch):
     p = replace(plan(), id="pge_1234", kind="variable", name="PG&E", source_label="PG&E",
                 amount_cents=None, pull_day=22, monthly_source=True, version="v1")
     client, _ = fixture([p])
@@ -106,7 +108,8 @@ def test_legacy_lowercase_split_keeps_zero_cash_recorded_and_its_actual_date(mon
         lambda: SimpleNamespace(snapshot=lambda *a, **kw: {"allocations": [value], "events": [event]}))
     source = storage.read_workbook(B, TODAY, client=client)
     assert source.charge(p, "2026-11")["recorded"]
-    assert source.charge(p, "2026-11")["date"] == "2026-11-01"
+    assert source.charge(p, "2026-11")["date"] == "2026-11-22"
+    assert source.charge(p, "2026-11")["status"] == "confirmed"
     assert source.settings.earliest_months[p.id] == "2026-12"
     runtime, _, _ = runtime_tables("brian", source.rows[BILL_TAB], [], [])
     from bookiebot.sheets.recurring_rows import with_recorded_months

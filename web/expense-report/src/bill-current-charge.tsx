@@ -6,7 +6,7 @@ import {allocate,type SplitMethod} from './transaction-split-model'
 import type {SplitInputDraft} from './transaction-split-control'
 import {useAppWorkStatus} from './app-work-guard'
 
-export type CurrentBillIntent={id:string;month:string;name:string;amountCents:number|null;method:'none'|SplitMethod;basis:number;requestId?:string;stage?:'configuration'|'offer'|'adopt'|'charge';needsAdoption?:boolean;offerCurrent?:boolean;recordedAmountCents?:number}
+export type CurrentBillIntent={id:string;month:string;name:string;amountCents:number|null;method:'none'|SplitMethod;basis:number;requestId?:string;stage?:'configuration'|'offer'|'adopt'|'charge';needsAdoption?:boolean;offerCurrent?:boolean;recordedAmountCents?:number;editAmount?:boolean}
 type Command={operation:TransactionOperation;id:string;month:string;version:string;updates?:{amount:number};method?:SplitMethod;payerShareCents?:number;requestId?:string;reviewVersion?:string}
 type Checked={reviewVersion:string;operation:TransactionOperation;after:Record<string,string>;share?:TransactionChangeSummary['share']}
 type Result={state:string;success?:boolean;detail?:string}
@@ -36,7 +36,7 @@ export function BillCurrentCharge({intent,ownerName,onDone}:{intent:CurrentBillI
    const amountChange=intent.amountCents!==null&&intent.amountCents!==next.amountCents&&!completed.current.has('update')
    const targetShare=intent.method==='income'?(next.splitOptions?.incomePayerCents??allocate(next.amountCents,intent.basis)):allocate(next.amountCents,intent.method==='none'?10000:intent.method==='equal'?5000:intent.method==='fronted'?0:intent.basis)
    const splitChange=!completed.current.has('split')&&!completed.current.has('cancel_split')&&((intent.method==='none'?'':intent.method)!==next.split||intent.method!=='none'&&next.splitOptions?.payerCents!==undefined&&targetShare!==next.splitOptions.payerCents)
-   const action=amountChange?'update':splitChange?(intent.method==='none'?'cancel_split':'split'):null
+   const action=intent.editAmount?(completed.current.has('update')?null:'update'):amountChange?'update':splitChange?(intent.method==='none'?'cancel_split':'split'):null
    if(!action){setFinished(true);return}
    setOperation(action);setDraft(((intent.amountCents??next.amountCents)/100).toFixed(2))
    const wanted=intent.method==='none'?'income':intent.method;setMethod(wanted);setPayerCents(targetShare);setSplitInput(null);setValid(true)
@@ -91,7 +91,7 @@ export function BillCurrentCharge({intent,ownerName,onDone}:{intent:CurrentBillI
  return <div className="bi-editor bb-bills-current" data-design="levels">
   <header className="sp-flow-heading bb-bill-heading"><h2>{finished?'This month is up to date':'This month’s charge'}</h2><p className="sp-flow-context">{row?.title??intent.name} · {new Date(intent.month+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})}</p></header>
   {finished?<><p className="bi-footnote">The recorded amount and split match your changes. Recurring settings are saved separately.</p><footer className="bi-editor-footer"><button type="button" className="bi-primary" onClick={onDone}>Close</button></footer></>:<>
-   <p className="bi-footnote">{operation==='update'?'Review the recorded amount, then its split.':'Review the recorded split.'} Future settings are already saved.</p>
+   <p className="bi-footnote">{intent.editAmount?'This month only. The saved autopay date stays the same.':`${operation==='update'?'Review the recorded amount, then its split.':'Review the recorded split.'} Future settings are already saved.`}</p>
    {inline&&<InlineTransactionEditor embedded snapshot={inline} onField={(_,value)=>{setDraft(value);setReview(null)}} onCategory={()=>{}} onShare={(value,next)=>{setPayerCents(value);setMethod(next);setReview(null)}} onSplitInput={setSplitInput} onValidity={setValid} onReview={()=>void prepare()} onConfirm={()=>void save()} onBack={()=>setReview(null)} onCancel={onDone} onRemoveSplit={()=>{setOperation('cancel_split');setReview(null)}}/>}
    {!row&&!busy&&!pending&&<button type="button" className="bb-settings-action" onClick={()=>void load()}>Reload charge</button>}
    {busy&&!row&&<p role="status">Loading charge…</p>}

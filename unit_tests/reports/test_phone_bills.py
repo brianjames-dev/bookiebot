@@ -17,6 +17,9 @@ async def client(monkeypatch, saved):
     monkeypatch.setenv("BOOKIEBOT_PUBLIC_BASE_URL", "http://127.0.0.1")
     monkeypatch.setattr(phone_app, "build_app_access_store", lambda: saved.commands.access)
     monkeypatch.setattr(service, "build_commands", lambda: saved.commands)
+    from bookiebot.reports import bill_checkin
+    monkeypatch.setattr(bill_checkin, 'build_store', lambda: bill_checkin._store(saved.commands.access))
+    monkeypatch.setattr(bill_checkin, 'read_workbook', service.read_workbook)
     app = web.Application()
     phone_bills.register_phone_bill_routes(app)
     http = TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True))
@@ -34,9 +37,9 @@ async def test_cookie_and_same_origin_before_any_bill_service(client, monkeypatc
     read, write = Mock(side_effect=AssertionError("No read")), Mock(side_effect=AssertionError("No write"))
     monkeypatch.setattr(service, "listing", read)
     monkeypatch.setattr(service.BillCommands, "command", write)
-    for path in ["/app/bills", "/app/bills/commands/request", "/app/bills/plan/charge"]:
+    for path in ["/app/bills", "/app/bills/check-in", "/app/bills/commands/request", "/app/bills/plan/charge"]:
         assert (await client.http.get(path)).status == 401
-    for path in ["/app/bills", "/app/bills/review"]:
+    for path in ["/app/bills", "/app/bills/review", "/app/bills/check-in", "/app/bills/check-in/preferences"]:
         assert (await client.http.post(path, headers=HEADERS, json={})).status == 401
     client.connect()
     for headers in [{}, {**HEADERS, "Origin": "https://foreign.invalid"}, {**HEADERS, "Sec-Fetch-Site": "cross-site"}]:
@@ -45,6 +48,42 @@ async def test_cookie_and_same_origin_before_any_bill_service(client, monkeypatc
     assert (await client.http.post("/app/bills/review", headers=HEADERS, json=[])).status == 400
     read.assert_not_called()
     write.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_checkin_claim_visible_ack_owner_scope_and_preference_validation(client, monkeypatch):
+    from datetime import datetime
+    from bookiebot.reports import bill_checkin
+    from bookiebot.sheets.routing import PACIFIC_TZ
+    client.connect()
+    monkeypatch.setattr(bill_checkin, 'now_pacific', lambda: datetime(2026, 11, 15, 12, tzinfo=PACIFIC_TZ))
+    eligible = Mock(return_value={'day':'2026-11-15', 'bills':[{'id':'pge','name':'PG&E','date':'2026-11-22','month':'2026-11','overdue':False}]})
+    monkeypatch.setattr(bill_checkin, 'candidates', eligible)
+    assert (await client.http.get('/app/bills/check-in')).status == 200
+    body = {'action':'claim', 'token':'first-device-token'}
+    for headers in ({}, {**HEADERS, 'Origin':'https://foreign.invalid'}):
+        assert (await client.http.post('/app/bills/check-in', headers=headers, json=body)).status == 403
+    assert (await client.http.post('/app/bills/check-in', headers=HEADERS, json={**body,'owner':'hannah'})).status == 400
+    claimed = await (await client.http.post('/app/bills/check-in', headers=HEADERS, json=body)).json()
+    assert claimed['claimed'] and claimed['bills'][0]['id'] == 'pge'
+    other = await (await client.http.post('/app/bills/check-in', headers=HEADERS, json={**body,'token':'second-device-token'})).json()
+    assert not other['claimed']
+    shown = await (await client.http.post('/app/bills/check-in', headers=HEADERS, json={**body,'action':'shown'})).json()
+    assert shown['shown']
+    assert not (await (await client.http.post('/app/bills/check-in', headers=HEADERS, json=body)).json())['claimed']
+    assert (await client.http.post('/app/bills/check-in/preferences', headers=HEADERS, json={'id':'not-your-bill','leadDays':7})).status == 400
+    assert not client.saved.client.http_client.sent
+
+
+@pytest.mark.asyncio
+async def test_no_eligible_bills_does_not_consume_a_checkin_day(client, monkeypatch):
+    from bookiebot.reports import bill_checkin
+    client.connect()
+    monkeypatch.setattr(bill_checkin, 'candidates', lambda *a, **kw: {'day':'2026-11-15','bills':[]})
+    result = await (await client.http.post('/app/bills/check-in', headers=HEADERS, json={'action':'claim','token':'first-device-token'})).json()
+    assert not result['claimed']
+    with bill_checkin.build_store().access.connect() as db:
+        assert db.execute('SELECT COUNT(*) AS total FROM app_bill_checkin_days').fetchone()['total'] == 0
 
 
 @pytest.mark.asyncio

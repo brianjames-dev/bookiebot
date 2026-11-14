@@ -1,4 +1,4 @@
-"""Read-only evidence that a shared bill was paid before its usual pull date."""
+"""Read-only dates for actual recipient repayments, separate from autopay."""
 from __future__ import annotations
 
 import calendar
@@ -19,19 +19,19 @@ def parsed_date(value: str) -> date | None:
 
 def settled_bill_dates(allocations: list[dict[str, Any]], events: list[dict[str, Any]],
                        *, owner: str, as_of: date) -> BillDates:
-    """Use actual confirmed settlement, never a pending report or debt reset.
+    """Retain the recipient's confirmed cash without paying the payer's bill.
 
-    The original bill date owns the occurrence. A later recurring schedule
-    cannot hide it after the partner's whole share has already been repaid.
-    Match exact normalized labels; ambiguous evidence stays unavailable.
+    A utility invoice can be split and reimbursed before its withdrawal. Only
+    the recipient's real repayment belongs on a receipt date; the payer still
+    uses the saved autopay date. Match partial cash to confirmed receipts too;
+    a debt reset cannot erase real cash or create a new payment date.
     """
     candidates: dict[tuple[str, str], set[tuple[str, date]]] = {}
     for value in allocations:
-        if (owner not in {value.get('payerOwner'), value.get('partnerOwner')}
+        if (owner != value.get('partnerOwner')
                 or value.get('sourceWorksheet') != 'income'
                 or value.get('lifecycle', 'active') != 'active'
-                or value.get('clearedCents', 0) or value.get('partnerShareCents', 0) <= 0
-                or value.get('settledCents', 0) < value['partnerShareCents']):
+                or value.get('partnerShareCents', 0) <= 0 or value.get('settledCents', 0) <= 0):
             continue
         paid_on = parsed_date(value['expenseDate'])
         title = value['sourceSheetTitle']
@@ -39,13 +39,17 @@ def settled_bill_dates(allocations: list[dict[str, Any]], events: list[dict[str,
                 or not title or paid_on.year != value['sourceYear']
                 or paid_on.month != list(calendar.month_name).index(title)):
             continue
-        received = sum(event['amountCents'] for event in events
-                       if event['allocationId'] == value['id'] and event['status'] == 'confirmed'
-                       and (when := parsed_date(event['date'])) is not None and when <= as_of)
-        if received < value['partnerShareCents']:
+        receipts = [(event['amountCents'], when) for event in events
+                    if event['allocationId'] == value['id'] and event['status'] == 'confirmed'
+                    and (when := parsed_date(event['date'])) is not None and when <= as_of]
+        received = sum(amount for amount, _ in receipts)
+        if received != value['settledCents']:
             continue
-        labels = ({value.get('sourceValues', {}).get('item'), value.get('item'), value['category']}
-                  if value['payerOwner'] == owner else {value.get('partnerSourceLabel') or value['category']})
+        paid_on = max(when for _, when in receipts)
+        # A monthly source cannot be moved to another month by an inferred date.
+        if paid_on.strftime('%Y-%m') != f"{value['sourceYear']:04d}-{list(calendar.month_name).index(title):02d}":
+            continue
+        labels = {value.get('partnerSourceLabel') or value['category']}
         for label in labels:
             if key := bill_label_key(str(label or '')):
                 candidates.setdefault((paid_on.strftime('%Y-%m'), key), set()).add((value['id'], paid_on))

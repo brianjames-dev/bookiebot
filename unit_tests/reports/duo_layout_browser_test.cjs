@@ -61,6 +61,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url()),name=url.pathname;
+  if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills/check-in'))return options.checkin?options.checkin(route):route.fulfill({json:{day:new Date().toISOString().slice(0,10),bills:[],claimed:false}});
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/transactions')&&options.transactions)return options.transactions(route);
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills')&&options.bills)return options.bills(route);
   if(url.origin!=='https://bookie.test'||request.method()!=='GET'){unexpected.push(request.method()+' '+url);return route.abort();}
