@@ -77,7 +77,7 @@ export interface SubscriptionItem extends AmountRow {
   pullMonth: number | null
 }
 
-export type CalendarEventKind = "subscription" | "bill" | "income"
+export type CalendarEventKind = "subscription" | "bill" | "income" | "transfer"
 
 export interface BillPrediction {
   amountCents: number

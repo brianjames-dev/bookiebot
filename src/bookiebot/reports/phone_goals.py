@@ -34,15 +34,30 @@ async def _goals(request: web.Request) -> web.Response:
             body = json.loads(raw)
             if not isinstance(body, dict):
                 raise GoalValidationError("Invalid savings goal request.")
-            result = await asyncio.to_thread(lambda: build_goals_store().command(session.owner_key, body))
+            from bookiebot.reports.savings_transfers import can_archive_goal, goal_payload
+            def command_goal():
+                store = build_goals_store()
+                before_archive = None
+                if body.get('operation') == 'archive':
+                    from bookiebot.reports.bill_settings import _commands
+                    commands = _commands(store.access)
+                    before_archive = lambda owner, identity: can_archive_goal(session.actor_key, owner, identity, commands=commands)
+                value = store.command(session.owner_key, body, before_archive=before_archive)
+                enriched = goal_payload(session.actor_key, {'goals': [value['goal']]})
+                return {**value, 'goal': enriched['goals'][0]}
+            result = await asyncio.to_thread(command_goal)
         elif "goal_id" in request.match_info:
             try:
                 offset = int(request.query.get("offset", "0"))
             except ValueError as exc:
                 raise GoalValidationError("Invalid history page.") from exc
-            result = await asyncio.to_thread(lambda: build_goals_store().history(session.owner_key, request.match_info["goal_id"], offset=offset))
+            from bookiebot.reports.savings_transfers import goal_history
+            result = await asyncio.to_thread(lambda: goal_history(session.actor_key, session.owner_key,
+                request.match_info['goal_id'], offset, store=build_goals_store()))
         else:
             result = await asyncio.to_thread(lambda: build_goals_store().list_goals(session.owner_key))
+            from bookiebot.reports.savings_transfers import goal_payload
+            result = await asyncio.to_thread(goal_payload, session.actor_key, result)
         current = await _session(request)
         if current is None or current.owner_key != session.owner_key:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)

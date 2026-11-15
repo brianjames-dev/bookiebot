@@ -19,6 +19,7 @@ B, H = "676638528590970917", "830984827904851969"
 @pytest.fixture
 def subscriptions(monkeypatch):
     clock = [datetime(2026, 11, 4, tzinfo=PACIFIC_TZ)]
+    monkeypatch.setattr('bookiebot.sheets.savings_transfers.read_all', lambda *a, **k: [])
     source = [["cadence", "name", "amount", "pull_day", "pull_month", "kind", "active"],
         ["monthly", "Xfinity", "61.50", "2", "", "needs", "yes"],
         ["monthly", "Slate Digital All Access", "14.99", "4", "", "wants", "yes"],

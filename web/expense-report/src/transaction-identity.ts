@@ -2,10 +2,11 @@ import catalog from './merchant-logos.json'
 import { companyIdentity, companyLogo } from './company-logo'
 import type { ExpenseEntry } from './types'
 
-export type DailyTransaction = ExpenseEntry & { id?: string; status?: 'recorded' | 'scheduled'; kind?: 'bill' | 'subscription' | 'income' | 'expense' | 'payment' | 'savings' }
+export type DailyTransaction = ExpenseEntry & { id?: string; status?: 'recorded' | 'scheduled'; kind?: 'bill' | 'subscription' | 'income' | 'expense' | 'payment' | 'savings' | 'transfer' }
 const byAlias = new Map(catalog.flatMap(merchant => merchant.aliases.map(alias => [companyIdentity(alias), merchant] as const)))
 
 export function transactionMerchant(entry: DailyTransaction, aliases: Record<string, string> = {}) {
+  if(entry.kind==='transfer') return null
   // Location is authoritative: a product called Apple at an unknown shop must
   // never borrow Apple's mark. Match exact names and explicit store suffixes.
   const value = (entry.location.trim() || entry.item.trim()).replace(/\s+(?:(?:store|location)\s*#?\s*|#\s*)\d{1,6}$/i, '')
@@ -28,6 +29,7 @@ const families = [
   { categories: ['Bills & Utilities', 'Bills and Utilities', 'Bills', 'Utilities'], label: 'Bills & utilities', icon: 'receipt', token: 'bills' },
   { categories: ['Income'], label: 'Income', icon: 'dollar', token: 'income' },
   { categories: ['Savings', 'Saved'], label: 'Savings', icon: 'piggy', token: 'savings' },
+  { categories: ['Transfer','Savings transfer','Savings transfers'], label: 'Transfer', icon: 'transfer', token:'savings' },
   { categories: ['ESPP', 'SpaceX ESPP'], label: 'Savings', icon: 'piggy', token: 'espp' },
 ]
 

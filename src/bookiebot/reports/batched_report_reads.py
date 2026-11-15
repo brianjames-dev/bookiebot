@@ -41,6 +41,9 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
     personal_id = get_budget_spreadsheet_id_for_user(actor_key, month.year)
     shared_id = get_shared_expenses_spreadsheet_id(month.year)
     reimbursement_books = configured_reimbursement_workbooks(actor_key, current.year)
+    from bookiebot.sheets.savings_transfers import TRANSFER_TAB, TRANSFER_STORAGE_YEAR, TRANSFER_EPOCH, decode as decode_transfers
+    supports_transfers = (month.year, month.month) >= (TRANSFER_EPOCH.year, TRANSFER_EPOCH.month)
+    transfer_book_id = get_budget_spreadsheet_id_for_user(actor_key, TRANSFER_STORAGE_YEAR) if supports_transfers else None
     selected_months = range(1, min(month.month + 1, 12) + 1)
     requested: dict[str, list[str]] = {
         personal_id: [*(calendar.month_name[number] for number in selected_months),
@@ -61,6 +64,8 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
     for spreadsheet_id in reimbursement_books.values():
         if spreadsheet_id:
             requested.setdefault(spreadsheet_id, []).append("Shared Reimbursements")
+    if transfer_book_id:
+        requested.setdefault(transfer_book_id, []).append(TRANSFER_TAB)
 
     loaded: dict[str, dict[str, list[list[str]]]] = {}
     for spreadsheet_id, titles in requested.items():
@@ -73,6 +78,8 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
             # the failed annual ledger instead of declaring old debts empty.
     personal = loaded[personal_id]
     shared = loaded[shared_id]
+    if transfer_book_id and transfer_book_id not in loaded:
+        raise ValueError('The savings transfer source is unavailable; Saved cannot be verified.')
     if month.name not in personal or month.name not in shared:
         raise MissingMonthWorksheetError(f"The {month.label} budget and shared expense tabs are required.")
 
@@ -109,6 +116,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
         shared_reimbursements=optional("Shared Reimbursements"),
         budget_history=tuple(history),
         savings_settings_rows=personal.get(SETTINGS_TAB),
+        transfer_plans=tuple(decode_transfers(loaded[transfer_book_id].get(TRANSFER_TAB, []))) if transfer_book_id else (),
         reimbursement_history=reimbursement_history_from_ledgers(
             actor_key, ledgers, as_of=current, years=checked_years, unavailable_years=unavailable_years,
         ),

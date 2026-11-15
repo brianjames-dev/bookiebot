@@ -150,7 +150,8 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
     transport = client.http_client
     metadata = transport.fetch_sheet_metadata(identity)
     props = {s["properties"]["title"]: s["properties"] for s in metadata["sheets"]}
-    titles = [t for t in [BILL_TAB, SUBSCRIPTION_TAB, CHARGES_TAB, SETTINGS_LOG_TAB, "Subscriptions", "Template", *calendar.month_name[1:]] if t in props]
+    from bookiebot.sheets.savings_transfers import TRANSFER_TAB
+    titles = [t for t in [BILL_TAB, SUBSCRIPTION_TAB, CHARGES_TAB, SETTINGS_LOG_TAB, TRANSFER_TAB, "Subscriptions", "Template", *calendar.month_name[1:]] if t in props]
     ranges = [absolute_range_name(t) for t in titles]
     loaded = []
     for render in ("FORMATTED_VALUE", "FORMULA"):

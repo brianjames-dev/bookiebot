@@ -24,6 +24,7 @@ async def client(tmp_path, monkeypatch):
     goals.initialize()
     monkeypatch.setattr(phone_app, "build_app_access_store", lambda: access)
     monkeypatch.setattr(phone_goals, "build_goals_store", lambda: goals)
+    monkeypatch.setattr('bookiebot.sheets.savings_transfers.read_all', lambda *a, **k: [])
     app = web.Application()
     phone_goals.register_phone_goal_routes(app)
     async with TestClient(TestServer(app), cookie_jar=CookieJar(unsafe=True)) as http:

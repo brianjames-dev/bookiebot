@@ -63,6 +63,7 @@ class ReportWorksheets:
     savings_settings_rows: list[list[str]] | None = None
     subscription_schedule: Any | None = None
     bill_charges: Any | None = None
+    transfer_plans: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -213,6 +214,7 @@ class ExpenseBreakdownReport:
     received_shared_reimbursements: list[SharedAllocation] | None = None
     savings_plan: SavingsPlan = field(default_factory=SavingsPlan)
     espp_history: dict[str, Any] | None = None
+    savings_transfers: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -415,6 +417,8 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
     from bookiebot.reports.batched_report_reads import batched_report_worksheets, can_batch_report_reads
     from bookiebot.sheets.auth import get_gspread_client
     from bookiebot.sheets.repo import GSpreadSheetsRepository
+    from bookiebot.sheets.savings_transfers import read_all as read_transfers, TRANSFER_EPOCH
+    supports_transfers = (month.year, month.month) >= (TRANSFER_EPOCH.year, TRANSFER_EPOCH.month)
 
     if _is_current_month(month):
         repo = get_sheets_repo()
@@ -432,6 +436,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
             shared_reimbursements=_optional_sheet(repo.find_shared_reimbursements_sheet),
             budget_history=_optional_budget_history(actor_key, month),
             reimbursement_history=read_reimbursement_history(actor_key),
+            transfer_plans=tuple(read_transfers(actor_key)) if supports_transfers and isinstance(repo, GSpreadSheetsRepository) else (),
         )
 
     gc = get_gspread_client()
@@ -454,6 +459,7 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
         shared_reimbursements=_worksheet_by_name(personal_spreadsheet, "Shared Reimbursements") if personal_spreadsheet is not None else None,
         budget_history=_optional_previous_year_budget_history(actor_key, month) + budget_history + _optional_next_year_income_history(actor_key, month),
         reimbursement_history=read_reimbursement_history(actor_key),
+        transfer_plans=tuple(read_transfers(actor_key, client=gc)) if supports_transfers else (),
     )
 
 
@@ -555,6 +561,13 @@ def build_expense_breakdown_report(
     needs_rollover, wants_rollover = _category_rollover_amounts(personal_rows)
     savings_deposits = _savings_deposits(personal_rows)
     amount_saved = _amount_saved(personal_rows, deposits=savings_deposits)
+    from bookiebot.sheets.savings_transfers import occurrences as transfer_occurrences
+    month_start = month.as_datetime().date()
+    month_end = date(month.year, month.month, calendar.monthrange(month.year, month.month)[1])
+    savings_transfers = transfer_occurrences(selected.transfer_plans, month_start, month_end)
+    if savings_transfers:
+        amount_saved = round((amount_saved or 0) + sum(t['amountCents'] for t in savings_transfers
+            if t['date'] <= generated_at.date().isoformat()) / 100, 2)
     savings_goal = _savings_goal(personal_rows)
     shared_need_entries = _entries_for_category(entries, "need_expenses")
     legacy_need_expenses = _need_expense_items(personal_rows)
@@ -601,6 +614,8 @@ def build_expense_breakdown_report(
         personal_rows=personal_rows,
         bill_predictions=_variable_bill_predictions(bill_schedule_rows, budget_history, month),
     )
+    calendar_events.extend(CalendarEvent('transfer', t['name'], t['amountCents'] / 100,
+        int(t['date'][8:]), 'savings', projected_only=t['date'] > generated_at.date().isoformat()) for t in savings_transfers)
     budget_shared_totals = _budget_shared_category_totals(personal_rows)
     itemized_shared_totals = _entry_totals_by_category(entries)
 
@@ -658,6 +673,18 @@ def build_expense_breakdown_report(
     )
     net_total = round(sum(category_balances["remaining"].values()), 2)
 
+    calendar_context = _calendar_adjacent_months(
+        month, subscriptions, bill_schedule_rows, budget_history,
+        income_projection_config, income_projection_reference, income_projection_receipts,
+        recorded_dates=paid_bill_dates,
+    )
+    for adjacent in calendar_context:
+        adjacent_start = adjacent.month.as_datetime().date()
+        adjacent_end = date(adjacent.month.year, adjacent.month.month, calendar.monthrange(adjacent.month.year, adjacent.month.month)[1])
+        adjacent.events.extend(CalendarEvent('transfer', t['name'], t['amountCents']/100, int(t['date'][8:]), 'savings',
+            projected_only=t['date'] > generated_at.date().isoformat())
+            for t in transfer_occurrences(selected.transfer_plans, adjacent_start, adjacent_end))
+
     return ExpenseBreakdownReport(
         actor_key=actor_key,
         owner_name=owner_name,
@@ -694,11 +721,7 @@ def build_expense_breakdown_report(
             recorded_dates=paid_bill_dates,
         ),
         calendar_events=calendar_events,
-        calendar_context=_calendar_adjacent_months(
-            month, subscriptions, bill_schedule_rows, budget_history,
-            income_projection_config, income_projection_reference, income_projection_receipts,
-            recorded_dates=paid_bill_dates,
-        ),
+        calendar_context=calendar_context,
         income_entries=income_entries,
         income_projection_config=income_projection_config,
         income_projection_reference=income_projection_reference,
@@ -708,6 +731,7 @@ def build_expense_breakdown_report(
         received_shared_reimbursements=received_reimbursements,
         savings_plan=savings_plan,
         espp_history=_espp_history(savings_plan, personal_rows, budget_history, month, savings_settings),
+        savings_transfers=savings_transfers,
         reimbursement_coverage=reimbursement_coverage,
         raw_sheets=[
             RawSheet("Shared Expenses", _compact_rows(shared_rows)),
@@ -2790,9 +2814,9 @@ def _report_client_payload(
         projected_savings = _calculate_month_savings(
             report.savings_plan, payload["incomeProjection"]["projectedAmount"], projected_entries, report.month,
         )
-        for values in (current_savings, projected_savings):
+        for is_projected, values in ((False, current_savings), (True, projected_savings)):
             values["estimatedEsppContribution"] = round(max(0, values["esppContribution"] - current_savings["esppContribution"]), 2)
-            values["cashSaved"] = round(report.amount_saved or 0, 2)
+            values["cashSaved"] = round(payload['savingsProjection']['projectedAmount' if is_projected else 'currentAmount'], 2)
             values["combinedContributions"] = round(values["cashSaved"] + values["esppContribution"], 2)
             values["combinedRate"] = (round(values["combinedContributions"] / values["takeHomeBeforeEspp"], 6)
                                       if values["takeHomeBeforeEspp"] else 0)
@@ -2853,7 +2877,7 @@ def _report_mode_view_from_payload(
         ),
         2,
     )
-    amount_saved = round(float(savings_projection["currentAmount"]), 2)
+    amount_saved = round(float(savings_projection['projectedAmount' if projected else 'currentAmount']), 2)
     savings_ideal = round(
         float(
             savings_projection["projectedIdeal"]
@@ -3135,6 +3159,8 @@ def _income_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]
 
 def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any]:
     current_amount = round(report.amount_saved or 0.0, 2)
+    upcoming_transfers = sum(t['amountCents'] for t in report.savings_transfers
+        if t['date'] > report.generated_at.date().isoformat()) / 100
     projected_income = _projected_income_total(
         report.income_entries,
         report.income_total,
@@ -3159,7 +3185,10 @@ def _savings_projection_payload(report: ExpenseBreakdownReport) -> dict[str, Any
     projected_minimum = round(projected_income * 0.1, 2)
     return {
         "currentAmount": current_amount,
-        "projectedAmount": current_amount,
+        "projectedAmount": round(current_amount + upcoming_transfers, 2),
+        **({'transferAmount': round(sum(t['amountCents'] for t in report.savings_transfers
+            if t['date'] <= report.generated_at.date().isoformat()) / 100, 2),
+            'upcomingTransfers': round(upcoming_transfers, 2)} if report.savings_transfers else {}),
         "currentIdeal": current_ideal,
         "currentMinimum": current_minimum,
         "projectedIdeal": projected_ideal,

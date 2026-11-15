@@ -17,6 +17,7 @@ export function activityDay(value: string, year: number, month: number): number 
   return parsedYear === year && parsedMonth === month && day >= 1 && day <= new Date(year, month, 0).getDate() ? day : null
 }
 export function calendarActivityCategory(event: CalendarEvent) {
+  if(event.kind==='transfer') return 'Savings'
   if (event.group === 'static_bills_subscriptions_needs') return 'Static Bills & Subscriptions'
   return event.kind === 'bill' ? event.group === 'rent' ? 'Rent' : 'Bills & Utilities'
     : (event.group === 'subscriptions_wants' || event.group === 'wants') ? 'Subs (Wants)' : 'Static Bills & Subscriptions'
@@ -38,7 +39,7 @@ export function calendarActivityStatus(event: CalendarEvent): ActivityStatus {
 export function reportActivity(report: ExpenseReportData, events: CalendarEvent[], projected: boolean): ReportActivity[] {
   return [
     ...report.dailyEntries.map((entry, index) => ({...entry, id:`expense-${index}`, day:activityDay(entry.date, report.year, report.month), status:'recorded' as const, dateSource:'recorded' as const})),
-    ...events.filter(event => event.kind !== 'income' && (projected || !event.projectedOnly)).map((event, index) => ({
+    ...events.filter(event => event.kind !== 'income' && event.kind !== 'transfer' && (projected || !event.projectedOnly)).map((event, index) => ({
       id:`calendar-${index}`, date:`${report.month}/${event.day}/${report.year}`, day:event.day,
       category:calendarActivityCategory(event), amount:event.amount, person:report.ownerName,
       item:event.label, location:'', status:calendarActivityStatus(event), dateSource:'scheduled' as const,

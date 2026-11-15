@@ -142,6 +142,11 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
 
 def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | None = None) -> dict[str, Any]:
     today = now_pacific().date()
+    if body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
+        from bookiebot.sheets.savings_transfers import read_source
+        from bookiebot.reports.savings_transfers import review as transfer_review
+        source = snapshot or read_source(actor)
+        return transfer_review(actor, body, source)['review']
     source = snapshot or read_workbook(actor, today)
     if body.get("operation") in {"end", "end-year", "restore-end", "restore-end-year"}:
         from bookiebot.reports.bill_cancellation import review_end, review_year, review_restore
@@ -318,7 +323,12 @@ class BillCommands:
         age = (datetime.now(timezone.utc) - datetime.fromisoformat(record["created_at"])).total_seconds()
         if record["state"] == "uncertain" or record["state"] == "running" and age >= 120:
             command = json.loads(record["command_json"])
-            if command.get("operation") in {"end-year", "restore-end-year"}:
+            if command.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
+                from bookiebot.sheets.savings_transfers import read_source
+                snapshot = read_source(actor)
+                if snapshot.year != command.get('year'):
+                    raise BillConflict('The original transfer workbook needs verification.')
+            elif command.get("operation") in {"end-year", "restore-end-year"}:
                 from bookiebot.reports.bill_cancellation import command_source
                 snapshot = command_source(actor, command, now_pacific().date())
             else:
@@ -429,7 +439,10 @@ class BillCommands:
             from bookiebot.reimbursements.projection import projection_lock
             with undo._RECENT_MUTATION_LOCK:
                 with projection_lock(build_reimbursement_store()):
-                    if body.get("operation") in {"end-year", "restore-end-year"}:
+                    if body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
+                        from bookiebot.sheets.savings_transfers import read_source
+                        source = read_source(actor)
+                    elif body.get("operation") in {"end-year", "restore-end-year"}:
                         from bookiebot.reports.bill_cancellation import command_source, authorized_child
                         authorized_child(self.access, owner, body)
                         source = command_source(actor, body, now_pacific().date())
@@ -437,10 +450,21 @@ class BillCommands:
                         source = read_workbook(actor, now_pacific().date())
                     carry = _carry_review(source, body, now_pacific().date()) if body.get("operation") == "rollover" else None
                     projection = _projection_review(source, body, now_pacific().date()) if body.get("operation") == "project" else None
-                    checked_review = carry["review"] if carry else projection["review"] if projection else review(actor, body, snapshot=source)
+                    transfer = None
+                    if body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
+                        from bookiebot.reports.savings_transfers import review as transfer_review
+                        transfer = transfer_review(actor, body, source)
+                    checked_review = transfer['review'] if transfer else carry["review"] if carry else projection["review"] if projection else review(actor, body, snapshot=source)
                     if checked_review["reviewVersion"] != body.get("reviewVersion"):
                         raise BillConflict("The bill review changed. Review it again before saving.")
-                    if body.get("operation") in {"end", "end-year", "restore-end", "restore-end-year"}:
+                    if body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
+                        from bookiebot.reports.savings_transfers import configuration_batch as transfer_batch
+                        assert transfer is not None
+                        batch, result = transfer_batch(source, transfer, request_id, digest)
+                        started = True
+                        batch.send()
+                        batch_committed = True
+                    elif body.get("operation") in {"end", "end-year", "restore-end", "restore-end-year"}:
                         from bookiebot.reports.bill_cancellation import end_batch, restore_batch
                         build = restore_batch if body["operation"].startswith("restore") else end_batch
                         batch, result = build(source, body, checked_review, request_id, digest, now_pacific().date())

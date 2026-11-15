@@ -296,6 +296,8 @@ def register_phone_app_routes(app: web.Application) -> None:
     register_phone_transaction_routes(app)
     from bookiebot.reports.phone_bills import register_phone_bill_routes
     register_phone_bill_routes(app)
+    from bookiebot.reports.phone_transfers import register_phone_transfer_routes
+    register_phone_transfer_routes(app)
     from bookiebot.reports.phone_reconciliation import register_phone_reconciliation_routes
     register_phone_reconciliation_routes(app)
     from bookiebot.reports.phone_history import register_phone_history_routes

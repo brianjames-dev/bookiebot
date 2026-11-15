@@ -1,13 +1,13 @@
 import {ChangedText,ChangedMoney,ChangedItem} from './transaction-value-motion'
 import { memo, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ChevronDown, DollarSign, Droplets, Flame, Fuel, GraduationCap, House, Package, PiggyBank, ReceiptText, Repeat2, ShieldCheck, ShoppingBag, ShoppingBasket, Utensils, Wifi, Zap } from 'lucide-react'
+import { ChevronDown, DollarSign, Droplets, Flame, Fuel, GraduationCap, House, Package, PiggyBank, ReceiptText, Repeat2, ShieldCheck, ShoppingBag, ShoppingBasket, Utensils, Wifi, Zap, ArrowRightLeft } from 'lucide-react'
 import { createDailyDayMotion, DAILY_PREVIEW_COUNT } from './daily-transactions-motion'
 import { transactionCategory, transactionMerchant, transactionText, type DailyTransaction } from './transaction-identity'
 
 const decodedLogos = new Set<string>()
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 const categoryOrder = new Intl.Collator('en-US', { sensitivity: 'base' })
-const icons: Record<string, typeof House> = { house: House, basket: ShoppingBasket, fuel: Fuel, utensils: Utensils, bag: ShoppingBag, package: Package, repeat: Repeat2, receipt: ReceiptText, dollar: DollarSign, piggy: PiggyBank, droplets: Droplets, wifi: Wifi, zap: Zap, flame: Flame, shield: ShieldCheck, graduation: GraduationCap }
+const icons: Record<string, typeof House> = { house: House, basket: ShoppingBasket, fuel: Fuel, utensils: Utensils, bag: ShoppingBag, package: Package, repeat: Repeat2, receipt: ReceiptText, dollar: DollarSign, piggy: PiggyBank, transfer:ArrowRightLeft, droplets: Droplets, wifi: Wifi, zap: Zap, flame: Flame, shield: ShieldCheck, graduation:GraduationCap }
 
 export function TransactionIcon({ entry, aliases, eager = false }: { entry: DailyTransaction; aliases?: Record<string, string>; eager?: boolean }) {
   const merchant = transactionMerchant(entry, aliases)

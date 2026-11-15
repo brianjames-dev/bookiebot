@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
-import { CalendarDays, Rows2, CreditCard, DollarSign, Droplets, GraduationCap, House, Repeat, ShieldCheck, Sparkles, Wifi, Zap } from 'lucide-react'
+import { CalendarDays, Rows2, CreditCard, DollarSign, Droplets, GraduationCap, House, Repeat, ShieldCheck, Sparkles, Wifi, Zap, PiggyBank } from 'lucide-react'
 import {BillPredictionInfo} from './bill-prediction-info'
 import { companyLogo } from './company-logo'
 import { MetricAmount } from './amount-appearance'
@@ -11,18 +11,18 @@ const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD
 const dateLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 export type CalendarSelection = { key: string; title: string; events: CalendarEvent[] }
 export function calendarEventDescription(event: CalendarEvent): string {
-  return `${event.label} · ${event.kind === 'subscription' ? 'Subscription' : event.kind === 'bill' ? 'Bill' : 'Income'} · ${event.amountUnknown ? 'Amount not entered' : money.format(event.amount)} · ${calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}${event.amountEstimated ? ' · Estimated amount' : ''}`
+  return `${event.label} · ${event.kind === 'transfer' ? 'Savings transfer' : event.kind === 'subscription' ? 'Subscription' : event.kind === 'bill' ? 'Bill' : 'Income'} · ${event.amountUnknown ? 'Amount not entered' : money.format(event.amount)} · ${calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}${event.amountEstimated ? ' · Estimated amount' : ''}`
 }
 function FallbackIcon({ event }: { event: CalendarEvent }) {
   const label = event.label.toLowerCase()
-  const Icon = event.kind === 'income' ? DollarSign : event.kind === 'subscription' ? Repeat
+  const Icon = event.kind === 'transfer' ? PiggyBank : event.kind === 'income' ? DollarSign : event.kind === 'subscription' ? Repeat
     : /water/.test(label) ? Droplets : /loan/.test(label) ? GraduationCap : /rent/.test(label) ? House
     : /internet|xfinity|spectrum|phone/.test(label) ? Wifi : /insurance/.test(label) ? ShieldCheck
     : /pge|pg&e|electric|power|gas/.test(label) ? Zap : CreditCard
   return <Icon aria-hidden="true" />
 }
 export function CompanyMedallion({ event, aliases }: { event: CalendarEvent; aliases?: Record<string, string> }) {
-  const logo = companyLogo(event.label, aliases)
+  const logo = event.kind === 'transfer' ? null : companyLogo(event.label, aliases)
   const [loaded, setLoaded] = useState<string | null>(null)
   const [failed, setFailed] = useState<string | null>(null)
   const ready = Boolean(logo && loaded === logo.src && failed !== logo.src)
@@ -135,7 +135,7 @@ export function CashflowCalendar({ year, month, events, context = [], aliases, p
         })}
       </div>
     </div>
-    <div className="bb-cf-legend" aria-label="Calendar legend">{(['bill', 'subscription', 'income'] as const).map(kind => <span key={kind}><i style={{ background: CALENDAR_COLORS[kind] }} />{kind === 'bill' ? 'Bills' : kind === 'subscription' ? 'Subs' : 'Income'}</span>)}</div>
+    <div className="bb-cf-legend" aria-label="Calendar legend">{(['bill', 'subscription', 'income', ...(events.some(e=>e.kind==='transfer')?['transfer' as const]:[])] as const).map(kind => <span key={kind}><i style={{ background: CALENDAR_COLORS[kind] }} />{kind === 'bill' ? 'Bills' : kind === 'subscription' ? 'Subs' : kind==='transfer'?'Transfers':'Income'}</span>)}</div>
   </section>
 }
 export function CalendarDayDetails({ selection, aliases }: { selection: CalendarSelection; aliases?: Record<string, string> }) {
@@ -145,7 +145,7 @@ export function CalendarDayDetails({ selection, aliases }: { selection: Calendar
       {totals.incoming > 0 && <span><small>Incoming</small><strong>{money.format(totals.incoming)}</strong></span>}</div>
     <ul>{selection.events.map((event, i) => <li key={`${event.kind}-${event.label}-${i}`}>
       <CompanyMedallion event={event} aliases={aliases} /><span><strong>{event.label}</strong>
-        <small>{event.kind === 'subscription' ? (event.group === 'subscriptions_wants' ? 'Subs (Wants)' : 'Subs (Needs)') : event.kind === 'income' ? 'Income' : 'Bill'} · {calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}{event.amountEstimated&&!event.prediction ? ' · Estimated' : ''}</small></span>
+        <small>{event.kind === 'transfer' ? 'Savings transfer' : event.kind === 'subscription' ? (event.group === 'subscriptions_wants' ? 'Subs (Wants)' : 'Subs (Needs)') : event.kind === 'income' ? 'Income' : 'Bill'} · {calendarActivityStatus(event) === 'scheduled' || event.amountUnknown ? 'Scheduled' : 'Recorded'}{event.amountEstimated&&!event.prediction ? ' · Estimated' : ''}</small></span>
       <b>{event.amountUnknown ? 'Not entered' : money.format(event.amount)}{event.prediction&&<BillPredictionInfo items={[{label:event.label,prediction:event.prediction}]}/>}</b>
     </li>)}</ul>
     <p>Scheduled dates do not confirm bank posting.{totals.unknown ? ' Bills without an entered amount are not included in totals.' : ''}</p>

@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 import threading
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from bookiebot.reports.app_access import AppAccessStore, PostgresAppAccessStore, build_app_access_store
@@ -66,6 +66,8 @@ class GoalsStore:
         self.access = access
 
     def initialize(self) -> None:
+        from bookiebot.reports.financial_commands import initialize_commands
+        initialize_commands(self.access)
         with self.access.connect(write=True) as db:
             if isinstance(self.access, PostgresAppAccessStore):
                 # Separate app processes may initialize goals together during
@@ -134,7 +136,7 @@ class GoalsStore:
                                        "createdAt": row["created_at"], "reversedAt": row["reversed_at"]} for row in rows[:25]],
                     "nextOffset": offset + 25 if len(rows) > 25 else None}
 
-    def command(self, owner: str, body: dict[str, Any]) -> dict[str, Any]:
+    def command(self, owner: str, body: dict[str, Any], *, before_archive: Callable[[str, str], None] | None = None) -> dict[str, Any]:
         self._owner(owner)
         request_id = body.get("requestId")
         if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,80}", request_id):
@@ -145,6 +147,9 @@ class GoalsStore:
             # and repeated requests. SQLite already reserves its writer above.
             db.execute("INSERT INTO app_goal_owners(owner_key) VALUES (?) ON CONFLICT(owner_key) DO NOTHING", (owner,))
             db.execute("SELECT owner_key FROM app_goal_owners WHERE owner_key = ?" + self.access._pairing_lock, (owner,)).fetchone()
+            if body.get('operation') == 'archive' and before_archive:
+                db.execute('INSERT INTO app_transaction_owners VALUES (?) ON CONFLICT(owner_key) DO NOTHING', (owner,))
+                db.execute('SELECT owner_key FROM app_transaction_owners WHERE owner_key=?' + self.access._pairing_lock, (owner,)).fetchone()
             existing = db.execute("SELECT fingerprint, result_json FROM app_goal_commands WHERE owner_key = ? AND request_id = ?", (owner, request_id)).fetchone()
             if existing is not None:
                 if existing["fingerprint"] != fingerprint:
@@ -191,6 +196,8 @@ class GoalsStore:
                     db.execute("UPDATE app_savings_goals SET name = ?, target_cents = ?, starting_cents = ?, target_date = ? WHERE owner_key = ? AND id = ?",
                                (name, target, starting, target_date, owner, goal_id))
                 elif operation in {"archive", "restore"}:
+                    if operation == 'archive' and before_archive:
+                        before_archive(owner, goal_id)
                     db.execute("UPDATE app_savings_goals SET archived = ? WHERE owner_key = ? AND id = ?", (int(operation == "archive"), owner, goal_id))
                 elif operation == "contribute":
                     amount = _cents(body.get("amountCents"), "Contribution")

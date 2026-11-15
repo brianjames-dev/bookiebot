@@ -231,13 +231,14 @@ type ChartPanel = {
 }
 
 type DailySpendingFilter = "all" | "needs" | "wants"
-type CategoryMixFilter = "all" | BudgetCategoryKey
+type CategoryMixFilter = "all" | BudgetCategoryKey | 'transfers'
 
 const CATEGORY_MIX_FILTERS: Array<{ value: CategoryMixFilter; label: string }> = [
   { value: "all", label: "All" },
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
   { value: "savings", label: "Savings" },
+  { value: 'transfers', label: 'Transfers' },
 ]
 const DAILY_SPENDING_FILTERS: Array<{ value: DailySpendingFilter; label: string }> = [
   { value: "all", label: "All" },
@@ -600,12 +601,14 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
   const allActivity = useMemo(() => reportActivity(report, activeReport.calendarEvents, projectionActive), [report, activeReport.calendarEvents, projectionActive])
   const activityRef = useRef(allActivity)
   activityRef.current = allActivity
+  const transferActivityRef=useRef<ReportActivity[]>([])
+  transferActivityRef.current=activeReport.calendarEvents.filter(e=>e.kind==='transfer'&&(projectionActive||!e.projectedOnly)).map((e,i)=>({id:'savings-transfer-'+i,date:`${report.year}-${String(report.month).padStart(2,'0')}-${String(e.day).padStart(2,'0')}`,day:e.day,category:'Savings transfers',amount:e.amount,person:report.ownerName,item:e.label,location:'',status:calendarActivityStatus(e),dateSource:'scheduled'}))
   const inspectCategory = useCallback((item: BreakdownItem) => {
     setChartTooltipDismissRevision(current => current + 1)
     setChartCollapseKey(current => current + 1)
-    const entries = activityRef.current.filter(entry => activityMatchesCategory(entry, item))
+    const entries = item.key==='savings_transfers'?transferActivityRef.current:activityRef.current.filter(entry => activityMatchesCategory(entry, item))
     setInspection({key:`category-${item.key}`, title:item.label, entries, total:item.amount,
-      note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly cash savings are summarized in Saved." : item.key === "espp" ? "Calculated from enrolled payroll and already withheld before deposit. Projected mode includes explicitly estimated contributions." : undefined})
+      note:item.key === "left" ? "Available budget after spending and savings; this is a balance, not a transaction." : item.key === "savings" ? "Monthly cash savings are summarized in Saved." : item.key==='savings_transfers'?'Savings transfers count once in Saved and any linked goal. Future transfers are shown only in Projected.':item.key === "espp" ? "Calculated from enrolled payroll and already withheld before deposit. Projected mode includes explicitly estimated contributions." : undefined})
   }, [])
   const inspectDay = useCallback((day: string, dailySpendingFilter: DailySpendingFilter, category = "") => {
     dismissChartTooltips()
@@ -745,6 +748,7 @@ const OverviewCharts = memo(function OverviewCharts({ report, activeReport, char
           categoryBalances={activeReport.categoryBalances}
           categoryBudgets={activeReport.categoryBudgets}
           amountSaved={activeReport.savingsInvesting?.cashSaved ?? activeReport.metrics.amountSaved}
+          transferAmount={activeReport.calendarEvents.filter(e=>e.kind==='transfer'&&(projectionActive||!e.projectedOnly)).reduce((sum,e)=>sum+e.amount,0)}
           allSpentTotal={reportSpentTotal(activeReport.metrics)}
           espp={activeReport.savingsInvesting?.esppContribution}
           estimatedEspp={activeReport.savingsInvesting?.estimatedEsppContribution}
@@ -1672,6 +1676,7 @@ type CategoryMixChartProps = {
   categoryBalances: CategoryBalances
   categoryBudgets: CategoryBalanceAmounts
   amountSaved: number
+  transferAmount?:number
   allSpentTotal: number
   espp?: number
   estimatedEspp?: number
@@ -1686,6 +1691,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   categoryBalances,
   categoryBudgets,
   amountSaved,
+  transferAmount=0,
   allSpentTotal,
   espp,
   estimatedEspp,
@@ -1696,7 +1702,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
   const duo = useAppNavigation()?.duoLandscape === true
   const selectedRollover = categoryMixRollover(categoryBalances, filter)
   const transferRows = categoryMixTransferRows(categoryBalances, filter)
-  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)
+  const chartData = categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp, transferAmount)
   // Spend/savings begin at noon, with the remaining balance last.
   const ringData = [...chartData.filter(item => item.key !== "left"), ...chartData.filter(item => item.key === "left")]
   const [pieHostRef, pieHostSize] = useElementSize<HTMLDivElement>()
@@ -1718,13 +1724,13 @@ const CategoryMixChart = memo(function CategoryMixChart({
   // After mounting, the painted sector owns these styles. A new React target
   // must not overwrite the current label before the next native ring frame.
   const initialCenterStyle = useRef(categoryCenterStyle(pieLayout)).current
-  const spentTotal = filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left" && !item.key.startsWith("coverage-")))
-  const selectedBudget = (filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
+  const spentTotal = filter === 'transfers'?transferAmount:filter === "all" ? allSpentTotal : amountRowsTotal(chartData.filter((item) => item.key !== "left" && !item.key.startsWith("coverage-")))
+  const selectedBudget = (filter==='transfers'?amountSaved:filter === "all" ? categoryBudgetTotal(categoryBudgets) : categoryBudgets[filter]) + ((filter === "all" || filter === "savings") ? espp ?? 0 : 0)
   // All still shows where income went, including cash savings and ESPP.
   // Keep its ring allocation distinct from the expense-only Spent headline.
-  const savedTotal = amountRowsTotal(chartData.filter((item) => item.key === "savings" || item.key === "espp"))
-  const usedTotal = filter === "all" ? roundCurrency(spentTotal + savedTotal) : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
-  const usedLabel = filter === "all" ? "spent + saved" : filter === "savings" ? "saved" : "used"
+  const savedTotal = amountRowsTotal(chartData.filter((item) => item.key === "savings" || item.key === "espp" || item.key==='savings_transfers'))
+  const usedTotal = filter==='transfers'?transferAmount:filter === "all" ? roundCurrency(spentTotal + savedTotal) : amountRowsTotal(chartData.filter((item) => item.key !== "left"))
+  const usedLabel = filter==='transfers'?'of cash saved':filter === "all" ? "spent + saved" : filter === "savings" ? "saved" : "used"
   const pressure = categoryMixPressure(filter, categoryBalances, usedTotal)
   const usedPercent = selectedBudget > 0 ? (usedTotal / selectedBudget) * 100 : 0
 
@@ -1732,7 +1738,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
     <div className="bb-chart-stack bb-chart-page bb-category-mix-page">
       <div className="bb-panel-head bb-chart-page-header bb-category-mix-summary">
         <div className="bb-category-summary-label">
-            <span className="bb-chart-kicker">{filter === "savings" ? "Saved" : "Spent"}</span>
+            <span className="bb-chart-kicker">{filter === "savings"||filter==='transfers' ? "Saved" : "Spent"}</span>
             <span className="bb-chart-mode-note">{projected ? "Projected" : "Current"}</span>
         </div>
         <div className="bb-category-amount-row">
@@ -1741,7 +1747,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
             <CategoryMixFilterControl filter={filter} onFilterChange={onFilterChange} />
           </div>
         </div>
-        {selectedBudget > 0 ? <div className="bb-chart-budget-note">{formatMoney(selectedBudget)} budget</div> : null}
+        {selectedBudget > 0 ? <div className="bb-chart-budget-note">{formatMoney(selectedBudget)} {filter==='transfers'?'total cash saved':'budget'}</div> : null}
       </div>
       <div className="bb-chart-layout bb-category-chart-layout bb-chart-page-body">
         <ChartContainer config={chartConfig(chartData)} className="bb-chart-box bb-category-chart-box">
@@ -1755,7 +1761,7 @@ const CategoryMixChart = memo(function CategoryMixChart({
             <CategoryContourCallouts scene={pieLayout.contour} data={ringData} ready={pieLayout.calloutsReady} visible={showCallouts && !duo} onInspect={onInspect} onExitComplete={showCallouts ? undefined : finishCalloutExit} />
             <button ref={centerRef} type="button" className="bb-category-pie-center" aria-label={duo ? "Show category breakdown" : showCallouts ? "Hide category callouts" : "Show category callouts"} aria-pressed={duo ? undefined : showCallouts} onClick={toggleCallouts} style={ringData.some(item => item.amount > 0) ? initialCenterStyle : categoryCenterStyle(pieLayout)} aria-live="polite">
               <FittedAmount className="bb-category-used">{selectedBudget > 0 ? `${Number(usedPercent.toFixed(1))}%` : "—"}</FittedAmount>
-              <span>{selectedBudget > 0 ? usedLabel : "no budget"}</span>
+              <span>{selectedBudget > 0 ? usedLabel : filter==='transfers'?'no transfers':"no budget"}</span>
             </button>
           </CategoryMixPieMotionHost>
         </ChartContainer>
@@ -1871,6 +1877,7 @@ function areCategoryMixChartPropsEqual(previous: CategoryMixChartProps, next: Ca
   return (
     previous.onInspect === next.onInspect &&
     previous.amountSaved === next.amountSaved &&
+    previous.transferAmount === next.transferAmount &&
     previous.allSpentTotal === next.allSpentTotal &&
     previous.espp === next.espp && previous.estimatedEspp === next.estimatedEspp &&
     previous.categoryBudgets.needs === next.categoryBudgets.needs &&
@@ -1920,6 +1927,7 @@ function categoryMixRollover(
   balances: CategoryBalances,
   filter: CategoryMixFilter,
 ) {
+  if(filter==='transfers') return 0
   if (filter !== "all") {
     return balances.remaining[filter]
   }
@@ -1945,6 +1953,7 @@ function categoryMixPressure(
   balances: CategoryBalances,
   spentTotal: number,
 ): CategoryMixPressure | null {
+  if(filter==='transfers') return null
   let pressure: Omit<CategoryMixPressure, "fillPercent"> | null = null
   if (filter === "all" && balances.totalOverspend > 0) {
     pressure = {
@@ -2027,6 +2036,7 @@ function CategoryMixOverflowFooter({ pressure, balances, filter, usedTotal }: {
   usedTotal: number
 }) {
   const uncovered = filter === "all" ? pressure.amount
+    :filter==='transfers'?0
     : pressure.tone === "danger" ? Math.min(pressure.amount, Math.max(0, -balances.remaining[filter]))
     : 0
   const covered = roundCurrency(pressure.amount - uncovered)
@@ -2062,22 +2072,31 @@ function categoryMixRows(
   transferRows: BreakdownItem[] = [],
   espp?: number,
   estimatedEspp = 0,
+  savingsTransfers = 0,
 ) {
+  const transferAmount=Math.min(Math.max(roundCurrency(savingsTransfers),0),Math.max(amountSaved,0))
+  const manualSaved=Math.max(roundCurrency(amountSaved-transferAmount),0)
+  if(filter==='transfers'){
+    const values=[{key:'savings_transfers',label:'Savings transfers',amount:transferAmount,percentage:0,color:'#d4b96b'},
+      {key:'savings',label:'Other cash saved',amount:manualSaved,percentage:0,color:SAVINGS_CATEGORY_COLOR}].filter(v=>v.amount>0)
+    return values.map(v=>({...v,percentage:amountSaved>0?roundCurrency(v.amount/amountSaved*100):0}))
+  }
   let filtered = data.filter((item) => {
     if (filter === "needs") return CATEGORY_NEEDS_KEYS.has(item.key)
     if (filter === "wants") return CATEGORY_WANTS_KEYS.has(item.key)
-    return filter === "all" && item.key !== "savings"
+    return filter === "all" && item.key !== "savings" && item.key !== 'savings_transfers'
   })
   if (filter === "savings" || filter === "all") {
-    filtered = [...filtered, ...(amountSaved > 0
+    filtered = [...filtered, ...(manualSaved > 0
       ? [{
           key: "savings",
           label: espp === undefined ? "Saved" : "Cash saved",
-          amount: roundCurrency(amountSaved),
+          amount: manualSaved,
           percentage: 0,
           color: SAVINGS_CATEGORY_COLOR,
         }]
       : [])]
+    if(transferAmount>0)filtered.push({key:'savings_transfers',label:'Savings transfers',amount:transferAmount,percentage:0,color:'#d4b96b'})
     if ((espp ?? 0) > 0) filtered.push({key:"espp", label:estimatedEspp ? "SpaceX ESPP · includes estimate" : "SpaceX ESPP", amount:roundCurrency(espp ?? 0), percentage:0, color:"hsl(var(--chart-4))"})
   }
   filtered = [...filtered, ...transferRows]
@@ -2106,7 +2125,7 @@ function categoryMixTransferRows(
   balances: CategoryBalances,
   filter: CategoryMixFilter,
 ): BreakdownItem[] {
-  if (filter === "all") {
+  if (filter === "all"||filter==='transfers') {
     return []
   }
   return balances.transfers
@@ -2857,7 +2876,7 @@ function dailyEntriesWithCalendarEvents(
       return {
         date: `${month}/${event.day}`,
         status: calendarActivityStatus(event),
-        kind: event.kind,
+        kind: event.kind==='transfer'?'savings' as const:event.kind,
         category: calendarActivityCategory(event),
         amount: event.amount,
         person: event.kind === "bill" ? "Need bill" : bucket === "wants" ? "Want sub" : "Need sub",

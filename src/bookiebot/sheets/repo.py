@@ -54,6 +54,14 @@ class GSpreadSheetsRepository:
     def income_sheet(self):
         return get_income_worksheet()
 
+    def savings_transfer_plans(self):
+        from bookiebot.sheets.savings_transfers import read_all
+        from bookiebot.sheets.routing import get_current_discord_user_id
+        actor = get_current_discord_user_id()
+        if actor is None:
+            raise ValueError('Savings transfers require a trusted personal account.')
+        return read_all(actor)
+
     def subscriptions_sheet(self):
         return get_subscriptions_worksheet()
 

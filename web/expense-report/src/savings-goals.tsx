@@ -11,7 +11,7 @@ export interface SavingsGoal {
   id: string; name: string; targetCents: number; startingCents: number; balanceCents: number
   contributionCents: number; contributionCount: number; targetDate: string; archived: boolean; version: number
 }
-interface Contribution { id: string; amountCents: number; date: string; note: string; reversedAt: string }
+interface Contribution { id: string; amountCents: number; date: string; note: string; reversedAt: string; readOnly?:boolean }
 type Command = Record<string, unknown>
 type Run = (body: Command, done: () => void) => void
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
@@ -90,9 +90,10 @@ export function SavingsGoals() {
     void load()
     const refresh = () => { if (!pending.current && document.visibilityState === "visible") void load() }
     window.addEventListener("focus", refresh); window.addEventListener("online", refresh)
+    window.addEventListener('bookiebot:transfers-changed',refresh)
     document.addEventListener("visibilitychange", refresh)
     return () => { mounted.current = false; readId.current += 1; window.removeEventListener("focus", refresh)
-      window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh) }
+      window.removeEventListener("online", refresh);window.removeEventListener('bookiebot:transfers-changed',refresh); document.removeEventListener("visibilitychange", refresh) }
   }, [load])
   const execute = async () => {
     const change = pending.current
@@ -302,7 +303,7 @@ function ContributionHistoryRow({ entry, goal, run, disabled, open, onToggle, on
 }) {
   const confirmationId = useId()
   const trigger = useRef<HTMLButtonElement>(null)
-  const canReverse = !entry.reversedAt && !goal.archived
+  const canReverse = !entry.readOnly && !entry.reversedAt && !goal.archived
   const expanded = Boolean(open && canReverse)
   const close = () => { onClose(); trigger.current?.focus({ preventScroll: true }) }
   return <div className="bb-goal-history-row"><div><strong>{money(entry.amountCents)}</strong><span>{entry.date}{entry.note ? ` · ${entry.note}` : ""}</span>

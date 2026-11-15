@@ -155,6 +155,10 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
                  "source": "sheet", "date": None} for category in ("needs", "wants", "savings")]
         saved = [{"label": f"Savings contribution {item.number}", "amount": _money(item.actual),
                   "source": "recorded", "date": None} for item in report.savings_deposits if item.actual]
+        saved.extend({'label': transfer['name'] + ' · savings transfer', 'amount': transfer['amountCents']/100,
+                      'source': 'recorded' if transfer['date'] <= report.generated_at.date().isoformat() else 'scheduled',
+                      'date': transfer['date']} for transfer in report.savings_transfers
+                     if mode == 'projected' or transfer['date'] <= report.generated_at.date().isoformat())
         if espp - estimated_espp:
             saved.append({"label": "SpaceX ESPP", "amount": _money(espp - estimated_espp), "source": "calculated", "date": None})
         if estimated_espp:
@@ -222,6 +226,11 @@ def metric_explanations(report: ExpenseBreakdownReport, payload: dict[str, Any])
             ])
             if estimated_espp:
                 explanations[mode]["saved"]["notes"].append(f"${estimated_espp:,.2f} of Saved is estimated ESPP from expected paychecks.")
+        if report.savings_transfers:
+            explanations[mode]['saved']['equation'] = 'Manual cash savings + savings transfers' + (' + payroll ESPP' if investing else '')
+            explanations[mode]['saved']['notes'].append('A savings transfer counts once in Saved and its optional goal; it is not an expense or income.')
+            if mode == 'projected':
+                explanations[mode]['saved']['notes'].append('Projected includes future scheduled transfers; goal balances count only transfers whose date has arrived.')
     return explanations
 
 
