@@ -26,6 +26,12 @@ export function transactionReviewChanges(summary:TransactionChangeSummary,row:Re
  }
  return changes
 }
+export function transferGoalEffects(effect:TransactionChangeSummary['transferEffect']){
+ if(!effect)return []
+ if(effect.goalBeforeId===effect.goalAfterId)return effect.goalBeforeId?[{name:effect.goalBeforeName,before:effect.savedBeforeCents,after:effect.savedAfterCents}]:[]
+ const duplicateName=effect.goalBeforeName===effect.goalAfterName
+ return [...(effect.goalBeforeId?[{name:effect.goalBeforeName+(duplicateName?' · previous':''),before:effect.savedBeforeCents,after:0}]:[]),...(effect.goalAfterId?[{name:effect.goalAfterName+(duplicateName?' · new':''),before:0,after:effect.savedAfterCents}]:[])]
+}
 export function InlineTransactionEditor(props:InlineEditorProps){
  const cached=useRef<InlineEditorProps|null>(null),[shown,setShown]=useState(false)
  if(props.snapshot)cached.current=props
@@ -39,7 +45,7 @@ export function InlineTransactionEditor(props:InlineEditorProps){
  const editing=operation==='update'||operation==='move',title=editing?(transfer?'Update transfer':'Update purchase'):operation==='split'?'Split purchase':operation==='delete'?(transfer?'Delete transfer':'Delete purchase'):operation==='undo'?'Undo change':'Remove split'
  const changes=review?transactionReviewChanges(review,row):[]
  const effect=review?.transferEffect
- const goalEffects=effect?(effect.goalBeforeName===effect.goalAfterName?(effect.goalBeforeName?[{name:effect.goalBeforeName,before:effect.savedBeforeCents,after:effect.savedAfterCents}]:[]):[...(effect.goalBeforeName?[{name:effect.goalBeforeName,before:effect.savedBeforeCents,after:0}]:[]),...(effect.goalAfterName?[{name:effect.goalAfterName,before:0,after:effect.savedAfterCents}]:[])]):[]
+ const goalEffects=transferGoalEffects(effect)
  const content=<section className={"bi-editor"+(operation==='split'?' sp-management':'')+(props.embedded?' bi-editor-embedded':'')} data-kind={row.kind} data-operation={operation} data-review={Boolean(review)} data-design="levels" role="region" aria-label="Edit transaction">
   <span className="bi-sr-only">{title}</span>
   <StepMotion review={Boolean(review)} open={open} mode="slide" duration={transactionMotion.duration} edit={<>

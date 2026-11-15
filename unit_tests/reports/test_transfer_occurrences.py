@@ -162,6 +162,16 @@ def test_archived_goals_cannot_receive_new_links_but_existing_history_is_correct
     assert balances()['goal-1234']==17000
 
 
+def test_same_named_goal_reassignment_reviews_distinct_allocations(state):
+    state.source.goals[1]['name']=state.source.goals[0]['name']
+    checked=tx.review(B,edit(state.rows()[0],goalId='goal-vacation'))['review']
+    effect=checked['transferEffect']
+    assert effect['goalBeforeId']=='goal-1234' and effect['goalAfterId']=='goal-vacation'
+    assert effect['goalBeforeName']==effect['goalAfterName']=='Emergency fund'
+    assert effect['savedBeforeCents']==effect['savedAfterCents']==15000
+    assert checked['item']['fields']['goalId']!=checked['after']['goalId']
+
+
 def test_transfer_graph_keeps_three_separate_series_and_actual_tooltip_totals():
     import shutil
     import subprocess

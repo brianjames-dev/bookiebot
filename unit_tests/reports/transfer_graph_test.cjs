@@ -16,3 +16,11 @@ bars.length=0;act(()=>chart.update(React.createElement(runtime.exports.Plot,{dat
 bars.length=0;act(()=>chart.update(React.createElement(runtime.exports.Plot,{data:[{...mixed,amount:30,transferAmount:0}],filter:'all',onInspectDay:()=>{}})));assert.equal(bars.length,2,'Overview and existing callers retain their two-series chart');
 const view=require('./load_frontend_module.cjs')('recorded-transaction-view.ts');const mapped=view.recordedChart([{date:'2026-11-15',month:'2026-11',count:3,totalCents:18000,needsCents:1000,wantsCents:2000,transferCents:15000}],'2026-11')[0];assert.equal(mapped.transferAmount,150);assert.equal(mapped.needsAmount,10);assert.equal(mapped.wantsAmount,20);
 console.log('Transfer graph stack, legend, tooltip, actual totals and compressed-axis checks passed');
+
+const editorSource=fs.readFileSync('web/expense-report/src/transaction-inline-editor.tsx','utf8'),editorFile=ts.createSourceFile('editor.tsx',editorSource,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+const goalFunction=editorFile.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='transferGoalEffects');assert(goalFunction);
+const effectsContext={exports:{}};vm.runInNewContext(ts.transpileModule(goalFunction.getText(editorFile),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,effectsContext);
+const effect={savedBeforeCents:15000,savedAfterCents:15000,goalBeforeId:'goal-1',goalAfterId:'goal-2',goalBeforeName:'Emergency fund',goalAfterName:'Emergency fund'};
+assert.deepEqual(JSON.parse(JSON.stringify(effectsContext.exports.transferGoalEffects(effect))),[{name:'Emergency fund · previous',before:15000,after:0},{name:'Emergency fund · new',before:0,after:15000}]);
+assert.equal(effectsContext.exports.transferGoalEffects({...effect,goalAfterId:'goal-1'}).length,1);assert.equal(effectsContext.exports.transferGoalEffects({...effect,goalBeforeId:'',goalAfterId:''}).length,0);
+console.log('Same-named goals retain distinct allocation review effects');

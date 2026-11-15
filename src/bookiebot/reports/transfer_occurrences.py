@@ -133,6 +133,7 @@ def review(actor: str, body: dict[str, Any]) -> dict[str, Any]:
     after_fields = _transfer_row(actor, day[:7], after, goal_names=names, goals=goals)['fields']
     effect = {'savedBeforeCents': 0 if before.get('deleted') else before['amountCents'],
               'savedAfterCents': 0 if after.get('deleted') else after['amountCents'],
+              'goalBeforeId': before['goalId'], 'goalAfterId': after['goalId'],
               'goalBeforeName': names.get(before['goalId'], ''), 'goalAfterName': names.get(after['goalId'], '')}
     payload = {'item': row, 'operation': operation, 'after': after_fields, 'destination': None,
                'transferEffect': effect, 'reviewVersion': digest([row['version'], normalized, after_fields, effect, bool(after.get('deleted'))])}

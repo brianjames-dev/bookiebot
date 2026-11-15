@@ -11,7 +11,7 @@ export interface TransactionChangeSummary {
   before: Record<string, string>
   after: Record<string, string>
   destination?: string
-  transferEffect?: {savedBeforeCents:number;savedAfterCents:number;goalBeforeName:string;goalAfterName:string}
+  transferEffect?: {savedBeforeCents:number;savedAfterCents:number;goalBeforeId:string;goalAfterId:string;goalBeforeName:string;goalAfterName:string}
   share?: {method: string; payerCents: number; partnerCents: number; payerBasisPoints?: number; payerName?: string; partnerName?: string}
   restoration?: {operation: "update" | "move"; current: Record<string, string>; currentCategory: string; restoredCategory: string}
 }
