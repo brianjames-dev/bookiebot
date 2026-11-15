@@ -129,7 +129,7 @@ def test_goal_archive_requires_unlinking_future_transfers_and_preserves_due_allo
     monkeypatch.setattr(service,'now_pacific',lambda:datetime(2026,11,15,12))
     p=ledger.Transfer('transfer-1234',1,'Savings',15000,'monthly','2026-11-15','2026-11-15','goal-1234')
     monkeypatch.setattr(ledger,'read_all',lambda *a,**k:[p])
-    commands=SimpleNamespace(pending=lambda owner:None)
+    commands=SimpleNamespace(blocked=lambda owner:False)
     with pytest.raises(GoalConflictError,match='Unlink or stop'):
         service.can_archive_goal(B,'brian','goal-1234',commands=commands)
     stopped=replace(p,revision=2,active=False,effective_from='2026-11-16')
@@ -162,7 +162,8 @@ def test_transactions_transfer_is_actual_only_inspectable_and_never_needs_or_wan
     automatic=tx._transfer_rows(B,'2026-11',[p],as_of=TODAY,goal_names={'goal-1234':'Emergency fund'})
     assert len(automatic)==1 and automatic[0]['kind']=='transfer' and automatic[0]['categoryLabel']=='Savings transfer'
     assert automatic[0]['fields']['goalName']=='Emergency fund'
-    assert not any(automatic[0]['capabilities'].values())
+    assert automatic[0]['capabilities']['update'] and automatic[0]['capabilities']['delete']
+    assert not any(automatic[0]['capabilities'][key] for key in ('move','split','cancel_split','undo'))
     needs={**automatic[0],'id':'needs','kind':'expense','category':'grocery','categoryLabel':'Grocery','amountCents':1000}
     wants={**needs,'id':'wants','category':'food','categoryLabel':'Food','amountCents':2000}
     income={**needs,'id':'income','kind':'income','category':'income','amountCents':100000}
@@ -170,6 +171,8 @@ def test_transactions_transfer_is_actual_only_inspectable_and_never_needs_or_wan
     all_rows=tx.listing(B,{'month':'2026-11','scope':'spending_or_transfers','view':'daily'})
     assert len(all_rows['items'])==3 and all_rows['totalAmountCents']==3000
     assert all_rows['days'][0]['needsCents']==1000 and all_rows['days'][0]['wantsCents']==2000
+    assert all_rows['days'][0]['transferCents']==15000 and all_rows['days'][0]['totalCents']==18000
+    assert all_rows['transferAmountCents']==15000
     assert all_rows['listDays'][0]['totalCents']==18000
     assert len(tx.listing(B,{'month':'2026-11','kind':'transfer'})['items'])==1
     assert len(tx.listing(B,{'month':'2026-11','kind':'savings'})['items'])==1
@@ -177,7 +180,7 @@ def test_transactions_transfer_is_actual_only_inspectable_and_never_needs_or_wan
     assert [r['id'] for r in tx.listing(B,{'month':'2026-11','bucket':'needs'})['items']]==['needs']
     days=tx._daily_totals(automatic)
     assert days[0]['totalCents']==15000 and days[0]['needsCents']==days[0]['wantsCents']==0
-    with pytest.raises(tx.TransactionValidation):tx._normalized({'operation':'delete'},automatic[0])
+    with pytest.raises(tx.TransactionValidation):tx._normalized({'operation':'split'},automatic[0])
 
 
 def test_scheduled_transfers_and_payroll_espp_keep_separate_saved_components(monkeypatch):

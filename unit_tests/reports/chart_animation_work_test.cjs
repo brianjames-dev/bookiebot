@@ -62,7 +62,7 @@ for(const [optimized,original,first,second,layouts] of [
 const source=fs.readFileSync('web/expense-report/src/report-app.tsx','utf8')
 const file=ts.createSourceFile('report-app.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
 const names=new Set(['money','formatMoney','useMediaQuery','CategoryMixPieSurface','DailySpendingChart','DailySpendingPlot','MemoizedDailySpendingPlot',
-  'NEEDS_BAR_COLOR','WANTS_BAR_COLOR','DAILY_SPENDING_BAR_RADIUS','DAILY_SPENDING_GRID_COLOR','DAILY_SPENDING_BOUNDARY_COLOR',
+  'NEEDS_BAR_COLOR','WANTS_BAR_COLOR','TRANSFER_BAR_COLOR','DAILY_SPENDING_BAR_RADIUS','DAILY_SPENDING_GRID_COLOR','DAILY_SPENDING_BOUNDARY_COLOR',
   'dailySpendingAxis','dailySpendingBreakAmount','dailySpendingChartRows','dailySpendingVisualAmount','dailySpendingActualAmount',
   'dailySpendingAxisTickLabel','dailySpendingYAxisDomain','dailySpendingYAxisTicks','dailySpendingTickRange','dailySpendingCursorFill'])
 const declarations=file.statements.filter(node=>ts.isFunctionDeclaration(node)?names.has(node.name?.text):ts.isVariableStatement(node)&&node.declarationList.declarations.some(d=>names.has(d.name.getText(file))))

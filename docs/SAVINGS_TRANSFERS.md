@@ -20,11 +20,11 @@ financial writer or separate goal-contribution copy is needed.
 **Category Mix** separates Savings transfers from other cash saved. All and
 Savings partition the same cash total, alongside separate payroll ESPP. The
 Transfers scope shows their share of total cash saved. Savings transfers never
-become Needs/Wants slices, spending drilldowns, bills, or Daily Spending bars.
+become Needs/Wants slices, spending drilldowns or bills.
 **Calendar** has a distinct Transfers legend color/icon, dated entries and native
 day details. **Transactions** shows due entries with a transfer icon/label and
 account/goal details. All includes transfers alongside purchases, while its
-spending graph remains expense-only. Transfers and Savings filters include the
+graph stacks a separate gold Transfers layer above Needs/Wants. Its legend and tooltip separate all three amounts; Total activity includes the transfer without increasing expense-only Spent. Transfers and Savings filters include the
 appropriate savings activity; Needs/Wants filters exclude it.
 
 Changing or stopping a transfer affects future occurrences, starting tomorrow.
@@ -32,7 +32,7 @@ Amounts, names, dates and goal links already counted remain unchanged. The
 next-date field defaults to the first future occurrence, even on a due date.
 Month-end and leap-day schedules retain their original day anchor. One-time
 transfers move to Past transfers when counted; stopped transfers are retained
-there too. There is no expense Edit/Split/Delete action on a transfer occurrence.
+there too. In Transactions, **Edit** or **Delete** changes only the selected due transfer. The native review shows its Saved contribution and any goal allocation changes; its original date and recurring schedule stay unchanged. Edit can change amount, name, account labels and goal. **Undo** restores that individual change, including Saved, goal history, Calendar, Category Mix and the graph. Transfers have no expense Split/Move actions.
 To archive a goal, first unlink or stop its future transfers; prior allocations
 remain in its history.
 
@@ -52,7 +52,7 @@ workbook**, in hidden **_BookieBot Savings Transfers**. This is one lifetime
 configuration, retained across annual rollover; do not fork it into each new
 annual book or remove the original workbook configuration. The table has
 `transfer_id`, `revision`, and literal `definition_json`. Complete effective-dated
-versions preserve past occurrences. New transfers cannot precede November 15,
+versions preserve past occurrences. Dated adjustments and deletion tombstones are retained inside the latest rule definition, independently versioned by original date. Future schedule changes carry them forward. The existing Settings Log receipt contains the dated Undo audit in the same atomic batch; public command recovery omits the private audit. Goal history has a derived transfer revision so correction refreshes never change manual goal edit versions. New transfers cannot precede November 15,
 2026, the feature's first supported date. Earlier reports retain their existing
 read paths and amounts.
 
@@ -85,7 +85,7 @@ Create a legitimate future transfer, inspect Review, then confirm. Check Current
 versus Projected, its separate Category Mix slice, Calendar event and goal history.
 On the due date it should appear once in Transactions and increase Saved and
 the linked goal once. Change only the future amount/link, then stop it and inspect
-Past transfers. Recorded months stay intact. Automated financial tests use
+Past transfers. Correct or delete one due entry in Transactions and use Undo; verify only that occurrence, Saved, its linked goal and the gold graph layer change. Fold with an edit/review open; short landscape controls must fit above the dock. Existing schedule dates/amount/goal remain intact. Automated financial tests use
 isolated fixtures; release verification does not alter live money.
 
 ## Creation request errors

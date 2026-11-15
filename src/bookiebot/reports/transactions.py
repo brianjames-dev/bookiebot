@@ -258,26 +258,32 @@ def _subscription_rows(actor: str, month: str, rows: list[list[str]], *, as_of: 
     return result
 
 
-def _transfer_rows(actor: str, month: str, plans: Any, *, as_of: date, goal_names: dict[str,str] | None = None) -> list[dict[str, Any]]:
+def _transfer_row(actor: str, month: str, item: dict[str, Any], *, goal_names: dict[str,str] | None = None,
+                  goals: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    goal = (goal_names or {}).get(item['goalId'], '')
+    explanation = 'This savings transfer increases Saved, without counting as Needs or Wants spending.'
+    if goal:
+        explanation += f' The same ${item["amountCents"]/100:.2f} also funds {goal}; it is counted once.'
+    return {'id':month+':'+item['id'], 'actionId':'', 'month':month, 'version':digest(item),
+        'date':item['date'], 'title':item['name'], 'location':'', 'person':get_user_config(actor).name,
+        'kind':'transfer', 'category':'savings_transfers', 'categoryLabel':'Savings transfer',
+        'amountCents':item['amountCents'], 'split':'',
+        'editableFields':['amount','item','fromAccount','toAccount','goalId'], 'notice':explanation,
+        'fields':{'item':item['name'], 'date':item['date'], 'amount':f'{item["amountCents"]/100:.2f}',
+                  'fromAccount':item['fromAccount'], 'toAccount':item['toAccount'],
+                  'goalId':item['goalId'], 'goalName':goal},
+        'transferOptions':{'goals':[{'id':g['id'],'name':g['name'],'archived':bool(g.get('archived'))} for g in (goals or [])]},
+        'capabilities':{op:op in {'update','delete'} for op in ('update','move','delete','split','cancel_split','undo')},
+        'reasons':{op:'Edit or delete only this transfer. Manage its recurring schedule in Settings → Savings transfers.'
+                   for op in ('update','move','delete','split','cancel_split','undo')}}
+
+
+def _transfer_rows(actor: str, month: str, plans: Any, *, as_of: date, goal_names: dict[str,str] | None = None,
+                   goals: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     from bookiebot.sheets.savings_transfers import occurrences
     year, number = map(int, month.split('-'))
     start, end = date(year, number, 1), min(as_of, date(year, number, calendar.monthrange(year, number)[1]))
-    result = []
-    for item in occurrences(plans, start, end):
-        goal = (goal_names or {}).get(item['goalId'], '')
-        explanation = 'This savings transfer increases Saved, without counting as Needs or Wants spending.'
-        if goal:
-            explanation += f' The same {item["amountCents"]/100:.2f} also funds {goal}; it is counted once.'
-        result.append({'id':month+':'+item['id'], 'actionId':'', 'month':month, 'version':digest(item),
-            'date':item['date'], 'title':item['name'], 'location':'', 'person':get_user_config(actor).name,
-            'kind':'transfer', 'category':'savings_transfers', 'categoryLabel':'Savings transfer',
-            'amountCents':item['amountCents'], 'split':'', 'editableFields':[], 'notice':explanation,
-            'fields':{'item':item['name'], 'date':item['date'], 'amount':f'{item["amountCents"]/100:.2f}',
-                      'fromAccount':item['fromAccount'], 'toAccount':item['toAccount'], 'goalName':goal},
-            'capabilities':{op:False for op in ('update','move','delete','split','cancel_split','undo')},
-            'reasons':{op:'Manage future transfers in Settings → Savings transfers. Recorded savings stay unchanged.'
-                       for op in ('update','move','delete','split','cancel_split','undo')}})
-    return result
+    return [_transfer_row(actor,month,item,goal_names=goal_names,goals=goals) for item in occurrences(plans,start,end)]
 
 
 def load_transactions(actor: str, month: str, *, fresh: bool = False, include_scheduled: bool = False) -> list[dict[str, Any]]:
@@ -301,7 +307,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
         paid_bill_dates = settled_bill_dates(allocations, events, owner=owner, as_of=as_of)
         aliases = actor_key_aliases(actor)
         from bookiebot.sheets import savings_transfers as transfer_ledger
-        transfer_plans, transfer_goal_names = None, {}
+        transfer_plans, transfer_goal_names, transfer_goals = None, {}, []
         for year in years:
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
@@ -310,9 +316,10 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
             if transfer_plans is None and (year, max(numbers,default=1)) >= (transfer_ledger.TRANSFER_EPOCH.year, transfer_ledger.TRANSFER_EPOCH.month):
                 transfer_plans = (transfer_ledger.decode(personal.get(transfer_ledger.TRANSFER_TAB, []))
                     if year == transfer_ledger.TRANSFER_STORAGE_YEAR else transfer_ledger.read_all(actor,client=client,today=as_of))
-                if any(p.goal_id for p in transfer_plans):
+                if transfer_plans:
                     from bookiebot.reports.goals_store import build_goals_store
-                    transfer_goal_names = {g['id']:g['name'] for g in build_goals_store().list_goals(owner)['goals']}
+                    transfer_goals = build_goals_store().list_goals(owner)['goals']
+                    transfer_goal_names = {g['id']:g['name'] for g in transfer_goals}
             from bookiebot.sheets.recurring_rows import runtime_tables
             bills, subscriptions, _ = runtime_tables(owner, personal.get("_BookieBot Bill Schedule", []),
                 personal.get("_BookieBot Subscription Schedule", []), personal.get("Subscriptions", []), personal.get("_BookieBot Bill Charges", []))
@@ -389,7 +396,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
                     if row["amountCents"] > 0:
                         result.append(row)
                 result.extend(_subscription_rows(actor, period, subscriptions, as_of=as_of))
-                result.extend(_transfer_rows(actor, period, transfer_plans or [], as_of=as_of, goal_names=transfer_goal_names))
+                result.extend(_transfer_rows(actor, period, transfer_plans or [], as_of=as_of, goal_names=transfer_goal_names,goals=transfer_goals))
         # A debtor may have no sheet expense until a repayment is confirmed.
         # Purchase context is a disclosure, never a new cash transaction. Existing
         # recipient bill cells already represent that cash and get the same cue.
@@ -430,7 +437,9 @@ def _daily_totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                                    "totalCents": 0, "needsCents": 0, "wantsCents": 0})
         day["count"] += 1
         day["totalCents"] += amount
-        if row.get('kind') != 'transfer':
+        if row.get('kind') == 'transfer':
+            day['transferCents'] = day.get('transferCents', 0) + amount
+        else:
             day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
     return list(days.values())
 
@@ -481,10 +490,12 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         # These are recorded sources only; no estimates acquire edit capabilities.
         result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected + (visible if cross_month else [])])
         chart_rows = [row for row in selected if row['kind'] != 'transfer'] if query.get('scope')=='spending_or_transfers' else selected
-        result["days"] = _daily_totals(chart_rows)
+        result["days"] = _daily_totals(selected)
         if day or len(chart_rows)!=len(selected):
             result["listDays"] = _daily_totals(visible)
         result["totalAmountCents"] = sum(accounted_amount(row) for row in chart_rows)
+        if any(row['kind']=='transfer' for row in selected):
+            result['transferAmountCents'] = sum(accounted_amount(row) for row in selected if row['kind']=='transfer')
     return result
 
 
@@ -622,6 +633,15 @@ def _accepted_split_row(actor: str, month: str, body: dict[str, Any]) -> dict[st
 
 
 def review(actor: str, body: dict[str, Any], *, fresh_source: bool = False) -> dict[str, Any]:
+    from bookiebot.reports import transfer_occurrences
+    if transfer_occurrences.handles(body):
+        from bookiebot.sheets.recurring import BillConflict, BillValidation
+        try:
+            return transfer_occurrences.review(actor, body)
+        except BillConflict as exc:
+            raise TransactionConflict(str(exc)) from exc
+        except BillValidation as exc:
+            raise TransactionValidation(str(exc)) from exc
     month = body.get("month")
     if not isinstance(month, str) or month == "all":
         raise TransactionValidation("Choose the transaction's recorded month.")
@@ -673,8 +693,25 @@ class TransactionCommands:
 
     def saved(self, owner: str, request_id: str):
         with self.access.connect() as db:
-            row = db.execute("SELECT state,result_json FROM app_transaction_commands WHERE owner_key=? AND request_id=?", (owner, request_id)).fetchone()
-            return {"state": row["state"], **json.loads(row["result_json"])} if row else None
+            row = db.execute("SELECT state,result_json,command_json,fingerprint,created_at FROM app_transaction_commands WHERE owner_key=? AND request_id=?", (owner, request_id)).fetchone()
+        if row is None:
+            return None
+        from bookiebot.reports import transfer_occurrences
+        if transfer_occurrences.handles(json.loads(row['command_json'])) and (row['state'] == 'uncertain' or row['state'] == 'running'
+                and (datetime.now(timezone.utc) - datetime.fromisoformat(row['created_at'])).total_seconds() >= 120):
+            from bookiebot.sheets.routing import get_discord_user_config
+            from bookiebot.sheets.savings_transfers import read_source
+            actor = next((key for key, value in get_discord_user_config().items() if value.budget_owner_key == owner), None)
+            if actor is None:
+                raise TransactionConflict('Reconnect the owner of this transfer change.')
+            receipt = transfer_occurrences.receipt(read_source(actor), request_id, row['fingerprint'])
+            if receipt:
+                result = transfer_occurrences.public_result(receipt)
+                with self.access.connect(write=True) as db:
+                    db.execute("UPDATE app_transaction_commands SET state='done',result_json=? WHERE owner_key=? AND request_id=?",
+                               (json.dumps(result), owner, request_id))
+                return result
+        return {"state": row["state"], **json.loads(row["result_json"])}
 
     def overview(self, owner: str, month: str) -> dict[str, Any]:
         """Owner-scoped recovery/Undo affordances survive another browser session."""
@@ -717,50 +754,61 @@ class TransactionCommands:
             if pending:
                 raise TransactionConflict("A prior change still needs verification. Check its saved status before another change.")
             if db.execute("SELECT request_id FROM app_bill_commands WHERE owner_key=? AND state!='done'", (owner,)).fetchone():
-                raise TransactionConflict("A bill change needs verification. Check its saved status in Settings → Bills first.")
+                raise TransactionConflict("A bill or transfer change needs verification. Check its saved status in Settings first.")
             db.execute("INSERT INTO app_transaction_commands VALUES (?,?,?,'running','{}',?,?)", (owner, request_id, fingerprint, json.dumps(body,sort_keys=True),datetime.now(timezone.utc).isoformat()))
         state, result = "done", {}
         writer_started = False
         try:
             with undo._RECENT_MUTATION_LOCK:
-                checked = review(actor, body, fresh_source=True)
-                if body.get("reviewVersion") != checked["review"]["reviewVersion"]:
-                    raise TransactionConflict("The review changed. Review the transaction again.")
-                row, data = checked["_row"], dict(checked["_normalized"])
-                operation = data.pop("operation")
-                with transaction_context(actor, row["month"]), sheet_command_context(request_id):
-                    logged = row["_logged"]
-                    if row["_manual"]:
+                from bookiebot.reports import transfer_occurrences
+                if transfer_occurrences.handles(body):
+                    from bookiebot.reimbursements.projection import projection_lock
+                    with projection_lock(shared.build_reimbursement_store()):
+                        checked = review(actor, body, fresh_source=True)
+                        if body.get('reviewVersion') != checked['review']['reviewVersion']:
+                            raise TransactionConflict('The transfer review changed. Review this entry again.')
+                        batch, result = transfer_occurrences.batch(checked, request_id, fingerprint)
                         writer_started = True
-                        # Explicit confirmation adopts the existing source as
-                        # audit lineage; it never copies/imports another row.
-                        logged.id = undo.record_undo_action(actor, logged.action) or ""
-                        if not logged.id:
-                            raise RuntimeError("Could not save source history")
-                    before_log = undo._read_log_data(raise_on_error=True)
-                    if before_log is None:
-                        raise RuntimeError("Could not read action history before the change")
-                    before = {entry.logged.id for entry in before_log.records}
-                    writer = {"update": undo.update_recent_action, "move": undo.move_recent_action,
-                        "delete": undo.delete_recent_action, "split": undo.change_split_recent_action if row["split"] else undo.split_recent_action,
-                        "cancel_split": undo.cancel_split_recent_action, "undo": undo.undo_logged_action}[operation]
-                    writer_started = True
-                    success, detail = writer(actor, action_id=logged.id, **data)
-                    result = {"success": success, "detail": detail}
-                    if not success and any(marker in detail.lower() for marker in (
-                        "could not verify", "undo record", "something went wrong", "could not safely", "may already")):
-                        state = "uncertain"
-                        result["detail"] = "I could not verify the change. Check Transactions and saved history before another change. This request will not be submitted again."
-                    elif success:
-                        reviewed = checked["review"]
-                        result["summary"] = {"operation": operation, "title": row["title"], "date": row["date"],
-                            "category": row["categoryLabel"], "location": row["location"], "person": row["person"],
-                            "amountCents": row["amountCents"], "before": dict(row["fields"]), "after": dict(reviewed["after"]),
-                            **{key: reviewed[key] for key in ("destination", "share", "restoration") if reviewed.get(key) is not None}}
-                        history = undo._read_log_data(raise_on_error=True)
-                        new = [record.logged for record in history.records if record.logged.id not in before and record.logged.user_key in actor_key_aliases(actor)] if history else []
-                        if new and operation != "undo" and undo.action_capabilities(new[-1].action).can_undo:
-                            result["undo"] = {"month": row["month"], "id": row["month"] + ":" + new[-1].id}
+                        batch.send()
+                else:
+                    checked = review(actor, body, fresh_source=True)
+                    if body.get("reviewVersion") != checked["review"]["reviewVersion"]:
+                        raise TransactionConflict("The review changed. Review the transaction again.")
+                    row, data = checked["_row"], dict(checked["_normalized"])
+                    operation = data.pop("operation")
+                    with transaction_context(actor, row["month"]), sheet_command_context(request_id):
+                        logged = row["_logged"]
+                        if row["_manual"]:
+                            writer_started = True
+                            # Explicit confirmation adopts the existing source as
+                            # audit lineage; it never copies/imports another row.
+                            logged.id = undo.record_undo_action(actor, logged.action) or ""
+                            if not logged.id:
+                                raise RuntimeError("Could not save source history")
+                        before_log = undo._read_log_data(raise_on_error=True)
+                        if before_log is None:
+                            raise RuntimeError("Could not read action history before the change")
+                        before = {entry.logged.id for entry in before_log.records}
+                        writer = {"update": undo.update_recent_action, "move": undo.move_recent_action,
+                            "delete": undo.delete_recent_action, "split": undo.change_split_recent_action if row["split"] else undo.split_recent_action,
+                            "cancel_split": undo.cancel_split_recent_action, "undo": undo.undo_logged_action}[operation]
+                        writer_started = True
+                        success, detail = writer(actor, action_id=logged.id, **data)
+                        result = {"success": success, "detail": detail}
+                        if not success and any(marker in detail.lower() for marker in (
+                            "could not verify", "undo record", "something went wrong", "could not safely", "may already")):
+                            state = "uncertain"
+                            result["detail"] = "I could not verify the change. Check Transactions and saved history before another change. This request will not be submitted again."
+                        elif success:
+                            reviewed = checked["review"]
+                            result["summary"] = {"operation": operation, "title": row["title"], "date": row["date"],
+                                "category": row["categoryLabel"], "location": row["location"], "person": row["person"],
+                                "amountCents": row["amountCents"], "before": dict(row["fields"]), "after": dict(reviewed["after"]),
+                                **{key: reviewed[key] for key in ("destination", "share", "restoration") if reviewed.get(key) is not None}}
+                            history = undo._read_log_data(raise_on_error=True)
+                            new = [record.logged for record in history.records if record.logged.id not in before and record.logged.user_key in actor_key_aliases(actor)] if history else []
+                            if new and operation != "undo" and undo.action_capabilities(new[-1].action).can_undo:
+                                result["undo"] = {"month": row["month"], "id": row["month"] + ":" + new[-1].id}
         except (TransactionValidation, TransactionConflict) as exc:
             result = {"success": False, "detail": str(exc)}
         except Exception:

@@ -77,3 +77,9 @@ Use isolated sheets and an isolated SQLite/PostgreSQL database for every financi
 On production, inspect Overview and Transactions, search/filter, open a review, then Cancel. Do not alter RJ11 or another real transaction as a test. Also test single-entry days, long days spanning pages, the unified chooser/search and rapid swipe reversals, with keyboard focus producing no visible borders. Native iPhone and real user financial acceptance remain separate from isolated automated tests and deployment health checks; checklist 156 records the release procedure.
 
 Native toolbar acceptance: STATUS checklist 295 covers both DUO poses, placeholder fitting, filters/search/clear, graph disclosure, independent open-pane scrolling and folding.
+
+## Individual savings transfers
+
+Due scheduled transfers appear alongside purchases. All stacks a separate gold Transfers graph layer; Needs/Wants totals remain spending-only. The Transfers filter uses the same gold color. Graph tooltips show each amount and Total activity, and date filters do not change the selected month or graph scope.
+
+Edit/Delete applies only to the selected original date, with a read-only native review and Undo. Amount, name, From/To and optional personal goal can change; the review shows the Saved contribution and goal reallocations. Recurrence, all other dates, manual cash and manual goal contributions remain untouched. Lost confirmations recover the original atomic receipt without another write. Existing native inline/right-pane slides and fold retention apply. See [Savings transfers](SAVINGS_TRANSFERS.md).

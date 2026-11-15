@@ -16,7 +16,7 @@ const file = ts.createSourceFile("report-app.tsx", source, ts.ScriptTarget.Lates
 const names = new Set([
   "money", "formatMoney", "DailySpendingSection", "DailySpendingChart", "MemoizedDailySpendingChart", "DailyEntriesTable",
   "DailySpendingPlot", "MemoizedDailySpendingPlot", "CategoryFilterControl", "compareDayGroups", "dailyEntryDayLabel", "isCurrentCalendarDay", "PACIFIC_CALENDAR_DATE",
-  "NEEDS_BAR_COLOR", "WANTS_BAR_COLOR", "DAILY_SPENDING_BAR_RADIUS", "DAILY_SPENDING_GRID_COLOR", "DAILY_SPENDING_BOUNDARY_COLOR",
+  "NEEDS_BAR_COLOR", "WANTS_BAR_COLOR", "TRANSFER_BAR_COLOR", "DAILY_SPENDING_BAR_RADIUS", "DAILY_SPENDING_GRID_COLOR", "DAILY_SPENDING_BOUNDARY_COLOR",
   "dailySpendingAxis", "dailySpendingBreakAmount", "dailySpendingChartRows", "dailySpendingVisualAmount",
   "dailySpendingActualAmount", "dailySpendingAxisTickLabel", "dailySpendingYAxisDomain", "dailySpendingYAxisTicks",
   "dailySpendingTickRange", "dailySpendingCursorFill",
