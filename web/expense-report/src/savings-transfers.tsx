@@ -27,7 +27,7 @@ async function request(path:string,body?:unknown,signal?:AbortSignal){
  const controller=new AbortController(),cancel=()=>controller.abort();let timedOut=false
  if(signal?.aborted)cancel();signal?.addEventListener('abort',cancel,{once:true})
  const timer=window.setTimeout(()=>{timedOut=true;controller.abort()},30_000)
- try{const response=await fetch(path,{method:body?'POST':'GET',credentials:'same-origin',mode:'same-origin',cache:'no-store',redirect:'error',headers:{'X-BookieBot-App':'1','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:controller.signal});const data=await response.json();if(!response.ok)throw new TransferError(data.error||'Could not verify transfers.',response.status);return data}
+ try{const response=await fetch(path,{method:body?'POST':'GET',credentials:'same-origin',mode:'same-origin',cache:'no-store',referrerPolicy:'same-origin',redirect:'error',headers:{'X-BookieBot-App':'1','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:controller.signal});const data=await response.json();if(!response.ok)throw new TransferError(data.error||'Could not verify transfers.',response.status);return data}
  catch(error){if(timedOut)throw new TransferError('Transfers took too long. Check saved status before repeating a change.',0);throw error}
  finally{window.clearTimeout(timer);signal?.removeEventListener('abort',cancel)}
 }

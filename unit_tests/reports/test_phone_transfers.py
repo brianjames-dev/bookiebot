@@ -30,7 +30,7 @@ async def test_transfer_session_same_origin_size_and_personal_scope(client):
         assert (await client.http.get(path)).status==401
     assert (await client.http.post('/app/transfers/review',json={},headers=HEADERS)).status==401
     client.connect()
-    for headers in ({},{**HEADERS,'Origin':'https://foreign.invalid'},{**HEADERS,'Sec-Fetch-Site':'cross-site'}):
+    for headers in ({},{**HEADERS,'Origin':'null'},{**HEADERS,'Origin':'https://foreign.invalid'},{**HEADERS,'Sec-Fetch-Site':'cross-site'}):
         assert (await client.http.post('/app/transfers',json={},headers=headers)).status==403
     assert (await client.http.post('/app/transfers',data='x'*4097,headers=HEADERS)).status==400
     response=await client.http.get('/app/transfers?owner=hannah')

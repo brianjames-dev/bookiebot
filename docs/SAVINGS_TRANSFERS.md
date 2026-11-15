@@ -87,3 +87,11 @@ On the due date it should appear once in Transactions and increase Saved and
 the linked goal once. Change only the future amount/link, then stop it and inspect
 Past transfers. Recorded months stay intact. Automated financial tests use
 isolated fixtures; release verification does not alter live money.
+
+## Creation request errors
+
+“Make transfer changes from BookieBot” means the request failed the same-origin
+check before Review or saving. Transfers requests use the same explicit
+same-origin referrer policy as Bills and Transactions under the private page
+policy. Update/reopen the Home Screen app; opaque and foreign request origins
+remain rejected. No schedule is saved by a rejected Review.

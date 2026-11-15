@@ -67,7 +67,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/transfers')&&options.transfers)return options.transfers(route);
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/goals')&&options.goals)return options.goals(route);
   if(url.origin!=='https://bookie.test'||request.method()!=='GET'){unexpected.push(request.method()+' '+url);return route.abort();}
-  if(name==='/app/expenses')return route.fulfill({contentType:'text/html',body:html(dark,old)});
+  if(name==='/app/expenses')return route.fulfill({contentType:'text/html',body:html(dark,old),...(options.referrerPolicy?{headers:{'Referrer-Policy':options.referrerPolicy}}:{})});
   if(/^\/app\/assets\/category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,path.basename(name)),'utf8')});
   if(/^\/app\/assets\/company-logo-[\w-]+\.(png|svg)$/.test(name))return route.fulfill({contentType:name.endsWith('.png')?'image/png':'image/svg+xml',body:fs.readFileSync(path.join(assets,path.basename(name)))});
   let value;

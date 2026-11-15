@@ -116,3 +116,19 @@ Month/year preparation retains each operational claim. A definitively rejected o
 Tests use isolated worksheet transports, SQLite/PostgreSQL command stores and synthetic browser fixtures. They cover effective dates, unknown columns/formulas, exact shares, partial/zero repayments, new recipient sources, future forecasts, duplicate/lost/stale requests, cross-flow uncertainty, reminder dates and rollover. Browser cases use the shipped bundle in Chromium/WebKit at 320px, 382px and open DUO widths, both themes, folding, independent scroll ownership and one combined in-Bills review/current-charge confirmation, stable row/filter anchors through closure, dense short-pane fit and lost-response/reload recovery. No synthetic financial writes are made to production workbooks.
 
 Native acceptance: STATUS checklist 297 covers backdated ending, original-month corrections, archive/undo and annual recovery. Retain checklist 296 for the streamlined flow and row retention, superseding the former post-save question and separate current-charge screens. Retain checklist 294's inclusive month and Transactions checks. Retain 293's pane-motion checks, checklist 292's controls and earlier accounting/source invariants. For real use, only confirm a legitimate bill or amount; configuration and amount reviews can otherwise be cancelled without writes.
+
+### Why a cancellation month says Keep
+
+Cancellation checkboxes depend on each original month’s source evidence. For a
+subscription represented by a category subtotal, the saved monthly subtotal must
+match the reconstructed subscription history for that category. A mismatch blocks
+automatic removal of any charge in that category/month; the same subscription
+can therefore be removable in one month and protected in another. The disabled
+row retains its reason and amount. This does not prove the particular
+subscription is wrong: an older literal subtotal or another subscription change
+can cause the category-wide difference. Verify the original source before
+correcting it; stopping future recurrence alone does not erase that amount.
+
+Entered payments, bank-linked charges, Shared allocations and confirmed future
+payments have separate protections. Cancellation never bypasses them simply
+because another month can be selected.
