@@ -61,3 +61,18 @@ async def test_revoked_session_after_transfer_read_discards_snapshot(client,monk
     monkeypatch.setattr(savings_transfers,'listing',revoke)
     response=await client.http.get('/app/transfers')
     assert response.status==401 and 'Emergency fund' not in await response.text()
+
+
+@pytest.mark.asyncio
+async def test_prior_transactions_claim_rejects_confirmation_without_claiming_transfer(client):
+    client.connect()
+    body=draft()
+    response=await client.http.post('/app/transfers/review',json=body,headers=HEADERS)
+    command={**body,'reviewVersion':(await response.json())['review']['reviewVersion'],'requestId':'rejected-transfer-123456'}
+    with client.state.commands.access.connect(write=True) as db:
+        db.execute("INSERT INTO app_transaction_commands VALUES (?,?,?,'uncertain','{}','{}',?)",
+                   ('brian','other-device-transaction','fingerprint','2026-11-15T12:00:00+00:00'))
+    response=await client.http.post('/app/transfers',json=command,headers=HEADERS)
+    assert response.status==409 and 'Transactions' in (await response.json())['error']
+    assert (await client.http.get('/app/transfers/commands/'+command['requestId'])).status==404
+    assert not client.state.t.sent

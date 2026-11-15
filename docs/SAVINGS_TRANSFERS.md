@@ -65,7 +65,7 @@ Goal archiving shares the financial owner lock to prevent racing a new link.
 
 The browser stores the original owner-scoped request before POST. Lost responses
 offer Check saved status and Retry same confirmation, retaining the original ID
-through reload. A successful atomic receipt completes recovery without repeating
+through reload. Definitive validation/claim rejections clear the unrecorded request and return to editing; errors remain visible after refresh. Read-only Refresh can recheck a resolved Bills claim. A successful atomic receipt completes recovery without repeating
 the writer. Missing, corrupt or unavailable transfer data fails verification;
 it is never silently substituted with zero. Source reads and GETs do not create
 tabs or record contributions.
