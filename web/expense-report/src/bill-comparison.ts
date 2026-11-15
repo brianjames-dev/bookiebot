@@ -36,7 +36,7 @@ export function useBillSelection(owner: string, defaults: string[]) {
 export function comparisonItems(history: UtilityHistoryItem[], events: CalendarEvent[], month: number, projected: boolean): UtilityHistoryItem[] {
   const byName = new Map<string, CalendarEvent[]>()
   for (const event of events) {
-    if (event.kind === "income") continue
+    if (event.kind === "income" || event.kind === 'transfer') continue
     const key = billLabelKey(event.label)
     byName.set(key, [...(byName.get(key) ?? []), event])
   }

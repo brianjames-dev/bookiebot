@@ -4,9 +4,9 @@ import {EditorExpansion} from './transaction-editor-workspace'
 // Preserve presentation positions and one material through pane handoffs.
 export const billSelectionMotion={duration:440,easing:'cubic-bezier(.2,.8,.25,1)'}
 type Entry={id:string;order:number;isNew:boolean;node:ReactNode}
-type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode;onClosed?:()=>void;onAnchorsChange?:(ids:string[])=>void}
+type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode;onClosed?:()=>void;onAnchorsChange?:(ids:string[])=>void;editorLabel?:string;emptyText?:string}
 
-function BillEditorEntry({entry,open,wide,locked,onClosed}:{entry:Entry;open:boolean;wide:boolean;locked:boolean;onClosed:()=>void}){
+function BillEditorEntry({entry,open,wide,locked,onClosed,editorLabel}:{entry:Entry;open:boolean;wide:boolean;locked:boolean;onClosed:()=>void;editorLabel:string}){
  const element=useRef<HTMLElement>(null),latest=useRef({open,onClosed}),motion=useRef<Animation|null>(null)
  const [ready,setReady]=useState(wide)
  const state=useRef({initialized:false,wide,open,generation:0})
@@ -34,14 +34,14 @@ function BillEditorEntry({entry,open,wide,locked,onClosed}:{entry:Entry;open:boo
   return()=>{++s.generation;node.style.transform=getComputedStyle(node).transform;animation.cancel()}
  },[open,wide])
  useLayoutEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)'),settle=()=>{if(!media.matches)return;motion.current?.cancel();motion.current=null;const node=element.current;if(node){node.dataset.billMoving='false';node.style.visibility=latest.current.open?'visible':'hidden';if(latest.current.open)node.style.transform='none'}if(!latest.current.open)latest.current.onClosed()};media.addEventListener('change',settle);return()=>media.removeEventListener('change',settle)},[])
- return <section ref={element} className="bb-bills-editor" aria-label="Bill editor" aria-hidden={!open} data-bill-slot={entry.id} data-new={entry.isNew} data-open={open} data-present="true" inert={!open||locked} style={{order:entry.order}}>
+ return <section ref={element} className="bb-bills-editor" aria-label={editorLabel} aria-hidden={!open} data-bill-slot={entry.id} data-new={entry.isNew} data-open={open} data-present="true" inert={!open||locked} style={{order:entry.order}}>
   <EditorExpansion open={wide||open&&ready} onCollapsed={()=>{if(!latest.current.open)latest.current.onClosed()}}>{entry.node}</EditorExpansion>
  </section>
 }
 
 /** Keep each live editor mounted through folding; retain outgoing row content
  * until its simultaneous collapse or eased pane motion finishes. */
-export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,children,onClosed,onAnchorsChange}:Props){
+export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,children,onClosed,onAnchorsChange,emptyText='Choose a bill to manage it.',editorLabel='Bill editor'}:Props){
  const records=useRef(new Map<string,Entry>()),active=useRef<string|null>(null),previousWide=useRef(wide),root=useRef<HTMLDivElement>(null)
  const [,redraw]=useState(0)
  active.current=open?billId:null
@@ -54,7 +54,7 @@ export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,childre
   onAnchorsChange?.([...records.current.keys()])
  })
  return <div className="bb-bill-editor-workspace" ref={root} data-present={records.current.size>0}>
-  {[...records.current.values()].map(entry=><BillEditorEntry key={entry.id} entry={entry} open={open&&entry.id===billId} wide={wide} locked={locked} onClosed={()=>remove(entry.id)}/>)}
-  {!records.current.size&&<section className="bb-bills-editor bb-bills-editor-empty" aria-label="Bill editor" data-open="false"><p className="bb-bills-empty">Choose a bill to manage it.</p></section>}
+  {[...records.current.values()].map(entry=><BillEditorEntry key={entry.id} entry={entry} open={open&&entry.id===billId} wide={wide} locked={locked} editorLabel={editorLabel} onClosed={()=>remove(entry.id)}/>)}
+  {!records.current.size&&<section className="bb-bills-editor bb-bills-editor-empty" aria-label={editorLabel} data-open="false"><p className="bb-bills-empty">{emptyText}</p></section>}
  </div>
 }

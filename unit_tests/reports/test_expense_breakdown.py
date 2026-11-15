@@ -250,7 +250,7 @@ def test_category_mix_counts_donor_transfers_as_effective_category_usage():
     transfer_source = source.split("function categoryMixTransferRows", 1)[1].split("function categoryMixPressure", 1)[0]
 
     assert "const transferRows = categoryMixTransferRows(categoryBalances, filter)" in category_source
-    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)" in category_source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp, transferAmount)" in category_source
     assert "transfer.from === filter" in transfer_source
     assert 'label: `${CATEGORY_BALANCE_LABELS[transfer.to]} overspend coverage`' in transfer_source
     assert "usedTotal / selectedBudget" in category_source
@@ -1990,7 +1990,7 @@ def test_report_frontend_keeps_expense_metrics_separate_from_saved_headlines():
     assert "projectedCategoryBalances(categoryBudgets, categorySpending)" in source
     assert "report.modeViews?.projected" in source
     assert "budgetData={activeReport.budgetBreakdown}" not in source
-    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp)" in source
+    assert "categoryMixRows(data, selectedRollover, filter, amountSaved, transferRows, espp, estimatedEspp, transferAmount)" in source
     assert "categoryBudgets={activeReport.categoryBudgets}" in source
     assert "Budget remaining" not in source
     assert "usedPercent.toFixed(1)" in source

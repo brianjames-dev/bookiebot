@@ -122,6 +122,35 @@ async def test_monthly_savings_check_and_log_overwrite_the_single_bucket():
 
 
 @pytest.mark.asyncio
+async def test_monthly_total_includes_due_transfers_once_without_overwriting_the_schedule(monkeypatch):
+    from contextlib import nullcontext
+    from datetime import datetime
+    from types import SimpleNamespace
+    from bookiebot.sheets.savings_transfers import Transfer
+    repo=SheetsRepoStub(income_rows=[['','Enter Monthly Savings Contribution','IDEAL = $300','MINIMUM = $150','50']])
+    plans=[Transfer('transfer-1234',1,'Savings',15000,'monthly','2026-11-15','2026-11-15'),
+           Transfer('transfer-5678',1,'Later',25000,'once','2026-11-20','2026-11-15')]
+    monkeypatch.setattr(repo,'savings_transfer_plans',lambda:plans,raising=False)
+    monkeypatch.setattr('bookiebot.sheets.routing.now_pacific',lambda:datetime(2026,11,15,12))
+    commands=SimpleNamespace(pending=lambda owner:None)
+    monkeypatch.setattr('bookiebot.reports.bill_settings.build_commands',lambda:commands)
+    monkeypatch.setattr('bookiebot.reimbursements.service.build_reimbursement_store',lambda:SimpleNamespace())
+    monkeypatch.setattr('bookiebot.reimbursements.projection.projection_lock',lambda store:nullcontext())
+    monkeypatch.setattr(su,'get_current_discord_user_id',lambda:'676638528590970917')
+    with repo.patched():
+        assert (await su.check_savings_deposited())['actual']==200
+        assert su.log_savings(300)
+        assert repo.income.acell('E1').value=='150.0'
+        assert (await su.check_savings_deposited())['actual']==300
+        assert not su.log_savings(100)
+        assert repo.income.acell('E1').value=='150.0'
+        assert len(plans)==2 and plans[0].amount_cents==15000
+        commands.pending=lambda owner:{'operation':'transfer-create','requestId':'unknown-transfer'}
+        assert not su.log_savings(400)
+        assert repo.income.acell('E1').value=='150.0','An unresolved financial command cannot be overwritten by a legacy total'
+
+
+@pytest.mark.asyncio
 async def test_monthly_savings_check_reads_legacy_first_row_targets():
     repo = SheetsRepoStub(
         income_rows=[

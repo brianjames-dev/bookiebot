@@ -32,6 +32,14 @@ assert.ok(!rows(data,200,'savings',1200,[],0).some(row=>row.key==='espp'))
 assert.equal(rows(data,6750,'all',1200).find(row=>row.key==='savings').amount,1200,'All includes cash savings even without ESPP enrollment')
 assert.ok(!rows(data,6750,'all',1200).some(row=>row.key==='espp'))
 assert.equal(rows(data,200,'savings',1200).find(row=>row.key==='savings').label,'Saved')
+const withTransfers=rows(data,6750,'all',1200,[],400,0,300)
+assert.equal(sum(withTransfers),sum(all),'Transfer and manual-cash slices partition the same Saved amount')
+assert.equal(withTransfers.find(r=>r.key==='savings').amount,900)
+assert.equal(withTransfers.find(r=>r.key==='savings_transfers').amount,300)
+assert.equal(rows([...data,{key:'savings_transfers',label:'Legacy duplicate',amount:999}],6750,'all',1200,[],400,0,300).filter(r=>r.key==='savings_transfers').length,1)
+assert.deepEqual(rows(data,0,'transfers',1200,[],400,0,300).map(r=>[r.key,r.amount]),[['savings_transfers',300],['savings',900]])
+assert.ok(!rows(data,0,'needs',1200,[],400,0,300).some(r=>r.key==='savings_transfers'))
+assert.ok(!rows(data,0,'wants',1200,[],400,0,300).some(r=>r.key==='savings_transfers'))
 console.log('Category Mix partitions full take-home once, separates cash/ESPP, and preserves category filters.')
 
 // Execute the real chart header while replacing only chart drawing/menus.
@@ -42,6 +50,12 @@ const base={data:[...data,{key:'savings',label:'Legacy savings row',amount:999}]
   categoryBudgets:{needs:3000,wants:1000,savings:1000},categoryBalances:{raw:{needs:2500,wants:850,savings:200},remaining:{needs:2500,wants:850,savings:200},deficits:{needs:0,wants:0,savings:0},totalOverspend:0,transfers:[]}}
 const money=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value)
 const displayed=props=>renderToStaticMarkup(React.createElement(Chart,props)).match(/class="bb-chart-total">([^<]+)/)[1]
+const transferProps={...base,filter:'all',amountSaved:1200,transferAmount:300,espp:400,allSpentTotal:650}
+assert.equal(displayed(transferProps),'$650.00')
+assert.equal(displayed({...transferProps,filter:'savings'}),'$1,600.00')
+assert.equal(displayed({...transferProps,filter:'transfers'}),'$300.00')
+assert.match(renderToStaticMarkup(React.createElement(Chart,{...transferProps,filter:'transfers'})),/25%/)
+assert.equal(equal(transferProps,{...transferProps,transferAmount:301}),false)
 for(const [cash,espp,estimated] of [[1200,undefined,0],[1200,0,0],[1200,400,0],[1200,600,200],[0,0,0],[-50,undefined,0]]) {
   for(const [projected,adjustment] of [[false,17.25],[true,38.75]]) {
     const allSpentTotal=headline({totalExpenses:650+adjustment,amountSaved:cash+(espp??0)})

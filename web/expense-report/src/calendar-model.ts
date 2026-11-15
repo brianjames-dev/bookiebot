@@ -44,7 +44,7 @@ export function logoCapacity(cellHeight: number, hasAmounts: boolean): number {
   const available = cellHeight - 36 - (hasAmounts ? 38 : 0)
   return Math.max(1, Math.min(6, Math.floor((available - CALENDAR_LAYOUT.iconSize) / (CALENDAR_LAYOUT.iconSize * (1 - CALENDAR_LAYOUT.overlap))) + 1))
 }
-export const CALENDAR_COLORS = { bill: '#78b9e2', subscription: '#b999e5', income: 'hsl(var(--success))' }
+export const CALENDAR_COLORS = { bill: '#78b9e2', subscription: '#b999e5', income: 'hsl(var(--success))', transfer:'#d4b96b' }
 export function calendarDot(events: CalendarEvent[]): string {
   const colors = [...new Set(events.map(item => CALENDAR_COLORS[item.kind]))]
   return colors.length < 2 ? colors[0] : `conic-gradient(${colors.map((color, i) => `${color} ${i * 100 / colors.length}% ${(i + 1) * 100 / colors.length}%`).join(', ')})`

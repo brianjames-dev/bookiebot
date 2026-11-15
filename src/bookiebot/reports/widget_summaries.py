@@ -65,6 +65,13 @@ def report_content(report: dict[str, Any], kind: str, mode: str, day: str) -> di
 
 def _goals_content(owner: str) -> dict[str, Any]:
     result = build_goals_store().list_goals(owner)
+    from bookiebot.reports.savings_transfers import goal_payload
+    from bookiebot.sheets.routing import get_discord_user_config, APPLE_SHORTCUT_RELAY_USER_ID
+    actor = next((key for key, config in get_discord_user_config().items()
+        if key != APPLE_SHORTCUT_RELAY_USER_ID and config.budget_owner_key == owner), None)
+    if actor is None:
+        raise ValueError('The personal savings owner is unavailable')
+    result = goal_payload(actor, result)
     if result["scope"] != "personal" or result["currency"] != "USD" or len(result["goals"]) > 200:
         raise ValueError("Invalid widget goals")
     goals = []

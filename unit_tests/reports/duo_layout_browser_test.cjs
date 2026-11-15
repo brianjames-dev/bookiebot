@@ -64,13 +64,15 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills/check-in'))return options.checkin?options.checkin(route):route.fulfill({json:{day:new Date().toISOString().slice(0,10),bills:[],claimed:false}});
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/transactions')&&options.transactions)return options.transactions(route);
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills')&&options.bills)return options.bills(route);
+  if(url.origin==='https://bookie.test'&&name.startsWith('/app/transfers')&&options.transfers)return options.transfers(route);
+  if(url.origin==='https://bookie.test'&&name.startsWith('/app/goals')&&options.goals)return options.goals(route);
   if(url.origin!=='https://bookie.test'||request.method()!=='GET'){unexpected.push(request.method()+' '+url);return route.abort();}
   if(name==='/app/expenses')return route.fulfill({contentType:'text/html',body:html(dark,old)});
   if(/^\/app\/assets\/category-mix-layout-[\w-]+\.js$/.test(name))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(assets,path.basename(name)),'utf8')});
   if(/^\/app\/assets\/company-logo-[\w-]+\.(png|svg)$/.test(name))return route.fulfill({contentType:name.endsWith('.png')?'image/png':'image/svg+xml',body:fs.readFileSync(path.join(assets,path.basename(name)))});
   let value;
   if(name==='/app/expenses/data')value=options.report?options.report(url):page.url().includes('pressure=1')?pressureReport:report;
-  else if(name==='/app/expenses/months')value={currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
+  else if(name==='/app/expenses/months')value=options.months??{currentMonth:'2026-10',months:[{value:'2026-09',label:'September 2026'},{value:'2026-10',label:'October 2026'}],coverage:{status:'complete',unavailableYears:[]}};
   else if(name==='/app/expenses/comparison'){if(comparison.hold)await new Promise(resolve=>comparison.release=resolve);value={selectedMonth:'2026-10',baselineMonth:'2026-09',baselineKind:'selected-month',mode:url.searchParams.get('mode'),throughDay:10,shortMonthAdjusted:false,selected:{spending:3043.37,complete:false},baseline:{spending:3149.82,complete:false},changeAmount:-106.45,changePercent:-3.4,status:'partial',coverageNote:'Synthetic comparison'};}
   else if(name==='/app/reconciliation')value={enabled:true,checkedAt:null,items:[]};
   else if(name==='/app/transactions')value={items:Array.from({length:24},(_,i)=>({id:'fixture-'+i,actionId:'fixture-'+i,version:'fixture-v1',month:'2026-10',date:'2026-10-'+String(i+1).padStart(2,'0'),title:'Fixture purchase '+i,location:'Fixture',person:'Brian',kind:'expense',category:'food',categoryLabel:'Food',amountCents:1000,split:'',fields:{},editableFields:[],capabilities:{},reasons:{}})),total:24,nextOffset:null,categories:[],persons:[],month:'2026-10'};

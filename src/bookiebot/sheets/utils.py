@@ -1587,6 +1587,20 @@ def _savings_contribution_cell(ws):
     )
 
 
+def _scheduled_cash_savings_cents() -> int:
+    from datetime import date
+    from bookiebot.sheets.routing import now_pacific
+    from bookiebot.sheets.savings_transfers import occurrences, TRANSFER_EPOCH
+    today = now_pacific().date()
+    if today < TRANSFER_EPOCH:
+        return 0
+    reader: Any = getattr(get_sheets_repo(), 'savings_transfer_plans', None)
+    if not callable(reader):
+        return 0  # Isolated/legacy repositories have no transfer source.
+    plans: Any = reader()
+    return sum(row['amountCents'] for row in occurrences(plans, date(today.year,today.month,1),today))
+
+
 def _labeled_savings_target(ws, row: int, col: int, target: str) -> float:
     for offset in range(1, 4):
         value = ws.cell(row, col + offset).value
@@ -1603,7 +1617,7 @@ async def check_savings_deposited():
             raise ValueError(f"Could not find '{SAVINGS_CONTRIBUTION_LABEL}'")
 
         row, col = cell.row, cell.col
-        actual_amount = clean_money(ws.cell(row, col + 3).value)
+        actual_amount = round(clean_money(ws.cell(row, col + 3).value) + _scheduled_cash_savings_cents()/100, 2)
         ideal_amount = _labeled_savings_target(ws, row, col, "ideal")
         minimum_amount = _labeled_savings_target(ws, row, col, "minimum")
 
@@ -1644,11 +1658,32 @@ async def check_savings_deposited():
             "actual": 0.0,
             "ideal": 0.0,
             "minimum": 0.0,
+            'unavailable': True,
         }
 
 
 def log_savings(amount):
     """Overwrite the current month's total savings contribution."""
+    from bookiebot.sheets import undo
+    try:
+        with undo._RECENT_MUTATION_LOCK:
+            if callable(getattr(get_sheets_repo(), 'savings_transfer_plans', None)):
+                from bookiebot.reports.bill_settings import build_commands
+                from bookiebot.reimbursements.projection import projection_lock
+                from bookiebot.reimbursements.service import build_reimbursement_store
+                actor = get_current_discord_user_id()
+                commands = build_commands()
+                with projection_lock(build_reimbursement_store()):
+                    if commands.pending(get_user_config(actor).budget_owner_key):
+                        raise ValueError('Check the saved status of your financial change before replacing monthly savings.')
+                    return _log_savings_total(amount)
+            return _log_savings_total(amount)
+    except Exception:
+        logger.exception('Could not verify the monthly savings source')
+        return False
+
+
+def _log_savings_total(amount):
     ws = _income_ws()
     try:
         cell = _savings_contribution_cell(ws)
@@ -1658,8 +1693,14 @@ def log_savings(amount):
         row, col = cell.row, cell.col
         target_cell = rowcol_to_a1(row, col + 3)
         previous_value = ws.acell(target_cell).value
-
-        ws.update_acell(target_cell, str(amount))
+        from bookiebot.sheets.recurring import money_cents
+        requested_cents = money_cents(amount)
+        scheduled_cents = _scheduled_cash_savings_cents()
+        if requested_cents is None or requested_cents < scheduled_cents:
+            raise ValueError('The monthly total cannot remove completed scheduled transfers.')
+        manual_amount = (requested_cents - scheduled_cents) / 100
+        stored_amount = str(manual_amount) if scheduled_cents else str(amount)
+        ws.update_acell(target_cell, stored_amount)
         record_undo_action(
             get_current_discord_user_id(),
             UndoAction(
@@ -1668,9 +1709,10 @@ def log_savings(amount):
                 row=row,
                 columns=[col + 3],
                 previous_values=[previous_value],
-                new_values=[str(amount)],
-                metadata={"type": "savings", "category": "monthly savings"},
-                description=f"monthly savings contribution ${amount}",
+                new_values=[stored_amount],
+                metadata={"type": "savings", "category": "monthly savings",
+                          **({'scheduled_savings_cents':str(scheduled_cents)} if scheduled_cents else {})},
+                description=f"additional cash savings ${manual_amount:.2f}" if scheduled_cents else f"monthly savings contribution ${amount}",
             ),
         )
         print(f"[INFO] Set monthly savings contribution: ${amount} at {target_cell}")

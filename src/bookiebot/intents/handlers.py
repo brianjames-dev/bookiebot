@@ -2105,6 +2105,9 @@ async def log_water_paid_handler(entities, message):
 
 async def query_savings_handler(entities, message):
     result = await su.check_savings_deposited()
+    if result.get('unavailable'):
+        await message.channel.send('Could not verify your monthly savings. Refresh or try again before relying on that total.')
+        return
     if result["deposited"]:
         response = (
             f"✅ Monthly savings contributed: ${result['actual']:.2f}\n"

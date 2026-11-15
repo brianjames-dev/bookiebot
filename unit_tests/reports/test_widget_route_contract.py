@@ -45,6 +45,7 @@ def typed_sources(client, monkeypatch, owner, mode):
     goals.initialize()
     monkeypatch.setattr(goals_store, "build_goals_store", lambda: goals)
     monkeypatch.setattr(widget_summaries, "build_goals_store", lambda: goals)
+    monkeypatch.setattr('bookiebot.sheets.savings_transfers.read_all', lambda *a, **k: [])
 
     def create_goal(account, name, balance):
         return goals.command(account, {"operation": "create", "requestId": uuid4().hex, "name": name,

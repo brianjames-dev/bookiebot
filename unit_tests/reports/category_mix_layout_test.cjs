@@ -19,7 +19,7 @@ try{
  assert.equal(select.props.value,'all')
  assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).children.join(''),'All')
  assert.equal(tree.root.findByProps({className:'bb-category-filter-label'}).props['aria-hidden'],'true','Intrinsic width label is hidden from assistive technology')
- assert.deepEqual(tree.root.findAllByType('option').map(option=>[option.props.value,option.children.join('')]),[['all','All'],['needs','Needs'],['wants','Wants'],['savings','Savings']])
+ assert.deepEqual(tree.root.findAllByType('option').map(option=>[option.props.value,option.children.join('')]),[['all','All'],['needs','Needs'],['wants','Wants'],['savings','Savings'],['transfers','Transfers']])
  Renderer.act(()=>select.props.onPointerDown())
  assert.equal(tree.root.findByProps({className:'bb-category-mix-filter'}).props['data-pointer-focus'],'true')
  Renderer.act(()=>select.props.onChange({target:{value:'needs'}}))

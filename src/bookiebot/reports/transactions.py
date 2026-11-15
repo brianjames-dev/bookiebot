@@ -258,6 +258,28 @@ def _subscription_rows(actor: str, month: str, rows: list[list[str]], *, as_of: 
     return result
 
 
+def _transfer_rows(actor: str, month: str, plans: Any, *, as_of: date, goal_names: dict[str,str] | None = None) -> list[dict[str, Any]]:
+    from bookiebot.sheets.savings_transfers import occurrences
+    year, number = map(int, month.split('-'))
+    start, end = date(year, number, 1), min(as_of, date(year, number, calendar.monthrange(year, number)[1]))
+    result = []
+    for item in occurrences(plans, start, end):
+        goal = (goal_names or {}).get(item['goalId'], '')
+        explanation = 'This savings transfer increases Saved, without counting as Needs or Wants spending.'
+        if goal:
+            explanation += f' The same {item["amountCents"]/100:.2f} also funds {goal}; it is counted once.'
+        result.append({'id':month+':'+item['id'], 'actionId':'', 'month':month, 'version':digest(item),
+            'date':item['date'], 'title':item['name'], 'location':'', 'person':get_user_config(actor).name,
+            'kind':'transfer', 'category':'savings_transfers', 'categoryLabel':'Savings transfer',
+            'amountCents':item['amountCents'], 'split':'', 'editableFields':[], 'notice':explanation,
+            'fields':{'item':item['name'], 'date':item['date'], 'amount':f'{item["amountCents"]/100:.2f}',
+                      'fromAccount':item['fromAccount'], 'toAccount':item['toAccount'], 'goalName':goal},
+            'capabilities':{op:False for op in ('update','move','delete','split','cancel_split','undo')},
+            'reasons':{op:'Manage future transfers in Settings → Savings transfers. Recorded savings stay unchanged.'
+                       for op in ('update','move','delete','split','cancel_split','undo')}})
+    return result
+
+
 def load_transactions(actor: str, month: str, *, fresh: bool = False, include_scheduled: bool = False) -> list[dict[str, Any]]:
     from bookiebot.sheets.bills import bill_payment_state, bill_label_key, list_bill_schedules
     from bookiebot.sheets.bill_payment_evidence import settled_bill_dates
@@ -278,11 +300,19 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
         allocation_by_id = {value["id"]: value for value in allocations}
         paid_bill_dates = settled_bill_dates(allocations, events, owner=owner, as_of=as_of)
         aliases = actor_key_aliases(actor)
+        from bookiebot.sheets import savings_transfers as transfer_ledger
+        transfer_plans, transfer_goal_names = None, {}
         for year in years:
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
             logs = [f"_BookieBot Action Log - {year:04d}-{number:02d}" for number in numbers]
-            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule", "Subscriptions", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges"])
+            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule", "Subscriptions", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges", transfer_ledger.TRANSFER_TAB])
+            if transfer_plans is None and (year, max(numbers,default=1)) >= (transfer_ledger.TRANSFER_EPOCH.year, transfer_ledger.TRANSFER_EPOCH.month):
+                transfer_plans = (transfer_ledger.decode(personal.get(transfer_ledger.TRANSFER_TAB, []))
+                    if year == transfer_ledger.TRANSFER_STORAGE_YEAR else transfer_ledger.read_all(actor,client=client,today=as_of))
+                if any(p.goal_id for p in transfer_plans):
+                    from bookiebot.reports.goals_store import build_goals_store
+                    transfer_goal_names = {g['id']:g['name'] for g in build_goals_store().list_goals(owner)['goals']}
             from bookiebot.sheets.recurring_rows import runtime_tables
             bills, subscriptions, _ = runtime_tables(owner, personal.get("_BookieBot Bill Schedule", []),
                 personal.get("_BookieBot Subscription Schedule", []), personal.get("Subscriptions", []), personal.get("_BookieBot Bill Charges", []))
@@ -359,6 +389,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
                     if row["amountCents"] > 0:
                         result.append(row)
                 result.extend(_subscription_rows(actor, period, subscriptions, as_of=as_of))
+                result.extend(_transfer_rows(actor, period, transfer_plans or [], as_of=as_of, goal_names=transfer_goal_names))
         # A debtor may have no sheet expense until a repayment is confirmed.
         # Purchase context is a disclosure, never a new cash transaction. Existing
         # recipient bill cells already represent that cash and get the same cue.
@@ -399,7 +430,8 @@ def _daily_totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                                    "totalCents": 0, "needsCents": 0, "wantsCents": 0})
         day["count"] += 1
         day["totalCents"] += amount
-        day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
+        if row.get('kind') != 'transfer':
+            day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
     return list(days.values())
 
 
@@ -428,9 +460,10 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
     except ValueError as exc:
         raise TransactionValidation("Choose a valid transactions page.") from exc
     def filtered(source: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [row for row in source if (not kind or row["kind"] == kind) and (not category or row["category"] == category)
+        return [row for row in source if (not kind or row["kind"] == kind or kind=='savings' and row['kind']=='transfer') and (not category or row["category"] == category)
             and (query.get("scope") != "spending" or row["kind"] in {"expense", "payment", "subscription"})
-            and (query.get("bucket") not in {"needs", "wants"} or ("wants" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needs") == query["bucket"])
+            and (query.get('scope') != 'spending_or_transfers' or row['kind'] in {'expense','payment','subscription','transfer'})
+            and (query.get("bucket") not in {"needs", "wants"} or row['kind'] in {'expense','payment','subscription'} and ("wants" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needs") == query["bucket"])
             and (not person or row["person"] == person) and (not split or bool(row["split"]) == (split == "shared"))
             and all(word in " ".join(str(row[k]) for k in ("title", "location", "person", "categoryLabel", "amountCents", "date")).casefold()
                     or word in {f"{row['amountCents'] / 100:.2f}", f"{row.get('displayAmountCents', row['amountCents']) / 100:.2f}"} for word in search)]
@@ -447,10 +480,11 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         # Aggregate the complete selected snapshot, not the visible 40-row page.
         # These are recorded sources only; no estimates acquire edit capabilities.
         result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected + (visible if cross_month else [])])
-        result["days"] = _daily_totals(selected)
-        if day:
+        chart_rows = [row for row in selected if row['kind'] != 'transfer'] if query.get('scope')=='spending_or_transfers' else selected
+        result["days"] = _daily_totals(chart_rows)
+        if day or len(chart_rows)!=len(selected):
             result["listDays"] = _daily_totals(visible)
-        result["totalAmountCents"] = sum(accounted_amount(row) for row in selected)
+        result["totalAmountCents"] = sum(accounted_amount(row) for row in chart_rows)
     return result
 
 
