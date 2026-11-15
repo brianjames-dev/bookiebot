@@ -139,18 +139,34 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
 def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | None = None) -> dict[str, Any]:
     today = now_pacific().date()
     source = snapshot or read_workbook(actor, today)
+    if body.get("operation") == "current":
+        from bookiebot.reports.bill_current_review import review_current
+        return review_current(actor, source, body)
     if body.get("operation") == "rollover":
         return _carry_review(source, body, today)["review"]
     if body.get("operation") == "project":
         return _projection_review(source, body, today)["review"]
     if body.get("operation") in {"amount", "adopt", "scheduled"}:
         return _amount_review(source, body, today)["review"]
-    change = prepare_change(source.settings, body, today=today)
+    explicit_current = "applyCurrentCharge" in body
+    if explicit_current and type(body["applyCurrentCharge"]) is not bool:
+        raise BillValidation("Choose whether to update the recorded charge.")
+    change = prepare_change(source.settings, {k:v for k,v in body.items() if k != "applyCurrentCharge"}, today=today)
     from bookiebot.reimbursements.service import enabled
     if change.after.split_method != "none" and not enabled():
         raise BillValidation("Shared splits are unavailable. Try again when Shared is connected.")
     configuration_batch(source, change, "review-preview", fingerprint(body), "{}", today=today)
-    return change.public()
+    result = change.public()
+    if explicit_current:
+        from bookiebot.reports.bill_current_review import configuration_target
+        current = configuration_target(actor, source, change)
+        if body["applyCurrentCharge"] and current and current["blockedReason"]:
+            raise BillValidation(current["blockedReason"])
+        result["currentChange"] = current
+        result["applyCurrentCharge"] = body["applyCurrentCharge"]
+        result["reviewVersion"] = fingerprint([change.review_version, body["applyCurrentCharge"],
+                                               current if body["applyCurrentCharge"] else None])
+    return result
 
 
 def _carry_review(source: WorkbookSnapshot, body: dict[str, Any], today: date) -> dict[str, Any]:
@@ -402,8 +418,10 @@ class BillCommands:
                         batch.send()
                         batch_committed = True
                     else:
-                        change = prepare_change(source.settings, body, today=now_pacific().date())
+                        change = prepare_change(source.settings, {k:v for k,v in body.items() if k != "applyCurrentCharge"}, today=now_pacific().date())
                         result = {"state": "done", "success": True, "detail": f"Bill {'stopped' if change.operation == 'delete' else 'saved'} from {change.after.effective_from}."}
+                        if body.get("applyCurrentCharge") and checked_review.get("currentChange"):
+                            result["currentChange"] = checked_review["currentChange"]
                         batch = configuration_batch(source, change, request_id, digest, json.dumps(result), today=now_pacific().date())
                         started = True
                         batch.send()

@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState} from 'react'
+import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react'
 import {ArrowLeft,ArrowRight,ChevronDown,ChevronRight,Plus,Trash2,RefreshCw,Clock3,Check} from 'lucide-react'
 import {TransactionIcon} from './daily-transactions'
 import {useAppNavigation} from './app-navigation'
@@ -10,6 +10,8 @@ import {EditorScenes} from './transaction-editor-workspace'
 import {StepMotion} from './transaction-step-motion'
 import {BillCurrentCharge,type CurrentBillIntent} from './bill-current-charge'
 import {BillCurrentOffer} from './bill-current-offer'
+import {billFlow,billFlowKey,runBillFlow,type BillSaveFlow,type BillCurrentChange} from './bill-save-flow'
+import {billReviewLines,currentReviewLines} from './bill-review'
 import {BillEditorWorkspace} from './bill-editor-workspace'
 import {billListAmount,currentBillHasHit,recurringStartMonth} from './bill-settings-model'
 import {usePageRefresh,usePageRefreshRegistry} from './page-refresh'
@@ -25,7 +27,7 @@ export type Bill={id:string;type:'subscription'|'variable'|'fixed';name:string;a
 type Snapshot={month:string;today:string;settingsVersion:string;ownerName:string;partnerName:string;incomeBasisPoints:number;splitsEnabled:boolean;bills:Bill[];pendingCommand?:Command}
 type Form={name:string;type:Bill['type'];amount:string;cadence:Bill['cadence'];pullDay:string;firstMonth:number;category:string;account:string;effectiveFrom:string;stopFrom:string;splitMethod:Bill['splitMethod'];payerBasisPoints:number}
 type Command=Record<string,unknown>&{operation:string;requestId?:string;reviewVersion?:string}
-type Review={operation:string;reviewVersion:string;name?:string;amountCents?:number;month?:string;date?:string;effectiveFrom?:string;before?:Bill|null;after?:Bill;share?:{method:string;payerName?:string;partnerName?:string;payerCents:number;partnerCents:number};replacesScheduledChanges?:boolean}
+type Review={operation:string;reviewVersion:string;name?:string;amountCents?:number;month?:string;date?:string;effectiveFrom?:string;before?:Bill|null;after?:Bill;share?:{method:string;payerName?:string;partnerName?:string;payerCents:number;partnerCents:number};replacesScheduledChanges?:boolean;currentChange?:BillCurrentChange|null;applyCurrentCharge?:boolean}
 type Result={state:string;success?:boolean;detail?:string;splitPending?:boolean;transaction?:{id:string;month:string}}
 type Mode='settings'|'amount'|'monthly'|'stop'|'adopt'|'split'|'offer'|'charge'
 type Draft={form:Form;mode:Mode;amount:string;review:Review|null;reviewBody:Command|null;splitInput:SplitInputDraft;valid:boolean;draftId:string;splitBefore:{method:Form['splitMethod'];basis:number}|null}
@@ -53,6 +55,10 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const [busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result|null>(null),[pending,setPending]=useState<Command|null>(null),[valid,setValid]=useState(true)
  const [splitInput,setSplitInput]=useState<SplitInputDraft>(null)
  const [confirmReady,setConfirmReady]=useState(false)
+ const root=useRef<HTMLDivElement>(null),rowPositions=useRef(new Map<string,DOMRect>()),rowMotion=useRef<Animation[]>([])
+ const captureRows=()=>{rowPositions.current=new Map([...root.current?.querySelectorAll<HTMLElement>('.bb-bills-row-shell')??[]].map(node=>[node.querySelector<HTMLElement>('[data-bill-id]')!.dataset.billId!,node.getBoundingClientRect()]))}
+ const flowKey=billFlowKey(ownerName),flowRef=useRef<BillSaveFlow|null>(null),order=useRef<string[]|null>(null)
+ const [flow,setFlow]=useState<BillSaveFlow|null>(null),[anchors,setAnchors]=useState<string[]>([])
  const [currentIntent,setCurrentIntent]=useState<CurrentBillIntent|null>(null),[newRequested,setNewRequested]=useState(false)
  const refreshRegistry=usePageRefreshRegistry()
  const work=useAppWorkGuard(),currentLocked=work.pending||work.uncertain
@@ -64,32 +70,34 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const placement=useRef<{order:number;isNew:boolean;billId?:string}>({order:1,isNew:true})
  const storageKey=`bookiebot:bills-request:${ownerName.toLowerCase()}`
  const reset=useCallback(()=>{drafts.current.clear();setForm(null);setSelected(null);setReview(null);setReviewBody(null);setMode('settings');setAmount('');setError('');setValid(true);setSplitInput(null);setConfirmReady(false);setCurrentIntent(null);splitBefore.current=null;try{sessionStorage.removeItem(followKey)}catch{}},[followKey])
- const updateWork=useAppWorkStatus({label:'Bill changes',pending:busy,uncertain:Boolean(pending),dirty:Boolean(form),onDiscard:reset})
+ const updateWork=useAppWorkStatus({label:'Bill changes',pending:busy,uncertain:Boolean(pending||flow?.pending),dirty:Boolean(form),onDiscard:reset})
  const load=useCallback(async()=>{
   const token=++generation.current;abort.current?.abort();const controller=new AbortController();abort.current=controller;setBusy(true);setError('')
   try{const next=await request('/app/bills',undefined,controller.signal) as Snapshot;if(!alive.current||token!==generation.current)return false
    if(next.ownerName?.toLowerCase()!==ownerName.toLowerCase())throw new Error('Your budget profile changed. Reopen BookieBot.');
    if(!Array.isArray(next.bills)||!next.settingsVersion)throw new Error('Bills could not be read completely.')
-   setSnapshot(next);try{const follow=JSON.parse(sessionStorage.getItem(followKey)||'null') as CurrentBillIntent|null;if(follow&&(follow.stage==='charge'||follow.stage==='adopt'||follow.stage==='offer')){setCurrentIntent(follow);setSelected(next.bills.find(b=>b.id===follow.id)??null);setForm(newForm(next,next.bills.find(b=>b.id===follow.id)));setMode(follow.stage)}}catch{};if(next.pendingCommand){setPending(next.pendingCommand);try{sessionStorage.setItem(storageKey,JSON.stringify(next.pendingCommand))}catch{}};return true
+   if(!order.current)captureRows();setSnapshot(next);try{const follow=JSON.parse(sessionStorage.getItem(followKey)||'null') as CurrentBillIntent|null;if(follow&&(follow.stage==='charge'||follow.stage==='adopt'||follow.stage==='offer')){setCurrentIntent(follow);setSelected(next.bills.find(b=>b.id===follow.id)??null);setForm(newForm(next,next.bills.find(b=>b.id===follow.id)));setMode(follow.stage)}}catch{};if(flowRef.current){const retained=flowRef.current;order.current=retained.rowOrder??order.current??next.bills.map(b=>b.id);const id=retained.current?.id??retained.configuration?.id;const bill=next.bills.find(b=>b.id===id);setSelected(bill??null);setForm(newForm(next,bill));if(retained.presentation)setReview(retained.presentation as Review)};if(next.pendingCommand&&!flowRef.current){setPending(next.pendingCommand);try{sessionStorage.setItem(storageKey,JSON.stringify(next.pendingCommand))}catch{}};return true
   }catch(e){if(alive.current&&token===generation.current&&!(e instanceof DOMException&&e.name==='AbortError'))setError(e instanceof Error?e.message:'Could not load Bills.');return false}
   finally{if(alive.current&&token===generation.current)setBusy(false)}
  },[storageKey,followKey])
  usePageRefresh(active?'settings':null,{refresh:async()=>{setRefreshing(true);try{return await load()}finally{setRefreshing(false)}},disabled:busy||Boolean(pending)||currentLocked})
- useEffect(()=>{alive.current=true;try{const saved=sessionStorage.getItem(storageKey);if(saved)setPending(JSON.parse(saved))}catch{}return()=>{alive.current=false;++generation.current;abort.current?.abort()}},[storageKey])
+ useEffect(()=>{alive.current=true;try{const retained=JSON.parse(sessionStorage.getItem(flowKey)||'null');if(retained?.version===1){if(retained.stage==='done')sessionStorage.removeItem(flowKey);else{flowRef.current=retained;setFlow(retained)}}else{const saved=sessionStorage.getItem(storageKey);if(saved)setPending(JSON.parse(saved))}}catch{}return()=>{alive.current=false;++generation.current;abort.current?.abort()}},[storageKey])
  useEffect(()=>{if(active&&!snapshot&&!flight.current)void load()},[active,snapshot,load])
  useEffect(()=>{if(wasActive.current&&!active&&!busy&&!pending&&!currentLocked){setNewRequested(false);reset()}wasActive.current=active},[active,busy,pending,currentLocked,reset])
  const choose=(bill?:Bill)=>{
-  if(busy||pending||currentLocked||!snapshot)return
+  if(busy||pending||flow||currentLocked||!snapshot)return
+  for(const animation of rowMotion.current)animation.finish();rowMotion.current=[]
   if(form&&bill?.id===selected?.id){if(bill)reset();return}
   const followup=mode==='charge'||mode==='offer'||mode==='adopt'
   if(followup){setCurrentIntent(null);try{sessionStorage.removeItem(followKey)}catch{}}
   if(form&&!followup)drafts.current.set(selected?.id??'new',{form,mode,amount,review,reviewBody,splitInput,valid,draftId:draftId.current,splitBefore:splitBefore.current})
+  if(!order.current)order.current=snapshot.bills.map(b=>b.id)
   const draft=drafts.current.get(bill?.id??'new')
   setSelected(bill??null);setForm(draft?.form??newForm(snapshot,bill));setMode(draft?.mode??'settings');setAmount(draft?.amount??'')
   setReview(draft?.review??null);setReviewBody(draft?.reviewBody??null);setSplitInput(draft?.splitInput??null);setValid(draft?.valid??true)
   draftId.current=draft?.draftId??crypto.randomUUID();setConfirmReady(false);setError('');setResult(null);splitBefore.current=draft?.splitBefore??null
  }
- const addBill=()=>{if(busy||pending||currentLocked||!snapshot){setNewRequested(true);return}choose()}
+ const addBill=()=>{if(busy||pending||flow||currentLocked||!snapshot){setNewRequested(true);return}choose()}
  const openMonthly=(bill:Bill)=>{
   if(locked||!snapshot)return
   if(!form||selected?.id!==bill.id)choose(bill)
@@ -113,14 +121,14 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   if(!selected||!snapshot||locked)return
   setCurrentIntent({id:selected.id,month:snapshot.month,name:selected.name,amountCents:null,method:selected.splitMethod,basis:selected.payerBasisPoints,stage:'charge',editAmount:!selected.charge.splitPending});setMode('charge')
  }
- useEffect(()=>{if(newRequested&&active&&!busy&&!pending&&!currentLocked&&snapshot){setNewRequested(false);choose()}},[newRequested,active,busy,pending,currentLocked,snapshot])
+ useEffect(()=>{if(newRequested&&active&&!busy&&!pending&&!flow&&!currentLocked&&snapshot){setNewRequested(false);choose()}},[newRequested,active,busy,pending,currentLocked,snapshot])
  // Confirmation is a separate action after the review's native slide settles.
  useEffect(()=>{setConfirmReady(false);if(!review)return;const timer=window.setTimeout(()=>setConfirmReady(true),transactionMotion.duration);return()=>window.clearTimeout(timer)},[review,selected?.id])
  const change=(patch:Partial<Form>)=>{setForm(previous=>previous?{...previous,...patch}:null);setReview(null);setReviewBody(null);setError('')}
- const prepare=async(operation=selected?'update':'create')=>{
+ const prepare=async(operation=selected?'update':'create',applyCurrentCharge=false)=>{
   if(flight.current||pending||!form||!snapshot)return
   flight.current=true;setBusy(true);setConfirmReady(false);setError('');setResult(null)
-  const base:Command={operation,settingsVersion:snapshot.settingsVersion,...(selected?{id:selected.id,version:selected.version}:{draftId:draftId.current})}
+  const base:Command={operation,...(['create','update'].includes(operation)?{applyCurrentCharge}:{}),settingsVersion:snapshot.settingsVersion,...(selected?{id:selected.id,version:selected.version}:{draftId:draftId.current})}
   let body:Command
   if(operation==='amount'||operation==='adopt')body={operation,id:selected?.id,month:snapshot.month,settingsVersion:snapshot.settingsVersion,chargeVersion:selected?.charge.version,...(operation==='amount'?{amount}: {})}
   else if(operation==='delete')body={...base,effectiveFrom:form.stopFrom}
@@ -128,6 +136,8 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   try{const next=await request('/app/bills/review',body);if(alive.current){setReview(next.review);setReviewBody(body)}}catch(e){if(alive.current)setError(e instanceof Error?e.message:'Could not review bill.')}
   finally{flight.current=false;if(alive.current)setBusy(false)}
  }
+ // Resume confirmations already made by the previous multi-screen release.
+ // New recurring confirmations use executeFlow and never enter offer/adopt UI.
  const accept=async(next:Result,command:Command)=>{
   setResult(next)
   if(next.state==='done'){
@@ -143,34 +153,55 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
    await load()
   }
  }
+ const executeFlow=async(next:BillSaveFlow,recover=false,retry=false)=>{
+  if(flight.current)return
+  flight.current=true;setBusy(true);setError('')
+  const persist=(value:BillSaveFlow)=>{sessionStorage.setItem(flowKey,JSON.stringify(value));flowRef.current=value;if(alive.current)setFlow(value)}
+  try{
+   await runBillFlow(next,request,persist,{recover,retry})
+   sessionStorage.removeItem(flowKey);flowRef.current=null;setFlow(null);reset();setResult({state:'done',success:true,detail:'Bill changes saved.'})
+   window.dispatchEvent(new Event('bookiebot:transactions-changed'));window.dispatchEvent(new Event('bookiebot:reimbursements-changed'));await load()
+  }catch(e){if(alive.current)setError((next.configuration&&next.stage!=='configuration'?'Recurring settings are saved. ':'')+(e instanceof Error?e.message:'Check saved status before continuing.'))}
+  finally{flight.current=false;if(alive.current)setBusy(false)}
+ }
  const save=async()=>{
-  if(flight.current||pending||!review||!reviewBody||!confirmReady)return
+  if(flight.current||pending||flow||!review||!reviewBody||!confirmReady)return
   const command={...reviewBody,requestId:crypto.randomUUID(),reviewVersion:review.reviewVersion}
-  try{if(selected&&snapshot&&form&&command.operation==='update'&&form.effectiveFrom===snapshot.month&&currentBillHasHit(selected.charge,snapshot.month,snapshot.today,selected.amountCents)){const plan=review.after;const follow:CurrentBillIntent={id:selected.id,month:snapshot.month,name:plan?.name??form.name,amountCents:(plan?.type??form.type)==='variable'?null:plan?.amountCents??Math.round(Number(form.amount)*100),method:plan?.splitMethod??form.splitMethod,basis:plan?.payerBasisPoints??selectedIncome,requestId:command.requestId,stage:'configuration',offerCurrent:true,recordedAmountCents:selected.charge.virtual?selected.charge.billAmountCents??selected.amountCents??0:selected.charge.amountCents,needsAdoption:selected.charge.virtual};sessionStorage.setItem(followKey,JSON.stringify(follow));setCurrentIntent(follow)};sessionStorage.setItem(storageKey,JSON.stringify(command))}catch{try{const follow=JSON.parse(sessionStorage.getItem(followKey)||'null');if(follow?.requestId===command.requestId)sessionStorage.removeItem(followKey)}catch{}setCurrentIntent(null);setError('Saved-status storage is unavailable. Reopen BookieBot before confirming this change.');return}
+  if(['create','update','delete'].includes(command.operation)){
+   const next=billFlow(command,review.applyCurrentCharge&&review.currentChange?review.currentChange:undefined)
+   next.presentation=review;next.rowOrder=order.current??snapshot?.bills.map(b=>b.id)
+   await executeFlow(next);return
+  }
+  try{sessionStorage.setItem(storageKey,JSON.stringify(command))}catch{setError('Saved-status storage is unavailable. Reopen BookieBot before confirming this change.');return}
   flight.current=true;setBusy(true);setPending(command);updateWork({label:'Bill changes',pending:true,uncertain:true})
-  try{await accept(await request('/app/bills',command),command)}catch(e){if(alive.current){if(e instanceof BillRequestError&&[400,403,409].includes(e.status))await accept({state:'done',success:false,detail:e.message},command);else{if(e instanceof BillRequestError&&e.status===401){reset();setSnapshot(null)}setResult({state:'uncertain',detail:e instanceof Error?e.message:'Check saved status.'})}}}
+  try{await accept(await request('/app/bills',command),command)}catch(e){if(alive.current){if(e instanceof BillRequestError&&[400,403,409].includes(e.status))await accept({state:'done',success:false,detail:e.message},command);else setResult({state:'uncertain',detail:e instanceof Error?e.message:'Check saved status.'})}}
   finally{flight.current=false;if(alive.current)setBusy(false)}
  }
  const checkSaved=async(retry=false)=>{if(flight.current||!pending?.requestId)return;flight.current=true;setBusy(true);setError('');try{await accept(await request(retry?'/app/bills':`/app/bills/commands/${encodeURIComponent(pending.requestId)}`,retry?pending:undefined),pending)}catch(e){setError(e instanceof Error?e.message:'Could not check saved status.')}finally{flight.current=false;setBusy(false)}}
  const reviewCurrent=()=>{if(!currentIntent||busy||pending||currentLocked)return;const next={...currentIntent,stage:currentIntent.needsAdoption?'adopt' as const:'charge' as const};try{sessionStorage.setItem(followKey,JSON.stringify(next))}catch{setError('Keep this screen open and retry the current-charge review.');return}setCurrentIntent(next);setMode(next.stage);setReview(null);setReviewBody(null)}
  const selectedIncome=form?.splitMethod==='income'?snapshot?.incomeBasisPoints??5000:form?.splitMethod==='equal'?5000:form?.splitMethod==='fronted'?0:form?.payerBasisPoints??10000
- const visible=snapshot?.bills.filter(b=>filter==='all'||(b.nextChange??b).type===filter||Boolean(form)&&b.id===selected?.id)??[]
+ const releaseRows=()=>{if(flowRef.current)return;captureRows();order.current=null;setAnchors([]);setSnapshot(value=>value?{...value}:value)}
+ useLayoutEffect(()=>{
+  if(!rowPositions.current.size)return
+  const before=rowPositions.current;rowPositions.current=new Map()
+  for(const animation of rowMotion.current)animation.finish();rowMotion.current=[]
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return
+  for(const node of root.current?.querySelectorAll<HTMLElement>('.bb-bills-row-shell')??[]){const old=before.get(node.querySelector<HTMLElement>('[data-bill-id]')!.dataset.billId!),now=node.getBoundingClientRect();if(old&&Math.abs(old.y-now.y)>.5)rowMotion.current.push(node.animate([{transform:`translateY(${old.y-now.y}px)`},{transform:'none'}],{duration:440,easing:'cubic-bezier(.2,.8,.25,1)'}))}
+ },[snapshot,anchors])
+ const ordered=order.current&&snapshot?[...snapshot.bills].sort((a,b)=>{const rank=(id:string)=>{const i=order.current!.indexOf(id);return i<0?order.current!.length:i};return rank(a.id)-rank(b.id)}):snapshot?.bills
+ const visible=ordered?.filter(b=>filter==='all'||(b.nextChange??b).type===filter||Boolean(form)&&b.id===selected?.id||anchors.includes(b.id)||Boolean(order.current)&&b.id===placement.current.billId)??[]
  // Keep the editor's row anchor through its closing expansion. Folding changes
  // only the grid placement, never the mounted scenes or controlled draft.
  if(form)placement.current={order:selected?visible.findIndex(bill=>bill.id===selected.id)*2+3:1,isNew:!selected,billId:selected?.id}
- const locked=busy||Boolean(pending)||currentLocked,lastReview=useRef<Review|null>(null)
+ const locked=busy||Boolean(pending)||Boolean(flow)||currentLocked,lastReview=useRef<Review|null>(null)
  if(review)lastReview.current=review
  const shownReview=review??lastReview.current
  const splitLabel=(bill:Pick<Bill,'splitMethod'|'payerBasisPoints'>)=>bill.splitMethod==='none'?'No split':bill.splitMethod==='income'?'By income':bill.splitMethod==='equal'?'50 / 50':bill.splitMethod==='fronted'?`100% ${snapshot?.partnerName}`:`${(bill.payerBasisPoints/100).toFixed(2)}% ${snapshot?.ownerName}`
- const reviewLines=shownReview?.after?[
-  {label:shownReview.after.type==='variable'?'Estimate':'Recurring amount',before:shownReview.before?money(shownReview.before.amountCents):null,after:money(shownReview.after.amountCents)},
-  {label:'Repeats',before:shownReview.before?`${shownReview.before.cadence} · day ${shownReview.before.pullDay}`:null,after:`${shownReview.after.cadence} · day ${shownReview.after.pullDay}`},
-  {label:shownReview.operation==='delete'?'Stops':'Applies from',before:null,after:monthLabel(shownReview.effectiveFrom!)+' onward'},
-  {label:'Recurring split',before:shownReview.before?splitLabel(shownReview.before):null,after:splitLabel(shownReview.after)},
- ]:shownReview?.share&&shownReview.share.method!=='none'?[
+ const reviewLines=shownReview?.after?billReviewLines(shownReview.before,shownReview.after,shownReview.operation):shownReview?.currentChange?currentReviewLines(shownReview.currentChange):shownReview?.share&&shownReview.share.method!=='none'?[
   {label:snapshot?.ownerName??'',before:null,after:money(shownReview.share.payerCents)},
   {label:snapshot?.partnerName??'',before:null,after:money(shownReview.share.partnerCents)},
  ]:[]
+ const allReviewLines=shownReview?.after&&shownReview.applyCurrentCharge&&shownReview.currentChange?[...reviewLines,...currentReviewLines(shownReview.currentChange).map(line=>({...line,label:new Date(shownReview.currentChange!.month+'-01T12:00:00').toLocaleDateString('en-US',{month:'short'})+' · '+line.label}))]:reviewLines
  const heading=mode==='split'?'Recurring split':mode==='amount'?'Monthly amount':mode==='monthly'?'This month’s bill':mode==='adopt'?'Recorded charge':mode==='stop'?'Stop bill':selected?((selected.nextChange??selected).active?'Edit bill':'Restart bill'):'New bill'
  const dueLabel=selected?.charge.date?new Date(selected.charge.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'Set a payment day'
  const reminder=selected&&selected.charge.canConfirmAmount!==false&&<label className="bb-bills-reminder">Amount check-in<span className="bi-select"><select aria-label="Amount check-in" disabled={locked} value={selected.checkInLeadDays===null?'off':selected.checkInLeadDays??7} onChange={e=>void setCheckin(e.target.value)}>{[1,3,7,14,30].map(n=><option key={n} value={n}>{n} {n===1?'day':'days'} before</option>)}<option value="off">Off</option></select><ChevronDown aria-hidden="true"/></span></label>
@@ -209,21 +240,23 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   </form>
  </>)
  const reviewView=shownReview&&<>
-  <header className="sp-flow-heading bb-bill-heading"><h2>{shownReview.operation==='delete'?'Stop bill':shownReview.operation==='adopt'?'Edit recorded charge':shownReview.operation==='amount'?'Confirm amount':'Review bill'}</h2><p className="sp-flow-context bb-bills-review-context"><span title={shownReview.after?.name??shownReview.name??selected?.name}>{shownReview.after?.name??shownReview.name??selected?.name}</span>{shownReview.after&&<span> · {kindLabel[shownReview.after.type]}</span>}</p></header>
-  {!shownReview.after&&<p className="bb-bills-review-amount">{money(shownReview.amountCents)}</p>}
-  <dl className="bi-review-changes" aria-label="Bill changes to review">{reviewLines.map(line=><div className="bi-review-change" key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new">{line.after}</span>}</dd></div>)}</dl>
-  {shownReview.after&&<p className="bi-footnote">Recorded charges need a separate confirmation.</p>}
+  <header className="sp-flow-heading bb-bill-heading bb-bills-review-heading" data-current-choice={Boolean(shownReview.currentChange&&shownReview.after)}><h2>{shownReview.operation==='delete'?'Stop bill':shownReview.operation==='adopt'?'Edit recorded charge':shownReview.operation==='amount'?'Confirm amount':shownReview.operation==='current'?'Review charge':'Review bill'}</h2>{shownReview.currentChange&&shownReview.after&&<label className="bb-bills-current-choice"><input type="checkbox" checked={Boolean(shownReview.applyCurrentCharge)} disabled={locked||Boolean(shownReview.currentChange.blockedReason)} onChange={e=>void prepare(shownReview.operation,e.target.checked)}/><span>Also update {monthLabel(shownReview.currentChange.month).split(' ')[0]}’s charge</span></label>}<p className="sp-flow-context bb-bills-review-context"><span title={shownReview.after?.name??shownReview.name??selected?.name}>{shownReview.after?.name??shownReview.name??selected?.name}</span>{shownReview.after&&<span> · {kindLabel[shownReview.after.type]}</span>}</p></header>
+  {!shownReview.after&&typeof shownReview.amountCents==='number'&&<p className="bb-bills-review-amount">{money(shownReview.amountCents)}</p>}
+  <dl className="bi-review-changes" aria-label="Bill changes to review" data-dense={allReviewLines.length>5}>{allReviewLines.map(line=><div className="bi-review-change" data-review-field={line.label} key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del title={line.before}>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span title={line.after}>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new" title={line.after}>{line.after}</span>}</dd></div>)}</dl>
+
+  {shownReview.currentChange?.blockedReason&&<p className="bi-footnote">{shownReview.currentChange.blockedReason}</p>}
   {shownReview.replacesScheduledChanges&&<p className="bi-footnote">Replaces later scheduled changes for this bill.</p>}
   {shownReview.operation==='amount'&&<p className="bi-footnote">Appears in Transactions on the saved autopay date. Early repayments stay in Shared.</p>}
   {shownReview.operation==='adopt'&&<p className="bi-footnote">Prepares this recorded charge for editing here. The purchase total stays unchanged.</p>}
   <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}><ArrowLeft aria-hidden="true"/>Back</button><button type="button" className="bi-primary" disabled={locked||!review||!confirmReady} onClick={()=>void save()}>{busy?'Saving…':shownReview.operation==='delete'?'Stop bill':shownReview.operation==='amount'?'Confirm amount':'Confirm'}</button></footer>
  </>
- return <div className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
+ return <div ref={root} className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
 
   <div className="bb-bills-notices">
   {newRequested&&<p className="bb-bills-status" role="status">New bill will open after the current change is verified.</p>}
-  {error&&(!form||wide)&&<p className="bb-bills-error" role="alert">{error}</p>}
+  {error&&(!form||wide||Boolean(flow))&&<p className="bb-bills-error" role="alert">{error}</p>}
   {result?.detail&&<p role="status" className="bb-bills-status">{result.detail}</p>}
+  {flow&&!busy&&<div className="bb-bills-recovery">{flow.pending?<><button type="button" onClick={()=>void executeFlow(flow,true)}>Check saved status</button><button type="button" onClick={()=>void executeFlow(flow,true,true)}>Retry same confirmation</button></>:<>{!flow.failed&&<button type="button" onClick={()=>void executeFlow(flow)}>Resume saved change</button>}<button type="button" onClick={()=>{sessionStorage.removeItem(flowKey);flowRef.current=null;setFlow(null);reset();void load()}}>Close</button></>}</div>}
   {pending&&<div className="bb-bills-recovery"><p role="status">Check the saved status before making another change.</p><button className="bb-bills-primary" type="button" disabled={busy} onClick={()=>void checkSaved()}>Check saved status</button><button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void checkSaved(true)}>Retry same confirmation</button></div>}
   {!snapshot&&busy&&<p role="status" className="bb-bills-empty">Loading bills…</p>}
   {!snapshot&&!busy&&<button type="button" className="bb-settings-action" onClick={()=>void load()}>Reload Bills</button>}
@@ -245,9 +278,9 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
     })}
     {!visible.length&&<p className="bb-bills-empty">No bills here yet.</p>}</div></div>
    </section>
-   <BillEditorWorkspace billId={selected?.id??'new'} order={placement.current.order} isNew={placement.current.isNew} open={Boolean(form)} wide={wide} locked={busy||Boolean(pending)}>
+   <BillEditorWorkspace billId={selected?.id??'new'} order={placement.current.order} isNew={placement.current.isNew} open={Boolean(form)} wide={wide} locked={busy||Boolean(pending)||Boolean(flow)} onAnchorsChange={ids=>setAnchors(previous=>previous.length===ids.length&&previous.every((id,index)=>id===ids[index])?previous:ids)} onClosed={releaseRows}>
     <EditorScenes scene={`${selected?.id??draftId.current}:${mode}`} open={Boolean(form)}>
-     <>{mode==='charge'&&currentIntent?<BillCurrentCharge intent={currentIntent} ownerName={ownerName} onDone={()=>{reset();void load()}}/>:<div className="bi-editor" data-design="levels" data-operation={mode==='stop'?'delete':'update'}>
+     <>{mode==='charge'&&currentIntent?<BillCurrentCharge intent={currentIntent} ownerName={ownerName} rowOrder={order.current??undefined} onDone={()=>{reset();void load()}}/>:<div className="bi-editor" data-design="levels" data-operation={mode==='stop'?'delete':'update'}>
       <StepMotion review={Boolean(review)} open={Boolean(form)} mode="slide" duration={transactionMotion.duration} edit={editView} confirm={reviewView}/>
       {error&&!wide&&<p className="bs-error" role="alert">{error}</p>}
      </div>}</>
