@@ -4,7 +4,7 @@ import {EditorExpansion} from './transaction-editor-workspace'
 // Preserve presentation positions and one material through pane handoffs.
 export const billSelectionMotion={duration:440,easing:'cubic-bezier(.2,.8,.25,1)'}
 type Entry={id:string;order:number;isNew:boolean;node:ReactNode}
-type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode}
+type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode;onClosed?:()=>void;onAnchorsChange?:(ids:string[])=>void}
 
 function BillEditorEntry({entry,open,wide,locked,onClosed}:{entry:Entry;open:boolean;wide:boolean;locked:boolean;onClosed:()=>void}){
  const element=useRef<HTMLElement>(null),latest=useRef({open,onClosed}),motion=useRef<Animation|null>(null)
@@ -41,16 +41,17 @@ function BillEditorEntry({entry,open,wide,locked,onClosed}:{entry:Entry;open:boo
 
 /** Keep each live editor mounted through folding; retain outgoing row content
  * until its simultaneous collapse or eased pane motion finishes. */
-export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,children}:Props){
+export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,children,onClosed,onAnchorsChange}:Props){
  const records=useRef(new Map<string,Entry>()),active=useRef<string|null>(null),previousWide=useRef(wide),root=useRef<HTMLDivElement>(null)
  const [,redraw]=useState(0)
  active.current=open?billId:null
  if(open)records.current.set(billId,{id:billId,order,isNew,node:children})
- const remove=(id:string)=>{if(active.current===id)return;if(records.current.delete(id))redraw(v=>v+1)}
+ const remove=(id:string)=>{if(active.current===id)return;if(records.current.delete(id)){redraw(v=>v+1);if(!records.current.size)onClosed?.()}}
  useLayoutEffect(()=>{
-  if(previousWide.current!==wide){previousWide.current=wide;let removed=false;for(const id of records.current.keys())if(id!==active.current){records.current.delete(id);removed=true}if(removed)redraw(v=>v+1)}
+  if(previousWide.current!==wide){previousWide.current=wide;let removed=false;for(const id of records.current.keys())if(id!==active.current){records.current.delete(id);removed=true}if(removed){redraw(v=>v+1);if(!records.current.size)onClosed?.()}}
   const list=root.current?.closest('.bb-bills')
   for(const row of list?.querySelectorAll<HTMLElement>('.bb-bills-row[data-bill-id]')??[])row.dataset.editorAnchor=String(records.current.has(row.dataset.billId!))
+  onAnchorsChange?.([...records.current.keys()])
  })
  return <div className="bb-bill-editor-workspace" ref={root} data-present={records.current.size>0}>
   {[...records.current.values()].map(entry=><BillEditorEntry key={entry.id} entry={entry} open={open&&entry.id===billId} wide={wide} locked={locked} onClosed={()=>remove(entry.id)}/>)}
