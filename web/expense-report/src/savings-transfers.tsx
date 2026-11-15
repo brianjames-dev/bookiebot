@@ -11,14 +11,14 @@ import {usePageRefresh,usePageRefreshRegistry} from './page-refresh'
 import './bill-settings.css'
 import './savings-transfers.css'
 
-type Frequency='once'|'monthly'|'quarterly'|'yearly'
+type Frequency='once'|'biweekly'|'monthly'|'quarterly'|'yearly'
 type Transfer={id:string;revision:number;name:string;amountCents:number;frequency:Frequency;startsOn:string;effectiveFrom:string;goalId:string;goalName?:string;fromAccount:string;toAccount:string;active:boolean;nextDate:string|null}
 type Command=Record<string,unknown>&{operation:string;requestId?:string;reviewVersion?:string}
 type Snapshot={ownerName:string;today:string;year:number;settingsVersion:string;transfers:Transfer[];goals:{id:string;name:string;archived:boolean}[];pendingCommand?:Command;blockedReason?:string}
 type Form={name:string;amount:string;frequency:Frequency;startsOn:string;goalId:string;fromAccount:string;toAccount:string}
 type Review={operation:string;effectiveFrom:string;reviewVersion:string;before:Transfer|null;after:Transfer}
 type Draft={form:Form;review:Review|null;body:Command|null;draftId:string}
-const frequencyLabel={once:'One time',monthly:'Monthly',quarterly:'Quarterly',yearly:'Yearly'}
+const frequencyLabel={once:'One time',biweekly:'Every 2 weeks',monthly:'Monthly',quarterly:'Quarterly',yearly:'Yearly'}
 const money=(value:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(value/100)
 const dateLabel=(value:string)=>new Date(value+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
 const tomorrow=(value:string)=>{const day=new Date(value+'T12:00:00');day.setDate(day.getDate()+1);return `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`}

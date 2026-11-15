@@ -1,7 +1,9 @@
 # Savings transfers
 
 Open **Settings → Savings transfers → Manage savings transfers → Add transfer**.
-Choose a name, amount, first date and One time, Monthly, Quarterly or Yearly.
+Choose a name, amount, first date and One time, Every 2 weeks, Monthly, Quarterly or Yearly.
+Every 2 weeks repeats on the original 14-day date anchor across month/year
+boundaries; changing only the future amount keeps that anchor.
 From/To are optional account labels. Link one of your active personal savings
 goals, or leave No goal. **Review → Confirm** saves the schedule; Review itself
 never writes. BookieBot records the scheduled savings; your bank performs the

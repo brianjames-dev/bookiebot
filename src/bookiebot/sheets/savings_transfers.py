@@ -20,7 +20,7 @@ TRANSFER_TAB = '_BookieBot Savings Transfers'
 TRANSFER_STORAGE_YEAR = 2026
 TRANSFER_EPOCH = date(2026, 11, 15)
 HEADERS = ['transfer_id', 'revision', 'definition_json']
-FREQUENCIES = {'once', 'monthly', 'quarterly', 'yearly'}
+FREQUENCIES = {'once', 'biweekly', 'monthly', 'quarterly', 'yearly'}
 
 
 def iso_date(value: Any) -> str:
@@ -118,6 +118,12 @@ def occurrences(transfers: Iterable[Transfer], start: date, end: date) -> list[d
                 continue
             if transfer.frequency == 'once':
                 dates = [first] if lower <= first <= upper else []
+            elif transfer.frequency == 'biweekly':
+                # Calendar dates, not elapsed hours or twice per month. Retain
+                # the original 14-day anchor across months, DST and edits.
+                offset = ((lower - first).days + 13) // 14 * 14
+                dates = [first + timedelta(days=days)
+                         for days in range(offset, (upper - first).days + 1, 14)]
             else:
                 step = {'monthly': 1, 'quarterly': 3, 'yearly': 12}[transfer.frequency]
                 offset = max(0, (lower.year - first.year) * 12 + lower.month - first.month)

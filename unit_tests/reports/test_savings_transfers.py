@@ -227,3 +227,22 @@ async def test_legacy_savings_query_does_not_present_unavailable_transfer_data_a
     await handlers.query_savings_handler({},SimpleNamespace(channel=SimpleNamespace(send=send)))
     assert 'Could not verify' in send.await_args.args[0]
     assert 'No monthly savings' not in send.await_args.args[0]
+
+
+def test_biweekly_confirmation_and_future_amount_edit_keep_prior_dates_and_goal_allocations(setup,monkeypatch):
+    s=setup
+    assert s.commands.command(B,confirm(draft(frequency='biweekly')))['success']
+    assert service.listing(B)['transfers'][0]['nextDate']=='2026-11-29'
+    for target in ('bookiebot.sheets.routing.now_pacific','bookiebot.reports.savings_transfers.now_pacific','bookiebot.reports.bill_settings.now_pacific'):
+        monkeypatch.setattr(target,lambda:datetime(2026,11,30,12))
+    snapshot=service.listing(B);p=snapshot['transfers'][0]
+    assert p['nextDate']=='2026-12-13'
+    body={'operation':'transfer-update','year':snapshot['year'],'id':p['id'],'revision':p['revision'],
+          'settingsVersion':snapshot['settingsVersion'],'transfer':{**draft()['transfer'],'frequency':'biweekly','amount':'200.00','startsOn':'2026-12-13'}}
+    assert s.commands.command(B,confirm(body,'biweekly-update-123456'))['success']
+    plans=ledger.read_all(B)
+    assert ledger.current(plans)[0].starts_on=='2026-11-15'
+    assert [(r['date'],r['amountCents']) for r in ledger.occurrences(plans,TODAY,date(2026,12,31))]==[
+        ('2026-11-15',15000),('2026-11-29',15000),('2026-12-13',20000),('2026-12-27',20000)]
+    goal={'id':'goal-1234','balanceCents':0,'contributionCents':0,'contributionCount':0}
+    assert service.goal_payload(B,{'goals':[goal]},today=date(2026,12,31))['goals'][0]['balanceCents']==70000

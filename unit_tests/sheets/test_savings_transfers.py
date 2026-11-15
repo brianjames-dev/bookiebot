@@ -13,6 +13,7 @@ def rule(**changes):
 
 @pytest.mark.parametrize('frequency,expected', [
     ('once', ['2026-01-31']),
+    ('biweekly', ['2026-01-31','2026-02-14','2026-02-28','2026-03-14','2026-03-28','2026-04-11','2026-04-25']),
     ('monthly', ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30']),
     ('quarterly', ['2026-01-31', '2026-04-30']),
     ('yearly', ['2026-01-31']),
@@ -52,3 +53,13 @@ def test_yearly_leap_day_uses_last_day_without_losing_original_anchor():
     p=rule(frequency='yearly',starts_on='2024-02-29',effective_from='2024-02-29')
     assert [r['date'] for r in occurrences([p],date(2024,1,1),date(2028,12,31))]==[
         '2024-02-29','2025-02-28','2026-02-28','2027-02-28','2028-02-29']
+
+
+def test_biweekly_midrange_edits_stop_and_year_boundary_retain_fourteen_day_anchor():
+    original=rule(frequency='biweekly',starts_on='2026-11-15',effective_from='2026-11-15')
+    changed=replace(original,revision=2,amount_cents=17500,goal_id='goal-2',effective_from='2026-11-20')
+    stopped=replace(changed,revision=3,active=False,effective_from='2026-12-14')
+    assert [(r['date'],r['amountCents'],r['goalId']) for r in occurrences(
+        [original,changed,stopped],date(2026,11,16),date(2027,1,31))]==[
+        ('2026-11-29',17500,'goal-2'),('2026-12-13',17500,'goal-2')]
+    assert [r['date'] for r in occurrences([original],date(2026,12,28),date(2027,1,31))]==['2027-01-10','2027-01-24']
