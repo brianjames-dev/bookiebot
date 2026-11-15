@@ -95,6 +95,45 @@ def test_bank_link_and_subtotal_mismatch_are_kept_not_silently_removed(setup):
     assert not s.t.sent
 
 
+@pytest.mark.parametrize('category,column', [('static_bills_subscriptions_needs',3),('subscriptions_wants',4)])
+@pytest.mark.parametrize('period,title', [('2026-08','August'),('2026-11','November')])
+def test_repaired_subtotal_unblocks_virtual_charge_without_changing_transactions(setup,category,column,period,title):
+    from copy import deepcopy
+    s=setup;p=replace(s.p,category=category);other=replace(s.other,category=category)
+    annual=replace(other,id='annual_other_month',name='Annual service',source_label='Annual service',
+        amount_cents=700,cadence='yearly',pull_months=(7,),version='annual-v1')
+    s.t.rows[SUBSCRIPTION_TAB]=s.t.formulas[SUBSCRIPTION_TAB]=encode([p,other,annual],SUBSCRIPTION_TAB,[])
+    label='Subscriptions (Wants)' if column==4 else 'Subscriptions (Needs)'
+    for month in ('August','September','October','November','December'):
+        row=['',label,'',''];row[column-1]='27' if month==title else '20'
+        s.t.rows[month]=[row]
+        s.t.formulas[month]=deepcopy(s.t.rows[month])
+    frozen=end._frozen(s.source(),p,period,TODAY)
+    s.t.rows[CHARGES_TAB]=s.t.formulas[CHARGES_TAB]=encode_charges([frozen],[])
+    s.t.properties[CHARGES_TAB]={'title':CHARGES_TAB,'sheetId':99}
+    source=s.source()
+    assert not end._summary_verified(source,period,category)
+    assert 'verification' in next(i for i in end.book_items(source,p,period,TODAY,set()) if i['month']==period)['reason']
+    def transactions():
+        _,virtual,_=runtime_tables('brian',s.t.rows[BILL_TAB],s.t.rows[SUBSCRIPTION_TAB],[],s.t.rows[CHARGES_TAB])
+        return tx._subscription_rows(B,period,virtual,as_of=date(2026,12,31))
+    before_rows=deepcopy(s.t.rows);before_formulas=deepcopy(s.t.formulas);before_transactions=transactions()
+    # Repair the derived subtotal only; the annual charge is due in July.
+    s.t.rows[title][0][column-1]='20';s.t.formulas[title][0][column-1]='20'
+    source=s.source()
+    assert end._summary_verified(source,period,category)
+    assert next(i for i in end.book_items(source,p,period,TODAY,set()) if i['month']==period)['removable']
+    assert transactions()==before_transactions
+    before_rows[title][0][column-1]='20';before_formulas[title][0][column-1]='20'
+    assert s.t.rows==before_rows and s.t.formulas==before_formulas and not s.t.sent
+    # Subtotal repair never bypasses independent bank/Shared safeguards.
+    linked={'billplan:'+p.id+'#pull='+period+'-01'}
+    assert 'Bank-linked' in next(i for i in end.book_items(source,p,period,TODAY,linked) if i['month']==period)['reason']
+    source.allocations=[{'id':'shared','payerOwner':'brian','sourceWorksheet':'income','sourceYear':2026,
+        'sourceSheetTitle':title,'billPlanId':p.id,'lifecycle':'active'}]
+    assert 'Shared' in next(i for i in end.book_items(source,p,period,TODAY,set()) if i['month']==period)['reason']
+
+
 def test_entered_or_split_payments_are_preserved(setup):
     s=setup;source=s.source()
     source.allocations=[{'id':'allocation','payerOwner':'brian','sourceWorksheet':'income','sourceYear':2026,
