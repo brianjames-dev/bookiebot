@@ -132,3 +132,7 @@ correcting it; stopping future recurrence alone does not erase that amount.
 Entered payments, bank-linked charges, Shared allocations and confirmed future
 payments have separate protections. Cancellation never bypasses them simply
 because another month can be selected.
+
+### Verified subtotal-only repair
+
+A stale aggregate can be repaired without changing individual bills. Reconstruct that exact month/category using effective-dated schedules and preserved virtual charge snapshots; exclude annual charges outside their billing month and exclude adopted physical rows already counted separately. Freeze historical subtotal values. For the current month, reuse the native managed summary formula with its price-version references and frozen-charge amounts so later adoption can maintain it. Re-read all relevant sources immediately before a precise subtotal-only batch, then verify actual amounts, schedule/charge records, formats and validation stayed unchanged. Replay the existing subtotal/cancellation checks; never enable a checkbox by weakening the guard. A subtotal repair does not stop a bill or authorize deleting its charges. Refresh Bills and reopen the review to discard stale source fingerprints.
