@@ -478,7 +478,7 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 ## On Deck
 
-First: CI/review/merge/deployment of verified Bills single-review flow, then native acceptance (checklist 296). This supersedes prior post-save offer/adoption/per-operation/completion screens; preserve inclusive months, canonical guards and accepted pane motion.
+First: native acceptance of the verified Bills single-review flow (checklist 296); required CI/review/merge/live evidence is recorded in PR #177. This supersedes prior post-save offer/adoption/per-operation/completion screens; preserve inclusive months, canonical guards and accepted pane motion.
 
 Retain the accepted Transactions toolbar (checklist 295; user accepted 2026-11-14). PR #176 is merged/deployed at About f7e58491. Retain accepted inclusive Bills starts #175 and their financial invariants.
 
