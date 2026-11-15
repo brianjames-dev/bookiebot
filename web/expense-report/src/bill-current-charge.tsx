@@ -70,7 +70,7 @@ export function BillCurrentCharge({intent,ownerName,onDone,rowOrder}:{intent:Cur
   </form>} confirm={<><dl className="bi-review-changes" aria-label="Charge changes to review">{lines.map(line=><div className="bi-review-change" key={line.label}><dt>{line.label}</dt><dd><del>{line.before}</del><span className="bi-review-new">{line.after}</span></dd></div>)}</dl><p className="bi-footnote">This month only. Repayments and the saved autopay date stay unchanged.</p><footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>setReview(null)}>Back</button><button type="button" className="bi-primary" disabled={locked||!ready} onClick={save}>{busy?'Saving…':'Save changes'}</button></footer></>}/>
   {error&&<p className="bs-error" role="alert">{error}</p>}
   {(flow?.pending||legacy)&&!busy&&<div className="bb-bills-current-recovery"><button type="button" onClick={()=>flow?void execute(flow,true):void recoverLegacy()}>Check saved status</button><button type="button" onClick={()=>flow?void execute(flow,true,true):void recoverLegacy(true)}>Retry same confirmation</button></div>}
-  {flow&&!flow.pending&&!busy&&<button type="button" className="bi-cancel" onClick={()=>{sessionStorage.removeItem(key);onDone()}}>Close</button>}
+  {flow&&!flow.pending&&!busy&&<div className="bb-bills-current-recovery">{!flow.failed&&<button type="button" onClick={()=>void execute(flow)}>Resume saved change</button>}<button type="button" className="bi-cancel" onClick={()=>{sessionStorage.removeItem(key);onDone()}}>Close</button></div>}
   {!row&&!busy&&!flow&&!legacy&&<button type="button" className="bb-settings-action" onClick={()=>void load()}>Reload charge</button>}
  </div>
 }

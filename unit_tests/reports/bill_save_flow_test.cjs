@@ -53,6 +53,16 @@ function server(change=current){
   assert.equal(stored.stage,'done');assert.equal(state.writes.filter(w=>w.body.requestId===id).length,1);assert(state.reads.some(r=>r.url.endsWith('/commands/'+id)));count++;
  }
  {
+  const state=server(),original=state.request;let reads=0,stored;state.request=async(url,body)=>{if(url.includes('/charge?')&&++reads===2)throw Error('temporary read failure');return original(url,body)};
+  await assert.rejects(runBillFlow(billFlow(undefined,current),state.request,s=>stored=clone(s)),/temporary read failure/);assert(stored.pending.result.success,'The amount receipt is persisted before the failed read');
+  await runBillFlow(stored,state.request,s=>stored=clone(s),{recover:true});assert.equal(stored.stage,'done');assert.equal(state.writes.length,2);assert(!state.reads.some(r=>r.url.includes('/commands/')),'A persisted result consumes recovery mode before the new split command');count++;
+ }
+ {
+  const state=server(),original=state.request;let reads=0,stored;state.request=async(url,body)=>{if(url.includes('/charge?')&&++reads===3)throw Error('between-stage read failure');return original(url,body)};
+  await assert.rejects(runBillFlow(billFlow(undefined,current),state.request,s=>stored=clone(s)),/between-stage read failure/);assert.equal(stored.stage,'split');assert(!stored.pending&&!stored.failed);
+  await runBillFlow(stored,state.request,s=>stored=clone(s),{recover:true});assert.equal(stored.stage,'done');assert.equal(state.writes.length,2,'Resume continues the remaining approved split without repeating the completed amount');count++;
+ }
+ {
   const state=server();state.before='update';let stored;
   await assert.rejects(runBillFlow(billFlow(undefined,current),state.request,s=>stored=clone(s)),/lost before/);
   const frozen=clone(stored.pending.body);await assert.rejects(runBillFlow(stored,state.request,s=>stored=clone(s),{recover:true}),/No saved/);assert.equal(state.writes.length,0);

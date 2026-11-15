@@ -25,23 +25,29 @@ function checkReview(value:any,row:RecordedTransaction){if(!value?.reviewVersion
  * Every exact command is durable before POST; recovery never invents a retry.
  * Each later operation rechecks the original/owned source and receipt facts. */
 export async function runBillFlow(flow:BillSaveFlow,request:Request,persist:(flow:BillSaveFlow)=>void,{recover=false,retry=false}:{recover?:boolean;retry?:boolean}={}){
+ // Recovery applies only to the unfinished command retained at entry. A
+ // between-stage resume may create a new command later in this invocation.
+ recover=recover&&Boolean(flow.pending&&!flow.pending.result)
+ retry=retry&&Boolean(flow.pending&&!flow.pending.result)
  const save=()=>persist(structuredClone(flow))
  const failed=(message:string):never=>{flow.failed=message;flow.pending=undefined;save();throw Error(message)}
  const verify=(row:RecordedTransaction,previous:RecordedTransaction,amount=previous.amountCents,split=method(previous),allowNewSplit=false)=>{try{sameSource(row,previous,amount,split,allowNewSplit)}catch(e){failed(e instanceof Error?e.message:'The saved charge needs inspection.')}}
  if(flow.failed)throw Error(flow.failed)
  save()
  const write=async(kind:Write['kind'],body:Command)=>{
-  if(!flow.pending){flow.pending={kind,body:{...body,requestId:body.requestId??crypto.randomUUID()}};save()}
+  if(!flow.pending){recover=false;retry=false;flow.pending={kind,body:{...body,requestId:body.requestId??crypto.randomUUID()}};save()}
   const pending=flow.pending,url=pending.kind==='bill'?'/app/bills':'/app/transactions'
   if(!pending.result){
    let result:any
    try{result=await request(recover&&!retry?`${url}/commands/${encodeURIComponent(pending.body.requestId!)}`:url,recover&&!retry?undefined:pending.body)}
    catch(error){if((!recover||retry)&&[400,403,409].includes((error as {status?:number}).status??0))failed(error instanceof Error?error.message:'The confirmation was rejected.');throw error}
-   recover=false;retry=false
    if(result.state!=='done')throw Error(result.detail||'Check saved status before continuing this change.')
    if(!result.success){flow.failed=result.detail||'The change could not be completed.';flow.pending=undefined;save();throw Error(flow.failed)}
    pending.result=result;save()
   }
+  // A persisted receipt is already the recovery answer. Consume that mode
+  // here too, before the next stage creates its first, unsubmitted command.
+  recover=false;retry=false
   return pending.result
  }
  const advance=(stage:BillSaveFlow['stage'])=>{flow.stage=stage;flow.pending=undefined;save()}
