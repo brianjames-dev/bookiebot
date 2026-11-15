@@ -186,7 +186,8 @@ def book_batch(source: WorkbookSnapshot, plan: BillPlan, start: str, remove: lis
     if charges != before_charges:
         batch.table(CHARGES_TAB, encode_charges(charges, source.rows.get(CHARGES_TAB, [])))
     tables = {tab: encoded if tab == plan.source_tab else source.rows.get(tab, []) for tab in (BILL_TAB, SUBSCRIPTION_TAB)}
-    project_sources(batch, plans, tables, start_month=start, today=today, charges=charges)
+    project_sources(batch, plans, tables, start_month=start, today=today, charges=charges,
+                    skip_occurrences={(plan.id,period) for period in remove})
     cells = []
     for item in items:
         if item['month'] not in remove:
@@ -205,6 +206,10 @@ def book_batch(source: WorkbookSnapshot, plan: BillPlan, start: str, remove: lis
             batch.values(title, row, column, [[0]])
         cells.append({'month': item['month'], 'row': row, 'column': column, 'label': cell(source.rows[title], row, 2),
             'beforeCents': round(numeric(cell(source.rows[title], row, column)) * 100),
+            'beforeFormula':cell(source.formulas[title],row,column),
+            'afterFormula':value if item['virtual'] and isinstance(value,str) else None,
+            **({'otherCents':round(numeric(cell(source.rows[title],row,7-column))*100),
+                'otherFormula':cell(source.formulas[title],row,7-column)} if not item['virtual'] else {}),
             'afterCents': remaining if item['virtual'] else 0, 'removedCents': item['amountCents']})
     audit = {'version': 1, 'planId': plan.id, 'start': start, 'items': items, 'removeMonths': remove,
         'beforePlans': [asdict(p) for p in _plans(source, plan.id)], 'afterPlans': [asdict(p) for p in plans if p.id == plan.id],
@@ -381,15 +386,30 @@ def restore_book(source: WorkbookSnapshot, audit: dict[str,Any], today: date, re
     if charges!=current_charges:
         batch.table(CHARGES_TAB,encode_charges(charges,source.rows.get(CHARGES_TAB,[])))
     tables={t:encoded if t==tab else source.rows.get(t,[]) for t in (BILL_TAB,SUBSCRIPTION_TAB)}
-    project_sources(batch,plans,tables,start_month=audit['start'],today=today,charges=charges)
+    project_sources(batch,plans,tables,start_month=audit['start'],today=today,charges=charges,
+                    skip_occurrences={(identity,period) for period in audit['removeMonths']})
+    from bookiebot.sheets.recurring_storage import _price_references
+    price_refs=_price_references(tables)
     for change in audit['cells']:
         period=month_key(change['month']);title=calendar.month_name[int(period[5:])]
         row,column=change['row'],change['column']
         if (int(period[:4])!=source.year or column not in (3,4) or cell(source.rows.get(title,[]),row,2)!=change['label']
                 or round(numeric(cell(source.rows[title],row,column))*100)!=change['afterCents']):
             raise BillConflict('A corrected monthly total changed. Review it before restoring this cancellation.')
+        formula=cell(source.formulas[title],row,column)
+        if 'afterFormula' in change and (formula!=change['afterFormula'] if change['afterFormula'] is not None else formula.startswith('=')):
+            raise BillConflict('The corrected source formula changed. Review it before restoring this cancellation.')
+        if 'otherCents' in change and (round(numeric(cell(source.rows[title],row,7-column))*100)!=change['otherCents']
+                or cell(source.formulas[title],row,7-column)!=change['otherFormula']):
+            raise BillConflict('The bill’s other budget column changed. Review it before restoring this cancellation.')
         virtual=any(i['month']==period and i['virtual'] for i in audit['items'])
-        value=f'=SUM({change["beforeCents"]/100:.2f})+N("{SUBSCRIPTION_TAB}")' if virtual and period>=source.settings.period else change['beforeCents']/100
+        if virtual:
+            value=f'=SUM({change["beforeCents"]/100:.2f})+N("{SUBSCRIPTION_TAB}")' if period>=source.settings.period else change['beforeCents']/100
+        else:
+            original=next((p for p in selected(before,period,include_inactive=True) if p.id==identity),None)
+            if original is None or original.version not in price_refs:
+                raise BillConflict('The original automatic price source needs verification before restoring it.')
+            value='='+price_refs[original.version]
         batch.values(title,row,column,[[value]],formulas=isinstance(value,str))
     restore={'version':1,'operation':'restore-end','owner':source.owner,'year':source.year,'planId':identity,
              'undoOf':audit['rootRequestId'],'restoredMonths':audit['removeMonths']}

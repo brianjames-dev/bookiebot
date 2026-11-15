@@ -449,7 +449,8 @@ def project_subscription_summaries(batch: SheetBatch, plans: list[BillPlan], tab
 
 
 def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, list[list[str]]], *, start_month: str, today: date,
-                    update_existing: bool = True, charges: list[BillCharge] | None = None):
+                    update_existing: bool = True, charges: list[BillCharge] | None = None,
+                    skip_occurrences: set[tuple[str,str]] | None = None):
     """Project authorized plans into existing months; never create a month tab."""
     snapshot = batch.snapshot
     price_refs = _price_references(tables)
@@ -464,6 +465,10 @@ def project_sources(batch: SheetBatch, plans: list[BillPlan], tables: dict[str, 
         append_row = max(len(rows), len(formulas)) + 2
         extras: dict[int, list[str]] = {3: [], 4: []}
         for plan in current:
+            # A reviewed cancellation/restore owns these exact original cells;
+            # a later definition must not relocate their historical category.
+            if skip_occurrences and (plan.id,period) in skip_occurrences:
+                continue
             recorded = occurrences.get((plan.id, period))
             if recorded and recorded.plan_snapshot:
                 if recorded.virtual:

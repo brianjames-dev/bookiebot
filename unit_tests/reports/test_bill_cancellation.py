@@ -296,3 +296,60 @@ def test_future_bank_link_is_preserved_even_before_the_scheduled_pull_day(setup)
     assert len(items)==1 and items[0]['reason']=='Bank-linked payment — keep'
     batch,_=end.book_batch(source,s.p,'2026-12',[],TODAY,refs);batch.send()
     assert next(c for c in decode_charges(s.t.rows[CHARGES_TAB]) if c.month=='2026-12').initial_amount_cents==1500
+
+
+def test_backdated_fixed_cancellation_preserves_original_categories_across_a_protected_change(setup,commands):
+    s=setup
+    needs=replace(s.p,kind='fixed',source_tab=BILL_TAB,monthly_source=True)
+    wants=replace(needs,category='subscriptions_wants',effective_from='2026-11',version='wants-v2')
+    s.p=wants
+    s.t.rows[BILL_TAB]=s.t.formulas[BILL_TAB]=encode([replace(needs,effective_until='2026-11'),wants],BILL_TAB,[])
+    s.t.rows[SUBSCRIPTION_TAB]=s.t.formulas[SUBSCRIPTION_TAB]=encode([s.other],SUBSCRIPTION_TAB,[])
+    for title in ['August','September','October','November','December']:
+        s.t.rows[title]=[['','Service','15',''],['','Subscriptions (Needs)','5'],['','(Needs) Subtotal:','=SUM(C1:C2)'],['','(Wants) Subtotal:','','=SUM(D1:D1)']]
+        s.t.formulas[title]=[['','Service',"='_BookieBot Bill Schedule'!J2",''],['','Subscriptions (Needs)','=SUM(Subscriptions!C2)'],['','(Needs) Subtotal:','=SUM(C1:C2)'],['','(Wants) Subtotal:','','=SUM(D1:D1)']]
+    s.t.formulas['November'][0][2]='15'
+    s.t.rows['December'][0][2]='0';s.t.rows['December'][0][3]='15'
+    s.t.formulas['December'][0][2]='0';s.t.formulas['December'][0][3]="='_BookieBot Bill Schedule'!J3"
+    original=BillCharge(needs.id,'2026-11','2026-11-01','Service',needs.category,s.t.properties['November']['sheetId'],1,3,
+        end.source_anchor(needs.id,'2026-11'),1500,True,source_action_id='original-recorded-charge',payer_owner='brian',
+        plan_snapshot=json.dumps(end.asdict(needs)),payment_date='2026-11-01')
+    s.t.rows[CHARGES_TAB]=s.t.formulas[CHARGES_TAB]=encode_charges([original],[])
+    s.t.properties[CHARGES_TAB]={'title':CHARGES_TAB,'sheetId':99}
+    request=confirmation(s,removeMonths=['2026-09','2026-10'])
+    assert commands.command(B,request)['success']
+    assert [float(s.t.rows[t][0][2]) for t in ['August','September','October','November']]==[15,0,0,15]
+    assert s.t.rows['November'][0][3]=='' and s.t.rows['October'][0][3]=='','Removing old Needs charges never moves them to Wants'
+    assert next(c for c in decode_charges(s.t.rows[CHARGES_TAB]) if c.month=='2026-11')==original
+    source=s.source();p=next(p for p in source.settings.records() if p.id==s.p.id)
+    undo={'operation':'restore-end','id':p.id,'version':p.version,'settingsVersion':source.settings.version,'undoOf':request['requestId']}
+    checked=bills.review(B,undo)
+    assert commands.command(B,{**undo,'reviewVersion':checked['reviewVersion'],'requestId':'restore-category-history-123456'})['success']
+    assert [float(s.t.rows[t][0][2]) for t in ['September','October','November']]==[15,15,15]
+    assert s.t.rows['October'][0][3]=='' and s.t.rows['November'][0][3]==''
+    assert float(s.t.rows['December'][0][3])==15 and float(s.t.rows['December'][0][2])==0
+    assert next(c for c in decode_charges(s.t.rows[CHARGES_TAB]) if c.month=='2026-11')==original
+
+
+def test_undo_restores_automatic_fixed_formula_provenance_for_later_corrections(setup):
+    s=setup;p=replace(s.p,kind='fixed',source_tab=BILL_TAB,monthly_source=True)
+    s.t.rows[BILL_TAB]=s.t.formulas[BILL_TAB]=encode([p],BILL_TAB,[])
+    s.t.rows[SUBSCRIPTION_TAB]=s.t.formulas[SUBSCRIPTION_TAB]=encode([s.other],SUBSCRIPTION_TAB,[])
+    for title in ['August','September','October','November','December']:
+        s.t.rows[title]=[['','Service','15'],['','Subscriptions (Needs)','5'],['','(Needs) Subtotal:','=SUM(C1:C2)']]
+        s.t.formulas[title]=[['','Service',"='_BookieBot Bill Schedule'!J2"],['','Subscriptions (Needs)','=SUM(Subscriptions!C2)'],['','(Needs) Subtotal:','=SUM(C1:C2)']]
+    batch,audit=end.book_batch(s.source(),p,'2026-09',['2026-09'],TODAY,set());batch.send()
+    audit['rootRequestId']='original-fixed-cancellation'
+    s.t.formulas['September'][0][2]='=0'
+    with pytest.raises(BillConflict,match='source formula changed'):
+        end.restore_book(s.source(),audit,TODAY)
+    s.t.formulas['September'][0][2]='0'
+    for table in (s.t.rows,s.t.formulas):table['September'][0].append('7')
+    with pytest.raises(BillConflict,match='other budget column changed'):
+        end.restore_book(s.source(),audit,TODAY)
+    assert len(s.t.sent)==1,'A changed formula or opposite category column must reject before writing'
+    for table in (s.t.rows,s.t.formulas):table['September'][0][3]=''
+    restored,_=end.restore_book(s.source(),audit,TODAY);restored.send()
+    source=s.source();identity=p.id;p=next(v for v in source.settings.records() if v.id==identity)
+    assert end._automatic_formula(source,p,s.t.formulas['September'][0][2]),'Undo restores an owned price-version formula rather than converting automatic history into entered cash'
+    assert next(i for i in end.book_items(source,p,'2026-09',TODAY,set()) if i['month']=='2026-09')['removable']
