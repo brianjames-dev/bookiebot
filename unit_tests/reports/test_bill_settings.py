@@ -139,7 +139,7 @@ def test_bill_and_transactions_commands_share_the_owner_uncertainty_boundary(sav
     from bookiebot.reports import transactions
     reader = Mock(side_effect=AssertionError("No financial read or write"))
     monkeypatch.setattr(transactions, "review", reader)
-    with pytest.raises(transactions.TransactionConflict, match="bill change"):
+    with pytest.raises(transactions.TransactionConflict, match="bill or transfer change"):
         transactions.TransactionCommands(saved.commands.access).command(B, {"requestId": "new-transaction-123456", "operation": "delete"})
     reader.assert_not_called()
 

@@ -36,6 +36,18 @@ def iso_date(value: Any) -> str:
 
 
 @dataclass(frozen=True)
+class OccurrenceAdjustment:
+    scheduled_on: str
+    revision: int
+    name: str
+    amount_cents: int
+    goal_id: str = ''
+    from_account: str = ''
+    to_account: str = ''
+    deleted: bool = False
+
+
+@dataclass(frozen=True)
 class Transfer:
     id: str
     revision: int
@@ -48,6 +60,7 @@ class Transfer:
     from_account: str = ''
     to_account: str = ''
     active: bool = True
+    adjustments: tuple[OccurrenceAdjustment, ...] = ()
 
     def public(self) -> dict[str, Any]:
         return {'id': self.id, 'revision': self.revision, 'name': self.name, 'amountCents': self.amount_cents,
@@ -67,7 +80,25 @@ def decode(rows: list[list[str]]) -> list[Transfer]:
         if not any(row):
             continue
         try:
-            transfer = Transfer(**json.loads(row[2]))
+            definition = json.loads(row[2])
+            if not isinstance(definition, dict):
+                raise ValueError('invalid transfer')
+            raw_adjustments = definition.pop('adjustments', [])
+            if not isinstance(raw_adjustments, list):
+                raise ValueError('invalid adjustments')
+            adjustments = tuple(OccurrenceAdjustment(**value) for value in raw_adjustments)
+            dates = set()
+            for change in adjustments:
+                if (not iso_date(change.scheduled_on) or change.scheduled_on in dates
+                        or type(change.revision) is not int or change.revision < 1
+                        or type(change.amount_cents) is not int or not 1 <= change.amount_cents <= 10_000_000_000
+                        or type(change.deleted) is not bool
+                        or any(not isinstance(v, str) or len(v) > 80 or any(ord(c) < 32 for c in v)
+                               for v in (change.name, change.goal_id, change.from_account, change.to_account))
+                        or not change.name.strip()):
+                    raise ValueError('invalid adjustment')
+                dates.add(change.scheduled_on)
+            transfer = Transfer(**definition, adjustments=adjustments)
             if (row[0] != transfer.id or int(row[1]) != transfer.revision
                     or not re.fullmatch(r'[A-Za-z0-9_-]{8,80}', transfer.id)
                     or type(transfer.revision) is not int or transfer.revision < 1
@@ -107,6 +138,7 @@ def occurrences(transfers: Iterable[Transfer], start: date, end: date) -> list[d
         groups.setdefault(transfer.id, []).append(transfer)
     result: list[dict[str, Any]] = []
     for identity, values in groups.items():
+        adjustments = {a.scheduled_on: a for a in max(values, key=lambda t: t.revision).adjustments}
         ordered = sorted(values, key=lambda t: (t.effective_from, t.revision))
         for index, transfer in enumerate(ordered):
             if not transfer.active:
@@ -138,10 +170,15 @@ def occurrences(transfers: Iterable[Transfer], start: date, end: date) -> list[d
                         dates.append(when)
                     offset += step
             for when in dates:
+                change = adjustments.get(when.isoformat())
+                if change and change.deleted:
+                    continue
+                value = change or transfer
                 result.append({'id': f'transfer-{identity}-{when.isoformat()}', 'transferId': identity,
-                               'date': when.isoformat(), 'name': transfer.name, 'amountCents': transfer.amount_cents,
-                               'goalId': transfer.goal_id, 'fromAccount': transfer.from_account,
-                               'toAccount': transfer.to_account, 'readOnly': True})
+                               'date': when.isoformat(), 'name': value.name, 'amountCents': value.amount_cents,
+                               'goalId': value.goal_id, 'fromAccount': value.from_account,
+                               'toAccount': value.to_account, 'readOnly': True,
+                               **({'adjustmentRevision': change.revision} if change else {})})
     return sorted(result, key=lambda item: (item['date'], item['id']))
 
 

@@ -64,6 +64,18 @@
 .bi-footnote { color:hsl(var(--muted-foreground)); font-size:11px; line-height:1.5; margin:8px 0 0; }
 .bi-delete-copy p { font-size:13px; line-height:1.5; margin:0 0 6px; color:hsl(var(--foreground)); }
 .bi-delete-copy>span { font-size:11px; line-height:1.5; color:hsl(var(--muted-foreground)); display:block; }
+.bi-transfer-effects { display:grid;gap:4px;margin:8px 0 0;font-size:12px;line-height:1.4; }
+.bi-transfer-context { margin:0 0 8px;font-size:12px;line-height:1.4;color:hsl(var(--muted-foreground));overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.bi-transfer-effects>div { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline; }
+.bi-transfer-effects dt { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:hsl(var(--muted-foreground)); }
+.bi-transfer-effects dd { display:flex;align-items:center;gap:5px;margin:0;font-variant-numeric:tabular-nums; }
+.bi-transfer-effects svg { width:12px;height:12px;flex:none;color:hsl(var(--muted-foreground)); }
+.bb-app-shell[data-duo-landscape=true] .bi-editor[data-kind=transfer] .bi-review-changes { grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px; }
+.bb-app-shell[data-duo-landscape=true] .bi-editor[data-kind=transfer] .bi-review-change { padding-block:4px;gap:2px; }
+.bb-app-shell[data-duo-landscape=true] .bi-editor[data-kind=transfer] .bi-review-change dd { flex-wrap:nowrap;font-size:12px; }
+.bb-app-shell[data-duo-landscape=true] .bi-editor[data-kind=transfer] .bi-review-change :is(del,.bi-review-new,.bi-review-new>span) { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.bb-app-shell[data-duo-landscape=true] .bi-editor[data-kind=transfer] .bi-review-change del { max-width:45%; }
+.bb-app-shell[data-duo-landscape=true] .bi-editor[data-kind=transfer] .bi-footnote { margin-top:4px; }
 .bi-product :is(input,select,button,summary),.bi-product :is(input,select,button,summary):focus,.bi-product :is(input,select,button,summary):focus-visible { outline:0!important; box-shadow:none!important; }
 /* During a category placement the real rows and persistent icon viewports
    share a stacking context. The lifted purchase covers passing neighbors as

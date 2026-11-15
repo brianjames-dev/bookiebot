@@ -252,6 +252,7 @@ const LEFT_CATEGORY_COLOR = "hsl(var(--category-remaining))"
 const SAVINGS_CATEGORY_COLOR = "hsl(var(--chart-5))"
 const NEEDS_BAR_COLOR = "hsl(var(--chart-1))"
 const WANTS_BAR_COLOR = "hsl(var(--chart-2))"
+const TRANSFER_BAR_COLOR = "#d4b96b"
 const DAILY_SPENDING_BAR_RADIUS: [number, number, number, number] = [2, 2, 2, 2]
 const DAILY_SPENDING_GRID_COLOR = "hsl(var(--muted-foreground))"
 const DAILY_SPENDING_BOUNDARY_COLOR = "hsl(var(--foreground))"
@@ -2195,12 +2196,14 @@ function expensePieLayoutsEqual(previous: ExpensePieLayout, next: ExpensePieLayo
 type DailySpendingRow = AmountRow & {
   needsAmount: number
   wantsAmount: number
+  transferAmount?: number
 }
 
 type DailySpendingChartRow = DailySpendingRow & {
   chartAmount: number
   chartNeedsAmount: number
   chartWantsAmount: number
+  chartTransferAmount: number
 }
 
 type DailySpendingAxis = {
@@ -2302,7 +2305,7 @@ function DailySpendingSection({ data, total, filter, entries, categoryColors, al
   </>
 }
 
-export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel, graphOpen, graphControls, graphStatus, graphBusy = false }: {
+export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId, onToggleDetails, onInspectDay, transactionControl, metricLabel = "Total Spent", legendLabel, includeTransfers=false, graphOpen, graphControls, graphStatus, graphBusy = false }: {
   onInspectDay: (day: string) => void
   data: DailySpendingRow[]
   total?: number
@@ -2313,12 +2316,13 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
   transactionControl?: ReactNode
   metricLabel?: string
   legendLabel?: string
+  includeTransfers?: boolean
   graphOpen?: boolean
   graphControls?: ReactNode
   graphStatus?: ReactNode
   graphBusy?: boolean
 }) {
-  const plot = <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} legendLabel={legendLabel} />
+  const plot = <MemoizedDailySpendingPlot data={data} filter={filter} onInspectDay={onInspectDay} legendLabel={legendLabel} includeTransfers={includeTransfers} />
   return <div className="bb-chart-layout">
     {graphOpen === undefined ? plot : <div id={`${detailsId}-graph`} className="bb-recorded-graph-reveal" data-open={graphOpen} aria-hidden={!graphOpen} inert={!graphOpen}><div className="bb-recorded-graph-clip" aria-busy={graphBusy}>{graphControls}{graphStatus || plot}</div></div>}
     <div className="bb-chart-side bb-daily-summary">
@@ -2333,14 +2337,14 @@ export function DailySpendingChart({ data, total, filter, detailsOpen, detailsId
   </div>
 }
 
-function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void; legendLabel?: string }) {
+function DailySpendingPlot({ data, filter, onInspectDay, legendLabel, includeTransfers=false }: { data: DailySpendingRow[]; filter: DailySpendingFilter; onInspectDay: (day: string) => void; legendLabel?: string;includeTransfers?:boolean }) {
   const {click,...selection}=useDailySpendingSelection(data.map(row=>row.label),onInspectDay)
   const duoLandscape=useAppNavigation()?.duoLandscape===true
   const axis = useMemo(() => dailySpendingAxis(data), [data])
   const chartData = useMemo(() => dailySpendingChartRows(data, axis), [data, axis])
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)")
   const showStackedBars = filter === "all" && !legendLabel
-  const singleBarColor = filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
+  const singleBarColor = legendLabel==='Transfers'?TRANSFER_BAR_COLOR:filter === "needs" ? NEEDS_BAR_COLOR : filter === "wants" ? WANTS_BAR_COLOR : "hsl(var(--chart-1))"
   return <div className="bb-daily-plot">
       <ChartContainer
         config={
@@ -2348,6 +2352,7 @@ function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: 
             ? {
                 chartNeedsAmount: { label: "Needs", color: NEEDS_BAR_COLOR },
                 chartWantsAmount: { label: "Wants", color: WANTS_BAR_COLOR },
+                ...(includeTransfers?{chartTransferAmount:{label:'Transfers',color:TRANSFER_BAR_COLOR}}:{}),
               }
             : { chartAmount: { label: "Amount", color: singleBarColor } }
         }
@@ -2386,17 +2391,19 @@ function DailySpendingPlot({ data, filter, onInspectDay, legendLabel }: { data: 
                 <>
                   <Bar isAnimationActive={!reducedMotion} animationInterpolateFn={stableBarAnimation} shape={stableBarShape} dataKey="chartNeedsAmount" name="Needs" stackId="daily" fill={NEEDS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
                   <Bar isAnimationActive={!reducedMotion} animationInterpolateFn={stableBarAnimation} shape={stableBarShape} dataKey="chartWantsAmount" name="Wants" stackId="daily" fill={WANTS_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />
+                  {includeTransfers&&<Bar isAnimationActive={!reducedMotion} animationInterpolateFn={stableBarAnimation} shape={stableBarShape} dataKey="chartTransferAmount" name="Transfers" stackId="daily" fill={TRANSFER_BAR_COLOR} radius={DAILY_SPENDING_BAR_RADIUS} />}
                 </>
               ) : (
-                <Bar isAnimationActive={!reducedMotion} animationInterpolateFn={stableBarAnimation} shape={stableBarShape} dataKey="chartAmount" name="Daily spending" fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
+                <Bar isAnimationActive={!reducedMotion} animationInterpolateFn={stableBarAnimation} shape={stableBarShape} dataKey="chartAmount" name={legendLabel??'Daily spending'} fill={singleBarColor} radius={DAILY_SPENDING_BAR_RADIUS} />
               )}
             </BarChart>
           </ResponsiveContainer>
         </div>
       </ChartContainer>
     <ul className="bb-daily-legend" aria-label="Daily spending legend">
-      {legendLabel?<li><span style={{background:NEEDS_BAR_COLOR}} aria-hidden="true"/>{legendLabel}</li>:filter !== "wants" && <li><span style={{ background: NEEDS_BAR_COLOR }} aria-hidden="true" />Needs</li>}
+      {legendLabel?<li><span style={{background:singleBarColor}} aria-hidden="true"/>{legendLabel}</li>:filter !== "wants" && <li><span style={{ background: NEEDS_BAR_COLOR }} aria-hidden="true" />Needs</li>}
       {!legendLabel&&filter !== "needs" && <li><span style={{ background: WANTS_BAR_COLOR }} aria-hidden="true" />Wants</li>}
+      {!legendLabel&&includeTransfers&&filter==='all'&&<li><span style={{background:TRANSFER_BAR_COLOR}} aria-hidden="true"/>Transfers</li>}
     </ul>
   </div>
 }
@@ -2445,6 +2452,7 @@ function dailySpendingChartRows(data: DailySpendingRow[], axis: DailySpendingAxi
       chartAmount,
       chartNeedsAmount: item.needsAmount * ratio,
       chartWantsAmount: item.wantsAmount * ratio,
+      chartTransferAmount: (item.transferAmount??0) * ratio,
     }
   })
 }
@@ -2540,10 +2548,11 @@ function DailySpendingTooltipContent({
     return null
   }
 
-  const rows = legendLabel ? [{label:legendLabel,amount:point.amount,color:NEEDS_BAR_COLOR}] : filter === "all"
+  const rows = legendLabel ? [{label:legendLabel,amount:point.amount,color:legendLabel==='Transfers'?TRANSFER_BAR_COLOR:NEEDS_BAR_COLOR}] : filter === "all"
     ? [
         { label: "Needs", amount: point.needsAmount, color: NEEDS_BAR_COLOR },
         { label: "Wants", amount: point.wantsAmount, color: WANTS_BAR_COLOR },
+        { label: 'Transfers', amount: point.transferAmount??0, color: TRANSFER_BAR_COLOR },
       ].filter((item) => item.amount > 0)
     : [
         {
@@ -2565,7 +2574,7 @@ function DailySpendingTooltipContent({
       ))}
       <div className="bb-chart-tooltip-row">
         <span />
-        <span>Total</span>
+        <span>{(point.transferAmount??0)>0&&!legendLabel?'Total activity':'Total'}</span>
         <strong>{formatMoney(point.amount)}</strong>
       </div>
     </div>

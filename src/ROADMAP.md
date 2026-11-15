@@ -6,7 +6,7 @@ BookieBot is already strong as a single-turn financial operator: it can parse na
 
 The next best direction is to make it more proactive, context-aware, and capable of handling multi-step financial tasks without needing explicit commands for every action.
 
-Implemented 2026-11-15: native scheduled savings transfers with one-time/every-two-weeks/monthly/quarterly/yearly rules, optional goal allocation, savings-only Category Mix and Calendar presentation, actual-only Transactions and recoverable confirmation. See [Savings transfers](../docs/SAVINGS_TRANSFERS.md); final verification/release evidence is tracked in STATUS/task PR.
+Implemented 2026-11-15: native scheduled savings transfers with one-time/every-two-weeks/monthly/quarterly/yearly rules, optional goal allocation, savings-only Category Mix and Calendar presentation, actual-only Transactions and recoverable confirmation. Individual Transactions edits/deletes/Undo correct only one occurrence and its Saved/goal allocation, with a separate gold graph stack. See [Savings transfers](../docs/SAVINGS_TRANSFERS.md); final verification/release evidence is tracked in STATUS/task PR.
 
 ## Highest-Value BookieBot Upgrades
 

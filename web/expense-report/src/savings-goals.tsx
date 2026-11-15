@@ -10,6 +10,7 @@ import "./savings-goals.css"
 export interface SavingsGoal {
   id: string; name: string; targetCents: number; startingCents: number; balanceCents: number
   contributionCents: number; contributionCount: number; targetDate: string; archived: boolean; version: number
+  transferVersion?:string
 }
 interface Contribution { id: string; amountCents: number; date: string; note: string; reversedAt: string; readOnly?:boolean }
 type Command = Record<string, unknown>
@@ -216,7 +217,7 @@ function GoalEntry({ goal, run, disabled, view, onViewChange }: {
       </div></CollapsibleContent>
       <GoalActionPanel open={view === "edit"}><GoalEditor key={goal.version} goal={goal} disabled={disabled} run={run} close={close} /></GoalActionPanel>
       <GoalActionPanel open={view === "contribute"}><ContributionEditor goal={goal} disabled={disabled} run={run} close={close} /></GoalActionPanel>
-      <GoalActionPanel open={view === "history"}><div className="bb-goal-history-heading"><h4>Contribution history</h4><button className="bb-goal-close" type="button" onClick={close}>Close</button></div><ContributionHistory key={goal.version} goal={goal} disabled={disabled} run={run} /></GoalActionPanel>
+      <GoalActionPanel open={view === "history"}><div className="bb-goal-history-heading"><h4>Contribution history</h4><button className="bb-goal-close" type="button" onClick={close}>Close</button></div><ContributionHistory key={`${goal.version}:${goal.transferVersion??''}`} goal={goal} disabled={disabled} run={run} /></GoalActionPanel>
       <GoalActionPanel open={view === "archive"}><div className="bb-goal-archive-confirm"><p>Archive {goal.name}? Its balance and history stay saved, and you can restore it later.</p>
         <div className="bb-goals-actions"><button type="button" disabled={disabled} onClick={() => run({ operation: "archive", goalId: goal.id, version: goal.version }, close)}>Archive goal</button>
           <button type="button" disabled={disabled} onClick={close}>Cancel</button></div></div></GoalActionPanel>

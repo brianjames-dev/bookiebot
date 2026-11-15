@@ -12,7 +12,7 @@ const titles:Partial<Record<TransactionOperation,string>>={update:'Edit purchase
 export function DuoTransactionPane({row,operation,reviewing,graphOpen,locked,onAction,onOptions,onGraph,onClose,editor,status,aliases}:{row:RecordedTransaction;operation:TransactionOperation|null;reviewing:boolean;graphOpen:boolean;locked:boolean;onAction:(operation:'update'|'split'|'delete')=>void;onOptions:()=>void;onGraph:()=>void;onClose:()=>void;editor:ReactNode;status:ReactNode;aliases?:Record<string,string>}){
  const heading=useRef<HTMLHeadingElement>(null)
  const entry=recordedEntry(row),copy=transactionText(entry,transactionMerchant(entry))
- const title=reviewing?'Review '+(operation==='delete'?'deletion':operation==='split'?'split':'change'):operation?titles[operation]??'Transaction':'Transaction'
+ const title=reviewing?(row.kind==='transfer'?'Review transfer':'Review '+(operation==='delete'?'deletion':operation==='split'?'split':'change')):row.kind==='transfer'?(operation==='update'?'Edit transfer':operation==='delete'?'Delete transfer':operation==='undo'?'Undo transfer change':'Savings transfer'):operation?titles[operation]??'Transaction':'Transaction'
  useLayoutEffect(()=>{if(!graphOpen)heading.current?.focus({preventScroll:true})},[row.id,operation,reviewing,graphOpen])
  return <aside className="bb-duo-action-pane" role="region" aria-label="Transaction options and editor" data-peek={graphOpen} onKeyDown={event=>{if(event.key==='Escape'&&!locked){event.preventDefault();onClose()}}}>
   <header className="bb-duo-pane-heading">
@@ -24,11 +24,11 @@ export function DuoTransactionPane({row,operation,reviewing,graphOpen,locked,onA
    </div>
   </header>
   <div className="bb-duo-pane-content" hidden={graphOpen}>
-   {!operation&&!transactionHasActions(row)?<RecordedTransactionDetails row={row} onClose={onClose} locked={locked} pane aliases={aliases}/>:<><TransactionEntryContext row={row} aliases={aliases}/>
-   {!operation&&<div className="bb-duo-entry-actions" role="group" aria-label={`Actions for ${copy.primary}`}>
-    {actions.map(([op,label,Icon])=><button key={op} type="button" className={`bb-recorded-action bb-recorded-action-${op}`} data-active={operation===op} disabled={locked||!row.capabilities[op]} aria-label={`${label} ${copy.primary}`} onClick={()=>onAction(op)}><Icon aria-hidden="true"/><span>{label}</span></button>)}
+   {!operation&&!transactionHasActions(row)?<RecordedTransactionDetails row={row} onClose={onClose} locked={locked} pane aliases={aliases}/>:<>{!(row.kind==='transfer'&&operation)&&<TransactionEntryContext row={row} aliases={aliases}/>}
+   {!operation&&<div className="bb-duo-entry-actions" data-transfer={row.kind==='transfer'} role="group" aria-label={`Actions for ${copy.primary}`}>
+    {actions.filter(([op])=>row.kind!=='transfer'||row.capabilities[op]).map(([op,label,Icon])=><button key={op} type="button" className={`bb-recorded-action bb-recorded-action-${op}`} data-active={operation===op} disabled={locked||!row.capabilities[op]} aria-label={`${label} ${copy.primary}`} onClick={()=>onAction(op)}><Icon aria-hidden="true"/><span>{label}</span></button>)}
    </div>}
-   {!operation&&<p className="bb-duo-action-hint">Choose an action for this entry.</p>}
+   {!operation&&<p className="bb-duo-action-hint">{row.kind==='transfer'?'Edit or delete only this transfer. Its recurring schedule continues.':'Choose an action for this entry.'}</p>}
    </>}
    {status}
    <div className="bb-duo-editor-host">{(operation||transactionHasActions(row))&&editor}</div>

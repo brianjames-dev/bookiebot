@@ -30,10 +30,11 @@ export interface RecordedTransaction {
   person: string; kind: string; category: string; categoryLabel: string; amountCents: number; displayAmountCents?: number; split: string; notice?: string; contextOnly?:boolean; repayment?:TransactionRepayment
   fields: Record<string, string>; editableFields: string[]; capabilities: Record<Operation, boolean>; reasons: Record<string, string>
   splitOptions?: {custom: boolean; payerName: string; partnerName: string; payerBasisPoints: number; payerCents?: number; incomePayerCents?:number}
+  transferOptions?: {goals:{id:string;name:string;archived:boolean}[]}
 }
-export interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; snapshotVersion?:string; days?:RecordedDay[]; listDays?:RecordedDay[]; totalAmountCents?:number; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
+export interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; snapshotVersion?:string; days?:RecordedDay[]; listDays?:RecordedDay[]; totalAmountCents?:number; transferAmountCents?:number; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
 interface Change { id: string; month: string; version?: string; operation: Operation; updates?: Record<string, string | number>; destination?: string; method?: string; payerShareCents?: number }
-interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: TransactionChangeSummary["share"]; restoration?: TransactionChangeSummary["restoration"] }
+interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: TransactionChangeSummary["share"]; restoration?: TransactionChangeSummary["restoration"]; transferEffect?:TransactionChangeSummary['transferEffect'] }
 interface Result { state: "running" | "done" | "uncertain"; success?: boolean; detail?: string; undo?: {month: string; id: string}; summary?: TransactionChangeSummary }
 const categories: Record<string, string> = {grocery: "Grocery", gas: "Gas", food: "Food", shopping: "Shopping", need_expenses: "Other needs"}
 
@@ -69,7 +70,7 @@ async function request(path: string, body?: unknown, signal?: AbortSignal): Prom
   } finally { window.clearTimeout(deadline); signal?.removeEventListener("abort", abort) }
 }
 function checkedDays(value:any):boolean {
-  return Array.isArray(value)&&value.every((day:any)=>day&&typeof day.date==='string'&&typeof day.month==='string'&&/^\d{4}-(?:0[1-9]|1[0-2])$/.test(day.month)&&Number.isSafeInteger(day.count)&&day.count>0&&Number.isSafeInteger(day.totalCents)&&Number.isSafeInteger(day.needsCents)&&Number.isSafeInteger(day.wantsCents))
+  return Array.isArray(value)&&value.every((day:any)=>day&&typeof day.date==='string'&&typeof day.month==='string'&&/^\d{4}-(?:0[1-9]|1[0-2])$/.test(day.month)&&Number.isSafeInteger(day.count)&&day.count>0&&Number.isSafeInteger(day.totalCents)&&Number.isSafeInteger(day.needsCents)&&Number.isSafeInteger(day.wantsCents)&&(day.transferCents===undefined||Number.isSafeInteger(day.transferCents)&&day.transferCents>=0))
 }
 function checkedListing(value: any): Listing {
   if (!value || !Array.isArray(value.items) || value.items.length > 40 || !Number.isSafeInteger(value.total) || !Array.isArray(value.categories) || !Array.isArray(value.persons)
@@ -239,7 +240,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
         body.updates = {}
         for (const field of fields) {
           const value = draft[field]
-          if (!value || (field !== "amount" && value === row!.fields[field])) continue
+          if ((field !== "amount" && value === row!.fields[field]) || (!value && !(row!.kind==='transfer'&&['goalId','fromAccount','toAccount'].includes(field)))) continue
           if (field === "amount") {
             if (!/^\d+(?:\.\d{1,2})?$/.test(value) || Number(value) <= 0) { setError("Enter a positive amount with up to two decimal places."); return }
             if (Math.round(Number(value) * 100) !== row!.amountCents) body.updates.amount = Math.round(Number(value) * 100)
@@ -256,7 +257,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
         }
       }
     }
-    inFlight.current = true; setBusy(true); setError("")
+    inFlight.current = true; setBusy(true); setError("");setResult(null)
     try {
       const data = await request("/app/transactions/review", body)
       if (!mounted.current) return
@@ -306,11 +307,12 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
         }else if(before&&id&&before.items.some(row=>row.id===id)&&next.summary){
           const afterItems=confirmedRows(before.items,id,next.summary)
           const old=before.items.find(row=>row.id===id)!,after=afterItems.find(row=>row.id===id),delta=(after?accountedAmount(after):0)-accountedAmount(old)
-          const updateDays=(days:RecordedDay[]|undefined)=>days?.flatMap(day=>day.date===old.date&&day.month===old.month?day.count===1&&!after?[]:[{...day,count:day.count-(after?0:1),totalCents:day.totalCents+delta}]:[day])
-          const periodDelta=before.month==='all'||before.month===old.month?delta:0
+          const updateDays=(days:RecordedDay[]|undefined)=>days?.flatMap(day=>day.date===old.date&&day.month===old.month?day.count===1&&!after?[]:[{...day,count:day.count-(after?0:1),totalCents:day.totalCents+delta,...(old.kind==='transfer'?{transferCents:(day.transferCents??0)+delta}:{})}]:[day])
+          const spendingTotalIncludesEntry=old.kind!=='transfer'||['savings','transfers'].includes(displayScope.filter)
+          const periodDelta=spendingTotalIncludesEntry&&(before.month==='all'||before.month===old.month)?delta:0
           // Keep identities inert during feedback; only the subsequent fresh
           // listing can make new versions/rows available for another command.
-          setCommit({token:++sequence.current,id,before,after:{...before,items:afterItems,days:updateDays(before.days),listDays:updateDays(before.listDays),totalAmountCents:(before.totalAmountCents??0)+periodDelta},result:next,phase:'closing'})
+          setCommit({token:++sequence.current,id,before,after:{...before,items:afterItems,days:updateDays(before.days),listDays:updateDays(before.listDays),totalAmountCents:(before.totalAmountCents??0)+periodDelta,...(old.kind==='transfer'?{transferAmountCents:(before.transferAmountCents??0)+delta}:{})},result:next,phase:'closing'})
         }else void finishFeedback(next)
       }
     }
@@ -322,7 +324,12 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     updateWork({label: "Transaction changes", pending:true, uncertain:true})
     try { sessionStorage.setItem(storageKey, JSON.stringify(command)) } catch {}
     try { const next = await request("/app/transactions", command); if (mounted.current) acceptResult(next) }
-    catch (failure) { if (mounted.current) { handleError(failure); setResult({state:"uncertain", detail:"The change may already be saved. Check its saved status before another change."}) } }
+    catch (failure) { if (mounted.current) {
+      handleError(failure)
+      if(failure instanceof RequestError&&[400,403,409].includes(failure.status)){
+        acceptResult({state:'done',success:false,detail:failure.message});setReview(null);setReviewBody(null)
+      }else setResult({state:"uncertain", detail:"The change may already be saved. Check its saved status before another change."})
+    } }
     finally { inFlight.current = false; if (mounted.current) setBusy(false) }
   }
   const checkStatus = async (retry = false) => {
@@ -346,12 +353,13 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   },[commit?.token,commit?.phase])
   async function finishFeedback(saved:Result,readBack?:Listing){
     setCommit(null);setResult(null);changed()
-    setAnnouncement(saved.summary?.operation==='undo'?'Change undone':saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split saved':'Change saved')
+    if(saved.summary?.kind==='transfer')window.dispatchEvent(new Event('bookiebot:transfers-changed'))
+    setAnnouncement(saved.summary?.operation==='undo'?'Change undone':saved.summary?.operation==='delete'?(saved.summary.kind==='transfer'?'Transfer deleted':'Purchase deleted'):saved.summary?.operation==='split'?'Split saved':'Change saved')
     const currentSequence=sequence.current
     const loaded=readBack?true:await load(0,false,true)
     if(readBack){setListing(readBack);setDisplayScope({filter,month,day});setNeedsFresh(false);setUpdatedAt(Date.now());setGraphRevision(value=>value+1)}
     if(!mounted.current||currentSequence!==sequence.current)return
-    if(saved.undo&&loaded){const seconds=transactionMotion.undoSeconds;setNotice({id:++sequence.current,title:saved.summary?.operation==='delete'?'Purchase deleted':saved.summary?.operation==='split'?'Split updated':'Purchase updated',deadline:Date.now()+seconds*1000,seconds,undo:saved.undo})}
+    if(saved.undo&&loaded){const seconds=transactionMotion.undoSeconds;setNotice({id:++sequence.current,title:saved.summary?.operation==='delete'?(saved.summary.kind==='transfer'?'Transfer deleted':'Purchase deleted'):saved.summary?.operation==='split'?'Split updated':saved.summary?.kind==='transfer'?'Transfer updated':'Purchase updated',deadline:Date.now()+seconds*1000,seconds,undo:saved.undo})}
     else if(!loaded)setError('Your change was saved. Refresh Transactions to see the current rows.')
   }
   useEffect(()=>{
@@ -416,9 +424,9 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   </div>
   const graphStatus=historyEnabled&&(graphError?<div className="bb-recorded-graph-status" role="alert"><span>{graphError}</span><button type="button" onClick={()=>setGraphRevision(value=>value+1)}>Retry graph</button></div>:graphPending?<div className="bb-recorded-graph-status" role="status">Loading graph…</div>:chart.length===0?<div className="bb-recorded-graph-status" role="status">No recorded activity in this period.</div>:null)
   const amountValue=Number(draft.amount),validAmount=/^\d+(?:\.\d{1,2})?$/.test(draft.amount??'')&&amountValue>0&&Number.isSafeInteger(Math.round(amountValue*100))
-  const validFields=selected?.editableFields.every(field=>field==='amount'||draft[field]===selected.fields[field]||Boolean(draft[field]?.trim())&&draft[field].length<=200)
+  const validFields=selected?.editableFields.every(field=>field==='amount'||draft[field]===selected.fields[field]||(selected.kind==='transfer'&&['goalId','fromAccount','toAccount'].includes(field)||Boolean(draft[field]?.trim()))&&(draft[field]?.length??0)<=(selected.kind==='transfer'?80:200))
   const canReview=Boolean(selected&&operation&&(operation==='update'?validAmount&&validFields&&(destination!==selected.category||selected.editableFields.some(field=>field==='amount'?Math.round(amountValue*100)!==selected.amountCents:(draft[field]??'').trim()!==(selected.fields[field]??'').trim())):operation==='split'?customValid&&(method!=='custom'||Boolean(selected.splitOptions?.custom))&&(method!=='fronted'||selected.kind==='expense')&&(selected.split?method!==selected.split||payerShareCents!==(selected.splitOptions?.payerCents??selected.amountCents):payerShareCents!==selected.amountCents):true))
-  const summary:TransactionChangeSummary|null=review?{operation:review.operation,title:review.item.title,date:review.item.date,category:review.item.categoryLabel,location:review.item.location,person:review.item.person,amountCents:review.item.amountCents,before:review.item.fields,after:review.after,destination:review.destination,share:review.share,restoration:review.restoration}:null
+  const summary:TransactionChangeSummary|null=review?{operation:review.operation,kind:review.item.kind,title:review.item.title,date:review.item.date,category:review.item.categoryLabel,location:review.item.location,person:review.item.person,amountCents:review.item.amountCents,before:review.item.fields,after:review.after,destination:review.destination,share:review.share,restoration:review.restoration,transferEffect:review.transferEffect}:null
   const snapshot:InlineSnapshot|null=selected&&operation?{row:selected,operation,draft,destination,method,payerCents:payerShareCents,splitInput,review:summary,canReview,locked,busy,categories:{...categories,...(selected.category in categories?{}:{[selected.category]:selected.categoryLabel})},persons:['Hannah','Brian (BofA)','Brian (AL)'],error}:null
   const editorProps=(row:RecordedTransaction,reference=false):InlineEditorProps=>({snapshot:selected?.id===row.id&&snapshot?snapshot:reference?{row,operation:'split',draft:row.fields,destination:row.category,method:(row.split||'income') as SplitMethod,payerCents:row.splitOptions?.payerCents??row.amountCents,splitInput:null,review:null,canReview:false,locked:true,busy:false,categories:categoryOptions,persons:[],error:''}:null,
     onField:(key,value)=>setDraft(previous=>({...previous,[key]:value})),onCategory:setDestination,onShare:(value,method)=>{setPayerShareCents(value);setMethod(method);setCustomValid(true)},onValidity:setCustomValid,onSplitInput:setSplitInput,onReview:()=>void preview(),onConfirm:()=>void confirm(),onBack:()=>{setReview(null);setReviewBody(null)},onCancel:()=>{if(repaymentOpen&&splitOrigin.current==='repayment'){setOperation(null);setReview(null);setReviewBody(null);setError('')}else discard()},onRemoveSplit:()=>begin(row,'cancel_split',splitOrigin.current)})
@@ -462,7 +470,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     {headerActions && createPortal(<button type="button" className="bb-transaction-all-months" aria-label="All recorded months" aria-pressed={month==='all'} disabled={locked||Boolean(operation)||Boolean(notice)} onClick={()=>{setDay('');setMonth(month==='all'?initialMonth:'all')}}>All months</button>,headerActions)}
     {navigation?.monthHeader?<div className="bb-transaction-period bb-transaction-scope"><span>{periodMonth==='all'?'All months':new Date(periodMonth+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}</span></div>:
     <details className="bb-transaction-period"><summary>{month==='all'?'All months':new Date(month+'-01T12:00:00').toLocaleDateString(undefined,{month:'long',year:'numeric'})}<ChevronDown aria-hidden="true"/></summary><div><label>Month<input aria-label="Recorded month" type="month" max={new Date().toISOString().slice(0,7)} value={month==='all'?initialMonth:month} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={event=>{if(event.target.value){setMonth(event.target.value);event.target.closest('details')?.removeAttribute('open')}}}/></label><button type="button" disabled={locked||Boolean(operation)||Boolean(notice)} onClick={event=>{setMonth(month==='all'?initialMonth:'all');event.currentTarget.closest('details')?.removeAttribute('open')}}>{month==='all'?'Selected month':'All months'}</button></div></details>}
-    {listing && <DailySpendingChart graphOpen={graphOpen} graphControls={graphControls} graphStatus={graphStatus} graphBusy={graphPending} data={chart} filter={graphFilter==='needs'||graphFilter==='wants'?graphFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={inspectGraphDay} legendLabel={graphFilter==='income'?'Income':graphFilter==='savings'?'Savings':graphFilter==='transfers'?'Transfers':undefined}
+    {listing && <DailySpendingChart graphOpen={graphOpen} graphControls={graphControls} graphStatus={graphStatus} graphBusy={graphPending} data={chart} filter={graphFilter==='needs'||graphFilter==='wants'?graphFilter:'all'} detailsOpen detailsId="bb-recorded-days" onToggleDetails={()=>{}} onInspectDay={inspectGraphDay} includeTransfers={graphFilter==='all'} legendLabel={graphFilter==='income'?'Income':graphFilter==='savings'?'Savings':graphFilter==='transfers'?'Transfers':undefined}
       transactionControl={<div className="bb-recorded-toolbar"><TransactionSearch value={search} disabled={locked||Boolean(operation)||Boolean(notice)} onChange={setSearch}/><div className="bb-recorded-summary-controls"><CategoryFilterControl filter={filter} onFilterChange={changeFilter} filters={filtersList} label="Filter transactions" dismissTrigger="recorded-transactions"/><button type="button" className="bb-recorded-graph-toggle" aria-label={graphOpen?'Hide spending graph':'Show spending graph'} aria-expanded={graphOpen} aria-controls="bb-recorded-days-graph" onClick={()=>setGraphOpen(value=>!value)}><ChartNoAxesColumn aria-hidden="true"/></button></div></div>}/>}
     {day&&<button type="button" className="bb-recorded-day-chip" aria-label={'Clear date filter '+recordedDateLabel(day,true)} onClick={()=>setDay('')}>{recordedDateLabel(day,true)}<X aria-hidden="true"/></button>}
     <div className="bb-recorded-results">

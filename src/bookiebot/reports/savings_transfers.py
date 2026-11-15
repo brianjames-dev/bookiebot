@@ -93,7 +93,8 @@ def review(actor: str, body: dict[str, Any], source: WorkbookSnapshot) -> dict[s
         # February-28 merely because the next displayed date is clamped.
         anchor = before.starts_on if before and before.active and before.frequency == fields['frequency'] and next_date(rules, before.id, effective) == start else start
         after = ledger.Transfer(identity, before.revision + 1 if before else 1, name, amount, fields['frequency'], anchor,
-                                effective.isoformat(), goal_id, text('fromAccount'), text('toAccount'))
+                                effective.isoformat(), goal_id, text('fromAccount'), text('toAccount'),
+                                adjustments=before.adjustments if before else ())
     updated = [r for r in rules if r.id != identity or r.effective_from < effective.isoformat()] + [after]
     names = {g['id']: g for g in _goals(source.owner)}
     after_public = {**after.public(), 'goalName': names.get(after.goal_id, {}).get('name', ''),
@@ -106,7 +107,8 @@ def review(actor: str, body: dict[str, Any], source: WorkbookSnapshot) -> dict[s
     return {'review': checked, 'rules': updated}
 
 
-def configuration_batch(source: WorkbookSnapshot, checked: dict[str, Any], request_id: str, digest: str):
+def configuration_batch(source: WorkbookSnapshot, checked: dict[str, Any], request_id: str, digest: str,
+                        *, result: dict[str, Any] | None = None, audit: dict[str, Any] | None = None):
     batch = SheetBatch(source)
     # Transfer records are literal JSON, including user-entered names. They
     # never run through editable-formula preservation or a bank/payment writer.
@@ -115,10 +117,11 @@ def configuration_batch(source: WorkbookSnapshot, checked: dict[str, Any], reque
     old_count = len(source.rows.get(ledger.TRANSFER_TAB, []))
     if old_count > len(rows):
         batch.values(ledger.TRANSFER_TAB, len(rows) + 1, 1, [[''] * len(ledger.HEADERS) for _ in range(old_count - len(rows))], hidden=True)
-    result = {'state': 'done', 'success': True, 'detail': 'Transfer stopped.' if checked['review']['operation'] == 'transfer-stop' else 'Transfer saved.'}
+    result = result or {'state': 'done', 'success': True, 'detail': 'Transfer stopped.' if checked['review']['operation'] == 'transfer-stop' else 'Transfer saved.'}
+    receipt = {**result, **({'_transferUndo': audit} if audit else {})}
     batch.values(SETTINGS_LOG_TAB, 1, 1, [LOG_HEADERS], hidden=True)
     batch.values(SETTINGS_LOG_TAB, max(2, len(source.rows.get(SETTINGS_LOG_TAB, [])) + 1), 1,
-                 [[request_id, digest, json.dumps(result), now_pacific().isoformat()]], hidden=True)
+                 [[request_id, digest, json.dumps(receipt), now_pacific().isoformat()]], hidden=True)
     return batch, result
 
 
@@ -131,7 +134,8 @@ def goal_payload(actor: str, result: dict[str, Any], *, today: date | None = Non
         cents = sum(r['amountCents'] for r in linked)
         goals.append({**goal, 'balanceCents': goal['balanceCents'] + cents,
                       'contributionCents': goal['contributionCents'] + cents,
-                      'contributionCount': goal['contributionCount'] + len(linked), 'transferCents': cents})
+                      'contributionCount': goal['contributionCount'] + len(linked), 'transferCents': cents,
+                      'transferVersion': fingerprint(linked)})
     return {**result, 'goals': goals}
 
 
@@ -161,7 +165,7 @@ def goal_history(actor: str, owner: str, identity: str, offset: int, *, store: A
 
 def can_archive_goal(actor: str, owner: str, identity: str, *, commands: Any) -> None:
     from bookiebot.reports.goals_store import GoalConflictError
-    if commands.pending(owner):
+    if commands.blocked(owner):
         raise GoalConflictError('Finish checking your financial change before archiving this goal.')
     today = now_pacific().date()
     rules = ledger.read_all(actor, today=today)

@@ -78,7 +78,7 @@ def test_daily_spending_bars_share_the_blue_corner_radius():
     chart_source = source.split("function DailySpendingChart", 1)[1].split("function dailySpendingYAxisDomain", 1)[0]
 
     assert "const DAILY_SPENDING_BAR_RADIUS: [number, number, number, number] = [2, 2, 2, 2]" in source
-    assert chart_source.count("radius={DAILY_SPENDING_BAR_RADIUS}") == 3
+    assert chart_source.count("radius={DAILY_SPENDING_BAR_RADIUS}") == 4
     assert "radius={[6, 6, 2, 2]}" not in chart_source
 
 

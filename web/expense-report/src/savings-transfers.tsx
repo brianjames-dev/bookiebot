@@ -53,6 +53,11 @@ export function SavingsTransfers({active,ownerName}:{active:boolean;ownerName:st
  },[key,ownerName])
  useEffect(()=>{alive.current=true;try{const saved=sessionStorage.getItem(key);if(saved)setPending(JSON.parse(saved))}catch{setError('Could not restore the saved transfer request. Reopen BookieBot.')};return()=>{alive.current=false;++generation.current;abort.current?.abort()}},[key])
  useEffect(()=>{if(active&&!snapshot&&!flight.current)void load()},[active,snapshot,load])
+ useEffect(()=>{
+  const changed=()=>{if(!snapshot||flight.current||form||pending)return;if(active)void load();else setSnapshot(null)}
+  window.addEventListener('bookiebot:transfers-changed',changed)
+  return()=>window.removeEventListener('bookiebot:transfers-changed',changed)
+ },[active,snapshot,form,pending,load])
  usePageRefresh(active?'settings':null,{refresh:async()=>{setRefreshing(true);try{return await load()}finally{setRefreshing(false)}},disabled:busy||Boolean(pending)||guard.pending||guard.uncertain})
  useEffect(()=>{setConfirmReady(false);if(!review)return;const timer=window.setTimeout(()=>setConfirmReady(true),transactionMotion.duration);return()=>window.clearTimeout(timer)},[review])
  const choose=(transfer?:Transfer)=>{

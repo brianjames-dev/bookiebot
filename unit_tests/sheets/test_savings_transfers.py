@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from bookiebot.sheets.savings_transfers import Transfer, occurrences, encode, decode, storage_book
+from bookiebot.sheets.savings_transfers import Transfer, OccurrenceAdjustment, occurrences, encode, decode, storage_book
 from bookiebot.sheets.recurring import BillConflict
 
 
@@ -63,3 +63,16 @@ def test_biweekly_midrange_edits_stop_and_year_boundary_retain_fourteen_day_anch
         [original,changed,stopped],date(2026,11,16),date(2027,1,31))]==[
         ('2026-11-29',17500,'goal-2'),('2026-12-13',17500,'goal-2')]
     assert [r['date'] for r in occurrences([original],date(2026,12,28),date(2027,1,31))]==['2027-01-10','2027-01-24']
+
+
+def test_dated_adjustments_change_only_one_entry_across_schedule_versions():
+    original=rule(starts_on='2026-11-15',effective_from='2026-11-15')
+    correction=OccurrenceAdjustment('2026-11-15',1,'Corrected entry',17500,'goal-2','Checking','Other savings')
+    future=replace(original,revision=2,effective_from='2026-12-01',amount_cents=25000,adjustments=(correction,))
+    values=occurrences([original,future],date(2026,11,1),date(2026,12,31))
+    assert [(v['date'],v['name'],v['amountCents'],v['goalId']) for v in values]==[
+        ('2026-11-15','Corrected entry',17500,'goal-2'),('2026-12-15','Emergency fund',25000,'goal-1')]
+    deleted=replace(future,adjustments=(replace(correction,revision=2,deleted=True),))
+    assert [v['date'] for v in occurrences([original,deleted],date(2026,11,1),date(2026,12,31))]==['2026-12-15']
+    assert decode(encode([original,future]))==[original,future]
+    with pytest.raises(BillConflict):decode(encode([replace(future,adjustments=(correction,correction))]))
