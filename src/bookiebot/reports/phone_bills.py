@@ -40,6 +40,11 @@ async def _bills(request: web.Request) -> web.Response:
                 pending = await asyncio.to_thread(lambda: service.build_commands().pending(session.owner_key))
                 if pending:
                     result["pendingCommand"] = pending
+                recover = getattr(service.build_commands(), 'recoverable_flow', None)
+                if callable(recover):
+                    flow = await asyncio.to_thread(recover, session.owner_key)
+                    if flow:
+                        result['pendingFlow'] = flow
         else:
             raw = bytearray()
             async for chunk in request.content.iter_chunked(1024):

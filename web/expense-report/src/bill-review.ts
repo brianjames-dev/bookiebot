@@ -9,6 +9,8 @@ export const splitLabel=(bill:Pick<Bill,'splitMethod'|'payerBasisPoints'>)=>bill
 export function billReviewLines(before:Bill|null|undefined,after:Bill,operation:string):BillReviewLine[]{
  const lines:BillReviewLine[]=[]
  const add=(label:string,old:string|undefined,value:string,always=false)=>{if(always||old!==value)lines.push({label,before:old??null,after:value})}
+ if(operation==='end')return [{label:'Stops',before:null,after:billMonth(after.effectiveFrom)+' onward'}]
+ if(operation==='restore-end')return [{label:'Status',before:'Ended',after:after.active?'Active':'Restored'}]
  if(operation==='delete')return [{label:'Status',before:'Active',after:'Stopped'},{label:'Stops',before:null,after:billMonth(after.effectiveFrom)+' onward'}]
  add('Name',before?.name,after.name)
  add('Type',before?types[before.type]:undefined,types[after.type])

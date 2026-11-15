@@ -38,6 +38,8 @@ def split_preview(plan: BillPlan, amount: int, owner: str) -> dict[str, Any]:
 def listing(actor: str) -> dict[str, Any]:
     today = now_pacific().date()
     snapshot = read_workbook(actor, today)
+    from bookiebot.reports.bill_cancellation import configured_years, latest_cancellation
+    years = configured_years(actor, today)
     from bookiebot.sheets.collaboration import split_amounts, partner_owner_key
     from bookiebot.reimbursements.service import enabled
     income_basis = round(split_amounts(100, "income", snapshot.owner)[0] * 100)
@@ -63,9 +65,11 @@ def listing(actor: str) -> dict[str, Any]:
         return value
 
     return {"month": snapshot.settings.period, "today": today.isoformat(), "settingsVersion": snapshot.settings.version,
+            "earliestStopMonth": f"{min(years, default=today.year):04d}-01",
             "ownerName": snapshot.owner.title(), "partnerName": partner_owner_key(snapshot.owner).title(),
             "incomeBasisPoints": income_basis, "splitsEnabled": enabled(),
             "bills": [{**public(p, snapshot.settings.period),
+                "cancellationRequestId": latest_cancellation(snapshot, p.id),
                 "nextChange": next((public(future, future.effective_from)
                     for future in sorted(snapshot.settings.plans, key=lambda value: value.effective_from)
                     if future.id == p.id and future.effective_from > snapshot.settings.period), None),
@@ -139,6 +143,13 @@ def _amount_review(snapshot: WorkbookSnapshot, body: dict[str, Any], today: date
 def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | None = None) -> dict[str, Any]:
     today = now_pacific().date()
     source = snapshot or read_workbook(actor, today)
+    if body.get("operation") in {"end", "end-year", "restore-end", "restore-end-year"}:
+        from bookiebot.reports.bill_cancellation import review_end, review_year, review_restore
+        if body["operation"] == "end":
+            return review_end(actor, source, body, today)
+        if body["operation"] == "end-year":
+            return review_year(source, body, today)
+        return review_restore(actor, source, body, today)
     if body.get("operation") == "current":
         from bookiebot.reports.bill_current_review import review_current
         return review_current(actor, source, body)
@@ -306,7 +317,12 @@ class BillCommands:
         result = {"state": record["state"], **json.loads(record["result_json"])}
         age = (datetime.now(timezone.utc) - datetime.fromisoformat(record["created_at"])).total_seconds()
         if record["state"] == "uncertain" or record["state"] == "running" and age >= 120:
-            snapshot = read_workbook(actor, now_pacific().date())
+            command = json.loads(record["command_json"])
+            if command.get("operation") in {"end-year", "restore-end-year"}:
+                from bookiebot.reports.bill_cancellation import command_source
+                snapshot = command_source(actor, command, now_pacific().date())
+            else:
+                snapshot = read_workbook(actor, now_pacific().date())
             rows = snapshot.rows.get("_BookieBot Bill Settings Log", [])
             receipt = next((r for r in rows[1:] if r and r[0] == request_id), None)
             if receipt and len(receipt) >= 3 and receipt[1] == record["fingerprint"]:
@@ -324,6 +340,38 @@ class BillCommands:
         with self.access.connect() as db:
             record = db.execute("SELECT command_json FROM app_bill_commands WHERE owner_key=? AND state!='done' ORDER BY created_at DESC", (owner,)).fetchone()
         return json.loads(record["command_json"]) if record else None
+
+    def recoverable_flow(self, owner: str):
+        """Recover already-confirmed annual stages even on another device.
+
+        Listing never submits a writer. Every continuation keeps the original
+        child body/ID and checks its own claim, source and atomic receipt.
+        """
+        with self.access.connect() as db:
+            rows = db.execute("SELECT request_id,state,result_json,command_json FROM app_bill_commands WHERE owner_key=? ORDER BY created_at DESC", (owner,)).fetchall()
+        records = {row['request_id']:row for row in rows}
+        seen = set()
+        for row in rows:
+            command, result = json.loads(row['command_json']), json.loads(row['result_json'])
+            children = result.get('historyCommands', [])
+            if command.get('operation') not in {'end','restore-end'} or row['state']!='done' or not result.get('success'):
+                continue
+            if command.get('id') in seen:
+                continue
+            seen.add(command.get('id'))
+            if not children:
+                continue
+            for index, child in enumerate(children):
+                record = records.get(child['requestId'])
+                if record and record['state']=='done':
+                    if not json.loads(record['result_json']).get('success'):
+                        break  # A definitive rejection requires a fresh review.
+                    continue
+                return {'version':1, 'stage':'history', 'configuration':command,
+                        'historyCommands':children, 'historyIndex':index,
+                        'presentation':result.get('recoveryReview'),
+                        **({'pending':{'kind':'bill','body':child}} if record else {})}
+        return None
 
     def blocked(self, owner: str) -> bool:
         with self.access.connect() as db:
@@ -381,13 +429,25 @@ class BillCommands:
             from bookiebot.reimbursements.projection import projection_lock
             with undo._RECENT_MUTATION_LOCK:
                 with projection_lock(build_reimbursement_store()):
-                    source = read_workbook(actor, now_pacific().date())
+                    if body.get("operation") in {"end-year", "restore-end-year"}:
+                        from bookiebot.reports.bill_cancellation import command_source, authorized_child
+                        authorized_child(self.access, owner, body)
+                        source = command_source(actor, body, now_pacific().date())
+                    else:
+                        source = read_workbook(actor, now_pacific().date())
                     carry = _carry_review(source, body, now_pacific().date()) if body.get("operation") == "rollover" else None
                     projection = _projection_review(source, body, now_pacific().date()) if body.get("operation") == "project" else None
                     checked_review = carry["review"] if carry else projection["review"] if projection else review(actor, body, snapshot=source)
                     if checked_review["reviewVersion"] != body.get("reviewVersion"):
                         raise BillConflict("The bill review changed. Review it again before saving.")
-                    if projection:
+                    if body.get("operation") in {"end", "end-year", "restore-end", "restore-end-year"}:
+                        from bookiebot.reports.bill_cancellation import end_batch, restore_batch
+                        build = restore_batch if body["operation"].startswith("restore") else end_batch
+                        batch, result = build(source, body, checked_review, request_id, digest, now_pacific().date())
+                        started = True
+                        batch.send()
+                        batch_committed = True
+                    elif projection:
                         batch = projection["batch"]
                         result = {"state": "done", "success": True, "detail": "This month's recurring bills are ready."}
                         batch.values(SETTINGS_LOG_TAB, 1, 1, [LOG_HEADERS], hidden=True)
@@ -444,6 +504,9 @@ class BillCommands:
             for key in list(_CACHE):
                 if key[0] == actor:
                     _CACHE.pop(key)
+        if result.get('success') and body.get('operation') in {'end','end-year','restore-end','restore-end-year'}:
+            from bookiebot.banking.service import clear_schedule_source_cache
+            clear_schedule_source_cache(actor)
         return result
 
 

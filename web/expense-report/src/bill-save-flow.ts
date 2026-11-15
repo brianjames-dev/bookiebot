@@ -3,7 +3,7 @@ import type {RecordedTransaction} from './transactions-screen'
 export type BillCurrentChange={id:string;month:string;source:RecordedTransaction;adopt:boolean;amountChanged:boolean;splitChanged:boolean;blockedReason:string;target:{amountCents:number;method:string;payerCents:number;partnerCents:number;payerName:string;partnerName:string}}
 type Command=Record<string,unknown>&{operation:string;requestId?:string}
 type Write={kind:'bill'|'transaction';body:Command;result?:any}
-export type BillSaveFlow={version:1;stage:'configuration'|'adopt'|'update'|'split'|'done';configuration?:Command;current?:BillCurrentChange;expected?:RecordedTransaction;pending?:Write;failed?:string;presentation?:unknown;rowOrder?:string[]}
+export type BillSaveFlow={version:1;stage:'configuration'|'history'|'adopt'|'update'|'split'|'done';configuration?:Command;current?:BillCurrentChange;expected?:RecordedTransaction;pending?:Write;failed?:string;presentation?:unknown;rowOrder?:string[];historyCommands?:Command[];historyIndex?:number}
 type Request=(path:string,body?:unknown)=>Promise<any>
 export const billFlowKey=(owner:string)=>`bookiebot:bill-flow:${owner.toLowerCase()}`
 export const billFlow=(configuration?:Command,current?:BillCurrentChange):BillSaveFlow=>({version:1,stage:configuration?'configuration':current?.adopt?'adopt':'update',configuration,current,expected:current?.source})
@@ -63,7 +63,18 @@ export async function runBillFlow(flow:BillSaveFlow,request:Request,persist:(flo
     if(!result.currentChange||stable(result.currentChange)!==stable(flow.current))failed('The recurring rule is saved, but the current-charge details need a fresh review.')
     flow.current=result.currentChange
    }
-   advance(flow.current?(flow.current.adopt?'adopt':'update'):'done');continue
+   if(flow.historyCommands){
+    const scope=(commands:Command[])=>commands.map(({requestId,rootRequestId,...command})=>command)
+    if(!Array.isArray(result.historyCommands)||stable(scope(result.historyCommands))!==stable(scope(flow.historyCommands)))failed('The bill is saved, but its historical corrections need a fresh review.')
+    flow.historyCommands=result.historyCommands;flow.historyIndex=0
+   }
+   advance(flow.historyCommands?.length?'history':flow.current?(flow.current.adopt?'adopt':'update'):'done');continue
+  }
+  if(flow.stage==='history'){
+   const command=flow.historyCommands?.[flow.historyIndex??0]
+   if(!command){advance('done');continue}
+   await write('bill',command)
+   flow.historyIndex=(flow.historyIndex??0)+1;advance('history');continue
   }
   const current=flow.current!,target=current.target
   if(flow.stage==='adopt'){

@@ -196,3 +196,24 @@
 @keyframes bb-bills-refresh-turn { to { transform:rotate(360deg) } }
 .bb-bills-refresh-spinning { animation:bb-bills-refresh-turn 800ms linear infinite;transform-origin:center }
 @media(prefers-reduced-motion:reduce) { .bb-bills-refresh-spinning { animation-duration:1600ms } }
+.bb-bill-end-review { min-height:0;display:flex;flex-direction:column;gap:4px }
+.bb-bill-end-total { display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0;font-size:12px;color:hsl(var(--muted-foreground)) }
+.bb-bill-end-total>strong { color:hsl(var(--primary));font-size:18px;white-space:nowrap }
+.bb-bill-end-items { min-height:0 }
+.bb-bills .bi-editor label.bb-bill-end-item { display:flex;align-items:center;gap:8px;min-height:44px;margin:0;padding:4px 0;border-bottom:1px solid hsl(var(--border) / .5) }
+.bb-bills .bi-editor .bb-bill-end-item input[type=checkbox] { appearance:auto;flex:none;width:18px;height:18px;padding:0;accent-color:hsl(var(--primary)) }
+.bb-bill-end-item>span { flex:1;min-width:0;display:flex;flex-direction:column;gap:2px }
+.bb-bill-end-item strong { font-size:13px;font-weight:500 }
+.bb-bill-end-item small { font-size:11px;color:hsl(var(--muted-foreground));overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.bb-bill-end-delta { white-space:nowrap;color:hsl(var(--foreground)) }
+.bb-bill-end-pages { display:flex;align-items:center;justify-content:center;gap:12px;font-size:12px;color:hsl(var(--muted-foreground)) }
+.bb-bill-end-pages button { display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;color:hsl(var(--primary));background:transparent }
+.bb-bill-end-pages svg { width:18px;height:18px }
+.bb-bills[data-wide=true] .bi-step-review:has(.bb-bill-end-review) { gap:4px }
+.bb-bills[data-wide=true] .bi-step-review:has(.bb-bill-end-review)>.bi-footnote { display:none }
+.bb-bills .bb-bills-undo-end { display:flex;justify-content:space-between;align-items:center;min-height:44px }
+.bb-bills .bb-bill-edit-heading>.bb-bills-undo-end { position:absolute;top:0;right:44px;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;background:transparent;color:hsl(var(--primary)) }
+.bb-bills-undo-end svg { width:18px;height:18px }
+.bb-bill-edit-heading:has(.bb-bills-undo-end) { padding-right:88px }
+.bb-bills-recovery { display:flex;flex-wrap:wrap;gap:6px }
+.bb-bills-recovery button { min-height:44px;padding:8px 12px;border:0;border-radius:10px;background:hsl(var(--primary) / .14);color:hsl(var(--primary));font-size:13px }
