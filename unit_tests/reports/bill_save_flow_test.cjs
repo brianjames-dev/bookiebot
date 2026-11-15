@@ -107,5 +107,13 @@ function server(change=current){
   assert(lines.some(l=>l.label==='Type'&&l.before==='Subscription'&&l.after==='Fixed bill'));assert.equal(billReviewLines(base,{...base,type:'fixed'},'update').length,2,'Unchanged fields do not dominate the review');
   assert(currentReviewLines(current).some(l=>l.label==='Recorded split'));count++;
  }
+ {
+  const templates=[{operation:'end-year',year:2024,reviewVersion:'year-2024'},{operation:'end-year',year:2025,reviewVersion:'year-2025'}],children=templates.map((c,i)=>({...c,rootRequestId:'end-root-original',requestId:'end-original-child-'+i})),saved=new Map(),writes=[];let lost=true,stored;
+  const request=async(url,body)=>{if(!body){const result=saved.get(url.split('/').at(-1));if(!result)throw Error('unsubmitted command');return result}writes.push(clone(body));const result={state:'done',success:true,...(body.operation==='end'?{historyCommands:children}:{})};saved.set(body.requestId,result);if(body.year===2024&&lost){lost=false;throw Error('lost historical acknowledgement')}return result};
+  const flow=billFlow({operation:'end',requestId:'end-root-original'});flow.historyCommands=templates;await assert.rejects(runBillFlow(flow,request,s=>stored=clone(s)),/lost historical/);assert.equal(stored.stage,'history');assert.equal(stored.historyIndex,0);await runBillFlow(stored,request,s=>stored=clone(s),{recover:true});assert.equal(stored.stage,'done');assert.equal(writes.length,3);assert.deepEqual(writes.map(w=>w.requestId),['end-root-original',...children.map(c=>c.requestId)],'Annual recovery never repeats the root/current month or completed historical write');count++;
+ }
+ {
+  const flow=billFlow({operation:'end'});flow.historyCommands=[{operation:'end-year',year:2025,reviewVersion:'approved'}];let writes=0;await assert.rejects(runBillFlow(flow,async()=>{writes++;return {state:'done',success:true,historyCommands:[{operation:'end-year',year:2025,reviewVersion:'different'}]}},()=>{}),/historical corrections/);assert.equal(writes,1,'A changed annual scope cannot create an unreviewed child writer');count++;
+ }
  console.log(count+' single-review flow/recovery/source/permission/storage/model cases passed');
 })().catch(error=>{console.error(error);process.exitCode=1});

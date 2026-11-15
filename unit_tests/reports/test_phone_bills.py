@@ -124,3 +124,18 @@ async def test_upstream_failure_is_not_an_empty_list_or_a_private_payload(client
     response = await client.http.get("/app/bills")
     data = await response.json()
     assert response.status == 503 and "bills" not in data and "private source data" not in str(data)
+
+
+@pytest.mark.asyncio
+async def test_confirmed_annual_flow_can_be_read_on_a_new_device_without_submitting_it(client,monkeypatch):
+    client.connect()
+    flow={'version':1,'stage':'history','configuration':{'operation':'end','id':'bill-fixture'},
+          'historyIndex':0,'historyCommands':[{'operation':'end-year','year':2025,'requestId':'approved-history-id'}]}
+    read=Mock(return_value=flow)
+    monkeypatch.setattr(client.saved.commands,'recoverable_flow',read)
+    before=len(client.saved.client.http_client.sent)
+    response=await client.http.get('/app/bills')
+    value=await response.json()
+    assert response.status==200 and value['pendingFlow']==flow
+    read.assert_called_once_with('brian')
+    assert len(client.saved.client.http_client.sent)==before,'Reading a confirmed continuation cannot submit a writer'

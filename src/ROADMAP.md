@@ -38,13 +38,15 @@ The bot could send a short alert and offer actions like confirm, delete, update,
 
 Implemented 2026-11-13: native Settings → Bills supports subscription, variable and fixed plans, effective-month edits/stops, monthly actual amounts and recurring split defaults. Hidden schedule history, canonical charge/split editing and recoverable monthly/yearly projection preserve recorded cash and prior months. Notification settings use concise labels; [implementation and usage](../docs/BILLS.md).
 
+Implemented 2026-11-14: backdated Bills cancellation reviews individual automatic charges and corrects their original monthly/annual sources, without crediting the current month. Preserve manual/bank/split payments, archive ended definitions, and provide guarded cancellation undo plus original-request annual recovery. Both DUO layouts retain one review and the accepted native editor motion. STATUS checklist 297 tracks acceptance.
+
 Bills editors share Transactions' fields, spacing, surfaces, footer buttons and native scene/review slides in both DUO poses, retaining drafts, validation and prepared reviews through folding.
 
 Variable bills use prior entered personal amounts for planning-only predictions in Bills and Projected Overview/Calendar, with a small explanation icon. Actual monthly entry replaces the estimate; Current and Transactions stay actual-only. The same read-only calculation serves Bills and reporting without storing synthetic charges.
 
 Open Bills uses a compact fixed editor above the dock with independently scrolling bill rows; closed layout retains its native spacing and places the divider after the expanded editor.
 
-Bills refinements retain native merchant logos, editable effective-month type changes, direct open-pane selection and separate guarded review/confirmation. Adopted virtual charges are removed from spreadsheet summaries atomically; nonstandard subscription categories receive physical sources. Definitively rejected preparation retries without replaying successful or unknown writers. Settings uses a connected glass Back/title capsule. Bills uses Transactions’ fold-aware pane geometry and scrollbars, a full-height right editor, concurrent compact row transitions and a slower 600 ms bill-selection crossfade; editor steps retain native slides. Add bill stays available, with refresh in the open toolbar and native pull-to-refresh when closed. Recurring settings automatically start with eligible current/future charges; after saving, already-hit current charges require an optional in-Bills canonical review. The active editor and prepared reviews remain mounted through folding.
+Bills refinements retain native merchant logos, effective-month edits, per-bill drafts and one changed-fields review with optional current-charge effects. Settings uses its connected glass Back/title capsule. Both poses retain native review slides, concurrent compact transitions, 440 ms opaque pane handoffs and folding continuity. Bills shares Transactions' fold/rail geometry and scrollbars; Add bill stays available, with open toolbar refresh and closed pull-to-refresh. Recorded occurrences, repayments, canonical claims and exact-request recovery remain authoritative.
 
 Track the dates that bills and subscriptions usually pull money from the bank, then send proactive Discord reminders.
 
