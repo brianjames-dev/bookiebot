@@ -13,6 +13,7 @@ from typing import Any
 from bookiebot.reports.accounts import Account, AccountConflict, account_store
 from bookiebot.reports.app_access import AppAccessStore, AppSession
 from bookiebot.reports.shared_bill_store import SharedBillStore
+from bookiebot.reports.shared_bill_identity import source_index, related_allocations, member_source
 from bookiebot.sheets.recurring import fingerprint
 from bookiebot.sheets.routing import get_user_config, get_discord_user_config
 
@@ -82,10 +83,8 @@ def _parts(bill: dict[str, Any], cents: int, owner: str) -> tuple[int, int]:
     return round(first * 100), round(second * 100)
 
 
-def _state(bill: dict[str, Any], link: dict[str, Any], period: str, ledger: dict[str, Any]) -> dict[str, Any]:
-    related = [a for a in ledger.get('allocations', []) if a.get('billPlanId') == link['plan_id']
-              and a.get('payerOwner') == link['payer_owner'] and a.get('partnerOwner') == link['member_owner']
-              ]
+def _state(bill: dict[str, Any], link: dict[str, Any], period: str, ledger: dict[str, Any],
+           related: list[dict[str, Any]]) -> dict[str, Any]:
     values = [a for a in related if a.get('sourceYear') == int(period[:4])
               and a.get('sourceSheetTitle') == calendar.month_name[int(period[5:])]
               and a.get('lifecycle','active')=='active']
@@ -152,6 +151,8 @@ def enrich_listing(actor: str, own: dict[str, Any], *, store: SharedBillStore | 
     sources: dict[str, Any] = {}
     ledgers: dict[str, Any] = {}
     hidden = set()
+    member_sources = source_index((b['id'], b.get('sourceLabel', '')) for b in own_bills)
+    adopted: dict[str, str] = {}
     for link in incoming:
         payer, _ = _accounts(link)
         source = sources.setdefault(payer.id, None)
@@ -162,7 +163,25 @@ def enrich_listing(actor: str, own: dict[str, Any], *, store: SharedBillStore | 
         if bill is None:
             # Fail visibly rather than silently dropping a shared obligation.
             raise AccountConflict('A shared bill’s source is unavailable. Refresh or ask its payer to check Bills.')
-        state = _state(bill, link, own['month'], ledgers[payer.id])
+        related = related_allocations(ledgers[payer.id].get('allocations', []), plan_id=link['plan_id'],
+            payer=payer.owner, member=account.owner,
+            sources=source_index((b['id'], b.get('sourceLabel', '')) for b in source['bills']),
+            starts={b['id']: b.get('sourceFrom', b['effectiveFrom']) for b in source['bills']})
+        local_id = link['member_plan_id'] or member_source(related, member_sources)
+        # An independent positive rule must remain visible until explicitly
+        # ended. Acceptance also rechecks its complete effective-dated source.
+        local = by_id.get(local_id)
+        if not link['member_plan_id'] and local:
+            from bookiebot.sheets.recurring_charges import following_month
+            if local.get('hasFutureAmount') or any(p.get('active') and p.get('amountCents') and p['effectiveUntil'] > following_month(own['month'])
+                   for p in (local, local.get('nextChange')) if p):
+                local_id = ''
+        if local_id:
+            if local_id in adopted:
+                raise AccountConflict('Different shared bills refer to the same local bill. Check their sources before continuing.')
+            adopted[local_id] = link['id']
+            hidden.add(local_id)
+        state = _state(bill, link, own['month'], ledgers[payer.id], related)
         sharing = {**_public_link(link, account), 'state': state, 'sourcePlanId': link['plan_id']}
         future = bill.get('nextChange')
         if future:
@@ -170,8 +189,6 @@ def enrich_listing(actor: str, own: dict[str, Any], *, store: SharedBillStore | 
             future = {**future,'account':'','id':'shared:'+link['id'],
                 'amountCents':_parts(future,amount,payer.owner)[1] if isinstance(amount,int) else None,
                 'prediction':None}
-        if link['status'] == 'active' and link['member_plan_id']:
-            hidden.add(link['member_plan_id'])
         # Keep the total out of the recipient's ordinary amount field. The
         # shared editor names total/share/received explicitly and has no writer.
         result['bills'].append({**bill, 'id': 'shared:' + link['id'], 'account': '', 'nextChange': future,
@@ -226,16 +243,25 @@ def review(actor: str, body: dict[str, Any], *, store: SharedBillStore | None = 
     # merely because two merchants happen to have the same display name.
     if body['action'] == 'accept':
         from bookiebot.sheets.recurring_storage import read_workbook
-        from bookiebot.sheets.bills import bill_label_key
         from bookiebot.sheets.routing import now_pacific
+        assert source is not None and link is not None
         snapshot = read_workbook(member.actor, now_pacific().date())
-        labels = {bill_label_key(a['partnerSourceLabel']) for a in snapshot.allocations
-            if a.get('payerOwner') == payer.owner and a.get('partnerOwner') == member.owner
-            and a.get('billPlanId') == plan_id and a.get('partnerSourceLabel')
-            and a.get('lifecycle', 'active') == 'active'}
-        candidates = {p.id for p in snapshot.settings.records() if bill_label_key(p.source_label) in labels}
-        member_plan_id = next(iter(candidates)) if len(candidates) == 1 else ''
+        related = related_allocations(snapshot.allocations, plan_id=plan_id, payer=payer.owner, member=member.owner,
+            sources=source_index((b['id'], b.get('sourceLabel', '')) for b in source['bills']),
+            starts={b['id']: b.get('sourceFrom', b['effectiveFrom']) for b in source['bills']})
+        member_plan_id = member_source(related, source_index((p.id, p.source_label) for p in snapshot.settings.records()))
         if member_plan_id:
+            for other in links:
+                if other['id'] == link['id'] or other['member_id'] != member.id or other['status'] != 'active':
+                    continue
+                other_local = other['member_plan_id']
+                if not other_local and other['payer_id'] == payer.id:
+                    prior = related_allocations(snapshot.allocations, plan_id=other['plan_id'], payer=payer.owner, member=member.owner,
+                        sources=source_index((b['id'], b.get('sourceLabel', '')) for b in source['bills']),
+                        starts={b['id']: b.get('sourceFrom', b['effectiveFrom']) for b in source['bills']})
+                    other_local = member_source(prior, source_index((p.id, p.source_label) for p in snapshot.settings.records()))
+                if other_local == member_plan_id:
+                    raise AccountConflict('A different shared bill already uses this local bill source.')
             from datetime import date
             current = now_pacific().date()
             following = date(current.year + (current.month == 12), current.month % 12 + 1, 1).strftime('%Y-%m')

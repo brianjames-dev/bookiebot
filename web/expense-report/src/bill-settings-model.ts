@@ -4,6 +4,12 @@ type Occurrence={available:boolean;month:string;recorded?:boolean;virtual?:boole
 
 /** A future rule must not replace the amount of a confirmed current invoice. */
 export function billListAmount(bill:Bill){
+ // A recorded shared invoice retains its original share even when a future
+ // recurring rule changes. Remaining debt is a separate value in the editor.
+ if(bill.readOnly&&bill.sharing?.state){
+  const state=bill.sharing.state,known=state.allocationIds.length>0
+  return {cents:state.purchaseTotalCents==null?null:state.memberShareCents,prediction:known?null:bill.prediction??null,known}
+ }
  const configured=bill.nextChange??bill
  if(configured.type!=='variable')return {cents:configured.amountCents,prediction:null,known:false}
  const known=bill.charge.available&&Boolean(bill.charge.recorded||(bill.charge.amountCents??0)>0)

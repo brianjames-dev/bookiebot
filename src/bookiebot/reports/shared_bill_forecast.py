@@ -12,6 +12,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from bookiebot.reports.shared_bills import build_store, account_for, _accounts
+from bookiebot.reports.shared_bill_identity import source_index, related_allocations, member_source
 from bookiebot.sheets.recurring import selected
 from bookiebot.sheets.routing import now_pacific
 
@@ -60,6 +61,8 @@ def forecast_inputs(actor: str, periods: list[str]) -> tuple[SharedBillForecast,
     from bookiebot.sheets.recurring_charges import decode_charges, CHARGES_TAB, occurrence_plan
     today = now_pacific().date()
     sources: dict[str, Any] = {}
+    member_snapshot = None
+    adopted: set[str] = set()
     result = []
     for link in links:
         payer, _ = _accounts(link)
@@ -69,10 +72,29 @@ def forecast_inputs(actor: str, periods: list[str]) -> tuple[SharedBillForecast,
         if not any(p.id == link['plan_id'] for p in source.settings.plans):
             from bookiebot.reports.accounts import AccountConflict
             raise AccountConflict('A shared bill’s source is unavailable. Refresh Bills before using its projection.')
-        related = [a for a in source.allocations if a.get('billPlanId') == link['plan_id']
-            and a.get('payerOwner') == payer.owner and a.get('partnerOwner') == viewer.owner
-        ]
+        related = related_allocations(source.allocations, plan_id=link['plan_id'], payer=payer.owner, member=viewer.owner,
+            sources=source_index((p.id, p.source_label) for p in source.settings.plans),
+            starts={identity: min(p.effective_from for p in source.settings.plans if p.id == identity)
+                    for identity in {p.id for p in source.settings.plans}})
         allocations=[a for a in related if a.get('lifecycle','active')=='active']
+        local_id = link['member_plan_id']
+        if not local_id and any(not a.get('billPlanId') and a.get('lifecycle', 'active') == 'active' for a in related):
+            # Resolve already accepted legacy memberships read-only, once per
+            # report. Never rewrite their original acceptance or money ledger.
+            if member_snapshot is None:
+                member_snapshot = read_workbook(viewer.actor, today)
+            local_id = member_source(related, source_index((p.id, p.source_label) for p in member_snapshot.settings.plans))
+            if local_id:
+                from bookiebot.sheets.recurring_charges import following_month
+                if any(p.id == local_id and p.active and p.amount_cents and p.effective_until > following_month(today.strftime('%Y-%m'))
+                       for p in member_snapshot.settings.plans):
+                    from bookiebot.reports.accounts import AccountConflict
+                    raise AccountConflict('End the separate recurring setup before using this shared bill’s projection. Existing charges stay unchanged.')
+        if local_id:
+            if local_id in adopted:
+                from bookiebot.reports.accounts import AccountConflict
+                raise AccountConflict('Different shared bills refer to the same local bill. Check their sources before continuing.')
+            adopted.add(local_id)
         for period in periods:
             plan = next((p for p in selected(list(source.settings.plans), period,include_inactive=True) if p.id == link['plan_id']), None)
             if plan is None:
@@ -117,9 +139,9 @@ def forecast_inputs(actor: str, periods: list[str]) -> tuple[SharedBillForecast,
                 target = split_preview(occurrence,total,payer.owner)['partnerCents']
                 if prediction:
                     prediction['amountCents']=target
-            labels={a['partnerSourceLabel'] for a in allocations if a.get('partnerSourceLabel')}
+            labels={a.get('partnerSourceLabel') or a.get('category','') for a in allocations}
             result.append(SharedBillForecast(link['id'],period,occurrence.name,category,when.isoformat(),target,
-                link['member_plan_id'],next(iter(labels)) if len(labels)==1 else '',prediction))
+                local_id,next(iter(labels)) if len(labels)==1 else '',prediction))
     return tuple(result)
 
 

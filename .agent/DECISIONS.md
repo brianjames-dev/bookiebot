@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-16 — Legacy shared bills resolve through canonical sources
+
+Sharing must read pre-enrollment income-row allocations that have no billPlanId/partnerSourceLabel. Require the exact payer/member owners, an original action and month, income-row provenance and one normalized immutable budget source; never infer from display name alone or override an explicit different bill ID. Use the same resolver for Bills state, local-source acceptance and recipient forecast fulfillment. A verified pending invitation occupies the existing logical bill row but grants no forecast membership until accepted. Current shared row amounts come from the original allocation, distinct from future defaults and remaining repayment.
+
+Already accepted memberships with an empty local plan resolve read-only against the same evidence; preserve their acceptance/revisions and never rewrite financial history merely to enroll old records. New explicit acceptance persists the verified local ID under existing locks/guards. Reject independent positive future plans and adoption of another active membership's local source, including a legacy inferred binding. Preserve uncertain-source visibility, void/clear handling, original invoice/autopay boundaries and November 1 actual reimbursement dates. No new bill schedule, cash ledger, financial migration or Google Sheets write is needed.
+
 ## 2026-11-15 — Google-first enrollment and provider-independent households
 
 The user chose managed storage over generated Google Sheets budgets. Verified new Google subjects create isolated database budgets through reviewed create/join setup with basic identity scopes only. Authenticate and resolve storage before financial reads. Preserve Brian/Hannah's original actor/owner/workbook/session and canonical bill/repayment identities; never attach or merge by email/name. Existing accounts can create/join the same household metadata in Settings without new financial setup or migrating records.

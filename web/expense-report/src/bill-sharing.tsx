@@ -74,9 +74,11 @@ export function BillSharingEditor({bill,ownerName,partnerName,onClose,onSaved,on
    setError(reason instanceof Error?reason.message:'Check this sharing request before trying again.')
   }}finally{flight.current=false;if(mounted.current)setBusy(false)}
  }
+ const invoiceMonth=member&&state?.allocationIds.length?state.month:bill.nextChange?configuration.effectiveFrom:null
+ const monthText=(month:string)=>new Date(month+'-01T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'})
  const summary=<div className="bb-shared-bill-content">
   <header className="sp-flow-heading bb-bill-heading"><h2>{member?'Shared bill':'Bill sharing'}</h2></header>
-  <div className="bb-shared-bill-name"><strong title={bill.name}>{bill.name}</strong><span>{membership?.status==='pending'?'Invitation pending':membership?.status==='active'?'Shared':`Share with ${partnerName}`}{bill.nextChange?` · ${new Date(configuration.effectiveFrom+'-01T12:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'})}`:''}</span></div>
+  <div className="bb-shared-bill-name"><strong title={bill.name}>{bill.name}</strong><span>{membership?.status==='pending'?'Invitation pending':membership?.status==='active'?'Shared':`Share with ${partnerName}`}{invoiceMonth?` · ${monthText(invoiceMonth)}`:''}</span></div>
   {member&&membership&&<>
    <div className="bb-shared-bill-people">{[{name:membership.payerName,label:'Pays the bill',cents:state?.purchaseTotalCents==null?null:state.payerShareCents},{name:membership.memberName,label:'Your share',cents:state?.purchaseTotalCents==null?null:state.memberShareCents}].map(person=><div key={person.name}><span className="bb-shared-bill-initial" aria-hidden="true">{person.name.slice(0,1)}</span><span><strong>{person.name}</strong><small>{person.label}</small></span><strong>{money(person.cents)}</strong></div>)}</div>
    {state&&<dl className="bb-shared-bill-facts">
@@ -85,7 +87,7 @@ export function BillSharingEditor({bill,ownerName,partnerName,onClose,onSaved,on
     <div><dt>Received by {membership.payerName}</dt><dd>{money(state.receivedCents)}</dd></div>
     <div><dt>{state.repaymentStatus==='cancelled'?'Not split this month':state.repaymentStatus==='not-billed'?state.predicted?'Estimated share':'Planned share':state.repaymentStatus==='reported'?'Awaiting confirmation':state.repaymentStatus==='cleared'?'Balance cleared':'Remaining to repay'}</dt><dd>{money(state.purchaseTotalCents==null?null:state.repaymentStatus==='not-billed'?state.memberShareCents:state.repaymentStatus==='cleared'?state.clearedCents:state.remainingCents)}</dd></div>
    </dl>}
-   <p className="bb-settings-note">Your recurring share · {configuration.type==='variable'?'Variable amount':money(configuration.amountCents)} · {configuration.cadence}</p>
+   <p className="bb-settings-note">Your recurring share{bill.nextChange?` from ${monthText(configuration.effectiveFrom)}`:''} · {configuration.type==='variable'?'Variable amount':money(configuration.amountCents)} · {configuration.cadence}</p>
   </>}
   {!member&&<p className="bb-settings-note">{membership?.status==='active'?`${partnerName} sees this bill’s schedule and repayment status.`:membership?.status==='pending'?`${partnerName} can accept this bill in their Bills screen.`:`${partnerName} can accept your invitation to see this bill’s schedule and repayments. You keep managing its recurring settings.`}</p>}
   <footer className="bi-editor-footer">
