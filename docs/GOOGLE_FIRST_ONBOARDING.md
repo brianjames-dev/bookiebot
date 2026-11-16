@@ -71,7 +71,8 @@ is not required for any managed-user flow.
   processes. No financial workbook is generated or migrated.
 - An owner/endpoint-scoped browser journal stores only an interrupted review ID.
   Reload checks its result read-only; an unresolved result retains the exact
-  confirmation and blocks new edits until checked/retried.
+  confirmation and blocks new edits until checked/retried. Recovery controls remain
+  accessible from Overview and even when the initial budget read fails.
 - Managed refreshes run at most once per twenty seconds while visible/idle and
   defer during drafts/reviews. Legacy refresh acknowledgement/backoff and phone
   preference separation remain unchanged.

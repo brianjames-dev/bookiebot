@@ -23,7 +23,7 @@ export function useReview(accountId:string,onComplete:()=>Promise<void>|void,end
       if(value.completed){remember(null);setUncertain(false);await done.current()}
       else if(value.expired){remember(null);setUncertain(false);setError('The unconfirmed review expired. Review your changes again.')}
       else {setReview(value);setUncertain(true);setError('Confirmation was interrupted. Retry safely using this same review.')}
-    }).catch(()=>{if(!abort.signal.aborted)setError('Could not recover your last confirmation. Reopen the app to retry.')}).finally(()=>{if(!abort.signal.aborted)setBusy(false)})
+    }).catch(()=>{if(!abort.signal.aborted)setError('Could not check your last confirmation. Try checking again below.')}).finally(()=>{if(!abort.signal.aborted)setBusy(false)})
     return()=>abort.abort()
   },[key,recovery])
   useAppWorkStatus({label:'Budget change',pending:busy,uncertain,dirty:Boolean(review),onDiscard:()=>{if(!uncertain)setReview(null)}})
