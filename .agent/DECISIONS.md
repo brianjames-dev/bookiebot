@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-16 — Ongoing shared bills retain one cash row and one forecast remainder
+
+After acceptance, recurring settings continue to belong to the payer's existing plan; each confirmed invoice owns its original canonical split independently of later defaults. Verify new cycles with the real configuration/amount/split/receipt/projection paths, including annual carry and idempotent request recovery, without touching live records. Each app observes the same membership cursor and canonical version changes; a background receipt can refresh both without a membership write.
+
+Payer and recipient plan IDs can differ for the same bill. Attach outstanding repayment details to the already verified recipient income-row payment in its original period, resolving its immutable source label rather than its editable display title. Do not append another purchase-context row for that same cash. Normalize equivalent old category/new source spellings before deciding a forecast label is ambiguous, so paid cash fulfills the accepted share once. Preserve actual receipt dates, payer autopay, protected historical cash and all mutation/reconciliation guards. These are read-model corrections, not a second financial writer or data migration.
+
 ## 2026-11-16 — Legacy shared bills resolve through canonical sources
 
 Sharing must read pre-enrollment income-row allocations that have no billPlanId/partnerSourceLabel. Require the exact payer/member owners, an original action and month, income-row provenance and one normalized immutable budget source; never infer from display name alone or override an explicit different bill ID. Use the same resolver for Bills state, local-source acceptance and recipient forecast fulfillment. A verified pending invitation occupies the existing logical bill row but grants no forecast membership until accepted. Current shared row amounts come from the original allocation, distinct from future defaults and remaining repayment.

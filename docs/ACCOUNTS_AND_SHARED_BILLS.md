@@ -75,6 +75,15 @@ they contribute shared future forecasts.
 
 ## Amounts and refresh
 
+After acceptance, a new invoice or future recurring split/price change updates
+both views from the payer's existing source. A recorded invoice retains its
+original split; a later recurring rule applies to subsequent eligible charges.
+Accepting or retrying a saved confirmation does not create another transaction.
+Partial repayment uses one recipient cash row with its remaining Due amount;
+the projected remainder plus paid cash equals one share. Older lowercase bill
+categories and newer company-name labels resolve to the same verified source.
+November 1 records and their receipts remain unchanged.
+
 - The payer’s hidden plan remains the source for future amount/date/split
   versions. An already recorded occurrence retains its original category,
   autopay date and canonical split, even after a recurring edit.
