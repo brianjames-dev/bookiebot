@@ -3,13 +3,14 @@ const frontend=path.resolve(__dirname,'../../web/expense-report'),req=createRequ
 const React=req('react'),Renderer=req('react-test-renderer'),{act}=Renderer,ts=req('typescript');
 global.IS_REACT_ACT_ENVIRONMENT=true;
 const listeners=new Map(),intervals=new Map(),refreshes=[],requests=[];
-let revision=0,ledgerVersion='',available=true,activeSuccess=true,id=0;
+let revision=0,ledgerVersion='',available=true,activeSuccess=true,id=0,now=0,cursorOk=true;
+const NativeDate=Date;class ClockDate extends NativeDate{static now(){return now}}
 const events={addEventListener(name,callback){const callbacks=listeners.get(name)||new Set();callbacks.add(callback);listeners.set(name,callbacks)},removeEventListener(name,callback){listeners.get(name)?.delete(callback)}};
 const window={...events,setInterval(callback,delay){assert.equal(delay,20000);intervals.set(++id,callback);return id},clearInterval(key){intervals.delete(key)}};
 const document={...events,visibilityState:'visible'},navigator={onLine:true};
 const registry={available:()=>available,async refresh(screen){refreshes.push(screen);return screen==='overview'||activeSuccess}};
-const runtime={exports:{},require:name=>name==='./page-refresh'?{usePageRefreshRegistry:()=>registry}:req(name),window,document,navigator,AbortController,
- fetch:async(url,options)=>{requests.push({url,options});return{ok:true,json:async()=>({revision,ledgerVersion})}}};
+const runtime={exports:{},require:name=>name==='./page-refresh'?{usePageRefreshRegistry:()=>registry}:req(name),window,document,navigator,AbortController,Date:ClockDate,
+ fetch:async(url,options)=>{requests.push({url,options});return{ok:cursorOk,json:async()=>({revision,ledgerVersion})}}};
 const source=ts.transpileModule(fs.readFileSync(path.join(frontend,'src/shared-account-updates.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 vm.runInNewContext(source,runtime);
 const {useSharedAccountUpdates}=runtime.exports;
@@ -28,16 +29,45 @@ const emit=name=>act(async()=>{for(const callback of listeners.get(name)||[])cal
  await act(async()=>tree.update(React.createElement(Fixture,props={...props,blocked:false})));
  assert.deepEqual(refreshes.slice(-2),['overview','transactions']);assert.equal(refreshes.length,4);
  await act(async()=>tree.update(React.createElement(Fixture,props={...props,screen:'savings',scope:'savings'})));
- assert.deepEqual(refreshes.slice(-2),['overview','savings'],'A previously mounted tab catches up independently');
- document.visibilityState='hidden';revision=3;await tick();assert.equal(refreshes.length,6);
- document.visibilityState='visible';await emit('visibilitychange');assert.equal(refreshes.length,8);
- navigator.onLine=false;revision=4;await emit('online');assert.equal(refreshes.length,8);
- navigator.onLine=true;available=false;await tick();assert.equal(refreshes.length,8);
- available=true;activeSuccess=false;await tick();assert.equal(refreshes.length,10);
- activeSuccess=true;await tick();assert.equal(refreshes.length,12,'A failed page refresh never acknowledges the new cursor');
- await tick();assert.equal(refreshes.length,12);
+ assert.equal(refreshes.at(-1),'savings');assert.equal(refreshes.length,5,'A new tab reuses the already current Overview');
+ document.visibilityState='hidden';revision=3;await tick();assert.equal(refreshes.length,5);
+ document.visibilityState='visible';await emit('visibilitychange');assert.equal(refreshes.length,7);
+ navigator.onLine=false;revision=4;await emit('online');assert.equal(refreshes.length,7);
+ navigator.onLine=true;available=false;await tick();assert.equal(refreshes.length,7);
+ available=true;activeSuccess=false;await tick();assert.equal(refreshes.length,9);
+ activeSuccess=true;await tick();await emit('focus');assert.equal(refreshes.length,9,'Failed automatic refreshes wait through focus events');
+ now+=59999;await tick();assert.equal(refreshes.length,9);
+ now++;await tick();assert.equal(refreshes.length,10,'Retry only the failed page after cooldown; Overview already succeeded');
+ await tick();assert.equal(refreshes.length,10);
  await act(async()=>tree.unmount());assert.equal(intervals.size,0);assert([...listeners.values()].every(set=>set.size===0));
  assert(requests.every(request=>request.url==='/app/account/changes'&&request.options.cache==='no-store'&&request.options.credentials==='same-origin'));
  assert(requests.at(-1).options.signal.aborted,'Owner/unmount cleanup cancels the cursor controller');
+ // Reproduce a controller's work guard clearing one React commit after its
+ // successful refresh resolves. That must not cause another Overview read.
+ refreshes.length=0;revision=5;let finish;
+ registry.refresh=async screen=>{refreshes.push(screen);if(screen==='settings')return await new Promise(resolve=>{finish=resolve});return true};
+ props={...props,screen:'settings',scope:'bills',blocked:false};
+ await act(async()=>{tree=Renderer.create(React.createElement(Fixture,props))});
+ assert.deepEqual(refreshes,['overview','settings']);
+ await act(async()=>tree.update(React.createElement(Fixture,props={...props,blocked:true})));
+ await act(async()=>finish(true));
+ await act(async()=>tree.update(React.createElement(Fixture,props={...props,blocked:false})));
+ await tick();assert.deepEqual(refreshes,['overview','settings'],'Settling the refresh’s own work guard cannot refresh again');
+ await act(async()=>tree.unmount());
+ refreshes.length=0;registry.refresh=async screen=>{refreshes.push(screen);return true};
+ props={...props,scope:'settings'};
+ await act(async()=>{tree=Renderer.create(React.createElement(Fixture,props))});
+ assert.deepEqual(refreshes,['overview'],'Root notification/widget preferences are not invalidated by a financial cursor');
+ await act(async()=>tree.unmount());
+ refreshes.length=0;cursorOk=false;props={...props,screen:'overview',scope:'overview'};
+ const readsBefore=requests.length;
+ await act(async()=>{tree=Renderer.create(React.createElement(Fixture,props))});
+ await emit('focus');assert.equal(requests.length,readsBefore+1);
+ now+=60000;await tick();assert.equal(requests.length,readsBefore+2);
+ now+=119999;await tick();assert.equal(requests.length,readsBefore+2,'Repeated failures back off for two minutes');
+ now++;cursorOk=true;await tick();assert.deepEqual(refreshes,['overview']);
+ revision++;cursorOk=false;await tick();now+=60000;cursorOk=true;await tick();
+ assert.deepEqual(refreshes,['overview','overview'],'A successful recovery resets the automatic retry delay');
+ await act(async()=>tree.unmount());
  console.log('Shared account cursor refresh, draft guards, per-screen catch-up and cleanup pass');
 })().catch(error=>{console.error(error);process.exitCode=1});
