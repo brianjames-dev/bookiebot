@@ -109,9 +109,11 @@ async def test_unlinked_google_subject_with_same_email_cannot_select_workbook(ph
     assert (await phone.client.post('/app/auth/google/start',json={'action':'link'},headers=HEADERS)).status==401
     query=await start(phone,'login')
     result=await callback(phone,query)
-    assert result.headers['Location'].endswith('auth=link-required')
-    assert 'bb_phone_local' not in result.cookies
-    assert (await phone.client.get('/app/account')).status==401
+    assert result.headers['Location'].endswith('auth=signed-in')
+    session=phone.access.get_session(result.cookies['bb_phone_local'].value)
+    assert session.owner_key.startswith('managed:') and session.actor_key.startswith('app:')
+    assert await phone_app._session(SimpleNamespace(cookies={'bb_phone_local':result.cookies['bb_phone_local'].value})) is None
+    assert (await phone.client.get('/app/account')).status==200
 
 
 @pytest.mark.asyncio

@@ -1,7 +1,8 @@
 """App-owned identities; existing workbook/actor keys remain financial adapters.
 
-An account is created only from a validated existing phone session. Google
-subjects are linked explicitly, never inferred from a matching email/name.
+Existing owners are adopted only from validated phone sessions. Verified new
+Google subjects enroll into separate managed accounts; existing financial
+owners are never inferred from a matching email or name.
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import re
 import secrets
 import time
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from bookiebot.reports.app_access import (
     AppAccessStore, AppSession, PostgresAppAccessStore, SESSION_TTL_SECONDS,
@@ -86,6 +87,13 @@ class AccountStore:
         return {'id': account.id, 'name': account.name, 'google': {'connected': google is not None,
                 'email': str(google['email']) if google else None}}
 
+    def from_session(self, session: AppSession) -> Account | None:
+        """Resolve only an already persisted account; never infer an owner."""
+        with self.access.connect() as db:
+            row = db.execute('SELECT * FROM app_users WHERE owner_key = ? AND actor_key = ?',
+                             (session.owner_key, session.actor_key)).fetchone()
+        return _account(row) if row else None
+
     def start(self, browser: str, *, account: Account | None = None, session_token: str = '') -> dict[str, str]:
         state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
         with self.access.connect(write=True) as db:
@@ -113,12 +121,12 @@ class AccountStore:
             return dict(row)
 
     def complete(self, flow: dict[str, Any], *, subject: str, email: str, session_token: str,
-                 validate_actor: Any) -> tuple[str, Account]:
+                 validate_actor: Any, enroll: bool = False, name: str = '') -> tuple[str, Account]:
         """Bind the verified subject and rotate the first-party session atomically.
 
         A linking callback must still hold the initiating, unrevoked session.
-        Email is display metadata only. Unlinked Google users cannot enroll or
-        select an existing workbook through the login endpoint.
+        Email is display metadata only. Enrollment creates a distinct managed
+        account and never selects or adopts an existing workbook.
         """
         with self.access.connect(write=True) as db:
             if isinstance(self.access, PostgresAppAccessStore):
@@ -146,12 +154,25 @@ class AccountStore:
                     (subject, row['user_id'], email, _now()))
             else:
                 if identity is None:
-                    raise AccountConflict('Link Google from Settings on your connected BookieBot app first.')
+                    if not enroll:
+                        raise AccountConflict('Link Google from Settings on your connected BookieBot app first.')
+                    identity_id = uuid4().hex
+                    display = ' '.join(name.split())[:60] or 'Your budget'
+                    db.execute('''INSERT INTO app_users (user_id, owner_key, actor_key, display_name, created_at)
+                        VALUES (?, ?, ?, ?, ?)''', (identity_id, 'managed:' + identity_id,
+                            'app:' + identity_id, display, _now()))
+                    db.execute('''INSERT INTO app_user_identities (provider, subject, user_id, email, created_at)
+                        VALUES ('google', ?, ?, ?, ?)''', (subject, identity_id, email, _now()))
+                    identity = {'user_id': identity_id}
                 row = db.execute('SELECT * FROM app_users WHERE user_id = ?', (identity['user_id'],)).fetchone()
                 if row is None:
                     raise AccountConflict('This BookieBot account is unavailable.')
             account = _account(row)
-            validate_actor(account.actor, account.owner)
+            if account.owner.startswith('managed:'):
+                if account.owner != 'managed:' + account.id or account.actor != 'app:' + account.id:
+                    raise AccountConflict('This BookieBot account is unavailable.')
+            else:
+                validate_actor(account.actor, account.owner)
             token = secrets.token_urlsafe(32)
             db.execute('''INSERT INTO app_phone_sessions (token_hash, actor_key, owner_key, expires_at)
                 VALUES (?, ?, ?, ?)''', (_hash(token), account.actor, account.owner, _now() + SESSION_TTL_SECONDS))

@@ -1,5 +1,7 @@
 # BookieBot Agent Roadmap
 
+2026-11-15: Google-first enrollment, provider-independent reviewed household membership and managed database budget setup are implemented. Existing connected workbooks remain authoritative for their owners. Extend the managed financial adapter for recurring schedules, bank/widget integrations and canonical mixed-provider expense sharing before exposing those workflows; never fork existing shared debt. See `docs/GOOGLE_FIRST_ONBOARDING.md`.
+
 The user-approved expense dashboard expansion is tracked in [Dashboard Enhancement Roadmap](../.agent/DASHBOARD_ROADMAP.md). Its ten improvements ship in seven separate passes; `.agent/STATUS.md` identifies the active pass. This includes reimbursement carry-forward, linked drilldowns, historical comparisons, explainable totals, device preferences/update notices, in-app read-only questions, optional notifications, and long-term savings goals.
 
 BookieBot is already strong as a single-turn financial operator: it can parse natural language, log and query Google Sheets, and manage recent transactions through update, delete, move, and undo flows.

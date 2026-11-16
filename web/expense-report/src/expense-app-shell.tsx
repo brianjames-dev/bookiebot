@@ -23,6 +23,7 @@ import { AppUpdatePrompt } from "./app-update-prompt"
 import { AmountAppearanceBoundary, AmountAppearanceSettings } from "./amount-appearance"
 import { useAppWorkGuard } from "./app-work-guard"
 import { AccountIdentity } from "./account-settings"
+import { HouseholdSettings } from "./household-settings"
 import { useSharedAccountUpdates } from "./shared-account-updates"
 import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
 import { TransactionsScreen } from "./transactions-screen"
@@ -38,11 +39,12 @@ interface ExpenseAppShellProps {
   avatarUrl: string; initialVersion: string; signOut: () => void; signingOut: boolean
   monthlyReady?: boolean; questionMonth?: string
   onRefresh?: () => Promise<boolean>; reportBusy?: boolean
+  householdEnabled?: boolean
 }
 export function ExpenseAppShell(props: ExpenseAppShellProps) {
   return <AmountAppearanceBoundary owner={props.report?.ownerName ?? props.ownerName ?? ""} enabled={Boolean(props.report)}><PageRefreshProvider><ExpenseAppShellContent {...props} /></PageRefreshProvider></AmountAppearanceBoundary>
 }
-function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false }: ExpenseAppShellProps) {
+function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, monthControl, comparison, avatarUrl, initialVersion, signOut, signingOut, monthlyReady = true, questionMonth, onRefresh, reportBusy = false, householdEnabled = false }: ExpenseAppShellProps) {
   const { theme, toggleTheme } = useExpenseReportTheme()
   const reconciliation = useReconciliation(Boolean(report))
   const owner = report?.ownerName ?? ownerName
@@ -285,6 +287,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}
           <button type="button" className="bb-settings-action bb-account-action bb-account-sign-out" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}><span>{signingOut ? "Signing out…" : "Sign out"}</span><LogOut aria-hidden="true"/></button>
         </section>
+        {householdEnabled&&<HouseholdSettings active={screen==='settings'&&!configurationOpen&&!widgetGuideOpen}/>}
         <section className="bb-settings-section" aria-labelledby="bb-updates-title"><h2 id="bb-updates-title">About &amp; updates</h2>
           <div className="bb-setting-row"><span>BookieBot</span><span className="bb-app-version">{initialVersion ? `Version ${initialVersion.slice(0, 8)}` : "Web app"}</span></div>
           {availableVersion && <button type="button" className="bb-settings-action" disabled={guard.pending || guard.uncertain} onClick={() => window.dispatchEvent(new CustomEvent("bookiebot:request-app-update"))}>Update available · Update now</button>}

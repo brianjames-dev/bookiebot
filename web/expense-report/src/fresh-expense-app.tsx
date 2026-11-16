@@ -97,6 +97,7 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
       questionMonth={state.selectedMonth ?? history.catalog?.currentMonth ?? reportMonth}
       controls={controls}
       initialVersion={config.version ?? ""}
+      householdEnabled={config.householdEnabled}
       avatarUrl={avatarUrl}
       signOut={signOut} signingOut={state.signingOut}
       monthControl={monthControl}

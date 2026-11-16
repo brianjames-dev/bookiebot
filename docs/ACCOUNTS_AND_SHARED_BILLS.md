@@ -119,11 +119,14 @@ BookieBot continues using its existing server-side Sheets integration.
 
 For public release, publish the OAuth app and complete any applicable branding
 and verification. Google exempts our basic identity scopes from Testing’s usual
-allowlist and seven-day authorization restrictions; BookieBot independently
-requires an existing linked account. See [Google’s audience rules](https://support.google.com/cloud/answer/15549945). This release
-supports the existing configured financial pair. Public household enrollment,
-new workbook provisioning, provider management and a complete Discord-independent
-financial-adapter migration are separate follow-ups.
+allowlist and seven-day authorization restrictions. See [Google’s audience rules](https://support.google.com/cloud/answer/15549945).
+Existing workbook access requires its explicitly linked account. New verified
+Google subjects instead get separate managed-budget onboarding, with no workbook
+selection or email matching. Both providers can create/join household metadata;
+Brian/Hannah keep their existing financial sources and sharing. See
+[Google-first onboarding](GOOGLE_FIRST_ONBOARDING.md) for managed-budget features,
+provider boundaries and remaining financial-adapter work. Optional Discord plugin
+conversion and complete provider feature parity remain follow-ups.
 
 ## Manual acceptance
 

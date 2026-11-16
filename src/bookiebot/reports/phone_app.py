@@ -228,7 +228,7 @@ def _page_head() -> str:
 
 
 async def _expense_app(_request: web.Request) -> web.Response:
-    config = json.dumps({"reportUrl": "/app/expenses/data", "logoutUrl": "/app/logout", "ownerName": "BookieBot", "version": frontend_version()})
+    config = json.dumps({"reportUrl": "/app/expenses/data", "logoutUrl": "/app/logout", "ownerName": "BookieBot", "version": frontend_version(), "onboardingUrl": "/app/bootstrap", "householdEnabled": True})
     html = f'''<!doctype html><html lang="en"><head>{_page_head()}</head><body>
 <div id="bookiebot-expense-report-root"></div><noscript>Please enable JavaScript to open BookieBot.</noscript>
 <script id="bookiebot-expense-app-config" type="application/json">{config}</script>
@@ -292,6 +292,8 @@ async def _asset(request: web.Request) -> web.StreamResponse:
 
 
 def register_phone_app_routes(app: web.Application) -> None:
+    from bookiebot.reports.phone_onboarding import register_onboarding_routes
+    register_onboarding_routes(app)
     from bookiebot.reports.phone_accounts import register_phone_account_routes
     register_phone_account_routes(app)
     from bookiebot.reports.phone_shared_bills import register_shared_bill_routes

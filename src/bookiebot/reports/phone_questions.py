@@ -25,6 +25,12 @@ async def _ask(request: web.Request) -> web.Response:
     active: set[str] = request.app[_STATE]['active']
     try:
         session = await _session(request)
+        managed_account = None
+        if session is None:
+            from bookiebot.reports.phone_accounts import account_session
+            identity = await account_session(request)
+            if identity is not None and identity[1].owner.startswith('managed:'):
+                session, managed_account = identity
         if session is None:
             return _json({'error':'Reconnect using /expense_app in Discord.'}, status=401)
         if request.content_length and request.content_length > 12000:
@@ -58,13 +64,24 @@ async def _ask(request: web.Request) -> web.Response:
         owner = session.owner_key
         active.add(owner)
         recent.append(now)
-        month = await available_phone_month(request, session, raw_month)
-        payload = await request.app[_REPORT_BUILDS].data(phone_report_payload(session, month))
+        if managed_account:
+            from bookiebot.reports.managed_budget import managed_store, _today
+            from bookiebot.reports.phone_accounts import _store
+            payload = (await asyncio.to_thread(lambda: managed_store(_store()).state(managed_account, raw_month or _today().strftime('%Y-%m'))))['report']
+        else:
+            month = await available_phone_month(request, session, raw_month)
+            payload = await request.app[_REPORT_BUILDS].data(phone_report_payload(session, month))
+        async def still_authorized():
+            if managed_account:
+                from bookiebot.reports.phone_accounts import account_session
+                identity = await account_session(request)
+                return identity is not None and identity[0] == session
+            return await _session(request) == session
         # Read authorization again before sharing a report with the existing AI provider.
-        if await _session(request) != session:
+        if not await still_authorized():
             return _json({'error':'Reconnect using /expense_app in Discord.'}, status=401)
         result = await answer_report_question(question.strip(), payload, mode)
-        if await _session(request) != session:
+        if not await still_authorized():
             return _json({'error':'Reconnect using /expense_app in Discord.'}, status=401)
         return _json(result)
     except UnavailableReportMonthError as exc:
