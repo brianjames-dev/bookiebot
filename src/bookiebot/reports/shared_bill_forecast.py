@@ -13,6 +13,7 @@ from typing import Any
 
 from bookiebot.reports.shared_bills import build_store, account_for, _accounts
 from bookiebot.reports.shared_bill_identity import source_index, related_allocations, member_source
+from bookiebot.sheets.bills import bill_label_key
 from bookiebot.sheets.recurring import selected
 from bookiebot.sheets.routing import now_pacific
 
@@ -139,14 +140,16 @@ def forecast_inputs(actor: str, periods: list[str]) -> tuple[SharedBillForecast,
                 target = split_preview(occurrence,total,payer.owner)['partnerCents']
                 if prediction:
                     prediction['amountCents']=target
-            labels={a.get('partnerSourceLabel') or a.get('category','') for a in allocations}
+            # Legacy categories (water/pg&e) and newer source labels
+            # (Water/PG&E) name the same verified bill, not ambiguous sources.
+            labels={bill_label_key(label):label for a in allocations
+                    if (label := a.get('partnerSourceLabel') or a.get('category',''))}
             result.append(SharedBillForecast(link['id'],period,occurrence.name,category,when.isoformat(),target,
-                local_id,next(iter(labels)) if len(labels)==1 else '',prediction))
+                local_id,next(iter(labels.values())) if len(labels)==1 else '',prediction))
     return tuple(result)
 
 
 def remaining_forecast(value: SharedBillForecast, payments: list[Any], source_labels: str | set[str]) -> int:
-    from bookiebot.sheets.bills import bill_label_key
     labels = {source_labels} if isinstance(source_labels, str) else source_labels
     keys = {bill_label_key(label) for label in labels if label}
     recorded = sum(round(p.amount * 100) for p in payments if bill_label_key(p.label) in keys)

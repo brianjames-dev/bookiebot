@@ -407,8 +407,12 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
             context = purchase_context(allocation, details)
             if not context or int(context["month"][:4]) not in years or month not in {"all", context["month"]}:
                 continue
+            # Each owner can have its own bill-plan ID. Reuse the existing
+            # verified repayment row by its stable budget source, not title.
             recipient = next((row for row in result if allocation["sourceWorksheet"] == "income"
-                              and row["month"] == context["month"] and (row.get("billPlanId") == allocation.get("billPlanId") if allocation.get("billPlanId") else row["category"] == allocation["category"])
+                              and row["month"] == context["month"]
+                              and ((allocation.get("billPlanId") and row.get("billPlanId") == allocation["billPlanId"])
+                                   or bill_label_key(row["category"]) == bill_label_key(allocation.get("partnerSourceLabel") or allocation["category"]))
                               and row.get("notice", "").startswith("This is a linked repayment.")), None)
             if recipient is not None:
                 attach_repayment(recipient, details)
