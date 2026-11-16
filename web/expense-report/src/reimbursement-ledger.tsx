@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { ratioShareCents } from "./split-ratio"
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
@@ -253,7 +254,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
       {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
-    {!snapshot && !error && <p role="status">Loading the matched shared payment…</p>}
+    {!snapshot && !error && <ReportLoading label="Loading the matched shared payment…"/>}
     {snapshot && <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} disabled={busy || uncertain || refreshing}
       run={run} refresh={() => void load()} />}
     <button type="button" className="bb-reconcile-action" disabled={busy || uncertain} onClick={onClose}>Back to reconciliation</button>
@@ -264,7 +265,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
-      {!snapshot && !error && <p className="bb-ledger-note" role="status">Loading reimbursements…</p>}
+      {!snapshot && !error && <ReportLoading label="Loading reimbursements…"/>}
       {snapshot && <LedgerContents snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run}
         refresh={() => void load()} refreshing={refreshing} />}
     </CardContent>

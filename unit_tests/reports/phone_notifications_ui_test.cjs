@@ -42,7 +42,7 @@ const html = renderToStaticMarkup(React.createElement(PhoneNotifications))
 const embeddedHtml = renderToStaticMarkup(React.createElement(PhoneNotifications, { embedded: true }))
 assert.ok(embeddedHtml.includes('aria-label="Phone notifications"'))
 assert.ok(!embeddedHtml.includes('aria-expanded='), "Settings embeds notifications without another collapsed heading")
-assert.ok(embeddedHtml.includes('role="status"') && embeddedHtml.includes("Loading…"), "Embedded settings retains device status")
+assert.ok(embeddedHtml.includes('role="status"') && embeddedHtml.includes('bb-report-loading-spinner') && embeddedHtml.includes('Loading notification settings…'), "Embedded settings retains an accessible device status with the shared compact spinner")
 assert.equal([...embeddedHtml.matchAll(/role="switch"/g)].length, 3)
 assert.ok(embeddedHtml.includes("Weekly summary · Mondays") && embeddedHtml.includes("Payment reminders · day before"));
 assert.ok(embeddedHtml.includes("Show Lock Screen amounts"));
@@ -258,7 +258,7 @@ async function lifecycleContracts() {
   state = resetBrowser({ fetch: () => loading.promise })
   tree = await mount()
   assert.ok(tree.root.findAllByProps({ role: "switch" }).every(node => node.props.disabled), "Loading cannot overwrite choices edited before settings arrived")
-  assert.equal(tree.root.findByProps({ className: "bb-notification-state" }).children.join(""), "Loading…")
+  assert.equal(tree.root.findByProps({ className: "bb-notification-state" }).findByProps({className:'sr-only'}).children.join(''), 'Loading notification settings…')
   await unmount(tree)
 
   state = resetBrowser({ subscribe: () => Promise.reject(Object.assign(Error("Denied"), { name: "NotAllowedError" })) })

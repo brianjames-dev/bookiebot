@@ -5,6 +5,10 @@ const vm = require('node:vm')
 const {createRequire} = require('node:module')
 const req = createRequire(path.resolve('web/expense-report/package.json'))
 const React = req('react'), renderer = req('react-test-renderer'), ts = req('typescript')
+const loadingRuntime = {exports: {}, require: req}
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/report-loading.tsx', 'utf8'), {
+  compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX},
+}).outputText, loadingRuntime)
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const requests = [], timers = new Map(), workHistory = [], copied = []
 let serial = 0, tree, owner = 'Brian', clipboardFailure = false, guides = 0
@@ -19,7 +23,7 @@ const runtime = {exports: {}, URL, Date, Error, AbortController,
   window: {location: {origin: 'https://bookiebot.example'}, setTimeout: (fn,ms)=>{timers.set(++serial,{fn,ms});return serial}, clearTimeout: id=>timers.delete(id)},
   navigator: {clipboard: {writeText: async value=>{if(clipboardFailure)throw Error('Clipboard unavailable'); copied.push(value)}}},
   fetch: (url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),
-  require: name => name.endsWith('.css') ? {} : name === './components/ui/motion' ? {
+  require: name => name === './report-loading' ? loadingRuntime.exports : name.endsWith('.css') ? {} : name === './components/ui/motion' ? {
     CollapsibleContent: ({open,id,children})=>React.createElement('div', {id,'data-open':open},children),
   } : name === './components/ui/report-menu' ? menuRuntime.exports : name === './page-refresh' ? {usePageRefresh:()=>false} : name === './app-work-guard' ? {useAppWorkStatus: value=>{workHistory.push(value);return value=>workHistory.push(value)}} : req(name),
 }
@@ -43,11 +47,13 @@ const lastWork = ()=>workHistory.at(-1)
 ;(async()=>{
   await renderer.act(async()=>{tree=renderer.create(component())})
   assert.equal(requests.length,1,'Mount reads settings without creating credentials')
+  assert.equal(tree.root.findAllByProps({className:'bb-pull-spinner bb-report-loading-spinner'}).length,1,'Pending widget settings use the actual shared spinner')
   assert.equal(latestRequest().options.method,'GET')
   const fetchOptions = latestRequest().options
   assert.equal(fetchOptions.headers['X-BookieBot-App'],'1')
   for(const [key,value]of Object.entries({credentials:'same-origin',mode:'same-origin',referrerPolicy:'same-origin',cache:'no-store',redirect:'error'}))assert.equal(fetchOptions[key],value)
   await respond(latestRequest(),base([]))
+  assert.equal(tree.root.findAllByProps({className:'bb-pull-spinner bb-report-loading-spinner'}).length,0,'Loaded widget settings remove their pending indicator')
   assert.match(rendered(),/No widgets paired yet/)
   assert.equal(lastWork().dirty,false)
   await click(button('Pair a widget'))

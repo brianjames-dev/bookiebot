@@ -61,6 +61,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/*',async route=>{
   const request=route.request(),url=new URL(request.url()),name=url.pathname;
+  if(options.request&&await options.request(route))return;
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills/check-in'))return options.checkin?options.checkin(route):route.fulfill({json:{day:new Date().toISOString().slice(0,10),bills:[],claimed:false}});
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/transactions')&&options.transactions)return options.transactions(route);
   if(url.origin==='https://bookie.test'&&name.startsWith('/app/bills')&&options.bills)return options.bills(route);
@@ -89,7 +90,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   else {unexpected.push(request.method()+' '+url);return route.fulfill({status:404,json:{error:'Unknown fixture'}});}
   return route.fulfill({json:value});
  });
- await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':''));await page.locator('.bb-metrics-grid').waitFor();await page.waitForTimeout(200);
+ await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':'')+(options.initialHash||''));await page.locator('.bb-metrics-grid').waitFor({state:options.initialHash?'attached':'visible'});await page.waitForTimeout(200);
  return {page,errors,unexpected,comparison};
 }
 async function geometry(page){return page.evaluate(()=>{

@@ -3,6 +3,10 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const {createRequire} = require('node:module')
 const req = createRequire(path.resolve('web/expense-report/package.json'))
 const React = req('react'), {create, act} = req('react-test-renderer'), ts = req('typescript')
+const loadingRuntime={exports:{},require:req}
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('web/expense-report/src/report-loading.tsx','utf8'),{
+  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX},
+}).outputText,loadingRuntime)
 global.IS_REACT_ACT_ENVIRONMENT = true
 const requests=[], timers=new Map(), copied=[]
 let serial=0, tree, back=0, pair=0, failCopy=false, deferredCopy=null
@@ -17,7 +21,7 @@ const runtime={exports:{},AbortController,
   window:{setTimeout(fn){timers.set(++serial,fn);return serial},clearTimeout(id){timers.delete(id)}},
   navigator:{clipboard:{writeText:async value=>{if(deferredCopy)return deferredCopy(value);if(failCopy)throw Error('Denied');copied.push(value)}}},
   fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),
-  require:name=>name.endsWith('.css')?{}:name==='./components/ui/motion'?motionRuntime.exports:req(name),
+  require:name=>name==='./report-loading'?loadingRuntime.exports:name.endsWith('.css')?{}:name==='./components/ui/motion'?motionRuntime.exports:req(name),
 }
 vm.runInNewContext(source,runtime)
 const text=node=>typeof node==='string'?node:Array.isArray(node)?node.map(text).join(''):node?.children?.map(text).join('')||''
@@ -38,6 +42,7 @@ const respondGoals=(request,goals,status=200)=>act(async()=>request.resolve({ok:
   assert.equal(requests[0].options.credentials,'omit','Public source fetch needs no account credentials')
   assert.equal(requests[0].options.redirect,'error')
   assert.ok(button('Loading script…').props.disabled)
+  assert.equal(button('Loading script…').findAllByProps({className:'bb-pull-spinner bb-report-loading-spinner'}).length,1,'The script action uses a compact spinner while its original read is pending')
   assert.equal(tree.root.findAllByType('button').filter(node=>text(node)==='Back to Settings').length,1,'The contextual glass Back is owned by the app shell')
   assert.equal(tree.root.findAllByType('ol').length,1)
   assert.equal(tree.root.findByType('ol').findAllByType('li').length,3,'Setup remains three short steps')

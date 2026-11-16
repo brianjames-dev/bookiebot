@@ -1,5 +1,7 @@
 # BookieBot on your iPhone
 
+App screens and panels use the same animated loading ring as Overview, including the initial Transactions list and its graph. Small controls use a compact version. Status descriptions remain available to screen readers, and Reduce Motion stops the rotation. Refresh keeps loaded content visible; read errors retain their message and retry action.
+
 New users open [BookieBot](https://bookiebot-production.up.railway.app/app/expenses),
 choose **Continue with Google**, create or join a household, review their budget
 settings, then add the app to the Home Screen using Safari's Share menu. Discord

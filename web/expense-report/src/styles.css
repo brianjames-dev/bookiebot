@@ -1904,6 +1904,9 @@ button.bb-left-categories { cursor: pointer; }
 .bb-report-loading { display: grid; place-items: center; min-height: 160px; color: hsl(var(--primary)); }
 .bb-report-loading-spinner { position: relative; animation: bb-pull-spin 850ms linear infinite; }
 .bb-report-loading-spinner svg { width: 52px; height: 52px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.bb-report-loading[data-compact] { display: inline-grid; min-height: 20px; width: 20px; vertical-align: middle; }
+.bb-report-loading[data-compact] .bb-report-loading-spinner,
+.bb-report-loading[data-compact] .bb-report-loading-spinner svg { width: 20px; height: 20px; }
 @media (max-width: 520px) { .bb-app-opening { margin-top: 28px; } }
 @media (prefers-reduced-motion: reduce) { .bb-report-loading-spinner { animation: none; } }
 

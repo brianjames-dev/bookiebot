@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useRef, useState } from "react"
 import { ArrowLeft, ChevronDown } from "lucide-react"
 import { CollapsibleContent } from "./components/ui/motion"
@@ -96,7 +97,7 @@ function WidgetCustomizer({ open }: { open: boolean }) {
         if (!event.target.value || goals.some(goal => goal.id === event.target.value)) setGoalId(event.target.value)
       }}><option value="">First active goal</option>{goals.map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label>}
     </div>
-    {type === "savings" && goalsLoading && <p className="bb-settings-note" role="status">Loading goals…</p>}
+    {type === "savings" && goalsLoading && <ReportLoading compact label="Loading goals…"/>}
     {type === "savings" && goalsError && <p className="bb-widget-error" role="alert">{goalsError} <button type="button" className="bb-settings-action" onClick={() => setAttempt(value => value + 1)}>Retry goals</button></p>}
     {type === "savings" && goalsLoaded && !goalsLoading && goals.length === 0 && <p className="bb-settings-note">No active goals yet. Add one in Savings.</p>}
     <div className="bb-widget-parameter-copy">
@@ -157,7 +158,7 @@ export function WidgetSetupGuide({ onBack, onPair }: { onBack: () => void; onPai
 
     <ol className="bb-widget-guide-steps">
       <li><h2>Copy to Scriptable</h2><p>Install <a href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noreferrer">Scriptable</a>, tap <strong>+</strong>, paste the script and name it <strong>BookieBot</strong>.</p>
-        <div className="bb-widget-actions"><button type="button" className="bb-toolbar-button" disabled={loading || !source} onClick={() => void copyScript()}>{loading ? "Loading script…" : "Copy script"}</button></div>
+        <div className="bb-widget-actions"><button type="button" className="bb-toolbar-button" aria-label={loading ? "Loading script…" : undefined} aria-busy={loading} disabled={loading || !source} onClick={() => void copyScript()}>{loading ? <ReportLoading compact label="Loading script…"/> : "Copy script"}</button></div>
         <p className="bb-settings-note">Already installed? Replace the code in the same script.</p>
         {error && <p className="bb-widget-error" role="alert">{error} <button type="button" className="bb-settings-action" onClick={() => setAttempt(value => value + 1)}>Try again</button></p>}
         {message && <p className="bb-settings-note" role="status">{message}</p>}

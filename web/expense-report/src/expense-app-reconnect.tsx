@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useRef, useState } from "react"
 
 import { ExpenseAppPairing, initialExpenseAppPairingState } from "./expense-app-session"
@@ -74,9 +75,9 @@ export function ExpenseAppReconnect() {
             }}>Use another link</button>
           </div>
         </>}
-        <p id={`${inputId}-status`} className="bb-app-reconnect-status" role="status" aria-live="polite" aria-atomic="true">
-          {state.message || (state.phase === "checking" ? "Checking your setup link…" : state.phase === "connecting" || state.phase === "connected" ? "Connecting this app…" : "")}
-        </p>
+        <div id={`${inputId}-status`} className="bb-app-reconnect-status" aria-live="polite" aria-atomic="true">
+          {busy ? <ReportLoading compact label={state.phase === "checking" ? "Checking your setup link…" : "Connecting this app…"}/> : state.message}
+        </div>
       </form>
     </section>
   )

@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useEffect, useRef, useState } from "react"
 import { AnimatedDisclosure } from "./components/ui/motion"
 import { useAppWorkStatus } from "./app-work-guard"
@@ -39,12 +40,11 @@ export function ReportQuestions({ month, mode, onShowSource, embedded = false }:
         <form onSubmit={(event) => { event.preventDefault(); ask() }}>
           <label>Your question<textarea rows={3} maxLength={2000} value={question} disabled={busy}
             onChange={(event) => setDraft({ scope, text: event.target.value })} placeholder="What should I pay attention to this month?" /></label>
-          <div className="bb-question-actions"><button type="submit" disabled={busy || !question.trim()}>{busy ? "Reading your report…" : "Ask BookieBot"}</button>
+          <div className="bb-question-actions"><button type="submit" aria-label={busy ? "Reading your report…" : undefined} aria-busy={busy} disabled={busy || !question.trim()}>{busy ? <ReportLoading compact label="Reading your report…"/> : "Ask BookieBot"}</button>
             <span>{question.length.toLocaleString()} / 2,000</span>
             {(state.answer || state.phase === "error" || busy) && <button type="button" onClick={() => client.current?.clear()}>{busy ? "Cancel" : "Clear answer"}</button>}
           </div>
         </form>
-        {busy && <p role="status" className="bb-question-note">Checking the selected report. This can take a moment.</p>}
         {state.phase === "error" && <div className="bb-question-error" role="alert"><p>{state.error}</p><button type="button" disabled={!question.trim()} onClick={ask}>Try again</button></div>}
         {state.answer && <div className="bb-question-answer" aria-live="polite"><p className="bb-question-answer-text">{state.answer.answer}</p>
           {!!state.answer.sources.length && <div className="bb-question-sources"><span>Based on</span>{state.answer.sources.map((source) => onShowSource

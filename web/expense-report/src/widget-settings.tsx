@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { ReportMenu } from "./components/ui/report-menu"
@@ -169,7 +170,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
   const canCreate = Boolean(settings && settings.connections.length < 5 && !busy && !needsRefresh && !pairing)
   return <section className="bb-settings-section bb-widget-settings" aria-labelledby={`${id}-title`}>
     <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2>{!pageRefresh && <button className="bb-icon-button bb-widget-refresh" type="button" disabled={busy} aria-busy={busy} onClick={() => void run()} aria-label="Refresh widgets" title="Refresh widgets"><RefreshCw aria-hidden="true" /></button>}</div>
-    {loading && <p className="bb-settings-note" role="status">Loading widgets…</p>}
+    {loading && <ReportLoading label="Loading widgets…"/>}
     {settings && <div className="bb-widget-connections">
       {settings.connections.length === 0 && <p className="bb-settings-note bb-widget-empty">No widgets paired yet.</p>}
       {settings.connections.map(connection => <div className="bb-widget-connection" key={connection.id}>
