@@ -20,6 +20,8 @@ import {usePageRefresh,usePageRefreshRegistry} from './page-refresh'
 import {BillPredictionInfo} from './bill-prediction-info'
 import type {BillPrediction} from './types'
 import {CategoryFilterControl} from './category-filter-control'
+import {ReportLoading} from './report-loading'
+import {readPageScroll,scrollPageTo} from './page-scroll'
 import type {BillAmountRequest} from './bill-checkin'
 import './bill-checkin.css'
 import './bill-settings.css'
@@ -73,10 +75,10 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const placement=useRef<{order:number;isNew:boolean;billId?:string}>({order:1,isNew:true})
  const storageKey=`bookiebot:bills-request:${ownerName.toLowerCase()}`
  const reset=useCallback(()=>{drafts.current.clear();setForm(null);setSelected(null);setReview(null);setReviewBody(null);setMode('settings');setAmount('');setError('');setValid(true);setSplitInput(null);setConfirmReady(false);setCurrentIntent(null);splitBefore.current=null;try{sessionStorage.removeItem(followKey)}catch{}},[followKey])
- const updateWork=useAppWorkStatus({label:'Bill changes',pending:busy,uncertain:Boolean(pending||flow?.pending),dirty:Boolean(form),onDiscard:reset})
- const load=useCallback(async()=>{
+ const updateWork=useAppWorkStatus({label:'Bill changes',pending:busy&&Boolean(form||pending||flow),uncertain:Boolean(pending||flow?.pending),dirty:Boolean(form),onDiscard:reset})
+ const load=useCallback(async(fresh=true)=>{
   const token=++generation.current;abort.current?.abort();const controller=new AbortController();abort.current=controller;setBusy(true);setError('')
-  try{const next=await request('/app/bills',undefined,controller.signal) as Snapshot;if(!alive.current||token!==generation.current)return false
+  try{const next=await request(fresh?'/app/bills?fresh=1':'/app/bills',undefined,controller.signal) as Snapshot;if(!alive.current||token!==generation.current)return false
    if(next.ownerName?.toLowerCase()!==ownerName.toLowerCase())throw new Error('Your budget profile changed. Reopen BookieBot.');
    if(!Array.isArray(next.bills)||!next.settingsVersion)throw new Error('Bills could not be read completely.')
    if(next.pendingFlow&&!flowRef.current){sessionStorage.setItem(flowKey,JSON.stringify(next.pendingFlow));flowRef.current=next.pendingFlow;setFlow(next.pendingFlow)};if(!order.current)captureRows();setSnapshot(next);try{const follow=JSON.parse(sessionStorage.getItem(followKey)||'null') as CurrentBillIntent|null;if(follow&&(follow.stage==='charge'||follow.stage==='adopt'||follow.stage==='offer')){setCurrentIntent(follow);setSelected(next.bills.find(b=>b.id===follow.id)??null);setForm(newForm(next,next.bills.find(b=>b.id===follow.id)));setMode(follow.stage)}}catch{};if(flowRef.current){const retained=flowRef.current;order.current=retained.rowOrder??order.current??next.bills.map(b=>b.id);const id=retained.current?.id??retained.configuration?.id;const bill=next.bills.find(b=>b.id===id);setSelected(bill??null);setForm(newForm(next,bill));if(retained.presentation)setReview(retained.presentation as Review)};if(next.pendingCommand&&!flowRef.current){setPending(next.pendingCommand);try{sessionStorage.setItem(storageKey,JSON.stringify(next.pendingCommand))}catch{}};return true
@@ -85,7 +87,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  },[storageKey,followKey])
  usePageRefresh(active?'settings':null,{refresh:async()=>{setRefreshing(true);try{return await load()}finally{setRefreshing(false)}},disabled:busy||Boolean(pending)||currentLocked})
  useEffect(()=>{alive.current=true;try{const retained=JSON.parse(sessionStorage.getItem(flowKey)||'null');if(retained?.version===1){if(retained.stage==='done')sessionStorage.removeItem(flowKey);else{flowRef.current=retained;setFlow(retained)}}else{const saved=sessionStorage.getItem(storageKey);if(saved)setPending(JSON.parse(saved))}}catch{}return()=>{alive.current=false;++generation.current;abort.current?.abort()}},[storageKey])
- useEffect(()=>{if(active&&!snapshot&&!flight.current)void load()},[active,snapshot,load])
+ useEffect(()=>{if(active&&!snapshot&&!flight.current)void load(false)},[active,snapshot,load])
  useEffect(()=>{if(wasActive.current&&!active&&!busy&&!pending&&!currentLocked&&!sharingBlocked&&!sharingRecovery){setNewRequested(false);reset()}wasActive.current=active},[active,busy,pending,currentLocked,sharingBlocked,sharingRecovery,reset])
  const choose=(bill?:Bill)=>{
   if(busy||pending||flow||currentLocked||sharingBlocked||sharingRecovery||!snapshot)return
@@ -127,6 +129,19 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  useEffect(()=>{if(newRequested&&active&&!busy&&!pending&&!flow&&!currentLocked&&snapshot){setNewRequested(false);choose()}},[newRequested,active,busy,pending,currentLocked,snapshot])
  // Confirmation is a separate action after the review's native slide settles.
  useEffect(()=>{setConfirmReady(false);if(!review)return;const timer=window.setTimeout(()=>setConfirmReady(true),transactionMotion.duration);return()=>window.clearTimeout(timer)},[review,selected?.id])
+ // A compact creation review is shorter than its form. Keep its heading out
+ // from under the fixed Settings capsule after the native slide settles.
+ useEffect(()=>{
+  if(wide||review?.operation!=='create'||!root.current)return
+  const timer=window.setTimeout(()=>{
+   const heading=root.current?.querySelector<HTMLElement>('.bb-bills-editor[data-open=true] .bi-step-review[aria-hidden=false] h2')
+   const capsule=document.querySelector<HTMLElement>('.bb-settings-masthead-title')
+   if(!heading||!capsule)return
+   const delta=heading.getBoundingClientRect().top-capsule.getBoundingClientRect().bottom-12
+   if(delta<0)scrollPageTo({top:readPageScroll().y+delta,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})
+  },transactionMotion.duration)
+  return()=>window.clearTimeout(timer)
+ },[review,wide])
  const change=(patch:Partial<Form>)=>{setForm(previous=>previous?{...previous,...patch}:null);setReview(null);setReviewBody(null);setError('')}
  const prepare=async(operation=selected?'update':'create',applyCurrentCharge=false,removeMonths?:string[])=>{
   if(flight.current||pending||!form||!snapshot)return
@@ -251,7 +266,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const reviewView=shownReview&&<>
   <header className="sp-flow-heading bb-bill-heading bb-bills-review-heading" data-current-choice={Boolean(shownReview.currentChange&&shownReview.after)}><h2>{shownReview.operation==='delete'||shownReview.operation==='end'?'Stop bill':shownReview.operation==='restore-end'?'Restore bill':shownReview.operation==='adopt'?'Edit recorded charge':shownReview.operation==='amount'?'Confirm amount':shownReview.operation==='current'?'Review charge':'Review bill'}</h2>{shownReview.currentChange&&shownReview.after&&<label className="bb-bills-current-choice"><input type="checkbox" checked={Boolean(shownReview.applyCurrentCharge)} disabled={locked||Boolean(shownReview.currentChange.blockedReason)} onChange={e=>void prepare(shownReview.operation,e.target.checked)}/><span>Also update {monthLabel(shownReview.currentChange.month).split(' ')[0]}’s charge</span></label>}<p className="sp-flow-context bb-bills-review-context"><span title={shownReview.after?.name??shownReview.name??selected?.name}>{shownReview.after?.name??shownReview.name??selected?.name}</span>{shownReview.after&&<span> · {kindLabel[shownReview.after.type]}</span>}</p></header>
   {!shownReview.after&&typeof shownReview.amountCents==='number'&&<p className="bb-bills-review-amount">{money(shownReview.amountCents)}</p>}
-  <dl className="bi-review-changes" aria-label="Bill changes to review" data-dense={allReviewLines.length>5}>{allReviewLines.map(line=><div className="bi-review-change" data-review-field={line.label} key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del title={line.before}>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span title={line.after}>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new" title={line.after}>{line.after}</span>}</dd></div>)}</dl>
+  <dl className="bi-review-changes" aria-label="Bill changes to review" data-dense={allReviewLines.length>5} data-new-bill={!selected&&shownReview.operation==='create'}>{allReviewLines.map(line=><div className="bi-review-change" data-review-field={line.label} key={line.label}><dt>{line.label}</dt><dd>{line.before!==null&&line.before!==line.after&&<><del title={line.before}>{line.before}</del><span className="bi-review-new"><ArrowRight aria-hidden="true"/><span title={line.after}>{line.after}</span></span></>}{(line.before===null||line.before===line.after)&&<span className="bi-review-new" title={line.after}>{line.after}</span>}</dd></div>)}</dl>
 
   {shownReview.cancellation&&<BillEndReview value={shownReview.cancellation} locked={locked} onSelection={months=>void prepare('end',false,months)}/>}
   {shownReview.currentChange?.blockedReason&&<p className="bi-footnote">{shownReview.currentChange.blockedReason}</p>}
@@ -269,7 +284,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   {result?.detail&&<p role="status" className="bb-bills-status">{result.detail}</p>}
   {flow&&!busy&&<div className="bb-bills-recovery">{flow.pending?<><button type="button" onClick={()=>void executeFlow(flow,true)}>Check saved status</button><button type="button" onClick={()=>void executeFlow(flow,true,true)}>Retry same confirmation</button></>:<>{!flow.failed&&<button type="button" onClick={()=>void executeFlow(flow)}>Resume saved change</button>}<button type="button" onClick={()=>{sessionStorage.removeItem(flowKey);flowRef.current=null;setFlow(null);reset();void load()}}>Close</button></>}</div>}
   {pending&&<div className="bb-bills-recovery"><p role="status">Check the saved status before making another change.</p><button className="bb-bills-primary" type="button" disabled={busy} onClick={()=>void checkSaved()}>Check saved status</button><button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void checkSaved(true)}>Retry same confirmation</button></div>}
-  {!snapshot&&busy&&<p role="status" className="bb-bills-empty">Loading bills…</p>}
+  {!snapshot&&busy&&<ReportLoading label="Loading bills…"/>}
   {!snapshot&&!busy&&<button type="button" className="bb-settings-action" onClick={()=>void load()}>Reload Bills</button>}
   </div>
   {snapshot&&<div className="bb-bills-panes">

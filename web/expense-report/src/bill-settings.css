@@ -73,6 +73,11 @@
 .bb-bills-review-context { display:flex;gap:4px;min-width:0 }
 .bb-bills-review-context>span:first-child { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .bb-bills-review-context>span+span { flex:none }
+/* New-bill review: retain full names/dates, pair short values in either pose. */
+.bb-bills .bi-step-review>.bi-review-changes[data-new-bill=true] { grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px }
+.bb-bills .bi-step-review>.bi-review-changes[data-new-bill=true]>.bi-review-change { grid-template-columns:minmax(0,1fr);gap:4px;padding-block:8px }
+.bb-bills .bi-step-review>.bi-review-changes[data-new-bill=true]>.bi-review-change dd { justify-content:flex-start;text-align:left;min-width:0;overflow-wrap:anywhere }
+.bb-bills .bi-step-review>.bi-review-changes[data-new-bill=true]>:is([data-review-field=Name],[data-review-field="Applies from"]) { grid-column:1 / -1 }
 .bb-bills .bi-editor label.bb-bills-current-choice { display:flex;align-items:center;gap:8px;min-height:44px;font-size:13px;color:hsl(var(--foreground)) }
 .bb-bills .bi-editor .bb-bills-current-choice input[type=checkbox] { width:18px;height:18px;padding:0;border:0;border-radius:3px;appearance:auto;flex:none;accent-color:hsl(var(--primary)) }
 .bb-bills-current-form { position:relative }

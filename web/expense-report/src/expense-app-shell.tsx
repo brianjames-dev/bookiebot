@@ -15,6 +15,7 @@ import { Investments } from "./investments"
 import { PhoneNotifications } from "./phone-notifications"
 import { WidgetSettings } from "./widget-settings"
 import { BillSettings } from "./bill-settings"
+import { ReportLoading } from "./report-loading"
 import { SavingsTransfers } from "./savings-transfers"
 import { BillCheckin, type BillAmountRequest } from "./bill-checkin"
 import { WidgetSetupGuide } from "./widget-setup-guide"
@@ -254,10 +255,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
       </div>
       {!monthlyReady && <main className="bb-shell-report-loading bb-main" hidden={!reportVisible && Boolean(report)} aria-busy={reportBusy}>
-        {reportBusy ? <div className="bb-report-loading" role="status">
-          <span className="bb-pull-spinner bb-report-loading-spinner" aria-hidden="true"><svg viewBox="0 0 32 32"><circle className="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" strokeDasharray="100" strokeDashoffset="25" /></svg></span>
-          <span className="sr-only">Loading your report…</span>
-        </div> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
+        {reportBusy ? <ReportLoading/> : <button type="button" className="bb-settings-action" onClick={() => void onRefresh?.()}>Try loading the report again</button>}
       </main>}
       <main className="bb-shell-transactions bb-main" aria-label="Transactions" hidden={screen !== "transactions"}>
         {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}

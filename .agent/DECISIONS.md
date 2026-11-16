@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-16 — Bills read reuse and variable invitation review
+
+Use a bounded per-server Bills listing cache following the existing report/widget task lifecycle: 30-second successful reads keyed by authenticated actor/owner, Pacific day and the shared/canonical cursor. Coalesce concurrent reads and retain their task after a client disconnect; failed or slow reads cannot renew an older success. Recheck the cursor before returning, retry once on a concurrent change and fail visibly if it continues changing. Manual refresh and post-save reads bypass saved results. Preferences, pending commands and recoverable flows remain fresh SQL reads. All reviews/commands retain uncached source verification; no browser financial read cache or HTTP caching. Shared revision/canonical changes invalidate both owners independently, while direct workbook edits have explicit refresh/short expiry.
+
+Variable sharing reviews show the recorded month's gross total separately from the recurring amount entered each cycle. Membership confirmation never treats a forecast or historical invoice as a new fixed price. Short Add Bill review fields share rows in both poses, with full-width name/start and closed-view heading placement through the existing page-scroll surface. Spinner reads do not lock the title/Back; real financial work keeps existing guards. Date/stop verification preserves recorded autopay/cash/receipts and the Ended archive, including annual carry. No financial writer, schema or membership lifecycle changes.
+
 ## 2026-11-16 — Ongoing shared bills retain one cash row and one forecast remainder
 
 After acceptance, recurring settings continue to belong to the payer's existing plan; each confirmed invoice owns its original canonical split independently of later defaults. Verify new cycles with the real configuration/amount/split/receipt/projection paths, including annual carry and idempotent request recovery, without touching live records. Each app observes the same membership cursor and canonical version changes; a background receipt can refresh both without a membership write.

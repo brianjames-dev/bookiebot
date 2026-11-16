@@ -11,7 +11,7 @@ export interface BillMembership {
 }
 type Action='invite'|'accept'|'decline'|'stop'
 type Change={action:Action;billId?:string;shareId?:string;reviewVersion?:string;requestId?:string}
-type Review={action:Action;reviewVersion:string;payerName:string;memberName:string;name:string|null;bill?:{amountCents:number|null;cadence:string;pullDay:number|null;splitMethod:string;effectiveFrom?:string}|null}
+type Review={action:Action;reviewVersion:string;payerName:string;memberName:string;name:string|null;bill?:{type:Bill['type'];amountCents:number|null;cadence:string;pullDay:number|null;splitMethod:string;effectiveFrom?:string}|null;currentCharge?:{month:string;amountCents:number;date:string|null}|null}
 export const sharingJournalKey=(owner:string)=>`bookiebot:bill-sharing:${owner.toLowerCase()}`
 export interface SharingJournal {billId:string;command:Change}
 export function readSharingJournal(owner:string):SharingJournal|null {
@@ -103,7 +103,11 @@ export function BillSharingEditor({bill,ownerName,partnerName,onClose,onSaved,on
   <header className="sp-flow-heading bb-bill-heading"><h2>{review?titles[review.action]:'Review sharing'}</h2></header>
   <strong>{bill.name}</strong>
   {review&&<><p>{review.action==='invite'?`${review.memberName} will receive an invitation.`:review.action==='accept'?`Share ${review.payerName}’s bill schedule and repayment status.`:review.action==='decline'?'Decline this invitation.':'Remove this bill from the shared Bills view.'}</p>
-   {review.bill&&<dl className="bb-shared-bill-facts"><div><dt>Bill total</dt><dd>{money(review.bill.amountCents)}</dd></div><div><dt>Repeats</dt><dd>{review.bill.cadence}</dd></div><div><dt>Payment day</dt><dd>{review.bill.pullDay??'Not set'}</dd></div></dl>}
+   {review.bill&&<dl className="bb-shared-bill-facts">
+    {review.bill.type==='variable'&&review.currentCharge&&<div><dt>{monthText(review.currentCharge.month)} bill total</dt><dd>{money(review.currentCharge.amountCents)}</dd></div>}
+    <div><dt>{review.bill.type==='variable'?'Future amount':'Recurring total'}</dt><dd>{review.bill.type==='variable'?`Entered ${review.bill.cadence}`:money(review.bill.amountCents)}</dd></div>
+    {review.bill.type==='variable'&&review.bill.amountCents!=null&&<div><dt>Estimate</dt><dd>{money(review.bill.amountCents)}</dd></div>}
+    <div><dt>Repeats</dt><dd>{review.bill.cadence}</dd></div><div><dt>Payment day</dt><dd>{review.bill.pullDay??'Not set'}</dd></div></dl>}
    <p className="bb-settings-note">Existing transactions, splits and received repayments stay unchanged.</p>
   </>}
   <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setChange(null);setError('')}}>Back</button><button type="button" className="bi-primary" disabled={locked||!ready} onClick={()=>void confirm()}>Confirm</button></footer>

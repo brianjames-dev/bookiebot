@@ -84,6 +84,10 @@ the projected remainder plus paid cash equals one share. Older lowercase bill
 categories and newer company-name labels resolve to the same verified source.
 November 1 records and their receipts remain unchanged.
 
+An invitation review separates a variable bill's recorded month total from its future amount, which is entered each billing cycle. A missing fixed estimate is not a request to configure a variable bill's permanent price. Acceptance still changes membership only.
+
+Changing the recurring payment day updates eligible unrecorded and future dates in both apps. A recorded occurrence keeps its own autopay date, amounts, split and receipt dates, including early reimbursement. Stopping the schedule removes future forecasts for both people, including after annual rollover; it does not revoke access to recorded shared repayments or delete their history. Ended bills remain in the Ended archive. Shared charges cannot be selected for historical removal through Stop bill.
+
 - The payer’s hidden plan remains the source for future amount/date/split
   versions. An already recorded occurrence retains its original category,
   autopay date and canonical split, even after a recurring edit.

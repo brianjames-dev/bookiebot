@@ -5,6 +5,7 @@ import asyncio
 import json
 import hashlib
 import logging
+from typing import Any
 from aiohttp import web
 
 from bookiebot.reports import shared_bills
@@ -13,27 +14,28 @@ from bookiebot.reports.accounts import AccountConflict
 logger = logging.getLogger(__name__)
 
 
+def change_cursor(owner: str) -> dict[str, Any]:
+    revision = shared_bills.build_store().revision(owner)
+    from bookiebot.reimbursements import service
+    ledger_version = ''
+    if service.enabled():
+        # Canonical-only reads also catch background receipts without a
+        # membership write. Do not project or read Sheets to check freshness.
+        ledger = service.build_reimbursement_store().snapshot(owner)
+        values = sorted((a['id'],a['version'],a.get('projectedVersion',0)) for a in ledger['allocations'])
+        resets = sorted((r['id'],r['version'],r['status']) for r in ledger.get('resets',[]))
+        events = sorted((e['id'],e['status'],e.get('confirmedAt',''),e.get('reversedAt','')) for e in ledger.get('events',[]))
+        ledger_version = hashlib.sha256(json.dumps([values,resets,events],sort_keys=True).encode()).hexdigest()
+    return {'revision':revision,'ledgerVersion':ledger_version}
+
+
 async def _changes(request: web.Request) -> web.Response:
     from bookiebot.reports.phone_app import _json, _session
     session = await _session(request)
     if session is None:
         return _json({'error':'Sign in to BookieBot.'},status=401)
     try:
-        def current():
-            revision = shared_bills.build_store().revision(session.owner_key)
-            from bookiebot.reimbursements import service
-            ledger_version = ''
-            if service.enabled():
-                # Read canonical versions only. This catches receipts/splits
-                # from Discord and scheduled processing without projecting or
-                # writing Sheets, and without exposing another person's data.
-                ledger = service.build_reimbursement_store().snapshot(session.owner_key)
-                values = sorted((a['id'],a['version'],a.get('projectedVersion',0)) for a in ledger['allocations'])
-                resets = sorted((r['id'],r['version'],r['status']) for r in ledger.get('resets',[]))
-                events = sorted((event['id'],event['status'],event.get('confirmedAt',''),event.get('reversedAt','')) for event in ledger.get('events',[]))
-                ledger_version = hashlib.sha256(json.dumps([values,resets,events],sort_keys=True).encode()).hexdigest()
-            return {'revision':revision,'ledgerVersion':ledger_version}
-        result = await asyncio.to_thread(current)
+        result = await asyncio.to_thread(change_cursor,session.owner_key)
         if await _session(request) != session:
             return _json({'error':'Sign in to BookieBot.'},status=401)
         return _json(result)
