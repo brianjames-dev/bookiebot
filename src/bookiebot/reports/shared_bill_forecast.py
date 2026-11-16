@@ -123,7 +123,9 @@ def forecast_inputs(actor: str, periods: list[str]) -> tuple[SharedBillForecast,
     return tuple(result)
 
 
-def remaining_forecast(value: SharedBillForecast, payments: list[Any], source_label: str) -> int:
+def remaining_forecast(value: SharedBillForecast, payments: list[Any], source_labels: str | set[str]) -> int:
     from bookiebot.sheets.bills import bill_label_key
-    recorded = sum(round(p.amount * 100) for p in payments if source_label and bill_label_key(p.label) == bill_label_key(source_label))
+    labels = {source_labels} if isinstance(source_labels, str) else source_labels
+    keys = {bill_label_key(label) for label in labels if label}
+    recorded = sum(round(p.amount * 100) for p in payments if bill_label_key(p.label) in keys)
     return max(0,value.target_cents-recorded)

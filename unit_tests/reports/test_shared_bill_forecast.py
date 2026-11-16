@@ -129,3 +129,52 @@ def test_recorded_shared_cycle_retains_original_schedule_category_and_allocation
     result=forecasts.forecast_inputs(HANNAH,['2026-11','2026-12'])
     assert len(result)==1 and result[0].category=='rent' and result[0].date=='2026-11-22'
     assert result[0].target_cents==10000 and result[0].prediction is None
+
+
+@pytest.mark.parametrize('day',[1,22])
+def test_verified_member_display_name_fulfills_forecast_once_for_paid_or_queued_bill(monkeypatch,day):
+    from bookiebot.sheets.recurring_rows import encode
+    monkeypatch.setattr(report,'now_pacific',lambda:datetime(2026,11,15,tzinfo=PACIFIC_TZ))
+    monkeypatch.setenv('BOOKIEBOT_REIMBURSEMENTS_ENABLED','false')
+    plan=BillPlan('member-rent','variable','Apartment',None,'monthly',day,(),'rent','','Rent',BILL_TAB,
+        effective_from='2026-01',version='member-v1')
+    personal=InMemoryWorksheet([
+        ['', 'Income','',''],['','Date','Source','Amount'],['','11/1/2026','Paycheck','3000'],
+        ['', 'Rent','700'],['','Bills & Utilities','0'],['','Total Needs','700'],['','Total Wants','0'],
+    ],title='November')
+    ws=ReportWorksheets(shared_expenses=InMemoryWorksheet([],title='Expenses'),personal_budget=personal,
+        bill_schedule=InMemoryWorksheet(encode([plan],BILL_TAB,[]),title=BILL_TAB),
+        shared_bill_forecasts=(forecast(member_plan_id=plan.id),))
+    result=report.build_expense_breakdown_report(actor_key=HANNAH,owner_name='Hannah',persons=['Hannah'],
+        month=BudgetMonth(2026,11),worksheets=ws)
+    assert (result.payments or result.queued_bills)[0].label=='Apartment'
+    assert next(e for e in result.calendar_events if e.shared_forecast).amount==300
+    payload=report.expense_breakdown_client_payload(result)
+    assert payload['modeViews']['current']['metrics']['totalExpenses']==(700 if day==1 else 0)
+    assert payload['modeViews']['projected']['metrics']['totalExpenses']==1000
+
+
+def test_renamed_verified_member_estimate_is_replaced_in_adjacent_context():
+    from bookiebot.sheets.recurring_rows import encode
+    plan=BillPlan('member-rent','variable','Apartment',None,'monthly',22,(),'rent','','Rent',BILL_TAB,
+        effective_from='2026-01',version='member-v1')
+    prediction=CalendarEvent('bill','Apartment',900,22,'rent',True,True)
+    item=forecast(member_plan_id=plan.id)
+    result=report._with_shared_bill_forecasts([prediction],(item,),BudgetMonth(2026,11),[],encode([plan],BILL_TAB,[]))
+    assert len(result)==1 and result[0].shared_forecast and result[0].amount==1000
+    actual=replace(prediction,amount=700,amount_estimated=False)
+    result=report._with_shared_bill_forecasts([actual],(item,),BudgetMonth(2026,11),[],encode([plan],BILL_TAB,[]))
+    assert result[0]==actual and result[1].shared_forecast and result[1].amount==300
+
+
+def test_december_report_loads_shared_january_forecast_without_creating_worksheets(monkeypatch):
+    monkeypatch.setattr(report,'now_pacific',lambda:datetime(2026,12,15,tzinfo=PACIFIC_TZ))
+    source=ReportWorksheets(shared_expenses=InMemoryWorksheet([],title='Expenses'),personal_budget=InMemoryWorksheet([],title='December'))
+    monkeypatch.setattr(report,'_load_report_worksheets',lambda *_:source)
+    january=forecast(period='2027-01',date='2027-01-01');calls=[]
+    def load(actor,periods):
+        calls.append((actor,periods));return (january,) if '2027-01' in periods else ()
+    monkeypatch.setattr(forecasts,'forecast_inputs',load)
+    result=report.load_report_worksheets(HANNAH,BudgetMonth(2026,12))
+    assert calls==[(HANNAH,['2026-12','2027-01'])]
+    assert result.shared_bill_forecasts==(january,)

@@ -420,9 +420,9 @@ def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorkshee
     result = _load_report_worksheets(actor_key, month)
     if _is_current_month(month):
         from bookiebot.reports.shared_bill_forecast import forecast_inputs
-        periods = [f'{month.year:04d}-{month.month:02d}']
-        if month.month < 12:
-            periods.append(f'{month.year:04d}-{month.month + 1:02d}')
+        from bookiebot.sheets.recurring_charges import following_month
+        current = f'{month.year:04d}-{month.month:02d}'
+        periods = [current, following_month(current)]
         result = replace(result, shared_bill_forecasts=forecast_inputs(actor_key, periods))
     return result
 
@@ -1282,23 +1282,24 @@ def _with_shared_bill_forecasts(events: list[CalendarEvent], forecasts: tuple[An
     from bookiebot.sheets.recurring import BILL_TAB, selected
     from bookiebot.sheets.recurring_rows import managed, decode
     period = f'{month.year:04d}-{month.month:02d}'
-    plans = selected(decode(bill_rows, BILL_TAB), period) if managed(bill_rows) else []
+    plans = selected(decode(bill_rows, BILL_TAB), period, include_inactive=True) if managed(bill_rows) else []
     result = list(events)
     for value in forecasts:
         if value.period != period:
             continue
         plan = next((p for p in plans if p.id == value.member_plan_id), None)
-        label = plan.source_label if plan else value.member_label
+        labels = {plan.source_label, plan.name} if plan else {value.member_label}
+        keys = {bill_label_key(label) for label in labels if label}
         # Replace only the verified local plan's planning estimate. Actual and
         # queued recipient payments remain authoritative and fulfill the target.
-        if label:
+        if keys:
             result = [event for event in result if not (event.kind == 'bill' and event.amount_estimated
-                and bill_label_key(event.label) == bill_label_key(label))]
-        remaining = remaining_forecast(value, payments, label)
-        if label:
+                and bill_label_key(event.label) in keys)]
+        remaining = remaining_forecast(value, payments, labels)
+        if keys:
             represented = sum(round(event.amount * 100) for event in result
                 if event.kind == 'bill' and not event.amount_estimated
-                and bill_label_key(event.label) == bill_label_key(label))
+                and bill_label_key(event.label) in keys)
             remaining = min(remaining,max(0,value.target_cents-represented))
         if remaining:
             result.append(CalendarEvent('bill',value.name,remaining / 100,int(value.date[8:]),value.category,

@@ -60,8 +60,10 @@ two accepted shared bills.
   status are separate. An early reimbursement does not mark the bill paid.
   Cleared balances are not described as money received.
 - Accepted recipient planning derives the remaining share from that same
-  occurrence. Existing paid or queued recipient amounts fulfill it once.
+  occurrence. Existing paid or queued recipient amounts fulfill it once, including a renamed
+  display label resolved through its verified local plan.
   Cancelled allocations do not reappear as current-month forecasts.
+  Adjacent calendar forecasts continue across December/January.
 - Variable estimates use available completed **gross shared invoices**, then
   apply the recurring split. They never average the payer’s net-after-repayment
   cell. Current-cycle invoices and ambiguous duplicate samples are excluded.
