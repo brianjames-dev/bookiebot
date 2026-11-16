@@ -74,10 +74,18 @@ two accepted shared bills.
 - Recipient forecasts appear in Projected Overview/Calendar. They are never
   written into actual-only Transactions or the monthly worksheets. Historical
   actuals and confirmed repayments remain their original source records.
-- Visible screens check the shared cursor/canonical ledger versions every
-  twenty seconds and on focus/reconnection. Drafts and pending/uncertain
-  commands defer refresh. Pull-to-refresh remains available. This is foreground
-  synchronization, not push delivery while the app is closed.
+- Visible financial screens check the shared cursor/canonical ledger versions
+  every twenty seconds and on focus/reconnection. Only a changed version reloads
+  financial data; a report already refreshed for that version is reused across
+  pages. Drafts and pending/uncertain commands defer this work.
+- Financial changes leave notification/widget preferences stable. Use Settings’
+  normal page refresh to reload those phone preferences. A completed refresh
+  does not trigger itself again when its loading state clears.
+- Failed automatic reads wait at least a minute before retrying, with increasing
+  delays up to five minutes. Success resets that delay. Explicit page refresh
+  remains available, and no financial change is automatically retried by this
+  polling path. This is foreground synchronization, not push delivery while
+  the app is closed.
 
 ## Persistence and recovery
 

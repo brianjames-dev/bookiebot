@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-15 — Bound shared invalidation independently of its own work guard
+
+A successful automatic page refresh acknowledges its captured financial cursor even while React is still committing that refresh’s own busy state. Keep the successful Overview cursor separately so entering another page or retrying a failed dependent page cannot re-read the same report. Recheck external drafts/navigation before refreshing a dependent financial view. Financial cursors invalidate Bills/Transfers and the main financial screens, not root per-phone notifications/widgets or their setup guide; those retain explicit page refresh. Failed automatic reads use 60/120/240/300 second backoff across interval/focus/unblock triggers and reset on success. Manual refresh and financial mutation/recovery rules remain unchanged. This replaces the PR #183 feedback path that replayed Settings refreshes until Google Sheets rate-limited the report.
+
 ## 2026-11-15 — App-owned identities and shared bill state
 
 Use stable app account IDs and explicit Google subject links in the existing app-access database. Preserve financial owner/workbook/action IDs and first-party sessions. Never merge by email, bind identities from an unauthenticated login or overwrite an existing provider link. Google OIDC uses one-use state, browser/session proof, nonce, PKCE, verified audience/issuer/signature and secure HttpOnly cookies; provider tokens/codes are not persisted or logged. Callback request logging omits queries. OAuth is configured in GCP External/Testing and Railway with two approved test accounts; real installed-PWA sign-in remains a physical-device acceptance step.
