@@ -5,6 +5,8 @@ export interface ExpenseAppConfig {
   logoutUrl: string
   ownerName: string
   version?: string
+  onboardingUrl?: string
+  householdEnabled?: boolean
 }
 
 export interface ExpenseAppState {

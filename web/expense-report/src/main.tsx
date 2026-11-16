@@ -4,6 +4,7 @@ import "./konsta.css"
 
 import { ExpenseReportApp } from "./report-app"
 import { FreshExpenseApp } from "./fresh-expense-app"
+import { GoogleFirstApp } from "./managed-budget-app"
 import type { ExpenseAppConfig } from "./expense-app-session"
 import type { ExpenseReportData } from "./types"
 import "./styles.css"
@@ -25,8 +26,12 @@ if (root) {
   createRoot(root).render(
     <React.StrictMode>
       {appConfig?.textContent
-        ? <FreshExpenseApp config={JSON.parse(appConfig.textContent) as ExpenseAppConfig} />
+        ? <PhoneEntry config={JSON.parse(appConfig.textContent) as ExpenseAppConfig} />
         : <ExpenseReportApp report={readReportData()} />}
     </React.StrictMode>,
   )
+}
+
+function PhoneEntry({config}: {config:ExpenseAppConfig}) {
+  return config.onboardingUrl ? <GoogleFirstApp config={config}/> : <FreshExpenseApp config={config}/>
 }

@@ -1,6 +1,16 @@
 # BookieBot on your iPhone
 
-After deployment and the bot restart, repeat separately for Brian and Hannah:
+New users open [BookieBot](https://bookiebot-production.up.railway.app/app/expenses),
+choose **Continue with Google**, create or join a household, review their budget
+settings, then add the app to the Home Screen using Safari's Share menu. Discord
+and Google Drive permissions are not needed. See [Google-first onboarding](GOOGLE_FIRST_ONBOARDING.md).
+
+Brian and Hannah keep their existing connected Home Screen apps and workbooks.
+Link Google from each person's own **Settings → Account** before using Google to
+reconnect; do not create a new managed budget for an existing workbook. Household
+create/join is available in Settings without moving financial data.
+
+If an existing workbook needs its initial pairing, repeat separately for each person:
 
 1. In Discord, use your own account to run **`/expense_app`**.
 2. Open **Set up BookieBot** in **Safari** within 15 minutes. If Discord opens its browser, choose **Open in Safari** before connecting.

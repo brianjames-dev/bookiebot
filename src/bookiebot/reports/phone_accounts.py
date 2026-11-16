@@ -51,16 +51,17 @@ async def _options(_request: web.Request) -> web.Response:
 
 
 async def _profile(request: web.Request) -> web.Response:
-    from bookiebot.reports.phone_app import _json, _session, _valid_owner
-    session = await _session(request)
-    if session is None:
+    from bookiebot.reports.phone_app import _json
+    authenticated = await account_session(request)
+    if authenticated is None:
         return _json({'error': 'Sign in to BookieBot.'}, status=401)
+    session, account = authenticated
     try:
         def read():
             store = _store()
-            return store.profile(store.for_session(session, _valid_owner(session).name))
+            return store.profile(account)
         result = await asyncio.to_thread(read)
-        if await _session(request) != session:
+        if await account_session(request) != authenticated:
             return _json({'error': 'Sign in to BookieBot.'}, status=401)
         result['googleEnabled'] = all(_config())
         return _json(result)
@@ -149,7 +150,7 @@ def _verify(token: str, client: str, nonce: str) -> dict[str, Any]:
             or claims.get('nonce') != nonce
             or claims.get('azp', client) != client):
         raise ValueError('Invalid Google identity.')
-    return {'subject': subject, 'email': email}
+    return {'subject': subject, 'email': email, 'name': claims.get('name', '') if isinstance(claims.get('name', ''), str) else ''}
 
 
 async def _callback(request: web.Request) -> web.Response:
@@ -170,7 +171,7 @@ async def _callback(request: web.Request) -> web.Response:
         id_token = await _exchange(code, flow['verifier'], _base_url() + '/app/auth/google/callback', client, secret)
         claims = await asyncio.to_thread(_verify, id_token, client, flow['nonce'])
         token, _ = await asyncio.to_thread(lambda: _store().complete(flow, **claims,
-            session_token=request.cookies.get(_cookie_name(), ''), validate_actor=_validate_actor))
+            session_token=request.cookies.get(_cookie_name(), ''), validate_actor=_validate_actor, enroll=True))
         status = 'linked' if flow['user_id'] else 'signed-in'
     except AccountConflict:
         status = 'link-required'
@@ -190,3 +191,33 @@ def register_phone_account_routes(app: web.Application) -> None:
     app.router.add_get('/app/account', _profile)
     app.router.add_post('/app/auth/google/start', _start)
     app.router.add_get('/app/auth/google/callback', _callback)
+
+
+async def account_session(request: web.Request):
+    """Identity authentication, including setup-only managed sessions.
+
+    Financial Sheets routes deliberately continue using phone_app._session;
+    a managed identity is never a valid legacy workbook adapter.
+    """
+    from bookiebot.reports.phone_app import _cookie_name, _valid_owner, build_app_access_store
+    token = request.cookies.get(_cookie_name(), '')
+    if not token or len(token) > 128:
+        return None
+    def read():
+        access = build_app_access_store()
+        session = access.get_session(token)
+        if session is None:
+            return None
+        store = account_store(access)
+        if session.owner_key.startswith('managed:'):
+            account = store.from_session(session)
+            if (account is None or account.owner != 'managed:' + account.id
+                    or account.actor != 'app:' + account.id):
+                return None
+        else:
+            try:
+                account = store.for_session(session, _valid_owner(session).name)
+            except (ValueError, RuntimeError):
+                return None
+        return session, account
+    return await asyncio.to_thread(read)
