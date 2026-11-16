@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-16 — One loading indicator across app screens
+
+Reuse Overview's existing ring, rotation, theme color and reduced-motion treatment for pending reads throughout the app. Initial screens and larger panels use the existing centered 52px indicator; small status areas and loading actions use the same ring at 20px with valid inline markup. Keep contextual labels available to assistive technology without a visible loading paragraph. Loaded content remains mounted during refresh, and errors, empty results, repayment state and uncertain-save recovery keep their existing explanatory text/actions. This is presentation only: no new requests, polling, cache, financial mutation or persistence behavior.
+
 ## 2026-11-16 — Bills read reuse and variable invitation review
 
 Use a bounded per-server Bills listing cache following the existing report/widget task lifecycle: 30-second successful reads keyed by authenticated actor/owner, Pacific day and the shared/canonical cursor. Coalesce concurrent reads and retain their task after a client disconnect; failed or slow reads cannot renew an older success. Recheck the cursor before returning, retry once on a concurrent change and fail visibly if it continues changing. Manual refresh and post-save reads bypass saved results. Preferences, pending commands and recoverable flows remain fresh SQL reads. All reviews/commands retain uncached source verification; no browser financial read cache or HTTP caching. Shared revision/canonical changes invalidate both owners independently, while direct workbook edits have explicit refresh/short expiry.

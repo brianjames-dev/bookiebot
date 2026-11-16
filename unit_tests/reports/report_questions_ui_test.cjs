@@ -41,7 +41,7 @@ async function main() {
   assert.ok(markup.includes('maxLength="2000"'))
   assert.ok(markup.includes("This app doesn’t save a conversation"))
   assert.match(markup, /<button type="button"[^>]*>What is driving my spending\?<\/button>/, "Suggestions fill the input; they are not form submissions")
-  assert.match(markup, /<button type="submit" disabled="">Ask BookieBot<\/button>/)
+  assert.match(markup, /<button type="submit"[^>]*disabled=""[^>]*>Ask BookieBot<\/button>/)
   const nativeStates = []
   const nativeClient = new ReportQuestionClient("2026-09", "current", state => nativeStates.push(state), function browserFetch() {
     "use strict"

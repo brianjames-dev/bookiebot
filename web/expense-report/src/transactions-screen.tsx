@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { cloneElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { ChartNoAxesColumn, ChevronDown, RefreshCw, Search, X } from "lucide-react"
@@ -422,7 +423,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
       <option value="0">{periodMonth==='all'?'All months':'Selected month'}</option><option value="3">Last 3 months</option><option value="6">Last 6 months</option><option value="12">Last 12 months</option>
     </select><ChevronDown aria-hidden="true"/></label>
   </div>
-  const graphStatus=historyEnabled&&(graphError?<div className="bb-recorded-graph-status" role="alert"><span>{graphError}</span><button type="button" onClick={()=>setGraphRevision(value=>value+1)}>Retry graph</button></div>:graphPending?<div className="bb-recorded-graph-status" role="status">Loading graph…</div>:chart.length===0?<div className="bb-recorded-graph-status" role="status">No recorded activity in this period.</div>:null)
+  const graphStatus=historyEnabled&&(graphError?<div className="bb-recorded-graph-status" role="alert"><span>{graphError}</span><button type="button" onClick={()=>setGraphRevision(value=>value+1)}>Retry graph</button></div>:graphPending?<div className="bb-recorded-graph-status"><ReportLoading label="Loading graph…"/></div>:chart.length===0?<div className="bb-recorded-graph-status" role="status">No recorded activity in this period.</div>:null)
   const amountValue=Number(draft.amount),validAmount=/^\d+(?:\.\d{1,2})?$/.test(draft.amount??'')&&amountValue>0&&Number.isSafeInteger(Math.round(amountValue*100))
   const validFields=selected?.editableFields.every(field=>field==='amount'||draft[field]===selected.fields[field]||(selected.kind==='transfer'&&['goalId','fromAccount','toAccount'].includes(field)||Boolean(draft[field]?.trim()))&&(draft[field]?.length??0)<=(selected.kind==='transfer'?80:200))
   const canReview=Boolean(selected&&operation&&(operation==='update'?validAmount&&validFields&&(destination!==selected.category||selected.editableFields.some(field=>field==='amount'?Math.round(amountValue*100)!==selected.amountCents:(draft[field]??'').trim()!==(selected.fields[field]??'').trim())):operation==='split'?customValid&&(method!=='custom'||Boolean(selected.splitOptions?.custom))&&(method!=='fronted'||selected.kind==='expense')&&(selected.split?method!==selected.split||payerShareCents!==(selected.splitOptions?.payerCents??selected.amountCents):payerShareCents!==selected.amountCents):true))
@@ -475,11 +476,11 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     {day&&<button type="button" className="bb-recorded-day-chip" aria-label={'Clear date filter '+recordedDateLabel(day,true)} onClick={()=>setDay('')}>{recordedDateLabel(day,true)}<X aria-hidden="true"/></button>}
     <div className="bb-recorded-results">
     {(!duoWide||!selected)&&status}
-    {loading && !listing && <p role="status" className="bb-recorded-loading">Loading recorded transactions…</p>}
+    {loading && !listing && <ReportLoading label="Loading recorded transactions…"/>}
     {!loading && !listing && !error && <p className="bb-transaction-empty">Open Transactions to load your recorded activity.</p>}
     {listing?.items.length===0&&<div className="bb-transaction-empty"><p>{search||filterCount?'No transactions match these filters.':'No recorded transactions in this period.'}</p>{(search||filterCount>0)&&<button type="button" onClick={()=>{setSearch('');setFilter('all')}}>Clear search and filters</button>}</div>}
     <div className="bb-transaction-list bb-daily-transactions" id="bb-recorded-days"><DailyTransactionDays groups={groups} year={Number(initialMonth.slice(0,4))} month={Number(initialMonth.slice(5))} flatSingles wrapRow={wrap} aliases={aliases} categoryColors={recordedCategoryColors}/></div>
-    {listing?.nextOffset !== null && listing?.nextOffset !== undefined && <button className="bb-transaction-load" type="button" disabled={loading||locked||Boolean(operation)||Boolean(notice)} onClick={()=>void load(listing.nextOffset!,true)}>{loading ? "Loading…" : "Load more transactions"}</button>}
+    {listing?.nextOffset !== null && listing?.nextOffset !== undefined && <button className="bb-transaction-load" type="button" aria-label={loading ? "Loading more transactions…" : undefined} aria-busy={loading} disabled={loading||locked||Boolean(operation)||Boolean(notice)} onClick={()=>void load(listing.nextOffset!,true)}>{loading ? <ReportLoading compact label="Loading more transactions…"/> : "Load more transactions"}</button>}
     {error && !listing && <button type="button" disabled={loading} onClick={()=>void load(0,false,true)}>Try again</button>}
     </div>
     </div>

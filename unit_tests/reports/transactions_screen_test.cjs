@@ -51,9 +51,14 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
 ;(async()=>{
  await run(()=>{tree=Renderer.create(fixture(false))});await tick();assert.equal(requests.length,0)
  assert.equal(updates.at(-1),null,'No transaction update time before a successful listing')
- await run(()=>tree.update(fixture(true)));await tick();await respond(listing())
+ await run(()=>tree.update(fixture(true)));await tick();
+ assert.equal(tree.root.findAllByProps({className:'bb-pull-spinner bb-report-loading-spinner'}).length,1,'Initial Transactions loading uses the shared Overview spinner')
+ await respond(listing())
+ assert.equal(tree.root.findAllByProps({className:'bb-pull-spinner bb-report-loading-spinner'}).length,0,'A loaded Transactions list removes its initial spinner')
  assert.equal(updates.at(-1),now,'Transactions reports its own successful listing time')
- const loadedAt=updates.at(-1);await click('Refresh transactions');await respond({error:'Offline fixture'},503)
+ const loadedAt=updates.at(-1);await click('Refresh transactions');
+ assert.equal(tree.root.findAllByProps({className:'bb-pull-spinner bb-report-loading-spinner'}).length,0,'Refreshing keeps the existing rows instead of replacing them with an initial loader')
+ await respond({error:'Offline fixture'},503)
  assert.equal(updates.at(-1),loadedAt,'A failed refresh retains the last successful update time')
  await click('Refresh transactions');await respond(listing());assert.equal(updates.at(-1),now)
  assert.equal(tree.root.findByProps({'data-graph-open':false}).props['data-graph-open'],false)

@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { CollapsibleContent } from "./components/ui/motion"
@@ -152,7 +153,7 @@ export function SavingsGoals() {
         {uncertain ? <div className="bb-goals-actions"><button type="button" disabled={busy} onClick={() => void execute()}>Retry this change</button>
           <button type="button" disabled={busy} onClick={() => void checkLatest()}>Check latest</button></div>
           : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy} onClick={() => { setError(""); void load() }}>Refresh goals</button>}</div>}
-      {!loaded && !error && <p role="status">Loading your goals…</p>}
+      {!loaded && !error && <ReportLoading label="Loading your goals…"/>}
       <div className="bb-goals-heading"><h3>Goals</h3>
         <button type="button" className="bb-goals-new" disabled={locked || !loaded} aria-expanded={creating} aria-controls={createId} onClick={() => { setCreating(!creating); setActiveGoal(null); setError("") }}>＋ Goal</button>
       </div>
@@ -292,7 +293,7 @@ function ContributionHistory({ goal, disabled, run }: { goal: SavingsGoal; disab
   return <div className="bb-goal-history"><div className="bb-goal-starting"><span>Starting balance</span><strong>{money(goal.startingCents)}</strong></div>
     {entries.map((entry) => <ContributionHistoryRow key={entry.id} entry={entry} goal={goal} run={run} disabled={disabled}
       open={reversing === entry.id} onToggle={() => setReversing(reversing === entry.id ? "" : entry.id)} onClose={() => setReversing("")} />)}
-    {loading && <p role="status">Loading contributions…</p>}
+    {loading && <ReportLoading label="Loading contributions…"/>}
     {!loading && !entries.length && !error && <p>No contributions yet.</p>}
     {error && <p role="alert">{error}</p>}
     {next !== null && <button type="button" disabled={loading || disabled} onClick={() => void load(next)}>{error ? "Try again" : "Load more"}</button>}

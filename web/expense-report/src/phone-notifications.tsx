@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useEffect, useRef, useState } from "react"
 import { usePageRefresh } from "./page-refresh"
 import { AnimatedDisclosure } from "./components/ui/motion"
@@ -216,10 +217,10 @@ export function PhoneNotifications({ embedded = false, refreshActive = true }: {
     </label>
   )
 
-  const stateLabel = settings ? settings.enabled ? "On" : "Off" : error ? "Unavailable" : "Loading…"
+  const stateLabel = settings ? settings.enabled ? "On" : "Off" : error ? "Unavailable" : <ReportLoading compact label="Loading notification settings…"/>
   const body = (
       <div className="bb-notification-settings">
-        {embedded && <div className="bb-notification-embedded-state"><h2>Notifications</h2><strong role="status">{stateLabel}</strong></div>}
+        {embedded && <div className="bb-notification-embedded-state"><h2>Notifications</h2><strong aria-live="polite">{stateLabel}</strong></div>}
         {!supported && <p>Open from your Home Screen to enable notifications (iOS 16.4+).</p>}
         {toggle("weekly", "Weekly summary · Mondays")}
         {toggle("upcoming", "Payment reminders · day before")}

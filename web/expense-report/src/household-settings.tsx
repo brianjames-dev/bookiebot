@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import {useCallback,useEffect,useState} from 'react'
 import {ChevronRight} from 'lucide-react'
 import {api,useReview,ReviewPanel} from './onboarding-review'
@@ -12,7 +13,7 @@ export function HouseholdSettings({active}:{active:boolean}){
   const load=useCallback(async()=>{try{const value=await api<HouseholdProfile>('/app/household');setProfile(value);setError('')}catch(e){setError((e as Error).message)}},[])
   useEffect(()=>{if(!active)return;const controller=new AbortController();void api<HouseholdProfile>('/app/household',undefined,controller.signal).then(value=>{if(!controller.signal.aborted){setProfile(value);setError('')}}).catch(e=>{if(!controller.signal.aborted)setError(e.message)});return()=>controller.abort()},[active])
   return <section className="bb-settings-section" aria-label="Household settings"><h2>Household</h2>
-    {profile?<HouseholdContent key={profile.account.id} profile={profile} reload={load}/>:<p className="bb-settings-note">{error||'Loading household…'}</p>}
+    {profile?<HouseholdContent key={profile.account.id} profile={profile} reload={load}/>:error?<p className="bb-settings-note" role="alert">{error}</p>:<ReportLoading label="Loading household…"/>}
     {error&&profile&&<p className="bb-settings-note" role="alert">{error}</p>}
   </section>
 }

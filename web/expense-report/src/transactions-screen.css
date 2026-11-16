@@ -87,7 +87,7 @@
 .bb-transaction-period>div button { width:100%; margin-top:10px; }
 .bb-recorded-day-chip { display:flex; align-items:center; gap:8px; min-height:44px; max-width:100%; padding:8px 12px; margin-top:12px; color:hsl(var(--primary)); background:hsl(var(--primary) / .08); border:1px solid hsl(var(--border)); border-radius:24px; }
 .bb-recorded-day-chip svg { width:14px; height:14px; }
-.bb-recorded-loading,.bb-daily-page-note { color:hsl(var(--muted-foreground)); font-size:12px; padding:12px 0; }
+.bb-daily-page-note { color:hsl(var(--muted-foreground)); font-size:12px; padding:12px 0; }
 @media(prefers-reduced-motion:reduce) { .bb-recorded-swipe * { transition:none!important; } .bb-recorded-graph-reveal,.bb-recorded-graph-toggle { transition:none; } }
 /* The approved workspace has no visible focus chrome; controls retain native focus and keyboard behavior. */
 .bb-transactions :focus,.bb-transactions :focus-visible,.bb-transactions .bb-category-mix-filter:focus-within { outline:none!important; box-shadow:none!important; }

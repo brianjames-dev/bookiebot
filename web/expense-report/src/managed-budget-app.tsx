@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import {api,useReview,ReviewPanel,type Flow,type Command} from './onboarding-review'
 import {useCallback,useEffect,useRef,useState,type CSSProperties} from 'react'
 import {KonstaProvider} from 'konsta/react'
@@ -102,7 +103,7 @@ function ManagedSession({initial,onReady,onSignedOut,version}:{initial:Bootstrap
   useEffect(()=>{if(initial.phase!=='ready')return;const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&!editor&&!flow.review&&!flow.busy&&Date.now()-loaded.current>=20000)void refresh()},20000);return()=>clearInterval(timer)},[editor,flow.review,flow.busy,initial.phase,refresh])
   useEffect(()=>{let stopped=false,checking=false;const check=()=>{if(checking||document.visibilityState!=='visible')return;checking=true;void api<Bootstrap>('/app/bootstrap').then(value=>{if(!stopped&&(value.account?.id!==account.id||value.provider!=='managed')){setState(null);onSignedOut()}}).catch(()=>{}).finally(()=>checking=false)};window.addEventListener('focus',check);window.addEventListener('pageshow',check);document.addEventListener('visibilitychange',check);return()=>{stopped=true;window.removeEventListener('focus',check);window.removeEventListener('pageshow',check);document.removeEventListener('visibilitychange',check)}},[account.id])
   if(initial.phase==='onboarding')return <Onboarding account={account} flow={flow} onSignOut={signOut}/>
-  if(!state)return <div className="bb-page bb-managed-welcome"><h1>Opening your budget…</h1>{flow.uncertain&&<ReviewPanel flow={flow}><h2>Check your last change</h2><p className="bi-footnote">Resolve the previous confirmation before making another change.</p></ReviewPanel>}{error&&<><p role="alert">{error}</p><button onClick={()=>void refresh()}>Try again</button><button onClick={signOut}>Sign out</button></>}</div>
+  if(!state)return <div className="bb-page bb-managed-welcome"><h1>BookieBot</h1>{!error&&!flow.uncertain&&<ReportLoading label="Opening your budget…"/>}{flow.uncertain&&<ReviewPanel flow={flow}><h2>Check your last change</h2><p className="bi-footnote">Resolve the previous confirmation before making another change.</p></ReviewPanel>}{error&&<><p role="alert">{error}</p><button onClick={()=>void refresh()}>Try again</button><button onClick={signOut}>Sign out</button></>}</div>
   const selectScreen=(next:AppScreen)=>{if(flow.busy||flow.uncertain)return;setScreen(next);if(next!=='settings')setMain(next)}
   const locked=flow.busy||flow.uncertain,overview=screen==='overview',selected=editor?.entry
   const nav={screen,duoLandscape:duo.landscape,monthHeader:true,preferences,sourceRequest:null,selectScreen}

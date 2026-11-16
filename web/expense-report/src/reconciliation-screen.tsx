@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { ArrowDownLeft, ArrowUpRight, Check, ChevronDown, RefreshCw } from "lucide-react"
 import { usePageRefresh } from "./page-refresh"
@@ -264,9 +265,9 @@ export function ReconciliationScreen({ controller, embeddedHeader=false }: { con
       {(Object.keys(filterLabels) as Filter[]).map(value => <button type="button" key={value} disabled={Boolean(receiptTarget)} aria-pressed={filter === value} onClick={() => { setFilter(value); setOpenId(null) }}>
         {filterLabels[value]}<span>{rows.filter(item => value === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === value).length}</span></button>)}
     </SlidingSelection>}
-    {!snapshot && !error && <p className="bb-reconcile-muted" role="status">Loading bank transactions…</p>}
+    {!snapshot && !error && <ReportLoading label="Loading bank transactions…"/>}
     {error && <div className="bb-reconcile-message" role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={() => void load()}>{needsRefresh ? "Check status" : "Try again"}</button></div>}
-    {busy && pendingOperation && pendingOperation !== "check" && <p className="bb-reconcile-muted" role="status">{pendingOperation === "prepare" ? "Opening your review…" : "Saving your review…"}</p>}
+    {busy && pendingOperation && pendingOperation !== "check" && <ReportLoading compact label={pendingOperation === "prepare" ? "Opening your review…" : "Saving your review…"}/>}
     {snapshot?.notice && <div className="bb-reconcile-message" role={snapshot.connections?.length ? 'alert' : 'status'}><p>{snapshot.notice}</p>
       <div className="bb-reconcile-recovery-actions">
       {snapshot.connections?.filter(connection => connection.needsReconnect).map(connection => <a key={connection.id}
@@ -277,7 +278,7 @@ export function ReconciliationScreen({ controller, embeddedHeader=false }: { con
     {snapshot?.enabled && !visibleRows.length && <div className="bb-reconcile-empty"><Check size={22} aria-hidden="true" /><p>{filter === "needs_review" ? snapshot.connections?.length ? "No saved transactions need review." : "Nothing needs review." : filter === "pending" ? "No pending transactions." : "No checked transactions yet."}</p></div>}
     <div className="bb-reconcile-list">{visibleRows.map(item => { const detail = details[item.id]; return <TransactionRow key={item.id} item={item} open={openId === item.id} disabled={Boolean(receiptTarget)}
       onToggle={() => setOpenId(value => value === item.id ? null : item.id)}>
-      {openId === item.id && loadingDetail && <p className="bb-reconcile-muted" role="status">Finding sheet entries…</p>}
+      {openId === item.id && loadingDetail && <ReportLoading label="Finding sheet entries…"/>}
       {openId === item.id && detailError && <div className="bb-reconcile-message" role="alert"><p>{detailError}</p><button type="button" onClick={() => { setDetails({}); setDetailRetry(value => value + 1) }}>Try suggestions again</button></div>}
       {detail?.id === item.id && <>
         {detail.matchLabel && <p className="bb-reconcile-matched"><Check size={15} aria-hidden="true" />{detail.matchLabel}</p>}
@@ -432,7 +433,7 @@ function ScheduleAmountReview({ item, suggestion, disabled, onCommand, onCancel,
   }, [item.id, item.version, suggestion.id, future, splitMethod, onRejectAccess])
   return <div className="bb-reconcile-confirm" role="group" aria-label="Review scheduled payment change">
     <strong>Update {suggestion.item}?</strong>
-    {loading && <p role="status">Preparing payment change…</p>}
+    {loading && <ReportLoading label="Preparing payment change…"/>}
     {error && <div role="alert"><p>{error}</p><button type="button" className="bb-reconcile-action" disabled={disabled} onClick={onRefresh}>Refresh suggestions</button></div>}
     {plan && !error && <>{plan.sharing ? <>
       <p>Full {plan.name} bill from the bank: <strong>{money(plan.newAmountCents)}</strong>.</p>

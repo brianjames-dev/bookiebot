@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict")
 const chart = require("./load_frontend_module.cjs")("comparison-chart.ts")
+const reportLoading = require("./load_frontend_module.cjs")("report-loading.tsx")
 const fs = require("node:fs")
 const path = require("node:path")
 const vm = require("node:vm")
@@ -38,6 +39,7 @@ function harness() {
     init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
   })
   const require = name => name === "react" ? hooks : name.endsWith(".css") ? {}
+    : name === "./report-loading" ? reportLoading
     : name === "./comparison-chart" ? chart
     : name === "./app-navigation" ? {useAppNavigation: () => null}
     : name.startsWith("./components") ? { SlidingSelection: "selection", FittedAmount: "amount", MonthPicker: "month-picker" } : req(name)
@@ -58,6 +60,7 @@ function nodes(element) {
   if (element === null || element === undefined || typeof element === "boolean") return []
   if (Array.isArray(element)) return element.flatMap(nodes)
   if (typeof element !== "object") return [element]
+  if (element.type === reportLoading.ReportLoading) return nodes(element.type(element.props))
   return [element, ...nodes(element.props?.children ?? element.children)]
 }
 const text = element => nodes(element).filter(node => typeof node === "string" || typeof node === "number").join(" ")
@@ -127,6 +130,7 @@ async function main() {
       init.signal.addEventListener("abort", () => { if (!ignoreAbort) reject(new Error("aborted")) }, { once: true })
     }),
     require: name => name === "react" ? React : name.endsWith(".css") ? {}
+      : name === "./report-loading" ? reportLoading
       : name === "./comparison-chart" ? chart
       : name === "./app-navigation" ? {useAppNavigation: () => ({preferences: {mode},duoLandscape})}
       : name.startsWith("./components") ? {

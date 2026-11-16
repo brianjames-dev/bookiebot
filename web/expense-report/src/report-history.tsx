@@ -1,3 +1,4 @@
+import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { ArrowDownRight, ArrowLeftRight, ChevronDown } from "lucide-react"
 import { FittedAmount } from "./components/ui/fitted-amount"
@@ -334,7 +335,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
       <div className="bb-comparison-viewport" id={id} aria-hidden={!open} inert={!open}>
         <div ref={frame.body} className="bb-comparison-content">
           <div className="bb-comparison-hero" role="status" aria-live="polite" aria-busy={loading}>
-            {loading && <p className="bb-comparison-note">{refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}</p>}
+            {loading && <ReportLoading compact label={refreshing && !requests.pending ? "Waiting for the refreshed report…" : "Comparing matching days…"}/>}
             {error && <p className="bb-comparison-note">{error} <button type="button" onClick={() => { requests.results.delete(resultKey); reload((value) => value + 1) }}>Try again</button></p>}
             {ready && !amounts && <p className="bb-comparison-note">{ready.coverageNote}</p>}
             {change !== null && <div className="bb-comparison-change">
@@ -367,7 +368,7 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
             <span>{comparisonAxisLabel(chart.maximum)}</span>
           </div>}
           {ready && chart && <p className="bb-comparison-period">{mode === "projected" ? "Projected" : "Current"} Spent · days 1–{ready.throughDay}{ready.status === "partial" ? " · includes undated costs" : ""}</p>}
-          {catalogLoading && !catalog && <p className="bb-comparison-note">Loading other months…</p>}
+          {catalogLoading && !catalog && <p className="bb-comparison-note"><ReportLoading compact label="Loading other months…"/></p>}
           {(catalogError || (catalog && catalog.coverage.status !== "complete")) && <p className="bb-comparison-note">
             {catalogError && catalogErrorMessage ? catalogErrorMessage : catalog?.coverage.code === "source_timeout"
               ? "Some comparison months couldn’t be checked because Google Sheets timed out."
