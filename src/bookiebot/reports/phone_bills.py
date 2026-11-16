@@ -7,6 +7,7 @@ import logging
 from aiohttp import web
 from bookiebot.reports import bill_settings as service
 from bookiebot.sheets.recurring import BillConflict, BillValidation
+from bookiebot.reports.accounts import AccountConflict
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ async def _bills(request: web.Request) -> web.Response:
                 result = await asyncio.to_thread(service.charge_transaction, actor, request.match_info["id"], request.query.get("month", ""))
             else:
                 result = await asyncio.to_thread(service.listing, actor)
+                from bookiebot.reports.shared_bills import enrich_listing
+                result = await asyncio.to_thread(enrich_listing, actor, result)
                 from bookiebot.reports.bill_checkin import build_store, DEFAULT_LEAD_DAYS
                 prefs = await asyncio.to_thread(lambda: build_store().preferences(session.owner_key))
                 for bill in result.get('bills', []):
@@ -71,8 +74,11 @@ async def _bills(request: web.Request) -> web.Response:
         current = await _session(request)
         if current is None or (current.owner_key, current.actor_key) != (session.owner_key, session.actor_key):
             return _json({"error": "Reconnect BookieBot using /expense_app in Discord."}, status=401)
+        if request.method == 'POST' and not checkin and not request.path.endswith('/review'):
+            from bookiebot.reports.phone_shared_bills import publish_change
+            await publish_change(session.owner_key)
         return _json(result)
-    except BillConflict as exc:
+    except (BillConflict, AccountConflict) as exc:
         return _json({"error": str(exc)}, status=409)
     except (ValueError, TypeError) as exc:
         return _json({"error": str(exc) if isinstance(exc, BillValidation) else "Invalid bill request."}, status=400)

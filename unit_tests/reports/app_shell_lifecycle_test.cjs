@@ -17,7 +17,7 @@ let sharedFocuses = 0, sharedScrolls = 0, widgetFocuses = 0, widgetScrolls = 0
 const sharedTarget = { focus() { sharedFocuses++ }, scrollIntoView() { sharedScrolls++ } }
 const widgetTarget = { focus() { widgetFocuses++ }, scrollIntoView() { widgetScrolls++; win.scrollY = 480 } }
 const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { onLine: true },
-  scrollTo({ top }) { this.scrollY = top }, location: { hash: '', origin: 'https://bookiebot.example', reload() { reloads++ } },
+  scrollTo({ top }) { this.scrollY = top }, location: { hash: '', href:'https://bookiebot.example/app/expenses', origin: 'https://bookiebot.example', reload() { reloads++ } },
   visualViewport: { ...events('viewport'), height: 800 }, matchMedia: () => ({ matches: false }),
   localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
   setTimeout(cb, delay) { const id = ++timerId; timers.set(id, { cb, delay }); return id }, clearTimeout(id) { timers.delete(id) },
@@ -50,7 +50,7 @@ function load(file) {
   }
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
   vm.runInNewContext(code, { exports, require: requireModule, AbortController, Error, Event, CustomEvent: Event, URL,
-    window: win, document: doc, HTMLElement: Element, Element, Node: Element,
+    window: win, document: doc, navigator:win.navigator, HTMLElement: Element, Element, Node: Element,
     fetch: (...args) => request(...args), crypto: { randomUUID: () => `shell-command-${++commandId}` },
     setTimeout: win.setTimeout, clearTimeout: win.clearTimeout,
     requestAnimationFrame: cb => win.setTimeout(cb, 16), cancelAnimationFrame: win.clearTimeout,
@@ -107,6 +107,8 @@ let owner = 'brian', pending, writes = [], reads = { goals: 0, reimbursements: 0
 request = async (url, options = {}) => {
   if (url === '/app/reconciliation') return options.body && bankRequest ? bankRequest.promise : !options.body && bankReadRequest ? bankReadRequest.promise : response({ enabled: bankEnabled, checkedAt: null, items: [] })
   if (url === '/app/version') return response({ version: 'shell-version-2' })
+  if (url === '/app/account') return response({id:'fixture-account',name:owner === 'hannah'?'Hannah':'Brian',googleEnabled:false,google:{connected:false,email:null}})
+  if (url === '/app/account/changes') return response({revision:0})
   if (url === '/app/widgets/script') return { ok: true, text: async () => '// BookieBot Home Screen widget\nconst BOOKIEBOT_ORIGIN = "https://bookiebot.example";' }
   if (url === '/app/widgets/settings') {
     const result = { connections: widgetConnections, scriptUrl: '/app/widgets/script', setupInstructionsUrl: '/app/widgets/help' }
@@ -143,8 +145,9 @@ async function main() {
   const tools = tree.root.findAll(node => node.type === 'div' && node.props.role === 'group' && node.props['aria-label'] === 'BookieBot tools')[0]
   assert.ok(tools.props.className.includes('k-toolbar'), 'Persistent actions use the installed Konsta top Toolbar')
   const toolPanes = tools.findAll(node => node.type === 'div' && node.props.className?.includes('bb-shell-toolbar-pane'))
-  assert.equal(toolPanes.length, 2, 'Chat and Settings have separate glass surfaces')
-  assert.deepEqual(toolPanes.map(pane => pane.findAllByType('button').map(node => node.props['aria-label'])), [['Ask BookieBot'], ['Settings']])
+  assert.equal(toolPanes.length, 1, 'Settings retains its glass surface; the portrait owns chat')
+  assert.deepEqual(toolPanes.map(pane => pane.findAllByType('button').map(node => node.props['aria-label'])), [['Settings']])
+  assert.equal(tree.root.findAll(node => node.type === 'button' && node.props['aria-label'] === 'Talk to BookieBot').length, 1)
   const navigationBar = tree.root.findByType('nav')
   assert.equal(navigationBar.children.length, 1, 'Floating navigation renders only its pane container, without an under-bar blur or gradient')
   for(const node of navigationBar.findAll(n=>n.type==='button'&&n.props['data-nav-screen'])) {
@@ -153,7 +156,7 @@ async function main() {
     assert.equal(node.findAllByType('svg').length,2,'Both silhouettes persist for reversible opacity transitions')
     assert.ok(node.findAllByType('span').every(n=>n.children.every(child=>typeof child!=='string')),'Nav renders no visible text labels')
   }
-  const askTrigger = button(tree, 'Ask BookieBot')
+  const askTrigger = button(tree, 'Talk to BookieBot')
   const dock=tree.root.findAll(node=>node.props.navigation instanceof navigation.AppNavigationStore)[0].props.navigation
   const mountedNavs=navMounts, mountedReport=reportMounts
   duoLandscape=true;await run(()=>tree.update(shell(report)))
@@ -185,10 +188,10 @@ async function main() {
   assert.equal(askTrigger.props['aria-expanded'], false)
   await run(() => askTrigger.props.onClick({ currentTarget: { focus() { throw Error('A pointer tap must not force focus') } } }))
   assert.equal(ask.open, true)
-  assert.equal(button(tree, 'Ask BookieBot').props['aria-expanded'], true)
+  assert.equal(button(tree, 'Talk to BookieBot').props['aria-expanded'], true)
   assert.ok(ask.openerRef, 'The dialog gets an explicit opener for accessible return focus without forcing focus on tap')
   await run(() => ask.onClose())
-  assert.equal(button(tree, 'Ask BookieBot').props['aria-expanded'], false)
+  assert.equal(button(tree, 'Talk to BookieBot').props['aria-expanded'], false)
   const initialReportInstance = rawReport(tree).props['data-report-instance']
   for (const label of ['Overview', 'Transactions', 'Shared', 'Savings']) {
     const node = button(tree, label)
@@ -250,7 +253,7 @@ async function main() {
   assert.notEqual(rawReport(tree).props['data-report-instance'], initialReportInstance, 'Only month-scoped report content resets')
   assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 2, 'Ledger refreshes new report data without remounting its draft')
   await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '37.25'); assert.equal(input(tree, 'Note').props.value, 'Payment draft')
-  await tap(tree, 'Ask BookieBot'); assert.equal(ask.open, true); assert.equal(ask.month, '2026-08')
+  await tap(tree, 'Talk to BookieBot'); assert.equal(ask.open, true); assert.equal(ask.month, '2026-08')
   await run(() => nav.preferences.setMode('projected')); assert.equal(ask.mode, 'projected')
   for (const [source, expected] of [['activity', 'transactions'], ['reimbursements', 'shared'], ['burn-rate', 'overview']]) {
     await run(() => ask.onShowSource(source)); assert.equal(screen(tree), expected); assert.equal(ask.open, false); assert.equal(nav.sourceRequest.section, source)
@@ -388,7 +391,7 @@ async function main() {
   assert.equal(tree.root.findAllByProps({className:'bb-app-loading-sheet'}).length,0)
   assert.equal(tree.root.findAllByProps({className:'bb-app-welcome'}).length,0)
   assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,1,'Startup has one centered loading indicator')
-  for (const label of ['Overview','Transactions','Shared','Savings','Reconcile','Settings','Ask BookieBot','Current','Projected']) assert.equal(button(tree,label).props.disabled,true,`${label} waits for the first report`)
+  for (const label of ['Overview','Transactions','Shared','Savings','Reconcile','Settings','Talk to BookieBot','Current','Projected']) assert.equal(button(tree,label).props.disabled,true,`${label} waits for the first report`)
   const bootReads = {...reads}
   await run(() => win.dispatchEvent(new Event('focus')))
   assert.deepEqual(reads,bootReads,'Boot chrome cannot start financial controllers, including bank focus checks')
@@ -432,7 +435,7 @@ async function main() {
   assert.equal(visible(rawReport(tree)), false, 'The retained previous month is never shown as the pending month')
   assert.ok(tree.root.findAll(node => node.type === 'main' && node.props.className === 'bb-shell-report-loading bb-main').some(visible))
   assert.ok(tree.root.findAll(node => node.type === 'p' && node.props['data-refresh-phase'] === 'loading').some(visible))
-  assert.equal(button(tree, 'Ask BookieBot').props.disabled, true)
+  assert.equal(button(tree, 'Talk to BookieBot').props.disabled, true)
   for (const label of ['Overview', 'Transactions', 'Shared', 'Savings']) assert.ok(!button(tree, label).props.disabled)
   await tap(tree, 'Savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft'); assert.equal(input(tree, 'Target ($)').props.value, '1000')
   await run(() => session.emitState({ report: null, selectedMonth: '2026-08', phase: 'error', message: 'Could not load August' }))
@@ -440,11 +443,11 @@ async function main() {
   await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '16.25'); assert.equal(input(tree, 'Note').props.value, 'Private receipt draft')
   await tap(tree, 'Overview'); assert.equal(visible(rawReport(tree)), false)
   assert.ok(tree.root.findAll(node => node.type === 'p' && node.props['data-refresh-phase'] === 'error').some(visible), 'A failed month retains a visible refresh/error state')
-  assert.equal(button(tree, 'Ask BookieBot').props.disabled, true)
+  assert.equal(button(tree, 'Talk to BookieBot').props.disabled, true)
   assert.deepEqual(reads, beforePendingReads, 'Intermediate loading and failure do not remount the financial controllers')
   await run(() => session.emit({ ...report, month: 8, monthLabel: 'August 2026', generatedAt: 'after-pending-month' }))
   assert.equal(visible(rawReport(tree)), true); assert.notEqual(rawReport(tree).props['data-report-instance'], beforePendingReportInstance)
-  assert.equal(button(tree, 'Ask BookieBot').props.disabled, false)
+  assert.equal(button(tree, 'Talk to BookieBot').props.disabled, false)
   await tap(tree, 'Savings'); assert.equal(input(tree, 'Goal name').props.value, 'Private Brian draft')
   await tap(tree, 'Shared'); assert.equal(input(tree, 'Amount ($)').props.value, '16.25'); assert.equal(input(tree, 'Note').props.value, 'Private receipt draft')
   const beforeOwnerReads = reads.goals

@@ -8,7 +8,7 @@ export interface AppWorkStatus {
   dirty?: boolean
   onDiscard?: () => void
 }
-export interface AppGuardedAction { kind: "update" | "signout"; onProceed: () => void | Promise<void> }
+export interface AppGuardedAction { kind: "update" | "signout" | "signin"; onProceed: () => void | Promise<void> }
 const EMPTY_WORK = { pending: false, uncertain: false, dirty: false }
 
 /** Status and reset callbacks only; drafts and financial data stay in their controllers. */
@@ -118,7 +118,8 @@ export function AppWorkGuardProvider({ children }: { children: ReactNode }) {
     }
   }, [action])
   const cancel = () => { if (!executing.current) setAction(null) }
-  const actionWord = (action ?? lastAction.current)?.kind === "signout" ? "sign out" : "update"
+  const actionKind = (action ?? lastAction.current)?.kind
+  const actionWord = actionKind === "signout" ? "sign out" : actionKind === "signin" ? "continue to Google" : "update"
   return <GuardContext.Provider value={{ registry, requestAction }}>{children}
     <dialog ref={dialog} className="bb-work-guard-dialog" aria-labelledby={headingId} aria-describedby={descriptionId}
       onCancel={event => { event.preventDefault(); cancel() }}>
@@ -136,7 +137,7 @@ export function AppWorkGuardProvider({ children }: { children: ReactNode }) {
           if (!action || executing.current) return
           try { if (registry.discard()) void proceed(action) }
           catch { setError("Couldn’t discard these changes. Return to the open form and try again.") }
-        }}>{status.dirty ? `Discard and ${actionWord}` : actionWord === "sign out" ? "Sign out" : "Update now"}</button>}
+        }}>{status.dirty ? `Discard and ${actionWord}` : actionKind === "signout" ? "Sign out" : actionKind === "signin" ? "Continue to Google" : "Update now"}</button>}
       </div>
     </dialog>
   </GuardContext.Provider>

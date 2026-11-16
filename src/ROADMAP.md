@@ -10,6 +10,8 @@ Implemented 2026-11-15: native scheduled savings transfers with one-time/every-t
 
 ## Highest-Value BookieBot Upgrades
 
+Implemented 2026-11-15: stable app accounts with explicitly linked Google OIDC identities, preserved first-party sessions, portrait chat, reviewed/accepted shared-bill membership, canonical monthly repayment views and recipient Projected/Calendar remainders. Foreground cursors defer refreshing financial drafts. Existing financial adapters and Discord remain operational; public household/workbook enrollment and the eventual optional Discord plugin are future slices. See [Accounts and shared bills](../docs/ACCOUNTS_AND_SHARED_BILLS.md).
+
 ### 1. Daily and Weekly Financial Briefings
 
 Add scheduled Discord summaries that proactively report:

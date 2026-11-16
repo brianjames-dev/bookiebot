@@ -83,7 +83,7 @@ export interface BillPrediction {
   amountCents: number
   source: 'history' | 'configured'
   sampleCount: number
-  basis: 'personal_bill_amount'
+  basis: 'personal_bill_amount' | 'shared_bill_invoice'
   firstMonth?: string
   lastMonth?: string
 }

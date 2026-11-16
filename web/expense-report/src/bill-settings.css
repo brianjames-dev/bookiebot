@@ -32,6 +32,35 @@
 .bb-bills-editor[data-new=true] .bi-editor { margin-left:0 }
 .bb-bill-edit-heading { position:relative;display:flex;align-items:center;min-height:44px;padding-right:44px;margin-bottom:12px }
 .bb-bill-edit-heading>h2 { margin:0 }
+.bb-bill-edit-heading:has(>.bb-bills-share) { padding-right:88px }
+.bb-bills .bb-bill-edit-heading>.bb-bills-share { position:absolute;top:0;right:44px;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;background:transparent;color:hsl(var(--primary)) }
+.bb-bills-share svg { width:20px;height:20px }
+.bb-shared-bill-content { display:flex;flex-direction:column;gap:14px;min-height:0 }
+.bb-shared-bill-content .bb-bill-heading { margin:0 }
+.bb-shared-bill-content p { margin:0 }
+.bb-shared-bill-name { display:flex;align-items:baseline;justify-content:space-between;gap:12px }
+.bb-shared-bill-name>strong { min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.bb-shared-bill-name>span { color:hsl(var(--muted-foreground));font-size:12px }
+.bb-shared-bill-people { display:grid;gap:12px }
+.bb-shared-bill-people>div { display:flex;align-items:center;gap:10px }
+.bb-shared-bill-people>div>span:nth-child(2) { flex:1;min-width:0 }
+.bb-shared-bill-people small { display:block;color:hsl(var(--muted-foreground));font-size:12px;margin-top:2px }
+.bb-shared-bill-initial { display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:50%;background:hsl(var(--primary) / .14);color:hsl(var(--primary)) }
+.bb-shared-bill-facts { display:grid;gap:10px;margin:0 }
+.bb-shared-bill-facts>div { display:flex;justify-content:space-between;gap:12px;align-items:baseline }
+.bb-shared-bill-facts dt { color:hsl(var(--muted-foreground));font-size:12px }
+.bb-shared-bill-facts dd { margin:0;text-align:right;font-variant-numeric:tabular-nums }
+.bb-bills[data-wide=true] .bi-step-edit:has(>.bb-bill-sharing) { display:flex;flex-direction:column }
+.bb-bills[data-wide=true] .bb-bill-sharing { display:flex;flex-direction:column;min-height:0;flex:1;height:100% }
+.bb-bills[data-wide=true] .bb-bill-sharing>.bi-step-viewport { flex:1;min-height:0 }
+.bb-bills[data-wide=true] .bb-shared-bill-content { height:100%;gap:5px }
+.bb-bill-sharing .bi-editor-footer { gap:10px }
+.bb-bills[data-wide=true] .bb-shared-bill-people { grid-template-columns:repeat(2,minmax(0,1fr));gap:12px }
+.bb-bills[data-wide=true] .bb-shared-bill-people>div { display:grid;grid-template-columns:32px minmax(0,1fr);gap:2px 6px }
+.bb-bills[data-wide=true] .bb-shared-bill-people>div>strong { grid-column:2 }
+.bb-bills[data-wide=true] .bb-shared-bill-initial { grid-row:1 / 3 }
+.bb-bills[data-wide=true] .bb-shared-bill-facts { gap:4px;font-size:13px }
+.bb-bills[data-wide=true] .bb-shared-bill-content .bi-editor-footer { margin-top:auto }
 .bb-bills .bb-bill-edit-heading>.bb-bills-stop { position:absolute;top:0;right:0;display:grid;place-items:center;width:44px;min-width:44px;height:44px;padding:0;border:0;background:transparent;color:hsl(var(--destructive)) }
 .bb-bills-form { row-gap:var(--bb-bill-gap) }
 .bb-bills-short-label { display:none }

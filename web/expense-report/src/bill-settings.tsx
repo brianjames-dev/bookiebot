@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useLayoutEffect,useRef,useState} from 'react'
-import {ArrowLeft,ArrowRight,ChevronDown,ChevronRight,Plus,Trash2,RefreshCw,Clock3,Check,RotateCcw} from 'lucide-react'
+import {ArrowLeft,ArrowRight,ChevronDown,ChevronRight,Plus,Trash2,RefreshCw,Clock3,Check,RotateCcw,UsersRound} from 'lucide-react'
 import {TransactionIcon} from './daily-transactions'
 import {useAppNavigation} from './app-navigation'
 import {useAppWorkGuard,useAppWorkStatus} from './app-work-guard'
@@ -14,6 +14,7 @@ import {BillCurrentOffer} from './bill-current-offer'
 import {billFlow,billFlowKey,runBillFlow,type BillSaveFlow,type BillCurrentChange} from './bill-save-flow'
 import {billReviewLines,currentReviewLines} from './bill-review'
 import {BillEditorWorkspace} from './bill-editor-workspace'
+import {BillSharingEditor,BillSharingRecovery,readSharingJournal,type BillMembership} from './bill-sharing'
 import {billListAmount,recurringStartMonth} from './bill-settings-model'
 import {usePageRefresh,usePageRefreshRegistry} from './page-refresh'
 import {BillPredictionInfo} from './bill-prediction-info'
@@ -24,13 +25,13 @@ import './bill-checkin.css'
 import './bill-settings.css'
 
 type Charge={available:boolean;month:string;amountCents?:number;billAmountCents?:number;status?:'unconfirmed'|'confirmed'|'paid';canConfirmAmount?:boolean;splitPending?:boolean;recorded?:boolean;virtual?:boolean;date?:string|null;version?:string}
-export type Bill={id:string;type:'subscription'|'variable'|'fixed';name:string;amountCents:number|null;cadence:'monthly'|'quarterly'|'yearly';pullDay:number|null;pullMonths:number[];category:string;account:string;active:boolean;effectiveFrom:string;effectiveUntil:string;splitMethod:'none'|SplitMethod;payerBasisPoints:number;version:string;nextDate:string|null;needsSetup:boolean;earliestEffectiveMonth:string;cancellationRequestId?:string|null;charge:Charge;nextChange?:Bill|null;prediction?:BillPrediction|null;checkInLeadDays?:number|null}
+export type Bill={readOnly?:boolean;sharing?:BillMembership|null;id:string;type:'subscription'|'variable'|'fixed';name:string;amountCents:number|null;cadence:'monthly'|'quarterly'|'yearly';pullDay:number|null;pullMonths:number[];category:string;account:string;active:boolean;effectiveFrom:string;effectiveUntil:string;splitMethod:'none'|SplitMethod;payerBasisPoints:number;version:string;nextDate:string|null;needsSetup:boolean;earliestEffectiveMonth:string;cancellationRequestId?:string|null;charge:Charge;nextChange?:Bill|null;prediction?:BillPrediction|null;checkInLeadDays?:number|null}
 type Snapshot={month:string;today:string;settingsVersion:string;ownerName:string;partnerName:string;incomeBasisPoints:number;splitsEnabled:boolean;bills:Bill[];pendingCommand?:Command;earliestStopMonth?:string;pendingFlow?:BillSaveFlow}
 type Form={name:string;type:Bill['type'];amount:string;cadence:Bill['cadence'];pullDay:string;firstMonth:number;category:string;account:string;effectiveFrom:string;stopFrom:string;splitMethod:Bill['splitMethod'];payerBasisPoints:number}
 type Command=Record<string,unknown>&{operation:string;requestId?:string;reviewVersion?:string}
 type Review={operation:string;reviewVersion:string;name?:string;amountCents?:number;month?:string;date?:string;effectiveFrom?:string;before?:Bill|null;after?:Bill;share?:{method:string;payerName?:string;partnerName?:string;payerCents:number;partnerCents:number};replacesScheduledChanges?:boolean;currentChange?:BillCurrentChange|null;applyCurrentCharge?:boolean;cancellation?:BillEndReviewData}
 type Result={state:string;success?:boolean;detail?:string;splitPending?:boolean;transaction?:{id:string;month:string};historyCommands?:Command[];recoveryReview?:Review}
-type Mode='settings'|'amount'|'monthly'|'stop'|'adopt'|'split'|'offer'|'charge'
+type Mode='settings'|'amount'|'monthly'|'stop'|'adopt'|'split'|'offer'|'charge'|'sharing'|'shared'
 type Draft={form:Form;mode:Mode;amount:string;review:Review|null;reviewBody:Command|null;splitInput:SplitInputDraft;valid:boolean;draftId:string;splitBefore:{method:Form['splitMethod'];basis:number}|null}
 const money=(cents:number|null|undefined)=>cents===null||cents===undefined?'Not set':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100)
 const monthLabel=(value:string)=>new Date(value+'-01T12:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})
@@ -56,6 +57,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const [busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result|null>(null),[pending,setPending]=useState<Command|null>(null),[valid,setValid]=useState(true)
  const [splitInput,setSplitInput]=useState<SplitInputDraft>(null)
  const [confirmReady,setConfirmReady]=useState(false)
+ const [sharingBlocked,setSharingBlocked]=useState(false),[sharingRecovery,setSharingRecovery]=useState(()=>readSharingJournal(ownerName))
  const root=useRef<HTMLDivElement>(null),rowPositions=useRef(new Map<string,DOMRect>()),rowMotion=useRef<Animation[]>([])
  const captureRows=()=>{rowPositions.current=new Map([...root.current?.querySelectorAll<HTMLElement>('.bb-bills-row-shell')??[]].map(node=>[node.querySelector<HTMLElement>('[data-bill-id]')!.dataset.billId!,node.getBoundingClientRect()]))}
  const flowKey=billFlowKey(ownerName),flowRef=useRef<BillSaveFlow|null>(null),order=useRef<string[]|null>(null)
@@ -84,9 +86,9 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  usePageRefresh(active?'settings':null,{refresh:async()=>{setRefreshing(true);try{return await load()}finally{setRefreshing(false)}},disabled:busy||Boolean(pending)||currentLocked})
  useEffect(()=>{alive.current=true;try{const retained=JSON.parse(sessionStorage.getItem(flowKey)||'null');if(retained?.version===1){if(retained.stage==='done')sessionStorage.removeItem(flowKey);else{flowRef.current=retained;setFlow(retained)}}else{const saved=sessionStorage.getItem(storageKey);if(saved)setPending(JSON.parse(saved))}}catch{}return()=>{alive.current=false;++generation.current;abort.current?.abort()}},[storageKey])
  useEffect(()=>{if(active&&!snapshot&&!flight.current)void load()},[active,snapshot,load])
- useEffect(()=>{if(wasActive.current&&!active&&!busy&&!pending&&!currentLocked){setNewRequested(false);reset()}wasActive.current=active},[active,busy,pending,currentLocked,reset])
+ useEffect(()=>{if(wasActive.current&&!active&&!busy&&!pending&&!currentLocked&&!sharingBlocked&&!sharingRecovery){setNewRequested(false);reset()}wasActive.current=active},[active,busy,pending,currentLocked,sharingBlocked,sharingRecovery,reset])
  const choose=(bill?:Bill)=>{
-  if(busy||pending||flow||currentLocked||!snapshot)return
+  if(busy||pending||flow||currentLocked||sharingBlocked||sharingRecovery||!snapshot)return
   for(const animation of rowMotion.current)animation.finish();rowMotion.current=[]
   if(form&&bill?.id===selected?.id){if(bill)reset();return}
   const followup=mode==='charge'||mode==='offer'||mode==='adopt'
@@ -94,11 +96,11 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   if(form&&!followup)drafts.current.set(selected?.id??'new',{form,mode,amount,review,reviewBody,splitInput,valid,draftId:draftId.current,splitBefore:splitBefore.current})
   if(!order.current)order.current=snapshot.bills.map(b=>b.id)
   const draft=drafts.current.get(bill?.id??'new')
-  setSelected(bill??null);setForm(draft?.form??newForm(snapshot,bill));setMode(draft?.mode??'settings');setAmount(draft?.amount??'')
+  setSelected(bill??null);setForm(draft?.form??newForm(snapshot,bill));setMode(bill?.readOnly?'shared':draft?.mode??'settings');setAmount(draft?.amount??'')
   setReview(draft?.review??null);setReviewBody(draft?.reviewBody??null);setSplitInput(draft?.splitInput??null);setValid(draft?.valid??true)
   draftId.current=draft?.draftId??crypto.randomUUID();setConfirmReady(false);setError('');setResult(null);splitBefore.current=draft?.splitBefore??null
  }
- const addBill=()=>{if(busy||pending||flow||currentLocked||!snapshot){setNewRequested(true);return}choose()}
+ const addBill=()=>{if(busy||pending||flow||currentLocked||sharingBlocked||sharingRecovery||!snapshot){setNewRequested(true);return}choose()}
  const openMonthly=(bill:Bill)=>{
   if(locked||!snapshot)return
   if(!form||selected?.id!==bill.id)choose(bill)
@@ -200,7 +202,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  // Keep the editor's row anchor through its closing expansion. Folding changes
  // only the grid placement, never the mounted scenes or controlled draft.
  if(form)placement.current={order:selected?visible.findIndex(bill=>bill.id===selected.id)*2+3:1,isNew:!selected,billId:selected?.id}
- const locked=busy||Boolean(pending)||Boolean(flow)||currentLocked,lastReview=useRef<Review|null>(null)
+ const locked=busy||Boolean(pending)||Boolean(flow)||currentLocked||sharingBlocked||Boolean(sharingRecovery),lastReview=useRef<Review|null>(null)
  if(review)lastReview.current=review
  const shownReview=review??lastReview.current
  const splitLabel=(bill:Pick<Bill,'splitMethod'|'payerBasisPoints'>)=>bill.splitMethod==='none'?'No split':bill.splitMethod==='income'?'By income':bill.splitMethod==='equal'?'50 / 50':bill.splitMethod==='fronted'?`100% ${snapshot?.partnerName}`:`${(bill.payerBasisPoints/100).toFixed(2)}% ${snapshot?.ownerName}`
@@ -212,8 +214,8 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  const heading=mode==='split'?'Recurring split':mode==='amount'?'Monthly amount':mode==='monthly'?'This month’s bill':mode==='adopt'?'Recorded charge':mode==='stop'?'Stop bill':selected?((selected.nextChange??selected).active?'Edit bill':'Restart bill'):'New bill'
  const dueLabel=selected?.charge.date?new Date(selected.charge.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'Set a payment day'
  const reminder=selected&&selected.charge.canConfirmAmount!==false&&<label className="bb-bills-reminder">Amount check-in<span className="bi-select"><select aria-label="Amount check-in" disabled={locked} value={selected.checkInLeadDays===null?'off':selected.checkInLeadDays??7} onChange={e=>void setCheckin(e.target.value)}>{[1,3,7,14,30].map(n=><option key={n} value={n}>{n} {n===1?'day':'days'} before</option>)}<option value="off">Off</option></select><ChevronDown aria-hidden="true"/></span></label>
- const editView=form&&snapshot&&(mode==='offer'&&currentIntent?<BillCurrentOffer intent={currentIntent} locked={locked} onKeep={()=>{reset();void load()}} onReview={reviewCurrent}/>:<>
-  <header className="sp-flow-heading bb-bill-heading bb-bill-edit-heading"><h2>{heading}</h2>{mode==='split'&&<button type="button" className="bi-cancel bb-bills-remove-split" disabled={locked} onClick={()=>{change({splitMethod:'none'});setSplitInput(null);setValid(true);setMode('settings')}}>Remove split</button>}{selected?.cancellationRequestId&&mode==='settings'&&<button type="button" className="bb-bills-undo-end" aria-label="Undo cancellation" title="Undo cancellation" disabled={locked} onClick={()=>void prepare('restore-end')}><RotateCcw aria-hidden="true"/></button>}{selected&&mode==='settings'&&<button type="button" className="bb-bills-stop" aria-label="Stop bill" disabled={locked} onClick={()=>setMode('stop')}><Trash2 aria-hidden="true"/></button>}</header>
+ const editView=form&&snapshot&&(selected&&(mode==='sharing'||mode==='shared')?<BillSharingEditor bill={selected} ownerName={ownerName} partnerName={snapshot.partnerName} onClose={()=>selected.readOnly?reset():setMode('settings')} onSaved={()=>{reset();void load()}} onBlock={setSharingBlocked}/>:mode==='offer'&&currentIntent?<BillCurrentOffer intent={currentIntent} locked={locked} onKeep={()=>{reset();void load()}} onReview={reviewCurrent}/>:<>
+  <header className="sp-flow-heading bb-bill-heading bb-bill-edit-heading"><h2>{heading}</h2>{mode==='split'&&<button type="button" className="bi-cancel bb-bills-remove-split" disabled={locked} onClick={()=>{change({splitMethod:'none'});setSplitInput(null);setValid(true);setMode('settings')}}>Remove split</button>}{selected?.cancellationRequestId&&mode==='settings'&&<button type="button" className="bb-bills-undo-end" aria-label="Undo cancellation" title="Undo cancellation" disabled={locked} onClick={()=>void prepare('restore-end')}><RotateCcw aria-hidden="true"/></button>}{selected&&mode==='settings'&&<button type="button" className="bb-bills-share" aria-label="Share bill" disabled={locked} onClick={()=>setMode('sharing')}><UsersRound aria-hidden="true"/></button>}{selected&&mode==='settings'&&<button type="button" className="bb-bills-stop" aria-label="Stop bill" disabled={locked} onClick={()=>setMode('stop')}><Trash2 aria-hidden="true"/></button>}</header>
   <form className="bi-fields bb-bills-form" data-editor-mode={mode} onSubmit={e=>{e.preventDefault();if(mode==='split'){if(valid&&!locked)setMode('settings');return}void prepare(mode==='stop'?'end':mode==='amount'?'amount':mode==='adopt'?'adopt':selected?'update':'create')}}>
    {mode==='split'?<>
     <div className="sp-management"><NotchedSplitControl unit="percent" inputDraft={splitInput} onInputDraft={setSplitInput} total={10000} payerCents={selectedIncome} method={form.splitMethod==='none'?'income':form.splitMethod} incomeBasis={snapshot.incomeBasisPoints} capture={6} payerName={snapshot.ownerName} partnerName={snapshot.partnerName} disabled={locked} onChange={(payerBasisPoints,splitMethod)=>change({payerBasisPoints,splitMethod})} onValidityChange={setValid}/></div>
@@ -261,6 +263,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  return <div ref={root} className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
 
   <div className="bb-bills-notices">
+  {sharingRecovery&&<BillSharingRecovery journal={sharingRecovery} ownerName={ownerName} onSaved={()=>{setSharingRecovery(null);void load()}} onBlock={setSharingBlocked}/>}
   {newRequested&&<p className="bb-bills-status" role="status">New bill will open after the current change is verified.</p>}
   {error&&(!form||wide||Boolean(flow))&&<p className="bb-bills-error" role="alert">{error}</p>}
   {result?.detail&&<p role="status" className="bb-bills-status">{result.detail}</p>}
@@ -277,7 +280,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
      return <div className="bb-bills-row-shell" style={{order:index*2+2}} key={bill.id}>
       <button type="button" className="bb-bills-row" data-predicted={Boolean(prediction)} aria-pressed={bill.id===selected?.id} data-bill-id={bill.id} data-editor-anchor={bill.id===placement.current.billId} disabled={locked} onClick={()=>choose(bill)}>
        <TransactionIcon entry={{date:bill.nextDate??'',category:bill.category==='bills_utilities'?'Bills & Utilities':bill.category==='rent'?'Rent':bill.category==='subscriptions_wants'?'Subs (Wants)':'Static Bills & Subscriptions',amount:(value??0)/100,person:ownerName,item:configured.name,location:configured.name}} aliases={aliases}/>
-       <span className="bb-bills-row-text"><strong>{configured.name}</strong><small>{!bill.active?'Ended':bill.nextChange?.active===false?`Ends ${monthLabel(bill.nextChange.effectiveFrom)}`:configured.needsSetup?'Finish setup':`${kindLabel[configured.type]} · ${configured.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?.active?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span>
+       <span className="bb-bills-row-text"><strong>{configured.name}</strong><small>{bill.readOnly?`${bill.sharing?.status==='pending'?'Invitation':'Shared'} · Paid by ${bill.sharing?.payerName}`:!bill.active?'Ended':bill.nextChange?.active===false?`Ends ${monthLabel(bill.nextChange.effectiveFrom)}`:configured.needsSetup?'Finish setup':`${kindLabel[configured.type]} · ${configured.cadence}`}{bill.effectiveFrom>snapshot.month?` · From ${monthLabel(bill.effectiveFrom)}`:bill.nextChange?.active?` · ${bill.nextChange.active?'Changes':'Stops'} ${monthLabel(bill.nextChange.effectiveFrom)}`:''}</small></span>
        <span className="bb-bills-row-amount">{value==null?bill.active?'Amount needed':'—':money(value)}</span><ChevronRight aria-hidden="true"/>
       </button>
       {prediction&&<BillPredictionInfo items={[{label:configured.name,prediction}]}/>}

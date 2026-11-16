@@ -148,6 +148,8 @@ def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | Non
         source = snapshot or read_source(actor)
         return transfer_review(actor, body, source)['review']
     source = snapshot or read_workbook(actor, today)
+    if body.get('id') in source.delegated_payers:
+        raise BillValidation('This shared bill’s payer manages its recurring settings and invoice amount.')
     if body.get("operation") in {"end", "end-year", "restore-end", "restore-end-year"}:
         from bookiebot.reports.bill_cancellation import review_end, review_year, review_restore
         if body["operation"] == "end":

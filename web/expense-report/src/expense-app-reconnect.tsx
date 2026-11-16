@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 
 import { ExpenseAppPairing, initialExpenseAppPairingState } from "./expense-app-session"
+import { GoogleLogin } from "./account-settings"
 
 export function ExpenseAppReconnect() {
   const [input, setInput] = useState("")
@@ -31,6 +32,7 @@ export function ExpenseAppReconnect() {
 
   return (
     <section className="bb-app-reconnect" aria-label="Reconnect this app">
+      <GoogleLogin/>
       <p>Request <code>/expense_app</code> in Discord, copy its setup link, then paste it here.</p>
       <form onSubmit={(event) => {
         event.preventDefault()

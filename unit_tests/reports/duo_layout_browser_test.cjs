@@ -81,6 +81,9 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   else if(name==='/app/notifications')value={enabled:false,preferences:{weekly:true,upcoming:false,showAmounts:false,hour:10}};
   else if(name==='/app/widgets/settings')value={connections:[],scriptUrl:'/app/widgets/script',setupInstructionsUrl:'/app/widgets/help'};
   else if(name==='/app/version')value={version:'fixture-version'};
+  else if(name==='/app/account')value={id:'fixture-user',name:'Brian',googleEnabled:false,google:{connected:false,email:null}};
+  else if(name==='/app/account/changes')value={revision:0};
+  else if(name==='/app/auth/options')value={googleEnabled:false};
   else if(name.includes('avatar'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'assets/avatars/avatar7.png'))});
   else {unexpected.push(request.method()+' '+url);return route.fulfill({status:404,json:{error:'Unknown fixture'}});}
   return route.fulfill({json:value});
@@ -242,12 +245,12 @@ async function pageScrollLifecycle(page){
  await tap(page,page.getByRole('button',{name:'Overview',exact:true}));
  await page.locator('.bb-app-shell[data-screen="overview"]').waitFor();
  assert.equal(await surface.evaluate(el=>el.scrollTop),240,'returning restores the content scroll position');
- await page.getByRole('button',{name:'Ask BookieBot',exact:true}).click();
+ await page.getByRole('button',{name:'Talk to BookieBot',exact:true}).click();
  await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock==='true');
  assert.equal(await surface.evaluate(el=>getComputedStyle(el).overflowY),'hidden','Message locks the content surface');
  // Model native focus scrolling while the dialog owns the keyboard.
  await surface.evaluate(el=>el.scrollTop=0);
- await page.getByRole('button',{name:'Close Ask BookieBot',exact:true}).click();
+ await page.getByRole('button',{name:'Close Talk to BookieBot',exact:true}).click();
  await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock!=='true');
  assert.equal(await surface.evaluate(el=>el.scrollTop),240,'closing Message restores the actual content position');
  await surface.evaluate(el=>el.scrollTo(0,0));
@@ -455,7 +458,7 @@ if(require.main===module)(async()=>{
       await page.getByRole('button',{name:'Compare spending',exact:true}).click();
       await page.locator('.bb-comparison-card[data-open="true"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       await page.getByRole('button',{name:'Collapse comparison',exact:true}).click();
-      await page.getByRole('button',{name:'Ask BookieBot',exact:true}).click();await page.getByRole('button',{name:'Close Ask BookieBot',exact:true}).click();
+      await page.getByRole('button',{name:'Talk to BookieBot',exact:true}).click();await page.getByRole('button',{name:'Close Talk to BookieBot',exact:true}).click();
       await page.getByRole('button',{name:'Settings',exact:true}).click();
       const preference=page.getByRole('switch',{name:'Duo landscape layout',exact:true});await preference.click();assert.equal(await preference.getAttribute('aria-checked'),'false');
       assert.notEqual(await page.evaluate(()=>getComputedStyle(document.documentElement).overflowY),'hidden','preference off restores ordinary document scrolling');

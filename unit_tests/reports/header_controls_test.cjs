@@ -58,6 +58,9 @@ for (const phase of ['ready', 'refreshing', 'stale', 'error']) {
   if (phase === 'stale' || phase === 'error') assert.ok(html.includes('Couldn’t refresh.') && html.includes('Showing '), 'Failure context remains available beneath the title')
 }
 const monthHeader = renderToStaticMarkup(React.createElement(ReportHeader, {month: 'October 2026', projected: false, onToggle() {}}))
+const interactiveBrand = renderToStaticMarkup(React.createElement(ReportBrand,{owner:'Brian',avatarUrl:'/fixture-avatar',status:'Updated now',onChat(){},chatOpen:true}))
+assert.ok(interactiveBrand.includes('aria-label="Talk to BookieBot"') && interactiveBrand.includes('aria-expanded="true"'))
+assert.equal((interactiveBrand.match(/bb-app-avatar/g)||[]).length,1,'One portrait owns the chat opener without a duplicate avatar')
 assert.ok(monthHeader.includes('October') && monthHeader.includes('Current') && !monthHeader.includes('bb-app-status'), 'The month/view row needs no second timestamp')
 
 const { ReportMenu } = load("components/ui/report-menu.tsx")

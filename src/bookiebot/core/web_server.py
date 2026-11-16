@@ -6,12 +6,20 @@ import os
 from typing import Any
 
 from aiohttp import web
+from aiohttp.abc import AbstractAccessLogger
 
 from bookiebot.core.bank_link import create_bank_link_app
 from bookiebot.banking.service import build_banking_service
 from bookiebot.reports.web import register_report_routes
 
 logger = logging.getLogger(__name__)
+
+
+class PrivateAccessLogger(AbstractAccessLogger):
+    """Log paths, never OAuth codes/state or existing private URL queries."""
+
+    def log(self, request: web.Request, response: web.StreamResponse, time: float) -> None:
+        self.logger.info('%s %s %s %.3fs', request.method, request.path, response.status, time)
 
 _WEB_SERVER_TASK: asyncio.Task | None = None
 _PLAID_WEBHOOK_WORKER_TASK: asyncio.Task | None = None
@@ -43,7 +51,7 @@ async def run_web_server() -> None:
     global _PLAID_WEBHOOK_WORKER_TASK
     app = create_bank_link_app()
     register_report_routes(app)
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(app, access_log_class=PrivateAccessLogger)
     await runner.setup()
     port = int(os.getenv("PORT", "8080"))
     site = web.TCPSite(runner, "0.0.0.0", port)
