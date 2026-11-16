@@ -55,6 +55,24 @@ the invitation. This prevents two future schedules without silently deleting
 history or altering an existing charge. One local source cannot be adopted by
 two accepted shared bills.
 
+Older Rent/utility splits can predate the bill-ID metadata. BookieBot resolves
+these through their original canonical expense/action, month, owner pair and
+unique budget source, including renamed display labels. A verified invitation
+appears on the existing logical bill row; it does not add another setup row.
+Already accepted legacy links resolve automatically on reads, without requiring
+leave/reaccept or changing the saved acceptance. Accepting a pending invitation
+stores its verified local source for future use. Ambiguous or independently
+configured sources retain the existing protections.
+
+The amount beside a shared bill is the original current invoice's **your share**,
+even when the next recurring rule differs or the balance is fully repaid. The
+details separately show bill total, your share, received and remaining. An
+early confirmed reimbursement remains an actual transaction on its original
+receipt date, including November 1; the payer's later autopay date stays separate.
+No transaction, split, repayment, bill schedule or amount is recreated by this
+link repair. Pending utility invitations still need explicit acceptance before
+they contribute shared future forecasts.
+
 ## Amounts and refresh
 
 - The payer’s hidden plan remains the source for future amount/date/split

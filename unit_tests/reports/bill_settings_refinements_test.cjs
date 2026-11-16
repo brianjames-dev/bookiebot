@@ -17,6 +17,12 @@ function load(file){if(cache.has(file))return cache.get(file);const exports={};c
  vm.runInNewContext(code,{exports,require:name=>name.endsWith('.css')?{}:modules[name]??(name.startsWith('.')?relative(name):req(name)),window:win,sessionStorage,AbortController,DOMException,Date,Intl,Event,Error,structuredClone,crypto:{randomUUID:()=>`bill-refinement-${++serial}-123456`},fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject}))});return exports;
 }
 const {BillSettings}=load(path.resolve('web/expense-report/src/bill-settings.tsx'));
+const {billListAmount}=load(path.resolve('web/expense-report/src/bill-settings-model.ts'));
+const settledShare={readOnly:true,type:'fixed',amountCents:0,nextChange:{type:'fixed',amountCents:90000},charge:{available:true,amountCents:4500,recorded:true},sharing:{state:{purchaseTotalCents:15000,memberShareCents:4500,remainingCents:0,allocationIds:['original-split']}}};
+assert.equal(billListAmount(settledShare).cents,4500,'A fixed shared row shows its original share, never next month’s rule or remaining debt');
+assert.equal(billListAmount({...settledShare,type:'variable'}).cents,4500);
+assert.equal(billListAmount(settledShare).known,true);
+assert.equal(billListAmount({...settledShare,sharing:{state:{...settledShare.sharing.state,purchaseTotalCents:null,allocationIds:[]}}}).cents,null,'An unavailable amount is not a real zero');
 const loan={id:'loan',name:'Z Loan',type:'fixed',amountCents:6000,cadence:'monthly',pullDay:1,pullMonths:[],category:'static_bills_subscriptions_needs',account:'Checking',active:true,effectiveFrom:'0001-01',effectiveUntil:'9999-12',splitMethod:'none',payerBasisPoints:10000,version:'p1',nextDate:'2026-12-01',needsSetup:false,earliestEffectiveMonth:'2026-12',charge:{available:true,recorded:true,virtual:false,amountCents:6000,month:'2026-11',date:'2026-11-01',version:'c1'}};
 const other={...loan,id:'other',name:'A Service',type:'subscription'};
 const snapshot=(bills=[loan,other])=>({month:'2026-11',today:'2026-11-13',settingsVersion:'sv1',ownerName:'Brian',partnerName:'Hannah',incomeBasisPoints:6473,splitsEnabled:true,bills:Array.isArray(bills)?bills:[bills]});

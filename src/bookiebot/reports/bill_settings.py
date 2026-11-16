@@ -54,6 +54,12 @@ def listing(actor: str) -> dict[str, Any]:
 
     def public(plan: BillPlan, period: str) -> dict[str, Any]:
         value = plan.public(period, as_of=today)
+        # Stable budget-source identity, distinct from an editable display name.
+        value['sourceLabel'] = plan.source_label
+        value['sourceFrom'] = min(p.effective_from for p in snapshot.settings.plans if p.id == plan.id)
+        from bookiebot.sheets.recurring_charges import following_month
+        value['hasFutureAmount'] = any(p.id == plan.id and p.active and p.amount_cents
+            and p.effective_until > following_month(snapshot.settings.period) for p in snapshot.settings.plans)
         info = snapshot.charge(plan, period)
         prediction = (predict_bill(plan.source_label, history, period, as_of=today,
             override_cents=plan.amount_cents, amount_column=4 if plan.category == "subscriptions_wants" else 3)
