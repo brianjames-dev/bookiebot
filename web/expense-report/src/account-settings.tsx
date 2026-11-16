@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { ChevronRight } from "lucide-react"
 import { useAppWorkGuard, useAppWorkStatus } from "./app-work-guard"
 
 interface AccountProfile {id:string;name:string;googleEnabled:boolean;google:{connected:boolean;email:string|null}}
@@ -28,8 +29,8 @@ export function GoogleSignInButton({link = false, disabled = false}: {link?:bool
     }
   }
   return <>
-    <button type="button" className="bb-settings-action bb-google-sign-in" disabled={disabled || busy || guard.pending || guard.uncertain}
-      onClick={() => guard.requestAction({kind:'signin',onProceed:start})}>{busy?'Connecting…':link?'Link Google account':'Continue with Google'}</button>
+    <button type="button" className={`bb-settings-action bb-google-sign-in${link?' bb-account-action':''}`} disabled={disabled || busy || guard.pending || guard.uncertain}
+      onClick={() => guard.requestAction({kind:'signin',onProceed:start})}><span>{busy?'Connecting…':link?'Link Google account':'Continue with Google'}</span>{link&&<ChevronRight aria-hidden="true"/>}</button>
     {error && <p className="bb-settings-note" role="alert">{error}</p>}
   </>
 }

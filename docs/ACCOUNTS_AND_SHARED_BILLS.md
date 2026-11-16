@@ -14,6 +14,10 @@ Thereafter **Continue with Google** on the disconnected screen can reconnect
 that same account. An unlinked Google account cannot choose a workbook or sign
 itself up as Brian or Hannah. Each person links from their own connected app.
 
+The Account card gives **Link Google account** and **Sign out** separate full-width
+action rows aligned with the account details. Sign out uses the app’s red action
+styling; each row remains a separate touch and keyboard target.
+
 The start action respects unsaved financial drafts and unresolved saves. A
 cancelled, expired, replayed, wrong-browser or revoked-session callback does not
 link an identity. Linking a different Google account over an existing link, or
@@ -105,7 +109,10 @@ the repository. Requested scopes are only `openid email profile`; no Gmail,
 Drive or Sheets access is requested from the signing-in Google account.
 BookieBot continues using its existing server-side Sheets integration.
 
-The audience must leave Testing before general public access. This release
+For public release, publish the OAuth app and complete any applicable branding
+and verification. Google exempts our basic identity scopes from Testing’s usual
+allowlist and seven-day authorization restrictions; BookieBot independently
+requires an existing linked account. See [Google’s audience rules](https://support.google.com/cloud/answer/15549945). This release
 supports the existing configured financial pair. Public household enrollment,
 new workbook provisioning, provider management and a complete Discord-independent
 financial-adapter migration are separate follow-ups.

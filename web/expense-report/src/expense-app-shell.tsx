@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { LogOut } from "lucide-react"
 import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenForReportSource, screenTitles, type AppScreen, type MainScreen, type ScrollNavigationState } from "./app-navigation"
 import { AppNavigationDock } from "./app-navigation-bar"
 import { NavigationViewport } from "./navigation-viewport"
@@ -282,7 +283,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         <section className="bb-settings-section" aria-labelledby="bb-account-title"><h2 id="bb-account-title">Account</h2>
           <AccountIdentity ownerName={report.ownerName} active={screen === 'settings' && !configurationOpen && !widgetGuideOpen}/>
           {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}
-          <button type="button" className="bb-settings-action" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}>{signingOut ? "Signing out…" : "Sign out"}</button>
+          <button type="button" className="bb-settings-action bb-account-action bb-account-sign-out" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}><span>{signingOut ? "Signing out…" : "Sign out"}</span><LogOut aria-hidden="true"/></button>
         </section>
         <section className="bb-settings-section" aria-labelledby="bb-updates-title"><h2 id="bb-updates-title">About &amp; updates</h2>
           <div className="bb-setting-row"><span>BookieBot</span><span className="bb-app-version">{initialVersion ? `Version ${initialVersion.slice(0, 8)}` : "Web app"}</span></div>
