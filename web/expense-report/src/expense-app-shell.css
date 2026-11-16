@@ -110,6 +110,11 @@
 .bb-settings-note, .bb-app-version { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.6; }
 .bb-settings-action { min-height: 44px; border: 0; background: transparent; color: hsl(var(--primary)); font: inherit; text-align: left; padding: 8px 0; cursor: pointer; }
 .bb-settings-action:disabled { opacity: .5; cursor: default; }
+.bb-account-action { display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:12px 0;border-top:1px solid hsl(var(--border));font-size:15px;line-height:1.4; }
+.bb-account-action > span { flex:1;min-width:0; }
+.bb-account-action > svg { flex:0 0 auto;width:18px;height:18px; }
+.bb-account-action:focus-visible { outline:2px solid currentColor;outline-offset:-2px;border-radius:4px; }
+.bb-account-sign-out { color:hsl(var(--destructive)); }
 .bb-app-shell[data-duo-landscape="true"] .bb-shell-bills { max-width:none; }
 .bb-setting-switch { width: 52px; height: 44px; padding: 6px 2px; border: 0; background: transparent; position: relative; flex: 0 0 52px; cursor: pointer; }
 .bb-setting-switch::before { content: ""; position: absolute; inset: 8px 2px; border-radius: 20px; background: hsl(var(--foreground) / .18); transition: background var(--bb-motion-duration); }
