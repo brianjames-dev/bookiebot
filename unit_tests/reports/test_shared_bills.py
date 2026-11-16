@@ -165,6 +165,26 @@ def test_future_split_can_be_shared_without_rewriting_current_unsplit_occurrence
     assert value['nextChange']['amountCents']==109989 and value['nextChange']['account']==''
 
 
+@pytest.mark.parametrize('recorded', [True,False])
+def test_variable_invitation_review_separates_monthly_input_from_recorded_invoice(catalog,monkeypatch,recorded):
+    apply(catalog,'invite');_,member=people(catalog)
+    identity=catalog.links(member)[0]['id']
+    monkeypatch.setattr(recurring_storage,'read_workbook',lambda *_:SimpleNamespace(allocations=[],
+        settings=SimpleNamespace(plans=[],records=lambda:[])))
+    def variable(actor):
+        value=listing(actor);current=value['bills'][0]
+        current.update(type='variable',amountCents=None)
+        current['charge']={**current['charge'],'recorded':recorded,'status':'confirmed' if recorded else 'unconfirmed'}
+        current['nextChange']={**current,'nextChange':None,'effectiveFrom':'2026-12','version':'future-variable'}
+        return value
+    checked=shared_bills.public_review(shared_bills.review(HANNAH,{'action':'accept','shareId':identity},store=catalog,load=variable))
+    assert checked['bill']['type']=='variable' and checked['bill']['amountCents'] is None
+    assert checked['bill']['effectiveFrom']=='2026-12'
+    assert checked['currentCharge']==({'month':'2026-11','amountCents':300000,'date':'2026-11-01'} if recorded else None)
+    assert 'Private account' not in str(checked)
+    assert catalog.links(member)[0]['status']=='pending'
+
+
 def test_acceptance_blocks_a_competing_positive_recurring_plan(catalog,monkeypatch):
     apply(catalog,'invite');_,member=people(catalog)
     identity=catalog.links(member)[0]['id']

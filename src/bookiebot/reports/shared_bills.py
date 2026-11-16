@@ -276,9 +276,14 @@ def review(actor: str, body: dict[str, Any], *, store: SharedBillStore | None = 
     version = fingerprint([viewer.id, body['action'], payer.id, member.id, plan_id,
         link['revision'] if link else 0, bill['version'] if bill else None,
         configuration['version'] if configuration else None, member_plan_id])
+    charge = bill.get('charge',{}) if bill else {}
+    current_charge = ({'month':source['month'],'amountCents':charge['billAmountCents'],'date':charge.get('date')}
+        if source and isinstance(charge.get('billAmountCents'),int)
+        and (charge.get('recorded') or charge.get('status') in {'confirmed','paid'}) else None)
     return {'action': body['action'], 'reviewVersion': version, 'shareId': SharedBillStore.identity(payer.id, member.id, plan_id),
         'revision': link['revision'] if link else 0, 'name': bill['name'] if bill else None,
         'payerName': payer.name, 'memberName': member.name,
+        'currentCharge': current_charge,
         'bill': {k:v for k,v in configuration.items() if k in {'name','type','amountCents','cadence','pullDay','splitMethod','payerBasisPoints','effectiveFrom'}} if configuration else None,
         '_payer': payer, '_member': member, '_planId': plan_id, '_memberPlanId': member_plan_id}
 

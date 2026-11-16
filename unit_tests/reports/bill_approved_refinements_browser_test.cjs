@@ -34,7 +34,7 @@ async function shot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdir
    await press(main.locator('.bb-bills-row').first());
    assert.equal(await active(page).getByRole('heading',{name:'Edit bill',exact:true}).count(),1);
    assert.equal(await active(page).locator('.bb-bill-edit-heading p').count(),0,'No duplicate merchant or month subtitle');
-   assert.equal(await active(page).locator('.bb-bill-edit-heading button').innerText(),'','Stop is icon only');
+   assert.equal(await active(page).getByRole('button',{name:'Stop bill',exact:true}).innerText(),'','Stop is icon only');
    assert.equal(await active(page).getByText('Applies from',{exact:true}).count(),1);
    const splitStyle=await active(page).locator('.bb-bills-split-action').evaluate(n=>{const r=n.getBoundingClientRect(),p=n.parentElement.getBoundingClientRect(),c=getComputedStyle(n);return {width:r.width,parentWidth:p.width,height:r.height,topBorder:c.borderTopWidth,bottomBorder:c.borderBottomWidth}});
    assert(Math.abs(splitStyle.width-splitStyle.parentWidth)<1,'Recurring split spans the form');assert.equal(splitStyle.height,46);assert.equal(splitStyle.topBorder,'0px');assert.equal(splitStyle.bottomBorder,'1px');

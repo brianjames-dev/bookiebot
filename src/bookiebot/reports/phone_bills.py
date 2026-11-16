@@ -8,8 +8,14 @@ from aiohttp import web
 from bookiebot.reports import bill_settings as service
 from bookiebot.sheets.recurring import BillConflict, BillValidation
 from bookiebot.reports.accounts import AccountConflict
+from bookiebot.reports.bill_listing_cache import BillListingCache
 
 logger = logging.getLogger(__name__)
+_BILL_LISTINGS = web.AppKey('bookiebot_bill_listings',BillListingCache)
+
+
+async def _close_listings(app: web.Application) -> None:
+    await app[_BILL_LISTINGS].close()
 
 
 async def _bills(request: web.Request) -> web.Response:
@@ -33,9 +39,18 @@ async def _bills(request: web.Request) -> web.Response:
             elif "id" in request.match_info:
                 result = await asyncio.to_thread(service.charge_transaction, actor, request.match_info["id"], request.query.get("month", ""))
             else:
-                result = await asyncio.to_thread(service.listing, actor)
                 from bookiebot.reports.shared_bills import enrich_listing
-                result = await asyncio.to_thread(enrich_listing, actor, result)
+                from bookiebot.reports.phone_shared_bills import change_cursor
+                for attempt in range(2):
+                    cursor = await asyncio.to_thread(change_cursor,session.owner_key)
+                    key = (actor,session.owner_key,service.now_pacific().date().isoformat(),cursor['revision'],cursor['ledgerVersion'])
+                    result = await request.app[_BILL_LISTINGS].read(key,
+                        lambda:enrich_listing(actor,service.listing(actor)),fresh=attempt>0 or request.query.get('fresh')=='1')
+                    if cursor == await asyncio.to_thread(change_cursor,session.owner_key):
+                        break
+                else:
+                    raise BillConflict('Shared bills changed while loading. Refresh Bills.')
+                # Preferences, uncertain commands and recovery are never cached.
                 from bookiebot.reports.bill_checkin import build_store, DEFAULT_LEAD_DAYS
                 prefs = await asyncio.to_thread(lambda: build_store().preferences(session.owner_key))
                 for bill in result.get('bills', []):
@@ -89,6 +104,8 @@ async def _bills(request: web.Request) -> web.Response:
 
 
 def register_phone_bill_routes(app: web.Application):
+    app[_BILL_LISTINGS] = BillListingCache()
+    app.on_cleanup.append(_close_listings)
     app.router.add_get("/app/bills", _bills)
     app.router.add_get("/app/bills/check-in", _bills)
     app.router.add_post("/app/bills/check-in", _bills)

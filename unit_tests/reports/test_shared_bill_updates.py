@@ -179,17 +179,17 @@ def accept_utilities(household):
         assert shared_bills.command(HANNAH, body, store=household.catalog)['status'] == 'active'
 
 
-def configuration_body(household, name, method, basis, start, amount=None):
+def configuration_body(household, name, method, basis, start, amount=None, pull_day=None):
     source = bill_settings.read_workbook(BRIAN, household.clock[0].date())
     plan = next(p for p in source.settings.records() if p.name == name)
     return {'operation':'update','id':plan.id,'version':plan.version,'settingsVersion':source.settings.version,
         'bill':{'name':plan.name,'type':plan.kind,'amount':amount if amount is not None else '' if plan.amount_cents is None else str(plan.amount_cents/100),
-            'cadence':plan.cadence,'pullDay':plan.pull_day,'pullMonths':list(plan.pull_months),'category':plan.category,
+            'cadence':plan.cadence,'pullDay':plan.pull_day if pull_day is None else pull_day,'pullMonths':list(plan.pull_months),'category':plan.category,
             'account':plan.account,'effectiveFrom':start,'splitMethod':method,'payerBasisPoints':basis}}
 
 
-def configure(household, name, method, basis, start, amount=None):
-    body = configuration_body(household,name,method,basis,start,amount)
+def configure(household, name, method, basis, start, amount=None, pull_day=None):
+    body = configuration_body(household,name,method,basis,start,amount,pull_day)
     checked = bill_settings.review(BRIAN, body)
     command = {**body,'reviewVersion':checked['reviewVersion'],'requestId':uuid4().hex}
     result = household.commands.command(BRIAN, command)
@@ -392,6 +392,7 @@ def test_recurring_rent_amount_and_split_retain_recorded_november_and_post_once_
 async def test_two_authenticated_apps_observe_acceptance_rules_and_invoices_through_shared_cursors(household,monkeypatch):
     from bookiebot.reports.bill_checkin import BillCheckinStore
     import bookiebot.reports.bill_checkin as checkin
+    monkeypatch.setattr('bookiebot.reports.bill_cancellation.bank_refs',lambda _owner:set())
     preferences = BillCheckinStore(household.catalog.access)
     monkeypatch.setattr(checkin,'build_store',lambda:preferences)
     monkeypatch.setenv('BOOKIEBOT_PUBLIC_BASE_URL','http://127.0.0.1')
@@ -460,4 +461,121 @@ async def test_two_authenticated_apps_observe_acceptance_rules_and_invoices_thro
             assert after['revision']==before['revision'] and after['ledgerVersion']!=before['ledgerVersion'], 'Background canonical changes invalidate both apps without a membership write'
         value = next(b for b in (await get(hannah,'/app/bills'))['bills'] if b['name']=='PG&E')
         assert value['sharing']['state']['receivedCents']==1000 and value['sharing']['state']['remainingCents']==3938
+        before_date = [await get(http,'/app/account/changes') for http in (brian,hannah)]
+        body = configuration_body(household,'PG&E','custom',6000,'2027-01',pull_day=29)
+        reviewed = (await post(brian,'/app/bills/review',body))['review']
+        assert (await post(brian,'/app/bills',{**body,'reviewVersion':reviewed['reviewVersion'],'requestId':uuid4().hex}))['success']
+        for http,before in zip((brian,hannah),before_date):
+            after = await get(http,'/app/account/changes')
+            assert after['revision']>before['revision'] and after['ledgerVersion']==before['ledgerVersion']
+            value = next(b for b in (await get(http,'/app/bills'))['bills'] if b['name']=='PG&E')
+            assert value['nextChange']['pullDay']==29 and value['charge']['date']=='2026-12-22'
+        before_stop = [await get(http,'/app/account/changes') for http in (brian,hannah)]
+        source = bill_settings.read_workbook(BRIAN,household.clock[0].date())
+        plan = next(p for p in source.settings.records() if p.name=='PG&E')
+        body = {'operation':'end','id':plan.id,'version':plan.version,'settingsVersion':source.settings.version,
+            'effectiveFrom':'2027-01','removeMonths':[]}
+        reviewed = (await post(brian,'/app/bills/review',body))['review']
+        assert (await post(brian,'/app/bills',{**body,'reviewVersion':reviewed['reviewVersion'],'requestId':uuid4().hex}))['success']
+        for http,before in zip((brian,hannah),before_stop):
+            after = await get(http,'/app/account/changes')
+            assert after['revision']>before['revision'] and after['ledgerVersion']==before['ledgerVersion']
+            value = next(b for b in (await get(http,'/app/bills'))['bills'] if b['name']=='PG&E')
+            assert not value['nextChange']['active'] and value['charge']['date']=='2026-12-22'
+        assert household.ledger.get_allocation(allocation['id'])['settledCents']==1000
         assert november_history(household)==original
+
+
+@pytest.mark.parametrize('name,period', [('Rent','2026-12'),('Water','2026-12'),('Recology','2027-02')])
+def test_shared_payment_date_changes_update_future_bills_but_keep_recorded_dates_and_receipts(household, name, period):
+    accept_utilities(household)
+    original = november_history(household)
+    original_transactions = {actor:original_rows(actor) for actor in (BRIAN,HANNAH)}
+    old_date = next(b for b in bill_views(household,BRIAN) if b['name']==name)['charge']['date']
+    configure(household,name,'equal',5000,'2026-12',pull_day=27)
+    for actor in (BRIAN,HANNAH):
+        value = next(b for b in bill_views(household,actor) if b['name']==name)
+        assert value['nextChange']['pullDay']==27
+        assert value['charge']['date']==old_date
+    household.clock[0] = datetime.fromisoformat(period+'-01T12:00:00').replace(tzinfo=PACIFIC_TZ)
+    if period.startswith('2027'):
+        assert bill_settings.carry_year(BRIAN,bill_settings.read_workbook(BRIAN,household.clock[0].date()),household.commands)
+    future = next(f for f in shared_bill_forecast.forecast_inputs(HANNAH,[period]) if f.name==name)
+    assert future.date==period+'-27'
+    # An eligible, unrecorded current cycle can still move to a new date.
+    configure(household,name,'equal',5000,period,pull_day=29)
+    day = min(29,calendar.monthrange(int(period[:4]),int(period[5:]))[1])
+    withdrawal = f'{period}-{day:02d}'
+    for actor in (BRIAN,HANNAH):
+        value = next(b for b in bill_views(household,actor) if b['name']==name)
+        assert value['charge']['date']==withdrawal
+    assert next(f for f in shared_bill_forecast.forecast_inputs(HANNAH,[period]) if f.name==name).date==withdrawal
+    if name=='Rent':
+        # Fixed schedules create the canonical split when autopay is due;
+        # variable invoices may be confirmed earlier in the same month.
+        household.clock[0] = household.clock[0].replace(day=29)
+    source = bill_settings.read_workbook(BRIAN,household.clock[0].date())
+    plan = next(p for p in source.settings.records() if p.name==name)
+    body = {'operation':'scheduled' if name=='Rent' else 'amount','id':plan.id,'month':period,
+        'settingsVersion':source.settings.version,'chargeVersion':source.charge(plan,period)['version'],
+        **({} if name=='Rent' else {'amount':'123.45'})}
+    checked = bill_settings.review(BRIAN,body)
+    command = {**body,'reviewVersion':checked['reviewVersion'],'requestId':uuid4().hex}
+    saved = household.commands.command(BRIAN,command)
+    assert saved['success'] and household.commands.command(BRIAN,command)==saved
+    allocation = next(a for a in household.ledger.snapshot('brian')['allocations']
+        if a['sourceYear']==int(period[:4]) and a['sourceSheetTitle']==calendar.month_name[int(period[5:])]
+        and a.get('billPlanId')==plan.id)
+    # A second schedule correction cannot move the already confirmed invoice.
+    configure(household,name,'equal',5000,period,pull_day=15)
+    assert household.ledger.get_allocation(allocation['id'])==allocation
+    for actor in (BRIAN,HANNAH):
+        value = next(b for b in bill_views(household,actor) if b['name']==name)
+        assert value['charge']['date']==withdrawal
+        events = [e for e in financial_report(household,actor).calendar_events if e.kind=='bill' and e.label==name]
+        assert events and all(e.day==day for e in events)
+    if name!='Rent':
+        assert not [r for r in transaction_rows(BRIAN,period) if r['title']==name]
+    queued = next(r for r in transactions.load_transactions(BRIAN,period,fresh=True,include_scheduled=True) if r['title']==name)
+    household.clock[0] = household.clock[0].replace(day=day)
+    actual = [r for r in transaction_rows(BRIAN,period) if r['title']==name]
+    assert len(actual)==1 and actual[0]['id']==queued['id'] and actual[0]['date']==withdrawal
+    assert november_history(household)==original
+    assert {actor:original_rows(actor) for actor in (BRIAN,HANNAH)}==original_transactions
+
+
+@pytest.mark.parametrize('name', ['Rent','Water','PG&E','Recology'])
+def test_stopping_shared_bill_keeps_shared_history_and_removes_only_future_forecasts(household, monkeypatch, name):
+    from bookiebot.reports import bill_cancellation
+    monkeypatch.setattr(bill_cancellation,'bank_refs',lambda _owner:set())
+    accept_utilities(household)
+    original = november_history(household)
+    original_transactions = {actor:original_rows(actor) for actor in (BRIAN,HANNAH)}
+    source = bill_settings.read_workbook(BRIAN,household.clock[0].date())
+    plan = next(p for p in source.settings.records() if p.name==name)
+    body = {'operation':'end','id':plan.id,'version':plan.version,'settingsVersion':source.settings.version,
+        'effectiveFrom':'2026-11','removeMonths':[]}
+    checked = bill_settings.review(BRIAN,body)
+    november = next(item for item in checked['cancellation']['items'] if item['month']=='2026-11')
+    assert not november['removable'] and 'Shared payment' in november['reason']
+    with pytest.raises(ValueError,match='can no longer be removed'):
+        bill_settings.review(BRIAN,{**body,'removeMonths':['2026-11']})
+    command = {**body,'reviewVersion':checked['reviewVersion'],'requestId':uuid4().hex}
+    saved = household.commands.command(BRIAN,command)
+    assert saved['success'] and household.commands.command(BRIAN,command)==saved
+    for actor in (BRIAN,HANNAH):
+        value = next(b for b in bill_views(household,actor) if b['name']==name)
+        assert not value['active']
+        assert value['sharing']['status']=='active', 'Stopping a schedule does not revoke access to recorded repayments'
+    shared = next(b for b in bill_views(household,HANNAH) if b['name']==name)
+    allocation = next(a for a in original[2] if a['item']==name)
+    assert shared['sharing']['state']['receivedCents']==allocation['settledCents']
+    assert not [f for f in shared_bill_forecast.forecast_inputs(HANNAH,['2026-12','2027-02']) if f.name==name]
+    household.clock[0] = datetime(2027,1,1,12,tzinfo=PACIFIC_TZ)
+    assert bill_settings.carry_year(BRIAN,bill_settings.read_workbook(BRIAN,household.clock[0].date()),household.commands)
+    for actor in (BRIAN,HANNAH):
+        assert not next(b for b in bill_views(household,actor) if b['name']==name)['active']
+        assert calendar_bill_cents(household,actor,name)==0
+    assert not [f for f in shared_bill_forecast.forecast_inputs(HANNAH,['2027-02']) if f.name==name]
+    assert november_history(household)==original
+    assert {actor:original_rows(actor) for actor in (BRIAN,HANNAH)}==original_transactions
