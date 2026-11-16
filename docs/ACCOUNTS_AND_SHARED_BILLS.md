@@ -88,6 +88,10 @@ An invitation review separates a variable bill's recorded month total from its f
 
 Changing the recurring payment day updates eligible unrecorded and future dates in both apps. A recorded occurrence keeps its own autopay date, amounts, split and receipt dates, including early reimbursement. Stopping the schedule removes future forecasts for both people, including after annual rollover; it does not revoke access to recorded shared repayments or delete their history. Ended bills remain in the Ended archive. Shared charges cannot be selected for historical removal through Stop bill.
 
+Restart an ended shared bill by reopening its existing configuration in **Ended bills**, choosing **Applies from**, then reviewing and confirming. Both apps reuse the original plan and accepted sharing link; no new invitation or bill is created. A later restart leaves the stopped interval empty, including across year rollover. New eligible charges use the restarted settings once, while recorded charges retain their original split, receipt dates and any remaining repayment balance. Retrying a saved confirmation cannot post another charge or replay an old Stop over a later restart.
+
+**Undo cancellation** restores the original cancelled configuration when its audit still permits restoration. **Restart bill** sets a new current/future start; it does not fill earlier stopped months. Both preserve recorded reimbursements.
+
 - The payer’s hidden plan remains the source for future amount/date/split
   versions. An already recorded occurrence retains its original category,
   autopay date and canonical split, even after a recurring edit.
