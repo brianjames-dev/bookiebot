@@ -21,6 +21,8 @@ import { AskBookieBotPanel } from "./ask-bookiebot-panel"
 import { AppUpdatePrompt } from "./app-update-prompt"
 import { AmountAppearanceBoundary, AmountAppearanceSettings } from "./amount-appearance"
 import { useAppWorkGuard } from "./app-work-guard"
+import { AccountIdentity } from "./account-settings"
+import { useSharedAccountUpdates } from "./shared-account-updates"
 import { ReconciliationScreen, useReconciliation } from "./reconciliation-screen"
 import { TransactionsScreen } from "./transactions-screen"
 import { PageRefreshProvider, usePageRefresh } from "./page-refresh"
@@ -217,6 +219,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
   const scopedSourceRequest = sourceRequest?.scope === reportIdentity ? sourceRequest : null
+  useSharedAccountUpdates({owner,screen,scope:screen==='settings'?(billsOpen?'bills':transfersOpen?'transfers':widgetGuideOpen?'widget-guide':'settings'):screen,
+    enabled:Boolean(report)&&!signingOut,blocked:guard.pending||guard.uncertain||guard.dirty})
   return <AppNavigationContext.Provider value={{ screen, selectScreen, preferences, sourceRequest: scopedSourceRequest, consumeSource, duoLandscape: duo.landscape, monthHeader:true }}>
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
       data-duo-enabled={duo.enabled || undefined}
@@ -230,9 +234,10 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           if(configurationOpen){widgetGuideRef.current=false;setBillsOpen(false);setTransfersOpen(false)}
           else if(widgetGuideOpen)selectScreen('settings')
           else selectScreen(lastMain)
-        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"} />}
+        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"}
+          onChat={() => setAskOpen(true)} chatRef={askTriggerRef} chatOpen={askOpen && monthlyReady} chatDisabled={!report || !monthlyReady} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
-          askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)}
+          askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)} avatarUrl={avatarUrl} showPortrait={screen === 'settings'}
           onSettings={() => selectScreen(screen === "settings" && !widgetGuideOpen && !configurationOpen ? lastMain : "settings")} />
       </header>
 
@@ -275,7 +280,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded refreshActive={!configurationOpen} /></div>
         <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} refreshActive={!configurationOpen} />
         <section className="bb-settings-section" aria-labelledby="bb-account-title"><h2 id="bb-account-title">Account</h2>
-          <div className="bb-setting-row"><span>Signed in as</span><strong>{report.ownerName}</strong></div>
+          <AccountIdentity ownerName={report.ownerName} active={screen === 'settings' && !configurationOpen && !widgetGuideOpen}/>
           {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}
           <button type="button" className="bb-settings-action" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}>{signingOut ? "Signing out…" : "Sign out"}</button>
         </section>

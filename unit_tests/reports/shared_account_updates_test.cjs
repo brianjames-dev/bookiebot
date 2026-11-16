@@ -1,0 +1,43 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module');
+const frontend=path.resolve(__dirname,'../../web/expense-report'),req=createRequire(path.join(frontend,'package.json'));
+const React=req('react'),Renderer=req('react-test-renderer'),{act}=Renderer,ts=req('typescript');
+global.IS_REACT_ACT_ENVIRONMENT=true;
+const listeners=new Map(),intervals=new Map(),refreshes=[],requests=[];
+let revision=0,ledgerVersion='',available=true,activeSuccess=true,id=0;
+const events={addEventListener(name,callback){const callbacks=listeners.get(name)||new Set();callbacks.add(callback);listeners.set(name,callbacks)},removeEventListener(name,callback){listeners.get(name)?.delete(callback)}};
+const window={...events,setInterval(callback,delay){assert.equal(delay,20000);intervals.set(++id,callback);return id},clearInterval(key){intervals.delete(key)}};
+const document={...events,visibilityState:'visible'},navigator={onLine:true};
+const registry={available:()=>available,async refresh(screen){refreshes.push(screen);return screen==='overview'||activeSuccess}};
+const runtime={exports:{},require:name=>name==='./page-refresh'?{usePageRefreshRegistry:()=>registry}:req(name),window,document,navigator,AbortController,
+ fetch:async(url,options)=>{requests.push({url,options});return{ok:true,json:async()=>({revision,ledgerVersion})}}};
+const source=ts.transpileModule(fs.readFileSync(path.join(frontend,'src/shared-account-updates.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+vm.runInNewContext(source,runtime);
+const {useSharedAccountUpdates}=runtime.exports;
+function Fixture(props){useSharedAccountUpdates(props);return null}
+const tick=()=>act(async()=>{for(const callback of intervals.values())callback();await Promise.resolve()});
+const emit=name=>act(async()=>{for(const callback of listeners.get(name)||[])callback();await Promise.resolve()});
+(async()=>{
+ let tree,props={owner:'brian',screen:'transactions',scope:'transactions',enabled:true,blocked:false};
+ await act(async()=>{tree=Renderer.create(React.createElement(Fixture,props))});
+ assert.deepEqual(refreshes,[],'Initial empty cursor does not duplicate the initial page load');
+ revision=1;ledgerVersion='receipt-1';await tick();assert.deepEqual(refreshes,['overview','transactions']);
+ await tick();assert.equal(refreshes.length,2,'Unchanged canonical state is not reloaded');
+ await act(async()=>tree.update(React.createElement(Fixture,props={...props,blocked:true})));
+ revision=2;ledgerVersion='receipt-2';const reads=requests.length;await tick();await emit('focus');
+ assert.equal(requests.length,reads,'Financial drafts and unknown writes defer even the cursor request');
+ await act(async()=>tree.update(React.createElement(Fixture,props={...props,blocked:false})));
+ assert.deepEqual(refreshes.slice(-2),['overview','transactions']);assert.equal(refreshes.length,4);
+ await act(async()=>tree.update(React.createElement(Fixture,props={...props,screen:'savings',scope:'savings'})));
+ assert.deepEqual(refreshes.slice(-2),['overview','savings'],'A previously mounted tab catches up independently');
+ document.visibilityState='hidden';revision=3;await tick();assert.equal(refreshes.length,6);
+ document.visibilityState='visible';await emit('visibilitychange');assert.equal(refreshes.length,8);
+ navigator.onLine=false;revision=4;await emit('online');assert.equal(refreshes.length,8);
+ navigator.onLine=true;available=false;await tick();assert.equal(refreshes.length,8);
+ available=true;activeSuccess=false;await tick();assert.equal(refreshes.length,10);
+ activeSuccess=true;await tick();assert.equal(refreshes.length,12,'A failed page refresh never acknowledges the new cursor');
+ await tick();assert.equal(refreshes.length,12);
+ await act(async()=>tree.unmount());assert.equal(intervals.size,0);assert([...listeners.values()].every(set=>set.size===0));
+ assert(requests.every(request=>request.url==='/app/account/changes'&&request.options.cache==='no-store'&&request.options.credentials==='same-origin'));
+ assert(requests.at(-1).options.signal.aborted,'Owner/unmount cleanup cancels the cursor controller');
+ console.log('Shared account cursor refresh, draft guards, per-screen catch-up and cleanup pass');
+})().catch(error=>{console.error(error);process.exitCode=1});

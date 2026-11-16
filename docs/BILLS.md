@@ -26,6 +26,16 @@ An early reimbursement is a separate cash event: it never marks the payer's util
 
 A future recurring change, including a new split, does not hide this month’s confirmed variable-bill amount in the list. If no confirmed amount is available, retain a verified prediction when one exists. **Amount needed** means neither is available; it does not describe the recurring split. The configuration’s Recurring split row shows the saved/drafted split separately.
 
+## Shared bills
+
+Save a recurring split, then use the bill editor’s **Share bill** icon to review
+an invitation. The recipient explicitly accepts in their own Bills screen and
+sees the original payer plan, current monthly allocation and canonical repayment
+status. They do not receive a competing copy or a payer-only invoice prompt.
+Projecting the remaining recipient share never writes a transaction. Sharing
+and leaving preserve existing charges and receipts. See [Accounts and shared bills](ACCOUNTS_AND_SHARED_BILLS.md)
+for legacy local-source guards, recovery and manual acceptance.
+
 ## Daily amount check-in
 
 On opening/resuming the app, a native **Confirm upcoming bills** prompt groups variable bills still needing an invoice amount in the current prepared billing month. The default window starts seven days before autopay and continues if an amount is overdue. Only the payer is prompted. A known amount, confirmed zero, stopped bill, off-cycle month or unavailable source is excluded. The window begins no earlier than that prepared billing month; opening the app never creates future worksheets or records an estimate.

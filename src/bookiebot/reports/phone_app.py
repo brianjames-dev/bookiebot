@@ -292,6 +292,10 @@ async def _asset(request: web.Request) -> web.StreamResponse:
 
 
 def register_phone_app_routes(app: web.Application) -> None:
+    from bookiebot.reports.phone_accounts import register_phone_account_routes
+    register_phone_account_routes(app)
+    from bookiebot.reports.phone_shared_bills import register_shared_bill_routes
+    register_shared_bill_routes(app)
     from bookiebot.reports.phone_transactions import register_phone_transaction_routes
     register_phone_transaction_routes(app)
     from bookiebot.reports.phone_bills import register_phone_bill_routes

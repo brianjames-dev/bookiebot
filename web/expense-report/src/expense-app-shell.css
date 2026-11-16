@@ -9,10 +9,21 @@
 .bb-app-shell :is(.bb-shell-shared,.bb-shell-savings) > .bb-report-section { background:transparent; color:inherit; box-shadow:none; clip-path:none; }
 .bb-app-shell .bb-chart-carousel-band { background:transparent; box-shadow:none; clip-path:none; }
 .bb-app-shell .bb-investments-section::before { display:none; }
-.bb-app-shell .bb-shell-masthead { box-sizing: border-box; min-height: calc(max(18px, env(safe-area-inset-top, 0px)) + 64px); padding-top: max(18px, env(safe-area-inset-top, 0px)); padding-right: 114px; }
+.bb-app-shell .bb-shell-masthead { box-sizing: border-box; min-height: calc(max(18px, env(safe-area-inset-top, 0px)) + 64px); padding-top: max(18px, env(safe-area-inset-top, 0px)); padding-right: 56px; }
+.bb-app-shell[data-screen="settings"] .bb-shell-masthead { padding-right:114px; }
 .bb-app-shell .bb-shell-masthead .bb-wordmark { min-width: 0; }
 .bb-app-shell .bb-shell-masthead .bb-report-brand { min-width: 0; }
-.bb-app-shell .bb-shell-header-actions { position: fixed; z-index: 60; top: max(18px, env(safe-area-inset-top, 0px)); right: max(var(--bb-page-gutter), calc((100vw - var(--bb-content-max)) / 2), env(safe-area-inset-right, 0px)); width: 102px; height: 44px; margin: 0; padding: 0; pointer-events: none; }
+.bb-app-shell .bb-shell-header-actions { position: fixed; z-index: 60; top: max(18px, env(safe-area-inset-top, 0px)); right: max(var(--bb-page-gutter), calc((100vw - var(--bb-content-max)) / 2), env(safe-area-inset-right, 0px)); width: 44px; height: 44px; margin: 0; padding: 0; pointer-events: none; }
+.bb-app-shell .bb-shell-header-actions[data-has-portrait="true"] { width:102px; }
+.bb-chat-portrait { position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;pointer-events:auto; }
+.bb-chat-portrait:active { transform:scale(.96); }
+.bb-chat-portrait:disabled { cursor:default;opacity:.6; }
+.bb-chat-portrait-badge { position:absolute;right:-2px;bottom:-1px;display:grid;place-items:center;width:16px;height:16px;border-radius:50%;background:hsl(var(--background));color:hsl(var(--foreground)); }
+.bb-chat-portrait-badge svg { width:12px;height:12px; }
+.bb-account-email { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%; }
+.bb-google-login { margin-bottom:20px; }
+.bb-auth-feedback { position:fixed;z-index:130;top:82px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:16px;width:max-content;max-width:calc(100vw - 32px);padding:12px 16px;border:1px solid hsl(var(--border));border-radius:18px;background:hsl(var(--background));color:hsl(var(--foreground));box-shadow:0 4px 22px #0002; }
+.bb-auth-feedback button { padding:4px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer; }
 .bb-app-shell .bb-shell-toolbar-inner { width: 100%; height: 44px; padding: 0; gap: 14px; }
 /* The navigation and fixed tools share one glass material and press response. */
 .bb-app-shell { --bb-glass-ink: rgb(22 24 27); --bb-glass-base: rgb(247 248 250 / .46); --bb-glass-held: rgb(216 221 228 / .62); --bb-glass-edge: rgb(255 255 255 / .36); --bb-glass-sheen: rgb(255 255 255 / .16); --bb-glass-selection: rgb(0 0 0 / .09); --bb-glass-shadow: 0 5px 20px rgb(0 0 0 / .12), inset 0 1px 1px rgb(255 255 255 / .72), inset 0 -1px 1px rgb(0 0 0 / .08); }

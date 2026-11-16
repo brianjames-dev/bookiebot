@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { KonstaProvider } from "konsta/react"
 import { ExpenseAppShell } from "./expense-app-shell"
 import { AppWorkGuardProvider } from "./app-work-guard"
+import { AuthFeedback } from "./account-settings"
 import type { ExpenseReportData } from "./types"
 import { ExpenseAppReconnect } from "./expense-app-reconnect"
 import { AppRefreshControl } from "./app-refresh-control"
@@ -50,7 +51,7 @@ function useFreshExpenseReport(config: ExpenseAppConfig) {
 }
 
 export function FreshExpenseApp({ config }: { config: ExpenseAppConfig }) {
-  return <KonstaProvider theme="ios" dark><AppWorkGuardProvider><FreshExpenseContent config={config} /></AppWorkGuardProvider></KonstaProvider>
+  return <KonstaProvider theme="ios" dark><AppWorkGuardProvider><AuthFeedback/><FreshExpenseContent config={config} /></AppWorkGuardProvider></KonstaProvider>
 }
 
 function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {

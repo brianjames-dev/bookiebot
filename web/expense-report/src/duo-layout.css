@@ -76,7 +76,7 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-app-shell[data-duo-overview="true"] > .bb-report-header .bb-projection-control {
   position: fixed; z-index: 60;
   top: calc(max(18px, env(safe-area-inset-top, 0px)) - 1px);
-  right: calc(var(--bb-duo-overlay) + var(--bb-duo-right-inset) + 116px);
+  right: calc(var(--bb-duo-overlay) + var(--bb-duo-right-inset) + 58px);
 }
 .bb-app-shell[data-duo-overview="true"] .bb-shell-report,
 .bb-app-shell[data-duo-overview="true"] .bb-report-content,

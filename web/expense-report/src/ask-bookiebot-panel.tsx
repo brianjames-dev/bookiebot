@@ -139,9 +139,9 @@ export function AskBookieBotPanel({ open, onClose, month, mode, onShowSource, op
           if (event.target === surfaceRef.current && event.propertyName === "transform") finishClose()
         }}>
         <header className="bb-ask-panel-header">
-          <div><h2 id={titleId} ref={titleRef} tabIndex={-1}>Ask BookieBot</h2>
+          <div><h2 id={titleId} ref={titleRef} tabIndex={-1}>Talk to BookieBot</h2>
             <p id={contextId}>{monthLabel} <span aria-hidden="true">·</span> {mode === "current" ? "Current" : "Projected"}</p></div>
-          <button type="button" className="bb-ask-panel-close" aria-label="Close Ask BookieBot" onClick={onClose}>
+          <button type="button" className="bb-ask-panel-close" aria-label="Close Talk to BookieBot" onClick={onClose}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
           </button>
         </header>

@@ -44,6 +44,9 @@ async def _transactions(request: web.Request) -> web.Response:
         current = await _session(request)
         if current is None or current.owner_key != session.owner_key or current.actor_key != session.actor_key:
             return _json({"error": "Reconnect BookieBot using /expense_app in Discord."}, status=401)
+        if request.method == 'POST' and not request.path.endswith('/review'):
+            from bookiebot.reports.phone_shared_bills import publish_change
+            await publish_change(session.owner_key)
         return _json(result)
     except service.TransactionConflict as exc:
         return _json({"error": str(exc)}, status=409)

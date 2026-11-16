@@ -67,6 +67,7 @@ class WorkbookSnapshot:
     settled_dates: BillDates = field(default_factory=dict)
     allocations: list[dict[str, Any]] = field(default_factory=list)
     as_of: date | None = None
+    delegated_payers: dict[str, str] = field(default_factory=dict)
 
     def bill_allocations(self, plan: BillPlan, month: str) -> list[dict[str, Any]]:
         def matches(value: dict[str, Any]) -> bool:
@@ -84,6 +85,8 @@ class WorkbookSnapshot:
         return [a for a in values if (a['sourceYear'], list(calendar.month_name).index(a['sourceSheetTitle'])) == latest]
 
     def responsible_owner(self, plan: BillPlan, month: str) -> str | None:
+        if plan.id in self.delegated_payers:
+            return self.delegated_payers[plan.id]
         roles = {a["payerOwner"] for a in self.bill_allocations(plan, month)}
         charge = next((c for c in decode_charges(self.rows.get(CHARGES_TAB, [])) if c.plan_id == plan.id and c.month == month), None)
         if charge and charge.payer_owner:
@@ -175,6 +178,8 @@ def read_workbook(actor: str, today: date, *, client: Any = None) -> WorkbookSna
     period = today.strftime("%Y-%m")
     snapshot = WorkbookSnapshot(actor, owner, today.year, identity, client, props, metadata.get("namedRanges", []), rows, formulas,
         BillSnapshot(owner, tuple(plans), fingerprint([owner, identity, rows, formulas, metadata.get("namedRanges", [])]), period, {}))
+    from bookiebot.reports.shared_bills import delegated_payers
+    snapshot.delegated_payers = delegated_payers(actor)
     minimums = {}
     protected_periods = []
     from bookiebot.reimbursements import service as reimbursements

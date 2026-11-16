@@ -64,6 +64,7 @@ class ReportWorksheets:
     subscription_schedule: Any | None = None
     bill_charges: Any | None = None
     transfer_plans: tuple[Any, ...] = ()
+    shared_bill_forecasts: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,7 @@ class CalendarEvent:
     amount_estimated: bool = False
     amount_unknown: bool = False
     prediction: dict[str, Any] | None = None
+    shared_forecast: bool = False
 
 
 @dataclass(frozen=True)
@@ -414,6 +416,18 @@ def _month_from_message(content: str) -> BudgetMonth:
 
 
 def load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorksheets:
+    from dataclasses import replace
+    result = _load_report_worksheets(actor_key, month)
+    if _is_current_month(month):
+        from bookiebot.reports.shared_bill_forecast import forecast_inputs
+        periods = [f'{month.year:04d}-{month.month:02d}']
+        if month.month < 12:
+            periods.append(f'{month.year:04d}-{month.month + 1:02d}')
+        result = replace(result, shared_bill_forecasts=forecast_inputs(actor_key, periods))
+    return result
+
+
+def _load_report_worksheets(actor_key: str, month: BudgetMonth) -> ReportWorksheets:
     from bookiebot.reports.batched_report_reads import batched_report_worksheets, can_batch_report_reads
     from bookiebot.sheets.auth import get_gspread_client
     from bookiebot.sheets.repo import GSpreadSheetsRepository
@@ -632,6 +646,8 @@ def build_expense_breakdown_report(
         else:
             breakdown_amounts[category] = itemized_shared_totals[category]
 
+    calendar_events = _with_shared_bill_forecasts(calendar_events, selected.shared_bill_forecasts,
+        month, entered_bills, bill_schedule_rows)
     budget_breakdown_amounts = dict(breakdown_amounts)
     entered_totals = _payment_totals_by_group(entered_bills)
     budget_breakdown_amounts["rent"] = entered_totals["rent"]
@@ -639,7 +655,7 @@ def build_expense_breakdown_report(
     budget_breakdown_amounts["static_bills_subscriptions_needs"] = round(budget_static_needs_total + entered_totals["static_bills_subscriptions_needs"], 2)
     budget_breakdown_amounts["subscriptions_wants"] = round(budget_wants_total + entered_totals["subscriptions_wants"], 2)
     for event in calendar_events:
-        if event.kind == "bill" and event.amount_estimated:
+        if event.kind == "bill" and (event.amount_estimated or event.shared_forecast):
             budget_breakdown_amounts[event.group] = round(
                 budget_breakdown_amounts[event.group] + event.amount, 2,
             )
@@ -678,6 +694,11 @@ def build_expense_breakdown_report(
         income_projection_config, income_projection_reference, income_projection_receipts,
         recorded_dates=paid_bill_dates,
     )
+    if selected.shared_bill_forecasts:
+        from dataclasses import replace
+        calendar_context = [replace(context, events=_with_shared_bill_forecasts(context.events,
+            selected.shared_bill_forecasts, context.month, [], bill_schedule_rows)) if context.available
+            and context.month.as_datetime() > month.as_datetime() else context for context in calendar_context]
     for adjacent in calendar_context:
         adjacent_start = adjacent.month.as_datetime().date()
         adjacent_end = date(adjacent.month.year, adjacent.month.month, calendar.monthrange(adjacent.month.year, adjacent.month.month)[1])
@@ -1250,6 +1271,39 @@ def _subscription_calendar_events(
             )
         )
     return events
+
+
+def _with_shared_bill_forecasts(events: list[CalendarEvent], forecasts: tuple[Any, ...], month: BudgetMonth,
+                                payments: list[PaymentItem], bill_rows: list[list[str]]) -> list[CalendarEvent]:
+    if not forecasts:
+        return events
+    from bookiebot.reports.shared_bill_forecast import remaining_forecast
+    from bookiebot.sheets.bills import bill_label_key
+    from bookiebot.sheets.recurring import BILL_TAB, selected
+    from bookiebot.sheets.recurring_rows import managed, decode
+    period = f'{month.year:04d}-{month.month:02d}'
+    plans = selected(decode(bill_rows, BILL_TAB), period) if managed(bill_rows) else []
+    result = list(events)
+    for value in forecasts:
+        if value.period != period:
+            continue
+        plan = next((p for p in plans if p.id == value.member_plan_id), None)
+        label = plan.source_label if plan else value.member_label
+        # Replace only the verified local plan's planning estimate. Actual and
+        # queued recipient payments remain authoritative and fulfill the target.
+        if label:
+            result = [event for event in result if not (event.kind == 'bill' and event.amount_estimated
+                and bill_label_key(event.label) == bill_label_key(label))]
+        remaining = remaining_forecast(value, payments, label)
+        if label:
+            represented = sum(round(event.amount * 100) for event in result
+                if event.kind == 'bill' and not event.amount_estimated
+                and bill_label_key(event.label) == bill_label_key(label))
+            remaining = min(remaining,max(0,value.target_cents-represented))
+        if remaining:
+            result.append(CalendarEvent('bill',value.name,remaining / 100,int(value.date[8:]),value.category,
+                projected_only=True,amount_estimated=bool(value.prediction),prediction=value.prediction,shared_forecast=True))
+    return result
 
 
 def _bill_calendar_events(
@@ -3252,6 +3306,8 @@ def _calendar_event_payload(item: CalendarEvent) -> dict[str, Any]:
         payload["amountUnknown"] = True
     if item.prediction is not None:
         payload["prediction"] = item.prediction
+    if item.shared_forecast:
+        payload['sharedBillForecast'] = True
     return payload
 
 

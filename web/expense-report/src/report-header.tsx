@@ -1,11 +1,24 @@
-import type { ReactNode } from "react"
+import type { ReactNode, Ref } from "react"
+import { MessageCircle } from "lucide-react"
 import { SlidingSelection } from "./components/ui/motion"
 
-export function ReportBrand({owner, avatarUrl, status, statusHidden = false}: {
+export interface PortraitChatProps {
+  onChat?: () => void; chatRef?: Ref<HTMLButtonElement>; chatOpen?: boolean; chatDisabled?: boolean
+}
+
+export function BookieBotPortrait({avatarUrl, onChat, chatRef, chatOpen, chatDisabled}: PortraitChatProps & {avatarUrl?: string}) {
+  const portrait = avatarUrl ? <img className="bb-app-avatar" src={avatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>
+  return onChat ? <button ref={chatRef} type="button" className="bb-chat-portrait" aria-label="Talk to BookieBot"
+    aria-haspopup="dialog" aria-expanded={Boolean(chatOpen)} disabled={chatDisabled} onClick={onChat}>
+    {portrait}<span className="bb-chat-portrait-badge" aria-hidden="true"><MessageCircle strokeWidth={1.8}/></span>
+  </button> : portrait
+}
+
+export function ReportBrand({owner, avatarUrl, status, statusHidden = false, ...chat}: {
   owner: string; avatarUrl?: string; status: ReactNode; statusHidden?: boolean
-}) {
+} & PortraitChatProps) {
   return <div className="bb-report-brand">
-    {avatarUrl ? <img className="bb-app-avatar" src={avatarUrl} alt="" /> : <span className="bb-wordmark-symbol" aria-hidden="true">b.</span>}
+    <BookieBotPortrait avatarUrl={avatarUrl} {...chat}/>
     <div className="bb-brand-copy">
       <span className="bb-wordmark">BookieBot{owner !== "BookieBot" && <span className="bb-report-owner"><span aria-hidden="true">•</span>{" "}{owner}</span>}</span>
       <div className="bb-brand-status" hidden={statusHidden}>{status}</div>

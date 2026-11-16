@@ -37,6 +37,9 @@ async def _reimbursements(request: web.Request) -> web.Response:
         current = await _session(request)
         if current is None or current.owner_key != session.owner_key:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
+        if request.method == 'POST':
+            from bookiebot.reports.phone_shared_bills import publish_change
+            await publish_change(session.owner_key)
         return _json(result)
     except ReimbursementNotFoundError as exc:
         return _json({"error": str(exc)}, status=404)

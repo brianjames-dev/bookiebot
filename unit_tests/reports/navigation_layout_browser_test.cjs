@@ -21,7 +21,7 @@ const bundle = req('esbuild').buildSync({ stdin: { resolveDir: frontend, loader:
     window.configure=changes=>setConfig(current=>({...current,...changes}));
     window.currentScreen=config.active;
     return <KonstaProvider theme="ios" dark={window.dark}><div className="bb-app-shell">
-      <AppHeaderTools askOpen={!!config.askOpen} settingsOpen={!!config.settings} askDisabled={!!config.disabled} settingsDisabled={!!config.disabled}
+      <AppHeaderTools showPortrait askOpen={!!config.askOpen} settingsOpen={!!config.settings} askDisabled={!!config.disabled} settingsDisabled={!!config.disabled}
         onAsk={()=>setConfig(current=>({...current,askOpen:!current.askOpen}))} onSettings={()=>setConfig(current=>({...current,settings:!current.settings}))}/>
       <AppNavigationBar disabled={!!config.disabled} active={config.active} current={config.settings ? null : config.active} compact={config.compact} reconciliationVisible={config.count===5}
         onSelect={active=>{window.selections.push(active); if(!window.blockNavigation) setConfig(current=>({...current,active}));}}/>
@@ -318,7 +318,11 @@ async function checkIllumination(page, glass, near, far) {
         const tools=await fixture(browser,390,dark,preference)
         await tools.evaluate(()=>document.body.style.minHeight='2000px')
         const navColor=await tools.locator('.bb-navigation-pane').evaluate(el=>getComputedStyle(el).backgroundColor)
-        for(const label of ['Ask BookieBot','Settings']) {
+        const portrait=tools.getByRole('button',{name:'Talk to BookieBot',exact:true})
+        const portraitBox=await portrait.boundingBox();assert.ok(portraitBox.width>=44&&portraitBox.height>=44)
+        await portrait.click();assert.equal(await portrait.getAttribute('aria-expanded'),'true')
+        await portrait.click();assert.equal(await portrait.getAttribute('aria-expanded'),'false')
+        for(const label of ['Settings']) {
           const button=tools.getByRole('button',{name:label,exact:true}),glass=button.locator('..')
           const before=await glass.boundingBox(),restColor=await glass.evaluate(el=>getComputedStyle(el).backgroundColor)
           assert.equal(restColor,navColor,'Fixed tools and navigation share the resting glass material')
