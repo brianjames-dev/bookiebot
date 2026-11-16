@@ -74,3 +74,39 @@ async def test_slow_build_has_no_new_cache_lifetime_and_boundaries_stay_isolated
     for index,key in enumerate(keys):
         assert (await cache.read(key,lambda:pytest.fail('Reuse only the exact scope')))['scope']==index
     await cache.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('old_fails', [False,True])
+async def test_explicit_refresh_waits_for_a_new_build_after_an_existing_read(old_fails):
+    cache = module.BillListingCache()
+    started, release = Event(), Event()
+    source = {'amount':100}
+    calls = []
+    def build():
+        amount=source['amount'];calls.append(amount)
+        if len(calls)==1:
+            started.set();assert release.wait(5)
+            if old_fails:
+                raise RuntimeError('The earlier read failed')
+        return {'amount':amount}
+    key = ('actor','owner','2026-11-16',1,'unchanged-cursor')
+    old = asyncio.create_task(cache.read(key,build))
+    assert await asyncio.to_thread(started.wait,5)
+    source['amount']=200  # A direct workbook edit has no SQL cursor change.
+    refresh = asyncio.create_task(cache.read(key,build,fresh=True))
+    await asyncio.sleep(0)
+    also_refresh = asyncio.create_task(cache.read(key,build,fresh=True))
+    normal = asyncio.create_task(cache.read(key,build))
+    await asyncio.sleep(0)
+    assert not refresh.done()
+    release.set()
+    if old_fails:
+        with pytest.raises(RuntimeError,match='earlier read failed'):
+            await old
+    else:
+        assert await old=={'amount':100}, 'Do not cancel another client’s original read'
+    assert await refresh==await also_refresh==await normal=={'amount':200}
+    assert await cache.read(key,build)=={'amount':200}, 'The older completion cannot cache pre-edit data again'
+    assert calls==[100,200], 'Requests waiting for the same follow-up read are coalesced'
+    await cache.close()
