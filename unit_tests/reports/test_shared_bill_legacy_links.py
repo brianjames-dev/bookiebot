@@ -151,7 +151,8 @@ def test_existing_accepted_legacy_rent_forecast_resolves_renamed_recipient_sourc
     assert values[0].date == '2026-11-01'
 
 
-def test_another_bill_cannot_adopt_already_accepted_unbound_legacy_source(legacy):
+@pytest.mark.parametrize('pending_first', [False, True])
+def test_another_bill_cannot_adopt_already_accepted_unbound_legacy_source(legacy, pending_first):
     payer, member = people(legacy.catalog)
     other = {**legacy.source['bills'][0], 'id': 'different-bill', 'sourceLabel': 'Other rent'}
     legacy.source['bills'].append(other)
@@ -159,6 +160,16 @@ def test_another_bill_cannot_adopt_already_accepted_unbound_legacy_source(legacy
         'billPlanId': other['id'], 'partnerSourceLabel': 'Rent'})
     invitation = legacy.catalog.apply(actor=payer, payer=payer, member=member, plan_id=other['id'], member_plan_id='',
         action='invite', revision=0, request_id=uuid4().hex, fingerprint='other-fixture')
+    if pending_first:
+        with legacy.catalog.access.connect(write=True) as db:
+            db.execute('UPDATE app_bill_shares SET created_at = 0 WHERE id = ?', (invitation['id'],))
+    result = shared_bills.enrich_listing(HANNAH, legacy.own, store=legacy.catalog,
+        load=legacy.load, ledger_read=lambda _: legacy.ledger)
+    assert len(result['bills']) == 5, 'A pending conflict must not make Bills unavailable'
+    conflict = next(b for b in result['bills'] if b['id'] == 'shared:'+invitation['id'])
+    assert conflict['sharing']['status'] == 'pending'
+    decline = shared_bills.review(HANNAH, {'action': 'decline', 'shareId': invitation['id']}, store=legacy.catalog, load=legacy.load)
+    assert decline['action'] == 'decline' and decline['shareId'] == invitation['id']
     with pytest.raises(AccountConflict, match='different shared bill'):
         shared_bills.review(HANNAH, {'action': 'accept', 'shareId': invitation['id']}, store=legacy.catalog, load=legacy.load)
 

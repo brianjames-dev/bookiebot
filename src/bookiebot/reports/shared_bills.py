@@ -140,6 +140,10 @@ def enrich_listing(actor: str, own: dict[str, Any], *, store: SharedBillStore | 
             by_id[link['plan_id']]['sharing'] = _public_link(link, account)
     result = {**own, 'bills': own_bills, 'sharingPartner': {'id': partner.id, 'name': partner.name}}
     incoming = [link for link in links if link['member_id'] == account.id and link['status'] in {'active', 'pending'}]
+    # Existing memberships own their verified mirror before invitations are
+    # considered, regardless of SQL creation/order. A pending conflict must
+    # remain accessible so it can be declined, never block the entire page.
+    incoming.sort(key=lambda link: link['status'] != 'active')
     if not incoming:
         return result
     if load is None:
@@ -177,10 +181,11 @@ def enrich_listing(actor: str, own: dict[str, Any], *, store: SharedBillStore | 
                    for p in (local, local.get('nextChange')) if p):
                 local_id = ''
         if local_id:
-            if local_id in adopted:
+            if local_id in adopted and link['status'] == 'active':
                 raise AccountConflict('Different shared bills refer to the same local bill. Check their sources before continuing.')
-            adopted[local_id] = link['id']
-            hidden.add(local_id)
+            if local_id not in adopted:
+                adopted[local_id] = link['id']
+                hidden.add(local_id)
         state = _state(bill, link, own['month'], ledgers[payer.id], related)
         sharing = {**_public_link(link, account), 'state': state, 'sourcePlanId': link['plan_id']}
         future = bill.get('nextChange')
