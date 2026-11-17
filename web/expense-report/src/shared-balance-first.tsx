@@ -1,17 +1,17 @@
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import {ReimbursementOptions,HistoryFilter,SelectionClose,BalanceSides,ReimbursementResetFlow,useShortReimbursementPane} from "./reimbursement-tools"
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
+import { ArrowDownLeft, ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
 import { TransactionIcon } from "./daily-transactions"
 import { transactionCategory, type DailyTransaction } from "./transaction-identity"
 import { EditorExpansion, EditorScenes } from "./transaction-editor-workspace"
 import { useAppWorkStatus } from "./app-work-guard"
 import { useReimbursementPage } from "./reimbursement-pagination"
 import { useAppNavigation } from "./app-navigation"
-import { ReportLoading } from "./report-loading"
 import { RepaymentAllocation } from "./repayment-allocation"
 import { ChangeMotionContext, ChangedMoney, ChangedText } from "./transaction-value-motion"
 import { reimbursementMethod, reimbursementMotionKey, useReimbursementValueMotion } from "./reimbursement-value-motion"
-import { canReverseLedgerEvent, defaultOffsetEntries, IncomingPayment, LedgerRow, ledgerTotals, ResetEditor, ResetHistory,
+import { canReverseLedgerEvent, defaultOffsetEntries, IncomingPayment, LedgerRow, ledgerTotals, ResetEditor,
   type LedgerAllocation, type LedgerSnapshot, type Run } from "./reimbursement-ledger"
 
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
@@ -39,23 +39,27 @@ export function reimbursementTransaction(item: LedgerAllocation): DailyTransacti
     category: categories[item.category.toLowerCase()] ?? item.category, amount: item.grossCents / 100 }
 }
 type Review = { state: string | undefined; to: number; from: number; entries: ReturnType<typeof defaultOffsetEntries>; min: string }
-type Scene = "summary" | "offset" | "payment" | "done" | "reset"
+type Scene = import("./reimbursement-tools").ReimbursementScene
 
-export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled = disabled, refreshing = false, run, aliases, refresh }: {
-  snapshot: LedgerSnapshot; disabled: boolean; selectDisabled?: boolean; refreshing?: boolean; run: Run; aliases?: Record<string, string>; refresh: () => void
+export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled = disabled, refreshing = false, run, aliases, refresh, headerActions, undoVersion = 0 }: {
+  snapshot: LedgerSnapshot; disabled: boolean; selectDisabled?: boolean; refreshing?: boolean; run: Run; aliases?: Record<string, string>; refresh: () => void; headerActions?: HTMLElement | null; undoVersion?: number
 }) {
+  const previousUndo = useRef(undoVersion)
+  const undoing = previousUndo.current !== undoVersion
   const { allocations, events, ownerKey } = snapshot
   const wide = useAppNavigation()?.duoLandscape === true
+  const short = useShortReimbursementPane(wide)
   const [detailPane, setDetailPane] = useState<HTMLDivElement | null>(null)
   const [selected, setSelected] = useState("")
+  const [resetId, setResetId] = useState("")
   const [history, setHistory] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
-  const moreId = useId()
-  const [scene, setScene] = useState<Scene>("summary")
+  const [scene, changeScene] = useState<Scene>("summary")
+  const [navigation, setNavigation] = useState<"forward" | "backward">("forward")
+  const setScene = (next: Scene, direction: "forward" | "backward" = "forward") => { if (next === "reset-history" && scene === "summary") setResetId(""); setNavigation(direction); changeScene(next) }
   const [review, setReview] = useState<Review | null>(null)
   const [date, setDate] = useState(today)
   const [offsetReceipt, setOffsetReceipt] = useState(0)
-  const [receipt, setReceipt] = useState<{ cash: number; sent: boolean } | null>(null)
+  useLayoutEffect(() => { previousUndo.current = undoVersion; if (undoVersion) { setReview(null); setOffsetReceipt(0); if (scene.startsWith("reset-")) setScene("reset-history", "backward"); else if (scene !== "summary") setScene("summary", "backward") } }, [undoVersion])
   const totals = ledgerTotals(allocations, ownerKey)
   const active = allocations.filter(item => item.outstandingCents > 0)
   const pending = events.filter(event => event.status === "pending")
@@ -79,15 +83,15 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
     : active.some(item => item.accounting !== "cash_v1" || item.version !== item.projectedVersion || Boolean(item.clearedCents))
       ? "Review historical or syncing expenses individually before settling all balances."
       : partnerKeys.length > 1 ? "Review each person's expenses separately before settling." : ""
-  const stale = review !== null && review.state !== snapshot.resetState
+  const stale = review !== null && review.state !== snapshot.resetState && !undoing
   const locked = disabled || Boolean(snapshot.error)
-  const close = () => { setScene("summary"); setReview(null) }
-  useAppWorkStatus({ label: "Shared settlement review", dirty: scene === "offset" || scene === "payment", onDiscard: close })
+  const close = () => { setScene("summary", "backward"); setReview(null) }
+  useAppWorkStatus({ label: "Shared settlement review", dirty: scene !== "summary" && scene !== "reset-history", onDiscard: close })
   const makeReview = (source: LedgerSnapshot): Review => ({ state: source.resetState, ...ledgerTotals(source.allocations, source.ownerKey),
     entries: defaultOffsetEntries(source.allocations, source.ownerKey, source.events),
     min: source.allocations.filter(item => item.outstandingCents > 0).reduce((latest, item) => sharedExpenseDate(item.expenseDate) > latest ? sharedExpenseDate(item.expenseDate) : latest, "1900-01-01") })
   const start = () => {
-    setSelected(""); setOffsetReceipt(0); setReceipt(null); setDate(today())
+    setSelected(""); setOffsetReceipt(0); setDate(today())
     setReview(makeReview(snapshot)); setScene(totals.to > 0 && totals.from > 0 ? "offset" : "payment")
   }
   // The acknowledged offset returns the new canonical snapshot in the same
@@ -98,15 +102,15 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
   const sent = paymentReview ? paymentReview.from > paymentReview.to : false
   const dateValid = Boolean(sharedExpenseDate(date)) && date >= (paymentReview?.min ?? "1900-01-01") && date <= today()
   const primary = (label: string, click: () => void, off = false) => <button type="button" className={scene === "summary" ? "sr-primary" : "bi-primary"} disabled={locked || off} onClick={click}>{label}{scene === "summary" && <ChevronRight />}</button>
-  const facts = (entries: [string, string][]) => <dl className="rp-payment-summary">{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-  const flow = <div className={`sr-editor${scene !== "summary" ? ` bi-editor sr-settlement-editor${!wide ? " sp-inline-editor" : ""}` : ""}`} data-stage={scene}>
-    <EditorScenes scene={scene}>
+  const flow = <div className="sr-editor" data-stage={scene}>
+    <EditorScenes scene={scene} direction={navigation} sceneClassName={name => name === "summary" ? "" : `bi-editor sr-settlement-editor${!wide ? " sp-inline-editor" : ""}`}>
       {scene === "offset" && review ? <>
         <div className="sr-editor-heading"><h2>Offset balances</h2></div>
-        <ol className="sr-steps"><li data-current="true">1 · Offset</li><li>2 · Record payment</li><li>3 · Settle</li></ol>
-        <div className="sr-offset-equation"><span>{money(review.to)}<small>Owed to you</small></span><ArrowLeftRight/><span>{money(review.from)}<small>You owe</small></span></div>
-        {facts([["Offset each way", money(Math.min(review.to, review.from))], [review.to >= review.from ? "Then receive" : "Then pay", money(Math.abs(review.to - review.from))]])}
-        <p className="bi-footnote">Equal debts cancel, oldest expenses first. No cash is recorded.</p>
+        <ol className="sr-settlement-steps" aria-label="Settlement steps"><li data-current="true">Offset</li>{review.to !== review.from && <><ChevronRight aria-hidden="true"/><li>Payment (optional)</li></>}</ol>
+        <dl className="sr-before-balances"><div><dt>{partner} owes you</dt><dd>{money(review.to)}</dd></div><div><dt>You owe {partner}</dt><dd>{money(review.from)}</dd></div></dl>
+        <div className="sr-offset-amount"><span>Offset each way</span><strong>{money(Math.min(review.to, review.from))}</strong></div>
+        <div className="sr-offset-result"><span>{review.to >= review.from ? "Still owed to you" : "Still owed to " + partner}</span><strong>{money(Math.abs(review.to - review.from))}</strong></div>
+        <p className="bi-footnote">Equal debts cancel. No money moves in this step.</p>
         {stale && <p role="status">Balances changed. Cancel and review again.</p>}
         <div className="bi-editor-footer"><button className="bi-cancel" disabled={disabled} onClick={close}>Cancel</button>{primary("Confirm offset", () => {
           if (stale || blocked || !review) return
@@ -114,57 +118,47 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
           run({ operation: "offset", entries: review.entries, date: today(), note: "" }, saved => {
             if (!saved) { close(); return }
             setOffsetReceipt(offset); setReview(null)
-            if (review.to === review.from) { setReceipt({ cash: 0, sent: false }); setScene("done") }
+            if (review.to === review.from) { setScene("summary") }
             else setScene("payment")
           })
         }, stale || Boolean(blocked))}</div>
       </> : scene === "payment" && paymentReview ? <>
-        <div className="sr-editor-heading"><h2>{sent ? "Record sent payment" : "Record money received"}</h2></div>
-        <ol className="sr-steps"><li>1 · Offset</li><li data-current="true">2 · Record payment</li><li>3 · Settle</li></ol>
+        <div className="sr-editor-heading"><h2>{sent ? "Record sent payment" : "Record money received"}</h2>{offsetReceipt > 0 && <span>Optional</span>}</div>
+        <ol className="sr-settlement-steps" aria-label="Settlement steps">{offsetReceipt > 0 && <><li data-complete="true"><CheckCheck aria-hidden="true"/>{money(offsetReceipt)} offset each way</li><ChevronRight aria-hidden="true"/></>}<li data-current="true">{sent ? "Record sent" : "Record received"}</li></ol>
         <div className="sr-transfer-path"><span className="sr-person">{sent ? person(ownerKey)[0] : partner[0]}</span>{sent ? "You" : partner}<ArrowUpRight/>{sent ? partner : "You"}<span className="sr-person sr-partner">{sent ? partner[0] : person(ownerKey)[0]}</span></div>
-        <div className="rp-balance"><span className="rp-person-name">{sent ? `Sent to ${partner}` : `Received from ${partner}`}</span><strong className="rp-balance-amount">{money(cash)}</strong></div>
+        <div className="rp-balance"><span className="rp-person-name">{sent ? `Still owed to ${partner}` : `Remaining to receive`}</span><strong className="rp-balance-amount">{money(cash)}</strong></div>
         <label className="sr-date">Payment date<input type="date" required min={paymentReview.min} max={today()} value={date} disabled={disabled} onChange={event => {
           if (!review) setReview(paymentReview)
           setDate(event.target.value)
         }}/></label>
         <p className="bi-footnote">{sent ? "Balances stay outstanding until the recipient confirms receipt." : "Confirm only money already received. No bank transfer is made."}</p>
-        {(stale || paymentReview.state !== snapshot.resetState) && <p role="status">Balances changed. Cancel and review again.</p>}
-        <div className="bi-editor-footer"><button className="bi-cancel" disabled={disabled} onClick={close}>Cancel</button>{primary(sent ? "Record sent" : "Confirm received", () => {
+        {!undoing && (stale || paymentReview.state !== snapshot.resetState) && <p role="status">Balances changed. Cancel and review again.</p>}
+        <div className="bi-editor-footer"><button className="bi-cancel" disabled={disabled} onClick={close}>{offsetReceipt > 0 ? "Not now" : "Cancel"}</button>{primary(sent ? "Record sent" : "Confirm received", () => {
           if (paymentReview.state !== snapshot.resetState || blocked || !dateValid) return
-          run({ operation: sent ? "report_all" : "receive_all", expectedState: paymentReview.state, date, note: "" }, saved => { if (!saved) { close(); return }; setReceipt({ cash, sent }); setScene("done"); setReview(null) })
+          run({ operation: sent ? "report_all" : "receive_all", expectedState: paymentReview.state, date, note: "" }, saved => { if (!saved) { close(); return }; setScene("summary"); setReview(null) })
         }, !cash || !dateValid || Boolean(blocked) || paymentReview.state !== snapshot.resetState)}</div>
-      </> : scene === "done" && receipt ? <>
-        <div className="sr-success"><CheckCheck/><h2>{receipt.sent ? "Payment reported" : "Balances updated"}</h2><p>{receipt.sent ? "Awaiting the recipient’s confirmation." : "Original purchases, splits and dates are preserved."}</p></div>
-        {facts([["Offset each way", money(offsetReceipt)], [receipt.sent ? "Cash reported" : "Cash received", money(receipt.cash)]])}
-        {primary("View reimbursements", close)}
-      </> : scene === "reset" ? <><div className="sr-editor-heading"><h2>Reset balances</h2></div><ResetEditor snapshot={snapshot} disabled={locked || Boolean(blocked) || pending.length > 0} run={run} close={close}/></> : <>
-        <div className="sr-hero" data-side={totals.net >= 0 ? "to" : "from"}><span className="sr-eyebrow">{!active.length ? "Shared balance" : totals.net === 0 ? "Net balance" : totals.net > 0 ? `${partner} owes you` : `You owe ${partner}`}</span><strong>{money(Math.abs(totals.net))}</strong><span>{active.length ? "After offsetting shared balances" : "No outstanding reimbursements"}</span></div>
-        <div className="sr-summary-sides"><div><span>Owed to you</span><strong>{money(totals.to)}</strong></div><ArrowLeftRight/><div><span>You owe</span><strong>{money(totals.from)}</strong></div></div>
+      </> : scene.startsWith("reset-") ? <ReimbursementResetFlow scene={scene} snapshot={snapshot} pageSize={short ? 2 : 3} disabled={locked} run={run} setScene={setScene} resetId={resetId} setResetId={setResetId} close={close}/> : scene === "reset" ? <><div className="sr-editor-heading"><h2>Reset balances</h2></div><ResetEditor snapshot={snapshot} disabled={locked || Boolean(blocked) || pending.length > 0} run={run} close={close}/></> : <>
+        <div className="sr-hero" data-side={totals.net >= 0 ? "to" : "from"}><span className="sr-eyebrow">{!active.length ? "Shared balance" : totals.net === 0 ? "Net balance" : totals.net > 0 ? `${partner} owes you` : `You owe ${partner}`}</span><strong>{money(Math.abs(totals.net))}</strong><span>{active.length ? totals.to > 0 && totals.from > 0 ? "After offsetting shared balances" : totals.to > 0 ? "Remaining to receive" : "Remaining to send" : "No outstanding reimbursements"}</span></div>
+        <BalanceSides wide={wide} partner={partner} owner={person(ownerKey)} to={totals.to} from={totals.from}/>
         {active.length ? primary(totals.to && totals.from ? "Offset & settle" : totals.to ? "Record received" : "Record sent payment", start, Boolean(blocked) || !snapshot.resetState)
           : <div className="sr-settled-note"><CheckCheck/>All reimbursements are settled</div>}
-        {active.length > 0 && <div className="sr-flow-caption"><span>Offset</span><ChevronRight/><span>Record payment</span><ChevronRight/><span>Settle</span></div>}
+        {active.length > 0 && <div className="sr-flow-caption">{totals.to > 0 && totals.from > 0 ? <><span>Offset</span>{totals.net !== 0 && <><ChevronRight/><span>Payment (optional)</span></>}</> : <span>{totals.to > 0 ? "Record received" : "Record sent"}</span>}</div>}
         {blocked && <p className="bi-footnote" role="status">{blocked}</p>}
         {incoming.length > 0 && <section className="bb-ledger-incoming" aria-label="Payments awaiting your confirmation"><h3>Awaiting your confirmation</h3>{incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={allocations.find(item => item.id === event.allocationId)!} disabled={disabled} run={run}/>)}</section>}
-        <div className="sr-summary-tools" aria-label="Reimbursement options">
-          <button type="button" className="sr-tool" disabled={selectDisabled || scene !== "summary"} aria-pressed={history} onClick={() => { setHistory(!history); setSelected(""); setMoreOpen(false) }}>{history ? "Back" : "History"}</button>
-          <button type="button" className="sr-tool sr-more-trigger" disabled={selectDisabled} aria-expanded={moreOpen} aria-controls={moreId} onClick={() => setMoreOpen(!moreOpen)}>More options<ChevronDown aria-hidden="true"/></button>
-          {refreshing && <ReportLoading compact label="Refreshing reimbursements…"/>}
-        </div>
-        <div className="sr-more-content" id={moreId} hidden={!moreOpen}>{active.length > 0 && snapshot.resetState && <button type="button" className="bi-cancel" disabled={locked || Boolean(blocked) || pending.length > 0} onClick={() => { setMoreOpen(false); setScene("reset") }}>Reset balances</button>}
-          {Boolean(snapshot.resets?.length) && <ResetHistory resets={snapshot.resets!} owner={ownerKey} disabled={disabled} run={run}/>}</div>
       </>}
     </EditorScenes>
   </div>
   return <div className="sr-balance-first bi-product" data-detail-open={Boolean(selected)} data-flow-open={scene !== "summary"} data-refreshing={refreshing}>
     {snapshot.projectionPending && <div className="sr-sync bb-ledger-message" role="status"><p>Recorded. Expense sheets are still syncing.</p><button disabled={disabled} onClick={refresh}>Refresh</button></div>}
     {snapshot.error && <p className="sr-sync bb-ledger-note" role="status">{snapshot.error}</p>}
-    <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope"><span>{history ? "All reimbursement history" : active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span></div>
+    <ReimbursementOptions history={history} setHistory={setHistory} setSelected={setSelected} setScene={setScene} headerActions={headerActions} wide={wide} disabled={locked || scene !== "summary"}/>
+    <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope">{history ? <HistoryFilter onClear={() => { setHistory(false); setSelected("") }}/> : <span>{active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span>}</div>
       {!shown.length && <p className="bb-ledger-empty">No reimbursements for this month.</p>}
       {page.visible.map(group => <BalanceMonth key={group.key} group={group} paginate={history} selected={selected} onSelect={id => { if (!selectDisabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} selectDisabled={selectDisabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide} detailPane={detailPane}/>)}
       {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all months</button>}
     </section>
     <aside className="sr-right" aria-label="Shared balance and settlement" aria-hidden={wide && Boolean(selected) || undefined} inert={wide && Boolean(selected) || undefined}>{flow}</aside>
-    <div className="sr-detail-layer" ref={setDetailPane} aria-label="Expense details" aria-hidden={!wide || !selected} inert={!wide || !selected}/>
+    <div className="sr-detail-layer" ref={setDetailPane} aria-label="Expense details" aria-hidden={!wide || !selected} inert={!wide || !selected}/>{wide && selected && <SelectionClose disabled={selectDisabled} onClose={() => setSelected("")}/>}
   </div>
 }
 

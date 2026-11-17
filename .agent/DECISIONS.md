@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-17 — Approved reimbursement tools and canonical timed reversals
+
+Use the selected title Header menu with choices only, rendered outside the alternating scene slots so its target and disabled state remain current. Reset history is a bounded compact list in the existing main editor, with reviewed canonical reset undo/redo and no arrow/page counter. Retained scenes own their geometry through entry/exit; optional semantic direction keeps forward/back independent of alternating render slots. Keep native Transactions materials, circular close, allocation view and UndoPopup, including its eight-second deadline and animations. No optimistic financial rollback or browser ledger copies.
+
+An acknowledged, fully projected command may offer a timed inverse. Atomic reverse_operation requires the exact canonical operation ID and complete current resetState, collects its created events and confirmations of prior sender reports under the same store lock, and uses existing reversal authority, cleared/source checks, audit IDs, request fingerprints and recoverable projections. A receipt reversal excludes a separately committed offset. Reset inverses use the existing reset ID/version and canUndo/canRedo guards; the history remains visible and updates after success. Unknown/rejected saves offer no success toast, and retry retains the exact request. Expiry/dismiss never mutates data. No schema, migration, financial adapter or live-data repair.
+
 ## 2026-11-17 — Reimbursement detail ownership and independent freshness
 
 Keep one stable portal container per row, moving that DOM target between the compact inline anchor and a dedicated open-DUO right-pane sibling. Do not render right-side details inside the left scroll/paint clip or change portal targets and remount financial controllers on folds. Pass value-motion context and feedback through the portal; open selection alone uses Transactions' native panel highlight. Reimbursements owns its successful snapshot/command timestamp through the existing AppUpdatedTime masthead pattern; a failed read does not advance it, and revoked access clears it. Proposed options/reset-history layouts remain drafts until selected. No financial protocol, writer, storage or schema change.

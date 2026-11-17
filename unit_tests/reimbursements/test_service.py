@@ -760,3 +760,23 @@ def test_dollar_split_exact_cents_and_repeated_gross_edits_retain_original_ratio
         assert value["payerShareCents"]+value["partnerShareCents"]==total
     assert value["payerShareCents"]==payer
     assert setup.store.snapshot("brian")["events"]==[]
+
+
+def test_operation_undo_projects_only_its_receipt_and_replays_safely(setup):
+    assert split(setup)[0]
+    initial = setup.store.snapshot('brian')['allocations'][0]
+    earlier = service.command('brian', payment(initial, 5000))
+    after_earlier = earlier['allocations'][0]
+    received = service.command('brian', payment(after_earlier, 7000))
+    event = next(e for e in received['events'] if e['operationId'] == received['operationId'])
+    body = command('reverse_operation', operationId=received['operationId'], expectedState=received['resetState'])
+    result = service.command('brian', body)
+    assert result['projectionPending'] is False
+    assert setup.sheet.read(2, 31, 32) == [414.72]
+    assert receipt_row(setup.book, event['id'])[2] == 0
+    assert receipt_row(setup.book, earlier['events'][0]['id'])[2] == 50
+    before = setup.store.snapshot('brian')
+    replay = service.command('brian', body)
+    assert replay['operationId'] == result['operationId']
+    assert setup.store.snapshot('brian') == before
+    assert setup.sheet.read(2, 31, 32) == [414.72]

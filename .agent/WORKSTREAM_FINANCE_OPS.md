@@ -710,6 +710,10 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ## Shared Expense Responsibility And Reimbursements
 
+### 2026-11-17 Approved Reimbursement Refinements — Implemented And Locally Verified
+
+Port the approved Header menu and main-pane reset history/reviews, centered payment presentation, native selection close/three-value detail and semantic retained-scene slides. Use Transactions’ actual timed UndoPopup for acknowledged receipts/offsets/resets; an atomic reverse_operation restores only the exact canonical event/confirmation group, while existing reset undo/redo reinstates that reset. Preserve complete active scope, both-owner state, original purchase inputs, prior independent cash/offsets, freshness, stable folding portals and exact-request recovery. Regression coverage includes SQLite/PostgreSQL operation reversal/stale/idempotent guards, native UI contracts, real isolated canonical browser fixtures, reset reinstatement and expiry. Full local 3,491 passed / 874 optional PostgreSQL skipped; types/build pass. Native verification includes eight canonical flow cases, eight payment/detail parity, eight split/feedback, fourteen Transactions scene cases and two short-view fit checks across Chromium/WebKit. Final-head release evidence is tracked in STATUS/PR #198. No synthetic production tests or financial writes; no other backlog reprioritization.
+
 ### 2026-09-08 Approved Confirmed-Repayment Ledger — Implemented And Migrated
 
 The user approved payer/ownership hardening, fail-closed mutation guards, canonical storage and repairs. They chose retaining gross under the original payer until confirmed repayment; each partial receipt amends that source and records the debtor's linked expense. Both directions and reviewed equal offsets are in scope. This supersedes the older target invariants below for migrated/new canonical allocations. Paid legacy history remains read-only until a separately reviewed correction/import can establish counterpart history safely.

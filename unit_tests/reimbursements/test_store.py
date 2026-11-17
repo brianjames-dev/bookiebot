@@ -1104,3 +1104,68 @@ def test_invalid_exact_custom_ratios_cannot_register_an_allocation(store,ratio):
     with pytest.raises(ReimbursementValidationError):
         store.register_allocation(payload()|{"method":"custom","customPayerRatio":ratio})
     assert store.snapshot("brian")["allocations"]==[]
+
+
+def test_reverse_operation_restores_only_bulk_receipt_and_is_idempotent(store):
+    first = store.register_allocation(payload())
+    second = store.register_allocation(payload())
+    for row in (first, second):
+        store.mark_projected(row['id'], row['version'])
+    prior = store.command('brian', payment(first, 500))
+    first = store.get_allocation(first['id'])
+    store.mark_projected(first['id'], first['version'])
+    reported = store.command('hannah', payment(first, 1000, operation='report_payment'))
+    paid = store.command('brian', bulk_payment(store))
+    for row in paid['allocations']:
+        store.mark_projected(row['id'], row['version'])
+    before = store.snapshot('brian')
+    undo = command('reverse_operation', operationId=paid['operationId'], expectedState=before['resetState'])
+    result = store.command('brian', undo)
+    assert store.command('brian', undo) == result
+    assert store.get_allocation(first['id'])['outstandingCents'] == 3500
+    assert store.get_allocation(second['id'])['outstandingCents'] == 4000
+    events = {e['id']: e for e in store.snapshot('hannah')['events']}
+    assert events[prior['events'][0]['id']]['status'] == 'confirmed'
+    assert events[reported['events'][0]['id']]['status'] == 'reversed'
+    assert all(e['status'] == 'reversed' for e in result['events'])
+    for row in store.snapshot('brian')['allocations']:
+        original = next(r for r in before['allocations'] if r['id'] == row['id'])
+        for key in ('grossCents', 'payerShareCents', 'partnerShareCents', 'expenseDate', 'sourceActionId'):
+            assert row[key] == original[key]
+    with pytest.raises(ReimbursementConflictError):
+        store.command('brian', command('reverse_operation', operationId=paid['operationId'], expectedState=store.snapshot('brian')['resetState']))
+
+
+def test_reverse_operation_rejects_stale_preview_atomically(store):
+    row = store.register_allocation(payload())
+    store.mark_projected(row['id'], row['version'])
+    paid = store.command('brian', payment(row, 1000))
+    state = store.snapshot('brian')['resetState']
+    row = store.get_allocation(row['id'])
+    store.mark_projected(row['id'], row['version'])
+    other = store.command('brian', payment(row, 500))
+    before = store.snapshot('brian')
+    with pytest.raises(ReimbursementConflictError):
+        store.command('brian', command('reverse_operation', operationId=paid['operationId'], expectedState=state))
+    assert store.snapshot('brian') == before
+    assert other['events'][0]['status'] == 'confirmed'
+
+
+def test_reverse_operation_offset_preserves_separate_cash_receipt(store):
+    row = store.register_allocation(payload())
+    debt = opposite(store)
+    for value in (row, debt):
+        store.mark_projected(value['id'], value['version'])
+    offset = store.command('brian', command('offset', date=now_pacific().date().isoformat(), note='', entries=[
+        {'allocationId': value['id'], 'version': value['version'], 'amountCents': 1000} for value in (row, debt)]))
+    for value in offset['allocations']:
+        store.mark_projected(value['id'], value['version'])
+    current = store.get_allocation(row['id'])
+    cash = store.command('brian', payment(current, 500))
+    for value in cash['allocations']:
+        store.mark_projected(value['id'], value['version'])
+    undo = store.command('hannah', command('reverse_operation', operationId=offset['operationId'], expectedState=store.snapshot('hannah')['resetState']))
+    assert len(undo['events']) == 2
+    assert store.get_allocation(row['id'])['settledCents'] == 500
+    assert store.get_allocation(debt['id'])['settledCents'] == 0
+    assert next(e for e in store.snapshot('brian')['events'] if e['id'] == cash['events'][0]['id'])['status'] == 'confirmed'

@@ -1,6 +1,6 @@
 import {useLayoutEffect,useRef,type ReactNode} from 'react'
 
-export function StepMotion({review,open,mode,duration,edit,confirm}:{review:boolean;open:boolean;mode:string;duration:number;edit:ReactNode;confirm:ReactNode}){
+export function StepMotion({review,open,mode,duration,edit,confirm,direction:navigation}:{review:boolean;open:boolean;mode:string;duration:number;edit:ReactNode;confirm:ReactNode;direction?:"forward"|"backward"}){
  const frame=useRef<HTMLDivElement>(null),editRef=useRef<HTMLDivElement>(null),reviewRef=useRef<HTMLDivElement>(null)
  const state=useRef({initialized:false,open,target:review?1:0,running:false,generation:0,width:0,height:0,animations:[] as Animation[],settle:()=>{},resize:()=>{}})
  useLayoutEffect(()=>{
@@ -10,11 +10,11 @@ export function StepMotion({review,open,mode,duration,edit,confirm}:{review:bool
   const generation=++s.generation
   s.animations.forEach(animation=>animation.cancel());s.animations=[]
   s.target=target;s.open=open;s.width=box.getBoundingClientRect().width
-  const settle=()=>{s.running=false;box.dataset.moving='false';s.height=panes[s.target].offsetHeight;box.style.height=s.height+'px';panes.forEach((pane,index)=>{pane.dataset.visible=String(index===s.target);pane.style.visibility=index===s.target?'visible':'hidden';pane.style.transform='none';pane.style.opacity='1';pane.style.zIndex=index===s.target?'2':'1'})}
+  const settle=()=>{s.running=false;box.dataset.moving='false';s.height=panes[s.target].offsetHeight;box.style.height=s.height+'px';panes.forEach((pane,index)=>{pane.dataset.visible=String(index===s.target);pane.style.visibility=index===s.target?'visible':'hidden';pane.style.transform=index===s.target?'translate3d(0px,0,0)':'none';pane.style.opacity='1';pane.style.zIndex=index===s.target?'2':'1'})}
   s.settle=()=>{++s.generation;s.animations.forEach(animation=>animation.cancel());s.animations=[];settle()}
   if(!changed||matchMedia('(prefers-reduced-motion: reduce)').matches||!s.width){s.initialized=true;settle();return}
   s.initialized=true;s.running=true;box.dataset.moving='true'
-  const forward=target===1,direction=forward?1:-1,incoming=panes[target],outgoing=panes[1-target],height=incoming.offsetHeight,easing='cubic-bezier(.22,.8,.25,1)'
+  const forward=navigation?navigation==="forward":target===1,direction=forward?1:-1,incoming=panes[target],outgoing=panes[1-target],height=incoming.offsetHeight,easing='cubic-bezier(.22,.8,.25,1)'
   panes.forEach((pane,index)=>{pane.dataset.visible='true';pane.style.visibility='visible';pane.style.zIndex=index===target?'2':'1';pane.style.transform=snapshots[index].transform;pane.style.opacity=snapshots[index].opacity})
   const from=snapshots[target].visible?snapshots[target]:{transform:`translate3d(${direction*s.width}px,0,0)`,opacity:'1'}
   const to=`translate3d(${-direction*s.width}px,0,0)`
@@ -28,11 +28,11 @@ export function StepMotion({review,open,mode,duration,edit,confirm}:{review:bool
   // incoming surface never snaps to its measured height at the slide's end.
   s.resize=()=>{const next=panes[s.target].offsetHeight;if(Math.abs(next-s.height)<=.5)return;const current=box.getBoundingClientRect().height;s.height=next;heightAnimation.cancel();heightAnimation=animate(box,[{height:current+'px'},{height:next+'px'}],{duration:Math.max(0,finishAt-performance.now())})}
   animate(outgoing,[{transform:snapshots[1-target].transform,opacity:snapshots[1-target].opacity},{transform:to,opacity:1}])
-  animate(incoming,[{transform:from.transform,opacity:from.opacity},{transform:'none',opacity:1}])
+  animate(incoming,[{transform:from.transform,opacity:from.opacity},{transform:'translate3d(0px,0,0)',opacity:1}])
   // Commit only the most recent transition. Rapid reversals start from the
   // current presentation values, rather than restarting at a scene endpoint.
   Promise.allSettled(s.animations.map(animation=>animation.finished)).then(()=>{if(s.generation!==generation)return;s.animations.forEach(animation=>animation.cancel());s.animations=[];settle()})
- },[review,open,mode,duration])
+ },[review,open,mode,duration,navigation])
  useLayoutEffect(()=>{
   const s=state.current,box=frame.current!,panes=[editRef.current!,reviewRef.current!]
   let pending=0
