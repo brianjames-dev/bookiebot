@@ -38,6 +38,7 @@ function load(file) {
   if (cache.has(file)) return cache.get(file)
   const exports = {}; cache.set(file, exports)
   const requireModule = name => {
+    if (name === './transaction-editor-workspace') return { EditorScenes: ({children}) => children, EditorExpansion: ({open,children}) => open ? children : null }
     if(name==='./bill-checkin')return {BillCheckin:()=>null}
     if (name.endsWith('.css')) return {}
     if (name === 'konsta/react') return konsta.exports
@@ -204,10 +205,8 @@ async function main() {
   await fill(tree, 'Goal name', 'Trip draft'); await fill(tree, 'Target ($)', '1000')
   assert.equal(navRenders,beforeDraft,'Page work-guard publications do not rerender the dock')
   assert.equal(guard.dirty, true)
-  await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')
-  const sharedMonth = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-month-toggle')
-  if (!sharedMonth.props['aria-expanded']) await run(() => sharedMonth.props.onClick())
-  const disclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-toggle')
+  await tap(tree, 'Shared')
+  const disclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'sr-row-main')
   await run(() => disclosure.props.onClick()); await tap(tree, 'Record received'); await fill(tree, 'Amount ($)', '37.25'); await fill(tree, 'Note', 'Payment draft')
   await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
   assert.equal(button(tree, 'Settings').props['aria-current'], 'page')
@@ -412,10 +411,8 @@ async function main() {
   await tap(tree,'Back')
   await tap(tree, 'Savings'); await tap(tree, '＋ Goal'); await fill(tree, 'Goal name', 'Private Brian draft')
   await fill(tree, 'Target ($)', '1000')
-  await tap(tree, 'Shared'); await tap(tree, 'View 1 expense')
-  const freshMonth = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-month-toggle')
-  if (!freshMonth.props['aria-expanded']) await run(() => freshMonth.props.onClick())
-  const freshDisclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reimbursement-toggle')
+  await tap(tree, 'Shared')
+  const freshDisclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'sr-row-main')
   await run(() => freshDisclosure.props.onClick()); await tap(tree, 'Record received')
   await fill(tree, 'Amount ($)', '16.25'); await fill(tree, 'Note', 'Private receipt draft')
   const beforePendingReads = { ...reads }, beforePendingReportInstance = rawReport(tree).props['data-report-instance']

@@ -10,6 +10,7 @@ import type { ExpenseReportData } from "./types"
 import "./styles.css"
 import "./expense-app-shell.css"
 import "./duo-layout.css"
+import "./shared-balance-first.css"
 
 function readReportData(): ExpenseReportData {
   const script = document.getElementById("bookiebot-expense-report-data")

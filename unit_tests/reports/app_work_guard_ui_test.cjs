@@ -32,6 +32,7 @@ function load(file) {
     if (name === 'konsta/react') return konsta.exports
     if (!name.startsWith('.')) return localRequire(name)
     const base = path.resolve(path.dirname(file), name)
+    if (name.endsWith('.json')) return JSON.parse(fs.readFileSync(base, 'utf8'))
     return load([base + '.tsx', base + '.ts'].find(fs.existsSync))
   }
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText

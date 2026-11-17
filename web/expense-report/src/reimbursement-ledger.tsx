@@ -8,6 +8,7 @@ import { useAppWorkStatus } from "./app-work-guard"
 import { usePageRefresh, usePageRefreshRegistry } from "./page-refresh"
 import { useReimbursementPage } from "./reimbursement-pagination"
 import "./reimbursement-ledger.css"
+import { BalanceFirstReimbursements } from "./shared-balance-first"
 
 export interface LedgerAllocation {
   id: string; payerOwner: string; partnerOwner: string; payerPerson: string
@@ -24,7 +25,7 @@ export interface LedgerEvent {
   status: "pending" | "confirmed" | "reversed"; createdAt: string; confirmedAt: string
   confirmedBy: string; reversedAt: string; reversedBy: string
 }
-interface LedgerSnapshot {
+export interface LedgerSnapshot {
   enabled: true; ownerKey: string; allocations: LedgerAllocation[]; events: LedgerEvent[]
   currency: "USD"; projectionPending?: boolean; error?: string; resetState?: string; resets?: LedgerReset[]
 }
@@ -35,7 +36,7 @@ interface LedgerReset {
 }
 type LedgerResponse = LedgerSnapshot | { enabled: false }
 type Command = Record<string, unknown>
-type Run = (command: Command, done: () => void) => void
+export type Run = (command: Command, done: (saved: boolean) => void) => void
 type Direction = "to" | "from"
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
 const person = (owner: string) => owner ? owner[0].toUpperCase() + owner.slice(1) : "Partner"
@@ -160,8 +161,9 @@ function validate(snapshot: LedgerResponse) {
 }
 
 export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number; review?: boolean }
-export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess }: {
+export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess, balanceFirst = false, aliases }: {
   fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; onClose?: () => void; onRejectAccess?: (message: string) => void
+  balanceFirst?: boolean; aliases?: Record<string, string>
 }) {
   const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
   const [legacy, setLegacy] = useState(false)
@@ -176,7 +178,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
   const readController = useRef<AbortController | null>(null)
   const writeController = useRef<AbortController | null>(null)
   const executing = useRef(false)
-  const pending = useRef<{ body: Command; done: () => void } | null>(null)
+  const pending = useRef<{ body: Command; done: (saved: boolean) => void } | null>(null)
   const load = useCallback(async () => {
     const id = ++readId.current
     readController.current?.abort()
@@ -226,7 +228,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     try {
       const result = validate(await request<LedgerResponse>(change.body, controller.signal))
       if (!mounted.current) return
-      pending.current = null; setUncertain(false); change.done()
+      pending.current = null; setUncertain(false); change.done(true)
       setSnapshot(result); setLegacy(false)
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
       if (change.body.operation !== "receive_all") await load()
@@ -235,8 +237,8 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       if (failure instanceof LedgerRequestError && failure.status < 500) {
         pending.current = null; setUncertain(false)
         if (matchedReceipt && [401, 403].includes(failure.status)) { setSnapshot(null); onRejectAccess?.(failure.message) }
-        if (failure.status === 401) { setSnapshot(null); setSignedOut(true); change.done() }
-        if (failure.status === 409) { change.done(); await load() }
+        if (failure.status === 401) { setSnapshot(null); setSignedOut(true); change.done(false) }
+        if (failure.status === 409) { change.done(false); await load() }
         setError(failure.message)
       } else {
         setUncertain(true)
@@ -259,15 +261,16 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       run={run} refresh={() => void load()} />}
     <button type="button" className="bb-reconcile-action" disabled={busy || uncertain} onClick={onClose}>Back to reconciliation</button>
   </section>
-  return <Card className="bb-report-section bb-reimbursement-section bb-canonical-reimbursements">
-    <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>
+  return <Card className={`bb-report-section bb-reimbursement-section bb-canonical-reimbursements${balanceFirst ? " bb-balance-first-card" : ""}`}>
+    {!balanceFirst && <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>}
     <CardContent>
       {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
       {!snapshot && !error && <ReportLoading label="Loading reimbursements…"/>}
-      {snapshot && <LedgerContents snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run}
-        refresh={() => void load()} refreshing={refreshing} />}
+      {snapshot && (balanceFirst ? <BalanceFirstReimbursements snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run} aliases={aliases} refresh={() => void load()} />
+        : <LedgerContents snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run}
+          refresh={() => void load()} refreshing={refreshing} />)}
     </CardContent>
   </Card>
 }
@@ -424,8 +427,8 @@ function LedgerMonth({ group, visible, events, reversibleIds, owner, disabled, r
     </div></CollapsibleContent>
   </section>
 }
-function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpenChange, disabled, run }: {
-  allocation: LedgerAllocation; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; open: boolean; onOpenChange: (open: boolean) => void; disabled: boolean; run: Run
+export function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpenChange, disabled, run, detailOnly = false }: {
+  allocation: LedgerAllocation; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; open: boolean; onOpenChange: (open: boolean) => void; disabled: boolean; run: Run; detailOnly?: boolean
 }) {
   const [mode, setMode] = useState<"" | "payment" | "history" | "split">("")
   const [splitReview, setSplitReview] = useState(0)
@@ -441,11 +444,12 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
   const splitBlocked = pendingSent || sheetPending || cleared > 0 || item.settledCents > 0
     || events.some(event => event.status === "confirmed")
   const settledLabel = sheetPending ? "Sheet update pending" : item.partnerShareCents === 0 ? "No reimbursement due" : cleared > 0 ? "Cleared" : events.some(event => event.kind === "offset" && event.status === "confirmed") ? "Settled" : isPayer ? "Received" : "Paid"
-  return <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={<>
+  const summary = <>
     <span className="bb-reimbursement-item"><strong title={item.item || item.category}>{item.item || item.category || "Shared expense"}</strong></span>
     <div className="bb-reimbursement-status" data-settled={settled}>{settled ? settledLabel : <><FittedAmount className="bb-reimbursement-due">{money(item.outstandingCents)}</FittedAmount><i className="bb-reimbursement-due-key" aria-hidden="true" /><small>due</small></>}</div>
     <span className="bb-disclosure-mark" aria-hidden="true" />
-  </>}>
+  </>
+  const detail = <>
     <div className="bb-reimbursement-detail">
       <div className="bb-reimbursement-receipt-meta"><p><time dateTime={isoDate(item.expenseDate) || undefined} title={item.expenseDate}>{dateLabel(item.expenseDate)}</time></p>
         <p>{item.method === "fronted" ? `Fronted for ${partner}` : item.method === "income" ? "By income" : item.method === "equal" ? "Split 50/50" : item.method === "custom" ? "Custom split" : item.method}</p>
@@ -468,12 +472,13 @@ function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpe
         {canWrite && !settled && <button type="button" disabled={disabled || pendingSent} aria-expanded={mode === "payment"} aria-controls={paymentId} onClick={() => setMode(mode === "payment" ? "" : "payment")}>{isPayer ? "Record received" : "Record sent payment"}</button>}
         <button type="button" aria-expanded={mode === "history"} aria-controls={historyId} onClick={() => setMode(mode === "history" ? "" : "history")}>History ({events.length})</button>
       </div>
-      <RetainedPanel id={splitId} open={open && mode === "split"}><SplitEditor key={splitReview} allocation={item}
+      <RetainedPanel id={splitId} open={(open || detailOnly) && mode === "split"}><SplitEditor key={splitReview} allocation={item}
         disabled={disabled} blocked={splitBlocked} run={run} close={() => setMode("")} /></RetainedPanel>
-      <RetainedPanel id={paymentId} open={open && mode === "payment"}><PaymentEditor key={item.version} allocation={item} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={() => setMode("")} /></RetainedPanel>
-      <RetainedPanel id={historyId} open={open && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
+      <RetainedPanel id={paymentId} open={(open || detailOnly) && mode === "payment"}><PaymentEditor key={item.version} allocation={item} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={() => setMode("")} /></RetainedPanel>
+      <RetainedPanel id={historyId} open={(open || detailOnly) && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
     </div>
-  </AnimatedDisclosure>
+  </>
+  return detailOnly ? detail : <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={summary}>{detail}</AnimatedDisclosure>
 }
 
 function SplitEditor({ allocation, disabled, blocked, run, close }: { allocation: LedgerAllocation; disabled: boolean; blocked: boolean; run: Run; close: () => void }) {
@@ -540,7 +545,7 @@ function ReceiveAllEditor({ snapshot, disabled, run, close }: { snapshot: Ledger
     <div className="bb-ledger-actions"><button type="submit" disabled={stale || !total}>Confirm all received</button><button type="button" onClick={close}>Cancel</button></div>
   </fieldset></form>
 }
-function ResetEditor({ snapshot, disabled, run, close }: { snapshot: LedgerSnapshot; disabled: boolean; run: Run; close: () => void }) {
+export function ResetEditor({ snapshot, disabled, run, close }: { snapshot: LedgerSnapshot; disabled: boolean; run: Run; close: () => void }) {
   const [review] = useState(() => ({ expectedState: snapshot.resetState, totals: ledgerTotals(snapshot.allocations, snapshot.ownerKey),
     count: snapshot.allocations.filter(item => item.outstandingCents > 0).length }))
   const [note, setNote] = useState("")
@@ -559,7 +564,7 @@ function ResetEditor({ snapshot, disabled, run, close }: { snapshot: LedgerSnaps
     <div className="bb-ledger-actions"><button type="submit" disabled={stale || !review.count}>Confirm reset to $0.00</button><button type="button" onClick={close}>Cancel</button></div>
   </fieldset></form>
 }
-function ResetHistory({ resets, owner, disabled, run }: { resets: LedgerReset[]; owner: string; disabled: boolean; run: Run }) {
+export function ResetHistory({ resets, owner, disabled, run }: { resets: LedgerReset[]; owner: string; disabled: boolean; run: Run }) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<LedgerReset | null>(null)
   const id = useId(), confirmationPrefix = useId()
@@ -621,7 +626,7 @@ function PaymentEditor({ allocation, isPayer, disabled, run, close }: { allocati
     <div className="bb-ledger-actions"><button type="submit">{isPayer ? "Confirm received record" : "Record sent payment"}</button><button type="button" onClick={close}>Cancel</button></div>
   </fieldset></form>
 }
-function IncomingPayment({ event, allocation, disabled, run }: { event: LedgerEvent; allocation: LedgerAllocation; disabled: boolean; run: Run }) {
+export function IncomingPayment({ event, allocation, disabled, run }: { event: LedgerEvent; allocation: LedgerAllocation; disabled: boolean; run: Run }) {
   const [open, setOpen] = useState(false)
   const id = useId()
   return <div className="bb-ledger-incoming-row"><div><strong>{allocation.item || allocation.category}</strong><span>{person(event.debtorOwner)} marked {money(event.amountCents)} sent</span></div>
