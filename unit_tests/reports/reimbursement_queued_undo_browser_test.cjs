@@ -24,18 +24,18 @@ const pause=page=>page.waitForTimeout(500);
   const confirm=page.getByRole('button',{name:kind==='reset'?'Confirm reset to $0.00':kind==='offset'?'Confirm offset':'Confirm received',exact:true});await tap(page,confirm);
   await page.waitForFunction(()=>document.querySelector('button[data-saving=true]'));
   assert.equal(await confirm.getAttribute('aria-busy'),'true');assert.equal(await confirm.locator('.bb-report-loading[data-compact=true]').count(),1);assert.equal(await confirm.locator('.bb-saving-label').evaluate(el=>getComputedStyle(el).visibility),'hidden');
-  releaseSave();await popup.waitFor();await pause(page);assert.equal(await popup.getAttribute('data-pending'),'true');assert.equal(await popup.locator('.bi-undo-time').count(),0);assert.equal(await page.getByText('Recorded. Expense sheets are still syncing.',{exact:true}).count(),0);
+  releaseSave();await popup.waitFor();await pause(page);assert.equal(await popup.locator('.bb-report-loading').count(),0);assert.equal(await popup.locator('.bi-undo-time').count(),1);assert.equal(await page.getByText('Recorded. Expense sheets are still syncing.',{exact:true}).count(),0);
   assert.equal(await popup.locator('button').filter({hasText:'Undo'}).isEnabled(),true);assert.equal(await page.locator('.bi-undo-overlay').getAttribute('data-modal'),'false');
-  await tap(page,popup.getByRole('button',{name:'Undo',exact:true}));await page.getByText('Undo queued',{exact:false}).waitFor();await pause(page);assert.equal(writes.length,2);assert.equal(await popup.getByRole('button',{name:'Undo',exact:true}).count(),0);
-  await page.reload();await tap(page,page.getByRole('button',{name:'Shared',exact:true}));await page.getByText('Undo queued',{exact:false}).waitFor();await pause(page);
+  await tap(page,popup.getByRole('button',{name:'Undo',exact:true}));await page.getByText('Undone',{exact:false}).waitFor();await pause(page);assert.equal(writes.length,2);assert(!/queue|sync|sheets|keep using/i.test(await popup.innerText()),'User feedback must not expose backend mechanics');assert.equal(await popup.getByRole('button',{name:'Undo',exact:true}).count(),0);
+  await page.reload();await tap(page,page.getByRole('button',{name:'Shared',exact:true}));await page.getByText('Undone',{exact:false}).waitFor();await pause(page);
   // Both phones recover the same durable job from a fast SQL snapshot.
-  await hannah.page.evaluate(()=>window.dispatchEvent(new Event('focus')));await hannah.page.getByText('Undo queued',{exact:false}).waitFor();
+  await hannah.page.evaluate(()=>window.dispatchEvent(new Event('focus')));await hannah.page.getByText('Undone',{exact:false}).waitFor();
   const rows=page.locator('.sr-row-main');assert(await rows.count()>0);assert.equal(await rows.first().isEnabled(),true,'Queued work must not freeze inspection');await tap(page,rows.first());await pause(page);
-  await page.setViewportSize({width:width<800?951:382,height:width<800?669:657});await pause(page);await page.setViewportSize({width,height});await pause(page);assert.equal(await popup.getAttribute('data-pending'),'true');
+  await page.setViewportSize({width:width<800?951:382,height:width<800?669:657});await pause(page);await page.setViewportSize({width,height});await pause(page);assert.equal(await popup.locator('.bb-report-loading').count(),0);
   await page.screenshot({path:output+'/'+tag+'-queued.png'});
-  phase='completed';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await hannah.page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Undone',{exact:true}).waitFor();await hannah.page.getByText('Undone',{exact:true}).waitFor();
+  phase='completed';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await hannah.page.evaluate(()=>window.dispatchEvent(new Event('focus')));await Promise.all(phones.map(phone=>phone.page.waitForFunction(()=>[...document.querySelectorAll('.sr-row-main')].some(el=>/Owed|Due/.test(el.textContent)))));
   assert.equal(writes.length,2,'Refresh, folds and polling never repeat financial commands');
-  await tap(page,popup.getByRole('button',{name:'Dismiss undo',exact:true}));await pause(page);
+  if(await popup.isVisible())await tap(page,popup.getByRole('button',{name:'Dismiss undo',exact:true}));await pause(page);
   if(width>800){
    // Refresh belongs only to the open layout and uses the native rotating arrow.
    holdRefresh=true;const refresh=page.getByRole('button',{name:'Refresh reimbursements',exact:true});assert.deepEqual(await refresh.evaluate(el=>{const s=getComputedStyle(el);return [s.width,s.height,s.borderStyle,s.backgroundColor]}),['44px','44px','none','rgba(0, 0, 0, 0)']);await tap(page,refresh);await page.waitForFunction(()=>document.querySelector('.sr-refresh-spinning'));assert.equal(await refresh.getAttribute('aria-busy'),'true');assert.equal(await refresh.locator('svg').evaluate(el=>getComputedStyle(el).animationName),'sr-refresh-turn');releaseRefresh();await pause(page);

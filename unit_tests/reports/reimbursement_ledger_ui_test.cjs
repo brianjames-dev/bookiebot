@@ -134,14 +134,22 @@ async function queuedFeedbackContracts(){
  let feedback,tree;const Harness=({snapshot})=>{feedback=useReimbursementFeedback(snapshot);return null}
  const saved={...clone(undoResult),projectionPending:true,undoState:'financial-revision'},job={id:'durable-job',actorOwner:'brian',operation:'reverse_operation',status:'queued',error:'',createdAt:'',updatedAt:''}
  await act(async()=>{tree=Renderer.create(React.createElement(Harness,{snapshot:saved}));await flush()});await act(async()=>{feedback.acknowledge({operation:'receive_all'},saved);await flush()})
- assert.equal(feedback.command.operation,'queue_undo');assert.equal(feedback.modal,false);assert.equal(feedback.pending,true)
- assert.equal(feedback.notice.deadline,0,'Syncing never expires Undo before it can be clicked')
+ assert.equal(feedback.command.operation,'queue_undo');assert.equal(feedback.modal,false)
+ assert(feedback.notice.deadline>0,'An acknowledged action uses the normal timed toast even while persistence catches up');assert.equal(feedback.detail,undefined)
+ const savedNotice=feedback.notice
+ await act(async()=>{tree.update(React.createElement(Harness,{snapshot:{...saved,projectionPending:false}}));await flush()})
+ assert.equal(feedback.notice,savedNotice,'Projection completion never replaces or restarts the success toast')
+ await act(async()=>{tree.update(React.createElement(Harness,{snapshot:saved}));await flush()})
  await act(async()=>{feedback.dismiss();feedback.acknowledge({operation:'queue_undo'},{...saved,undoJob:job,undoJobs:[job]});tree.update(React.createElement(Harness,{snapshot:{...saved,undoJobs:[job]}}));await flush()})
- assert.equal(feedback.notice.title,'Undo queued');assert.equal(feedback.command,null);assert.equal(feedback.modal,false)
+ assert.equal(feedback.notice.title,'Undone');assert.equal(feedback.command,null);assert.equal(feedback.modal,false)
  await act(async()=>{tree.unmount();await flush();tree=Renderer.create(React.createElement(Harness,{snapshot:{...saved,undoJobs:[job]}}));await flush()})
- assert.equal(feedback.notice.title,'Undo queued','Refresh reconstructs queued feedback from canonical SQL status')
+ assert.equal(feedback.notice.title,'Undone','Refresh reconstructs queued feedback from canonical SQL status')
+ const acceptedNotice=feedback.notice
  await act(async()=>{tree.update(React.createElement(Harness,{snapshot:{...saved,projectionPending:false,undoJobs:[{...job,status:'completed'}]}}));await flush()})
- assert.equal(feedback.notice.title,'Undone');assert.equal(feedback.pending,false);assert(feedback.notice.deadline>0);assert.equal(feedback.command,null)
+ assert.equal(feedback.notice.title,'Undone');assert(feedback.notice.deadline>0);assert.equal(feedback.command,null)
+ assert.equal(feedback.notice,acceptedNotice,'Background completion does not repeat the success message')
+ await act(async()=>{feedback.dismiss();tree.update(React.createElement(Harness,{snapshot:{...saved,projectionPending:false,undoJobs:[{...job,status:'completed'}]}}));await flush()})
+ assert.equal(feedback.notice,null,'Dismissed completion stays dismissed on later reads')
  await act(async()=>{tree.unmount();await flush()})
 }
 async function acknowledgedUndoDoesNotWaitForDuplicateRead(){
@@ -401,7 +409,7 @@ async function emptyDirectionsAndMarkerContracts() {
   assert.ok(text(tree.root).includes("You don’t currently owe any money."))
   assert.equal(tree.root.findAll(node => hasClass(node, "bb-ledger-net")).length, 0, "An empty direction does not show the opposite direction's net balance")
   assert.equal(button(tree.root, "View ", true), undefined, "No records means no empty expandable list")
-  assert.ok(text(tree.root).includes("Saved · syncing sheets."))
+  assert.ok(!text(tree.root).includes("Recorded. Expense sheets are still syncing."))
   assert.ok(text(tree.root).includes("The worksheet view needs another sync."))
   assert.ok(text(tree.root).includes("Awaiting your confirmation"), "Necessary incoming payment review remains available from an empty direction")
   await tap(button(tree.root, "Review")); await tap(button(tree.root, "Confirm received"))
@@ -412,7 +420,7 @@ async function emptyDirectionsAndMarkerContracts() {
   assert.ok(button(tree.root, "View 3 expenses"))
   assert.ok(text(tree.root).includes("Net owed to you$95.00"))
   await expand(tree, "PG&E")
-  assert.ok(text(tree.root).includes("Saved · syncing sheets."), "A recorded payment cannot appear fully synced while its sheet projection is pending")
+  assert.ok(!text(tree.root).includes("sheets still need to update"), "Persistence details belong behind the scenes")
   await unmount(tree)
 
   state = fixture()
@@ -514,7 +522,7 @@ async function confirmationAndOffsetContracts() {
   ])
   assert.equal(body.date, "2026-09-08")
   assert.ok(text(tree.root).includes("Net owed to you$45.00"), "An equal-sided offset preserves the net balance")
-  assert.ok(text(tree.root).includes("Saved · syncing sheets."))
+  assert.ok(!text(tree.root).includes("Recorded. Expense sheets are still syncing."))
   state.snapshot.projectionPending = false
   await act(async()=>{await latestPageRefresh.refresh();await flush()})
   assert.equal(writes(state).length, 1, "Refreshing projection state does not repeat the saved offset")
@@ -596,7 +604,7 @@ async function recoveryContracts() {
   })
   let tree = await mount(); await expand(tree, "PG&E"); await tap(button(tree.root, "Record received")); await fill(tree, "Amount", "1.01"); await submit(tree)
   assert.ok(text(tree.root).includes("Owed to you$103.99"), "A confirmed POST snapshot remains visible if the follow-up GET fails")
-  assert.ok(text(tree.root).includes("Saved · syncing sheets."))
+  assert.ok(!text(tree.root).includes("Recorded. Expense sheets are still syncing."))
   assert.equal(button(tree.root, "Retry this record"), undefined, "A confirmed command does not become uncertain because its follow-up read fails")
   assert.equal(writes(state).length, 1)
   await unmount(tree)
@@ -1184,7 +1192,7 @@ async function balanceFirstHiddenRecoveryContracts(){
   const state=fixture();state.snapshot.allocations=[];state.snapshot.events=[];state.snapshot.projectionPending=true;state.snapshot.resetState='inactive-revision-1'
   const tree=await mount({balanceFirst:true}),full=()=>state.calls.filter(call=>call.url==='/app/reimbursements'&&!call.body)
   assert.equal(full().length,1,'Hidden pending corrections recover even when the visible list is empty')
-  assert.ok(text(tree.root).includes('Saved · syncing sheets.'))
+  assert.ok(!text(tree.root).includes('Recorded. Expense sheets are still syncing.'))
   state.snapshot.resetState='inactive-revision-2'
   await act(async()=>{for(const callback of listeners.window.get('focus'))callback();await flush()})
   assert.equal(full().length,2,'An advanced complete cursor recovers another hidden correction')
