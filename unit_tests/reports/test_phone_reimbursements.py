@@ -84,10 +84,9 @@ async def test_queued_undo_is_responsive_durable_and_refreshes_both_accounts(cli
         body = payment(client)
     saved = await (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).json()
     assert saved["projectionPending"]
-    gate, started = Event(), Event()
+    gate = Event()
     recover = service.recover_queued_undos
     def delayed():
-        started.set()
         assert gate.wait(5)
         return recover()
     def project(store):
@@ -110,10 +109,12 @@ async def test_queued_undo_is_responsive_durable_and_refreshes_both_accounts(cli
             assert current["allocations"] == saved["allocations"]
             assert current["undoJobs"][0]["status"] == "queued"
         gate.set()
-        for _ in range(100):
-            if not client.store.pending_undo_jobs():
-                break
-            await asyncio.sleep(.01)
+        # The canonical inverse commits before its final projection. Await the
+        # worker, not merely the job's SQL status, before comparing complete
+        # snapshots that include the mutable projectedVersion metadata.
+        task = client.http.server.app[phone_reimbursements._UNDO_RECOVERY].task
+        if task is not None:
+            await asyncio.wait_for(asyncio.shield(task), 5)
         assert not client.store.pending_undo_jobs()
         for actor, owner in ((HANNAH, "hannah"), (BRIAN, "brian")):
             connect(client, actor, owner)
