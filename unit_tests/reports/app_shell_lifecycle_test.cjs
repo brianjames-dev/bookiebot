@@ -206,6 +206,7 @@ async function main() {
   assert.equal(navRenders,beforeDraft,'Page work-guard publications do not rerender the dock')
   assert.equal(guard.dirty, true)
   await tap(tree, 'Shared')
+  assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Reimbursements')
   const disclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'sr-row-main')
   await run(() => disclosure.props.onClick()); await tap(tree, 'Record received'); await fill(tree, 'Amount ($)', '37.25'); await fill(tree, 'Note', 'Payment draft')
   await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
