@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react"
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronRight, Clock3 } from "lucide-react"
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
 import { TransactionIcon } from "./daily-transactions"
 import { transactionCategory, type DailyTransaction } from "./transaction-identity"
 import { EditorExpansion, EditorScenes } from "./transaction-editor-workspace"
@@ -7,6 +7,8 @@ import { useAppWorkStatus } from "./app-work-guard"
 import { useReimbursementPage } from "./reimbursement-pagination"
 import { useAppNavigation } from "./app-navigation"
 import { RepaymentAllocation } from "./repayment-allocation"
+import { ChangeMotionContext, ChangedMoney, ChangedText } from "./transaction-value-motion"
+import { reimbursementMethod, reimbursementMotionKey, useReimbursementValueMotion } from "./reimbursement-value-motion"
 import { canReverseLedgerEvent, defaultOffsetEntries, IncomingPayment, LedgerRow, ledgerTotals, ResetEditor, ResetHistory,
   type LedgerAllocation, type LedgerSnapshot, type Run } from "./reimbursement-ledger"
 
@@ -54,7 +56,9 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
   const pending = events.filter(event => event.status === "pending")
   const incoming = pending.filter(event => event.payeeOwner === ownerKey && allocations.some(item => item.id === event.allocationId && item.accounting === "cash_v1"))
   const currentMonth = today().slice(0, 7)
-  const shown = balanceFirstScope(allocations, currentMonth, history)
+  const scoped = balanceFirstScope(allocations, currentMonth, history)
+  const retained = allocations.find(item => item.id === selected)
+  const shown = retained && !scoped.some(item => item.id === selected) ? [...scoped, retained] : scoped
   if (selected && !shown.some(item => item.id === selected)) setSelected("")
   const groups = [...new Set(shown.map(item => sharedExpenseDate(item.expenseDate).slice(0, 7) || "undated"))]
     .sort((a, b) => a === "undated" ? 1 : b === "undated" ? -1 : b.localeCompare(a))
@@ -158,30 +162,35 @@ function BalanceMonth({ group, selected, onSelect, disabled, snapshot, reversibl
 }) {
   const page = useReimbursementPage(group.items, item => item.id)
   return <section className="sr-month" aria-label={group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}><h3>{group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}</h3>
-    {page.visible.map(item => {
-      const entry = reimbursementTransaction(item), category = transactionCategory(entry), isPayer = item.payerOwner === snapshot.ownerKey
-      const ownEvents = snapshot.events.filter(event => event.allocationId === item.id)
-      const opened = selected === item.id
-      const offset = ownEvents.filter(event => event.kind === "offset" && event.status === "confirmed").reduce((sum, event) => sum + event.amountCents, 0)
-      const method = item.method === "income" ? "By income" : item.method === "equal" ? "50/50" : item.method === "fronted" ? "Fronted" : "Custom split"
-      const pendingCents = ownEvents.filter(event => event.status === "pending").reduce((sum, event) => sum + event.amountCents, 0)
-      const status = <span className="rp-status"><Clock3/>{!item.outstandingCents ? "Settled" : pendingCents ? "Payment reported" : item.settledCents ? "Partly repaid" : "Awaiting repayment"}</span>
-      const balance = <div className="rp-balance"><span className="rp-person-name">{isPayer ? `${person(item.partnerOwner)} owes you` : `You owe ${person(item.payerOwner)}`}</span><strong className="rp-balance-amount">{money(item.outstandingCents)}</strong>{wide && status}</div>
-      const detailSummary = <>
-        <div className="rp-purchase"><TransactionIcon entry={entry} aliases={aliases} eager/><div className="rp-merchant"><strong>{entry.location || entry.item || entry.category}</strong><span>{category.label} · {dateLabel(item.expenseDate)}</span></div></div>
-        {balance}{!wide && <div className="rp-inline-status">{status}<span>{method}</span></div>}
-        <RepaymentAllocation payerName={person(item.payerOwner)} partnerName={person(item.partnerOwner)} payerCents={item.payerShareCents} partnerCents={item.partnerShareCents} incoming={isPayer} method={wide && method}/>
-        <dl className="rp-payment-summary" aria-label="Purchase and repayments"><div><dt>Purchase total</dt><dd>{money(item.grossCents)}</dd></div><div><dt>Cash {isPayer ? "received" : "paid"}</dt><dd>{money(Math.max(0, item.settledCents - offset))}</dd></div>
-          {offset > 0 && <div><dt>Settled by offset</dt><dd>{money(offset)}</dd></div>}{Boolean(item.clearedCents) && <div><dt>Cleared without payment</dt><dd>{money(item.clearedCents!)}</dd></div>}</dl>
-      </>
-      return <div className="sr-row-group" key={item.id}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={disabled} data-selected={opened} onClick={() => onSelect(item.id)}>
-        <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
-        <span className="sr-row-value"><strong>{money(item.outstandingCents || item.partnerShareCents)}</strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronRight className="sr-row-chevron"/>
-      </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened} retain>
-        <LedgerRow allocation={item} events={ownEvents} reversibleIds={reversibleIds} owner={snapshot.ownerKey} open={opened} onOpenChange={() => onSelect(item.id)} disabled={disabled} run={run} detailOnly detailSummary={detailSummary} compact={!wide}/>
-      </EditorExpansion></div>
-      </div>
-    })}
+    {page.visible.map(item => <BalanceRow key={item.id} item={item} selected={selected} onSelect={onSelect} disabled={disabled} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
     {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all expenses</button>}
   </section>
+}
+
+function BalanceRow({ item, selected, onSelect, disabled, snapshot, reversibleIds, run, aliases, wide }: {
+  item: LedgerAllocation; selected: string; onSelect: (id: string) => void; disabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
+}) {
+  const opened = selected === item.id, isPayer = item.payerOwner === snapshot.ownerKey
+  const { shown, plan } = useReimbursementValueMotion(item, opened, isPayer), key = reimbursementMotionKey(item.id)
+  const entry = reimbursementTransaction(shown), category = transactionCategory(entry)
+  const ownEvents = snapshot.events.filter(event => event.allocationId === item.id)
+  const offset = ownEvents.filter(event => event.kind === "offset" && event.status === "confirmed").reduce((sum, event) => sum + event.amountCents, 0)
+  const method = <ChangedText value={reimbursementMethod(shown)} motionKey={key + "method"}/>
+  const pendingCents = ownEvents.filter(event => event.status === "pending").reduce((sum, event) => sum + event.amountCents, 0)
+  const status = <span className="rp-status"><Clock3/>{!item.outstandingCents ? "Settled" : pendingCents ? "Payment reported" : item.settledCents ? "Partly repaid" : wide ? "Awaiting repayment" : "Pending"}</span>
+  const balance = <div className="rp-balance"><span className="rp-person-name">{isPayer ? `${person(item.partnerOwner)} owes you` : `You owe ${person(item.payerOwner)}`}</span><strong className="rp-balance-amount"><ChangedMoney value={money(shown.outstandingCents)} motionKey={key + "remaining"}/></strong>{wide && status}</div>
+  const detailSummary = <>
+    <div className="rp-purchase"><TransactionIcon entry={entry} aliases={aliases} eager/><div className="rp-merchant"><strong>{entry.location || entry.item || entry.category}</strong><span>{category.label} · {dateLabel(item.expenseDate)}</span></div></div>
+    {wide ? balance : <header className="sp-detail-heading">{balance}</header>}{!wide && <div className="rp-inline-status">{status}<span>{method}</span></div>}
+    <RepaymentAllocation payerName={person(item.payerOwner)} partnerName={person(item.partnerOwner)} payerCents={shown.payerShareCents} partnerCents={shown.partnerShareCents} incoming={isPayer} method={wide && method} renderAmount={(cents, side) => <ChangedMoney value={money(cents)} motionKey={key + side}/>}/>
+    <dl className="rp-payment-summary" aria-label="Purchase and repayments"><div><dt>Purchase total</dt><dd>{money(item.grossCents)}</dd></div><div><dt>Cash {isPayer ? "received" : "paid"}</dt><dd>{money(Math.max(0, item.settledCents - offset))}</dd></div>
+      {offset > 0 && <div><dt>Settled by offset</dt><dd>{money(offset)}</dd></div>}{Boolean(item.clearedCents) && <div><dt>Cleared without payment</dt><dd>{money(item.clearedCents!)}</dd></div>}</dl>
+  </>
+  return <ChangeMotionContext.Provider value={plan}><div className="sr-row-group" data-feedback={plan ? "animating" : undefined}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={disabled} data-selected={opened} onClick={() => onSelect(item.id)}>
+    <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
+    <span className="sr-row-value"><strong><ChangedMoney value={money(shown.outstandingCents || shown.partnerShareCents)} motionKey={key + "remaining"}/></strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronDown className="sr-row-chevron" aria-hidden="true"/>
+  </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened} retain>
+    <LedgerRow allocation={item} events={ownEvents} reversibleIds={reversibleIds} owner={snapshot.ownerKey} open={opened} onOpenChange={() => onSelect(item.id)} disabled={disabled} run={run} detailOnly detailSummary={detailSummary} compact={!wide} incomePayerCents={snapshot.splitOptions?.[item.id]?.incomePayerCents}/>
+  </EditorExpansion></div>
+  </div></ChangeMotionContext.Provider>
 }

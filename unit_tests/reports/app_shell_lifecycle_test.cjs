@@ -55,7 +55,7 @@ function load(file) {
     window: win, document: doc, navigator:win.navigator, HTMLElement: Element, Element, Node: Element,
     fetch: (...args) => request(...args), crypto: { randomUUID: () => `shell-command-${++commandId}` },
     setTimeout: win.setTimeout, clearTimeout: win.clearTimeout,
-    requestAnimationFrame: cb => win.setTimeout(cb, 16), cancelAnimationFrame: win.clearTimeout,
+    requestAnimationFrame: cb => win.setTimeout(cb, 16), cancelAnimationFrame: win.clearTimeout, matchMedia: win.matchMedia,
   })
   return exports
 }

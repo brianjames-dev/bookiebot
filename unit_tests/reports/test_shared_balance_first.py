@@ -10,11 +10,13 @@ from bookiebot.reimbursements.store import ReimbursementStore
 from bookiebot.sheets.routing import now_pacific
 
 
-def test_balance_first_offset_then_cash_and_sender_confirmation(tmp_path):
+def test_balance_first_offset_then_cash_and_sender_confirmation(tmp_path, monkeypatch):
     access = AppAccessStore(tmp_path / "shared.sqlite3")
     access.initialize()
     store = ReimbursementStore(access)
     store.initialize()
+    from bookiebot.reimbursements import service
+    monkeypatch.setattr(service, "build_reimbursement_store", lambda: store)
     current = now_pacific().date().replace(day=1)
     previous = current - timedelta(days=1)
 
@@ -38,7 +40,7 @@ def test_balance_first_offset_then_cash_and_sender_confirmation(tmp_path):
     add("netflix", "Netflix", 800, current, settled=800)
 
     def snap():
-        return {owner: {**store.snapshot(owner), "enabled": True, "ownerKey": owner, "projectionPending": False} for owner in ("brian", "hannah")}
+        return {owner: service.snapshot(owner) for owner in ("brian", "hannah")}
 
     initial = snap()
     rows = {row["id"]: row for row in initial["brian"]["allocations"]}

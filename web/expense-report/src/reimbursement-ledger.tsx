@@ -11,7 +11,8 @@ import "./reimbursement-ledger.css"
 import { BalanceFirstReimbursements } from "./shared-balance-first"
 import { StepMotion } from "./transaction-step-motion"
 import { transactionMotion } from "./transaction-inline-editor"
-import { ArrowLeft, X } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
+import { ReimbursementSplitEditor } from "./reimbursement-split-editor"
 
 export interface LedgerAllocation {
   id: string; payerOwner: string; partnerOwner: string; payerPerson: string
@@ -31,6 +32,7 @@ export interface LedgerEvent {
 export interface LedgerSnapshot {
   enabled: true; ownerKey: string; allocations: LedgerAllocation[]; events: LedgerEvent[]
   currency: "USD"; projectionPending?: boolean; error?: string; resetState?: string; resets?: LedgerReset[]
+  splitOptions?: Record<string, { incomePayerCents: number }>
 }
 interface LedgerReset {
   id: string; version: number; status: "active" | "undone"; actorOwner: string
@@ -430,8 +432,8 @@ function LedgerMonth({ group, visible, events, reversibleIds, owner, disabled, r
     </div></CollapsibleContent>
   </section>
 }
-export function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpenChange, disabled, run, detailOnly = false, detailSummary, compact = true }: {
-  allocation: LedgerAllocation; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; open: boolean; onOpenChange: (open: boolean) => void; disabled: boolean; run: Run; detailOnly?: boolean; detailSummary?: ReactNode; compact?: boolean
+export function LedgerRow({ allocation: item, events, reversibleIds, owner, open, onOpenChange, disabled, run, detailOnly = false, detailSummary, compact = true, incomePayerCents }: {
+  allocation: LedgerAllocation; events: LedgerEvent[]; reversibleIds: Set<string>; owner: string; open: boolean; onOpenChange: (open: boolean) => void; disabled: boolean; run: Run; detailOnly?: boolean; detailSummary?: ReactNode; compact?: boolean; incomePayerCents?: number
 }) {
   const [mode, setMode] = useState<"" | "payment" | "history" | "split">("")
   const [splitReview, setSplitReview] = useState(0)
@@ -481,7 +483,7 @@ export function LedgerRow({ allocation: item, events, reversibleIds, owner, open
       <RetainedPanel id={historyId} open={(open || detailOnly) && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
     </div>
   </>
-  return detailOnly ? <LedgerDetailScenes allocation={item} events={events} reversibleIds={reversibleIds} open={open} compact={compact} disabled={disabled} run={run}
+  return detailOnly ? <LedgerDetailScenes allocation={item} events={events} reversibleIds={reversibleIds} open={open} compact={compact} disabled={disabled} run={run} incomePayerCents={incomePayerCents}
     summary={detailSummary} close={() => onOpenChange(false)} isPayer={isPayer} canWrite={canWrite} settled={settled} pendingSent={pendingSent} splitBlocked={splitBlocked}
     notices={<>{!canWrite && <p className="bi-footnote">Historical split · read only</p>}{sheetPending && <p className="bi-footnote" role="status">Change saved; sheets are still syncing.</p>}
       {pendingSent && <p className="bi-footnote">{isPayer ? "Review the pending payment before recording another receipt." : "Sent payment awaiting confirmation. The balance changes when received."}</p>}
@@ -490,9 +492,10 @@ export function LedgerRow({ allocation: item, events, reversibleIds, owner, open
     : <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={summary}>{detail}</AnimatedDisclosure>
 }
 
-function LedgerDetailScenes({ allocation, events, reversibleIds, open, compact, disabled, run, summary, notices, close, isPayer, canWrite, settled, pendingSent, splitBlocked }: {
+function LedgerDetailScenes({ allocation, events, reversibleIds, open, compact, disabled, run, summary, notices, close, isPayer, canWrite, settled, pendingSent, splitBlocked, incomePayerCents }: {
   allocation: LedgerAllocation; events: LedgerEvent[]; reversibleIds: Set<string>; open: boolean; compact: boolean; disabled: boolean; run: Run; summary: ReactNode; notices: ReactNode; close: () => void
   isPayer: boolean; canWrite: boolean; settled: boolean; pendingSent: boolean; splitBlocked: boolean
+  incomePayerCents?: number
 }) {
   const [mode, setMode] = useState<"" | "payment" | "split" | "history">("")
   const [visits, setVisits] = useState({ payment: 0, split: 0, history: 0 })
@@ -501,26 +504,26 @@ function LedgerDetailScenes({ allocation, events, reversibleIds, open, compact, 
   const editing = mode !== "", alternate = mode === "split" || mode === "history"
   const title = mode === "payment" ? isPayer ? "Record money received" : "Record sent payment" : mode === "split" ? "Edit split" : mode === "history" ? "Payment history" : "Reimbursement"
   return <div className={`sr-detail-native bi-editor${compact ? " sp-inline-editor" : ""}`} data-detail-mode={mode || "summary"}>
-    <header className={`sr-detail-heading ${!editing && !compact ? "sp-detail-heading" : "sp-flow-heading"}`}><h2>{title}</h2><button type="button" className="sr-icon-button" disabled={disabled} aria-label="Close reimbursement details" onClick={close}><X/></button></header>
+    {(mode === "payment" || mode === "history") && <header className="sr-detail-heading sp-flow-heading"><h2>{title}</h2></header>}
     <section className={`sp-detail${compact ? " sp-detail-inline" : ""}`} data-direction={isPayer ? "receive" : "send"} aria-label="Reimbursement editor" onKeyDown={event => { if (event.key === "Escape" && !disabled) { event.preventDefault(); close() } }}>
       <StepMotion review={editing} open={open} mode="slide" duration={transactionMotion.duration} edit={<div className="sp-summary">
         {summary}{notices}
-        <div className="sr-detail-tools">{canWrite && isPayer && <button type="button" className="bi-cancel" disabled={disabled || splitBlocked} onClick={() => choose("split")}>Edit split</button>}
+        <div className="sr-detail-tools">{canWrite && isPayer && <button type="button" className="bi-primary" disabled={disabled || splitBlocked} onClick={() => choose("split")}>Edit split</button>}
           <button type="button" className="bi-cancel" disabled={disabled} onClick={() => choose("history")}>History ({events.length})</button></div>
-        <footer className="bi-editor-footer sp-summary-footer"><button type="button" className="bi-cancel" disabled={disabled} onClick={close}>Close</button>
+        <footer className="bi-editor-footer sp-summary-footer"><button type="button" className="bi-cancel" disabled={disabled} onClick={close}>Cancel</button>
           {canWrite && !settled && <button type="button" className="bi-primary" disabled={disabled || pendingSent} onClick={() => choose("payment")}>{isPayer ? "Record received" : "Record sent payment"}</button>}</footer>
       </div>} confirm={<div className="bi-editor bi-editor-embedded">
         <StepMotion review={alternate} open={open && editing} mode="slide" duration={transactionMotion.duration}
           edit={visits.payment > 0 && <PaymentEditor key={`${allocation.version}:${visits.payment}`} allocation={allocation} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={back} native/>}
           confirm={<StepMotion review={mode === "history"} open={open && alternate} mode="slide" duration={transactionMotion.duration}
-            edit={visits.split > 0 && <SplitEditor key={visits.split} allocation={allocation} disabled={disabled} blocked={splitBlocked} run={run} close={back} native/>}
+            edit={visits.split > 0 && <ReimbursementSplitEditor key={visits.split} active={open && mode === "split"} allocation={allocation} incomePayerCents={incomePayerCents} disabled={disabled} blocked={splitBlocked} run={run} close={back}/>}
             confirm={visits.history > 0 && <><PaymentHistory allocation={allocation} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run}/><footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={disabled} onClick={back}><ArrowLeft/>Back</button></footer></>}/>} />
       </div>} />
     </section>
   </div>
 }
 
-function SplitEditor({ allocation, disabled, blocked, run, close, native = false }: { allocation: LedgerAllocation; disabled: boolean; blocked: boolean; run: Run; close: () => void; native?: boolean }) {
+function SplitEditor({ allocation, disabled, blocked, run, close }: { allocation: LedgerAllocation; disabled: boolean; blocked: boolean; run: Run; close: () => void }) {
   const [review] = useState(allocation)
   const initialBasis = review.customPayerBasisPoints ?? Math.round(review.payerShareCents / review.grossCents * 10_000)
   const [basis, setBasis] = useState(initialBasis)
@@ -537,11 +540,11 @@ function SplitEditor({ allocation, disabled, blocked, run, close, native = false
   const finish = () => { setBasis(initialBasis); setTotal((review.grossCents / 100).toFixed(2)); close() }
   useAppWorkStatus({ label: "Split changes", dirty: changed,
     onDiscard: () => { setBasis(initialBasis); setTotal((review.grossCents / 100).toFixed(2)); close() } })
-  return <form className={native ? "bi-fields sr-native-form" : "bb-ledger-form bb-ledger-split-editor"} onSubmit={event => {
+  return <form className="bb-ledger-form bb-ledger-split-editor" onSubmit={event => {
     event.preventDefault()
     if (disabled || blocked || stale || !valid || !changed) return
     run({ operation: "edit_split", allocationId: review.id, version: review.version, grossCents: gross, ...(preserveRatio ? {payerShareCents: payerShare} : {payerBasisPoints: basis}) }, finish)
-  }}><fieldset disabled={disabled || blocked || stale}><legend className={native ? "bi-sr-only" : undefined}>Edit split</legend>
+  }}><fieldset disabled={disabled || blocked || stale}><legend>Edit split</legend>
     <label>Expense total ($)<input required inputMode="decimal" value={total} aria-invalid={!valid}
       onChange={event => setTotal(event.target.value)} /></label>
     {!valid && <p className="bb-ledger-note" role="status">Enter a total greater than $0.00 with at most two decimal places.</p>}
@@ -554,8 +557,8 @@ function SplitEditor({ allocation, disabled, blocked, run, close, native = false
     </div>
     <p className="bb-ledger-note">Save to apply this split and expense total. The full expense stays in your budget until repayment is confirmed.</p>
   </fieldset>{stale && <p className="bb-ledger-note" role="status">This expense changed. Cancel and reopen Edit split to review the latest amounts.</p>}
-    <div className={native ? "bi-editor-footer" : "bb-ledger-actions"}>{native && <button className="bi-cancel" type="button" disabled={disabled} onClick={finish}>Cancel</button>}<button className={native ? "bi-primary" : undefined} type="submit" disabled={disabled || blocked || stale || !valid || !changed}>Save split</button>
-      {!native && <button type="button" disabled={disabled} onClick={finish}>Cancel</button>}</div>
+    <div className="bb-ledger-actions"><button type="submit" disabled={disabled || blocked || stale || !valid || !changed}>Save split</button>
+      <button type="button" disabled={disabled} onClick={finish}>Cancel</button></div>
   </form>
 }
 

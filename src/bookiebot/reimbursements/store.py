@@ -756,7 +756,7 @@ class ReimbursementStore:
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
                        "receive_all": {"expectedState", "date", "note"},
                        "report_all": {"expectedState", "date", "note"},
-                       "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints", "payerShareCents"},
+                       "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints", "payerShareCents", "method"},
                        "reset": {"expectedState", "note"},
                        "undo_reset": {"resetId", "version"}, "redo_reset": {"resetId", "version"}}
             if not isinstance(operation, str) or operation not in allowed or set(body) - common - allowed[operation]:
@@ -768,7 +768,17 @@ class ReimbursementStore:
                 allocation_id = _text(body.get("allocationId"), "Allocation identifier", 200, required=True)
                 self._writable(self._row(db, allocation_id))
                 gross = _cents(body.get("grossCents"), "Expense total")
-                if "payerShareCents" in body:
+                method = body.get("method", "custom")
+                if method not in ("custom", "equal", "income", "fronted"):
+                    raise ReimbursementValidationError("Choose a valid split method.")
+                if method != "custom":
+                    from bookiebot.sheets.collaboration import split_amounts
+                    source = json.loads(self._row(db, allocation_id)["payload_json"])
+                    payer = int(round(split_amounts(gross / 100, method, source["payerOwner"])[0] * 100))
+                    if "payerBasisPoints" in body or _integer(body.get("payerShareCents"), "Payer share", 0, gross) != payer:
+                        raise ReimbursementValidationError("The share no longer matches this split method. Review it again.")
+                    custom = {}
+                elif "payerShareCents" in body:
                     if "payerBasisPoints" in body:
                         raise ReimbursementValidationError("Choose a custom amount or percentage, not both.")
                     payer = _integer(body["payerShareCents"], "Payer share", 0, gross)
@@ -779,7 +789,7 @@ class ReimbursementStore:
                     custom = {"customPayerBasisPoints": basis}
                 self._revise_allocation(db, owner, allocation_id, body.get("version"), {
                     "grossCents": gross, "payerShareCents": payer, "partnerShareCents": gross - payer,
-                    "method": "custom", **custom,
+                    "method": method, **custom,
                 }, operation="edit_split")
                 changed.append(allocation_id)
             elif operation in {"reset", "undo_reset", "redo_reset"}:

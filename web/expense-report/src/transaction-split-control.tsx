@@ -3,7 +3,7 @@ import {ChartPie} from 'lucide-react'
 import {allocate,circleFillHeight,identifySplit,quarterShare,sliderShare,stepShare,parseShare,shareText,splitMoney,splitNotches,splitMethodLabel,type SplitMethod} from './transaction-split-model'
 
 export type SplitInputDraft={payer:boolean;text:string}|null
-export function NotchedSplitControl({total,payerCents,method,incomeBasis,capture,incomeTarget,payerName,partnerName,allowCustom=true,disabled,onChange,onValidityChange,inputDraft,onInputDraft,unit='money'}:{total:number;payerCents:number;method:SplitMethod;incomeBasis:number;capture:number;incomeTarget?:number;payerName:string;partnerName:string;allowCustom?:boolean;disabled:boolean;onChange:(cents:number,method:SplitMethod)=>void;onValidityChange:(valid:boolean)=>void;inputDraft?:SplitInputDraft;onInputDraft?:(draft:SplitInputDraft)=>void;unit?:'money'|'percent'}){
+export function NotchedSplitControl({total,payerCents,method,incomeBasis,capture,incomeTarget,payerName,partnerName,allowCustom=true,allowIncome=true,disabled,onChange,onValidityChange,inputDraft,onInputDraft,unit='money'}:{total:number;payerCents:number;method:SplitMethod;incomeBasis:number;capture:number;incomeTarget?:number;payerName:string;partnerName:string;allowCustom?:boolean;allowIncome?:boolean;disabled:boolean;onChange:(cents:number,method:SplitMethod)=>void;onValidityChange:(valid:boolean)=>void;inputDraft?:SplitInputDraft;onInputDraft?:(draft:SplitInputDraft)=>void;unit?:'money'|'percent'}){
  const [localDraft,setLocalDraft]=useState<SplitInputDraft>(null),[announcement,setAnnouncement]=useState('')
  // Transactions keeps raw input with its draft so changing panes preserves validation too.
  const draft=inputDraft===undefined?localDraft:inputDraft
@@ -12,7 +12,7 @@ export function NotchedSplitControl({total,payerCents,method,incomeBasis,capture
  const incomeCents=incomeTarget??allocate(total,incomeBasis),notches=splitNotches(total,incomeBasis,incomeCents),mode=splitMethodLabel(method,incomeBasis,partnerName),partner=total-payerCents
  const display=(value:number)=>unit==='percent'?`${(value/100).toFixed(2)}%`:splitMoney(value)
  const debt=partner===0?`${partnerName} owes nothing.`:`${partnerName} will owe ${payerName} ${display(partner)}.`
- const invalidDraft=draft!==null&&parseShare(draft.text,total)===null,canRestoreIncome=!disabled&&(payerCents!==incomeCents||invalidDraft)
+ const invalidDraft=draft!==null&&parseShare(draft.text,total)===null,canRestoreIncome=allowIncome&&!disabled&&(payerCents!==incomeCents||invalidDraft)
  const send=(raw:number)=>{const value=allowCustom?raw:notches.reduce((best,point)=>Math.abs(point-raw)<Math.abs(best-raw)?point:best,notches[0]);setDraft(null);onValidityChange(true);onChange(value,identifySplit(value,total,incomeBasis,method,incomeCents))}
  return <div className="bs-split" data-visual="levels" role="group" aria-label={unit==='percent'?'Split new charges':'Split the purchase'}>
   <div className="bs-context"><button className="bs-income-reset" type="button" aria-label="Split by income" data-tooltip="Split by income" disabled={!canRestoreIncome} onClick={()=>{
