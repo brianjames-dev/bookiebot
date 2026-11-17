@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from bookiebot.reimbursements import service
 from bookiebot.reimbursements.store import ReimbursementStore
+from bookiebot.reimbursements.presentation import display_snapshot
 from bookiebot.reports.app_access import AppAccessStore
 from bookiebot.sheets.routing import now_pacific
 from unit_tests.reimbursements.test_store import payload, command
@@ -46,14 +47,30 @@ def test_queued_undo_browser_phases_preserve_original_purchases(tmp_path, monkey
         job = store.command('brian', {**undo, 'requestId': uuid4().hex})['undoJob']
         queued = snap()
         queued['brian']['undoJob'] = job
+        assert [row['settledCents'] for row in queued['brian']['allocations']] == [row['settledCents'] for row in saved['brian']['allocations']]
+        assert [row['clearedCents'] for row in queued['brian']['allocations']] == [row['clearedCents'] for row in saved['brian']['allocations']]
         project()
         store.command('brian', {'operation': 'queued_undo', 'requestId': 'queued-undo-'+job['id']}, _undo_job_id=job['id'])
         project()
         completed = snap()
         for owner in ('brian', 'hannah'):
             assert completed[owner]['undoJobs'][0]['status'] == 'completed'
+            displayed = display_snapshot(queued[owner])
+            assert displayed['displayPending']
+            for key in ('settledCents', 'clearedCents', 'outstandingCents', 'status'):
+                assert [r[key] for r in displayed['allocations']] == [r[key] for r in completed[owner]['allocations']]
+            assert all(r['version'] == old['version'] for r, old in zip(displayed['allocations'], queued[owner]['allocations']))
             assert completed[owner]['allocations'][0]['grossCents'] == first['grossCents']
             assert [r['outstandingCents'] for r in completed[owner]['allocations']] == [r['outstandingCents'] for r in initial[owner]['allocations']]
         cases[kind] = {'initial': initial, 'saved': saved, 'queued': queued, 'completed': completed, 'command': body, 'undo': undo}
     if output := os.getenv('BOOKIEBOT_QUEUED_UNDO_FIXTURE'):
         Path(output).write_text(json.dumps(cases))
+
+
+def test_shared_display_resource_matches_canonical_inverse(tmp_path, monkeypatch):
+    import subprocess
+    root = Path(__file__).resolve().parents[2]
+    fixture = tmp_path / 'phases.json'
+    monkeypatch.setenv('BOOKIEBOT_QUEUED_UNDO_FIXTURE', str(fixture))
+    test_queued_undo_browser_phases_preserve_original_purchases(tmp_path, monkeypatch)
+    subprocess.run(['node', 'unit_tests/reports/reimbursement_display_state_test.cjs'], cwd=root, check=True, capture_output=True, text=True)

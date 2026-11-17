@@ -1,3 +1,6 @@
+import {useAppResource} from './app-resource-state'
+import {reimbursementDisplay} from './reimbursement-display-state'
+import {displayListing,displayDays,displayTransaction,type RepaymentRowState} from './transaction-display-state'
 import {ReportLoading} from "./report-loading"
 import { cloneElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react"
 import { createPortal } from "react-dom"
@@ -27,13 +30,14 @@ import "./duo-transactions.css"
 
 type Operation = TransactionOperation
 export interface RecordedTransaction {
+  canonicalAllocationId?:string;canonicalAllocationVersion?:number;canonicalEventId?:string;canonicalBillCash?:boolean
   id: string; actionId: string; month: string; version: string; date: string; title: string; location: string
   person: string; kind: string; category: string; categoryLabel: string; amountCents: number; displayAmountCents?: number; split: string; notice?: string; contextOnly?:boolean; repayment?:TransactionRepayment
   fields: Record<string, string>; editableFields: string[]; capabilities: Record<Operation, boolean>; reasons: Record<string, string>
   splitOptions?: {custom: boolean; payerName: string; partnerName: string; payerBasisPoints: number; payerCents?: number; incomePayerCents?:number}
   transferOptions?: {goals:{id:string;name:string;archived:boolean}[]}
 }
-export interface Listing { items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; snapshotVersion?:string; days?:RecordedDay[]; listDays?:RecordedDay[]; totalAmountCents?:number; transferAmountCents?:number; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
+export interface Listing { repaymentRows?:RepaymentRowState[];repaymentListRows?:RepaymentRowState[];items: RecordedTransaction[]; total: number; nextOffset: number | null; categories: string[]; persons: string[]; month: string; undo?: {id:string;month:string}; snapshotVersion?:string; days?:RecordedDay[]; listDays?:RecordedDay[]; totalAmountCents?:number; transferAmountCents?:number; pendingCommand?: Change & {requestId:string;reviewVersion:string} }
 interface Change { id: string; month: string; version?: string; operation: Operation; updates?: Record<string, string | number>; destination?: string; method?: string; payerShareCents?: number }
 interface Review { item: RecordedTransaction; after: Record<string, string>; reviewVersion: string; operation: Operation; destination?: string; share?: TransactionChangeSummary["share"]; restoration?: TransactionChangeSummary["restoration"]; transferEffect?:TransactionChangeSummary['transferEffect'] }
 interface Result { state: "running" | "done" | "uncertain"; success?: boolean; detail?: string; undo?: {month: string; id: string}; summary?: TransactionChangeSummary }
@@ -104,12 +108,14 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const [filter,setFilter]=useState("all"),[day,setDay]=useState("")
   useEffect(()=>{setMonth(initialMonth);setDay('')},[initialMonth])
   const [chartMonths,setChartMonths]=useState(0),[graphRevision,setGraphRevision]=useState(0)
-  const [graphHistory,setGraphHistory]=useState<{key:string;days:RecordedDay[]}|null>(null)
+  const [graphHistory,setGraphHistory]=useState<{key:string;days:RecordedDay[];repaymentRows?:RepaymentRowState[]}|null>(null)
   const [graphLoading,setGraphLoading]=useState(false),[graphError,setGraphError]=useState('')
   const historyFreshRevision=useRef(0)
   const {kind,category,split,scope,bucket}=transactionFilter(filter)
   const manager=useRef<{close?:(instant?:boolean)=>void}>({})
-  const [listing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
+  const ledgerDisplay=useAppResource(reimbursementDisplay,ownerName)
+  const [canonicalListing, setListing] = useState<Listing | null>(null), [loading, setLoading] = useState(false), [error, setError] = useState("")
+  const listing=useMemo(()=>displayListing(canonicalListing,ledgerDisplay),[canonicalListing,ledgerDisplay])
   const [displayScope, setDisplayScope] = useState({filter:"all",month:initialMonth,day:''})
   const [selected, setSelected] = useState<RecordedTransaction | null>(null)
   const [repaymentOpen,setRepaymentOpen]=useState(false),splitOrigin=useRef<'row'|'repayment'>('row')
@@ -117,9 +123,11 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const [destination, setDestination] = useState(""), [method, setMethod] = useState<SplitMethod>("income")
   const [payerShareCents, setPayerShareCents] = useState(0), [customValid, setCustomValid] = useState(true)
   const [splitInput,setSplitInput]=useState<SplitInputDraft>(null)
+  useEffect(()=>{if(ledgerDisplay)setSelected(row=>row?displayTransaction(row,ledgerDisplay):row)},[ledgerDisplay])
   const [review, setReview] = useState<Review | null>(null), [reviewBody, setReviewBody] = useState<Change | null>(null)
   const [busy, setBusy] = useState(false), [result, setResult] = useState<Result | null>(null), [pending, setPending] = useState<(Change & {requestId: string; reviewVersion: string}) | null>(null)
   const [revision, setRevision] = useState(0)
+  const projectionRefresh=useRef<false|'source'|'canonical'>(false)
   const [needsFresh,setNeedsFresh]=useState(false)
   const [announcement,setAnnouncement]=useState('')
   const inFlight = useRef(false), generation = useRef(0), mounted = useRef(true)
@@ -197,17 +205,26 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
       void request('/app/transactions?'+query,undefined,controller.signal).then(checkedListing).then(next=>{
         if(!live||controller.signal.aborted)return
         if(!next.days)throw new Error("Couldn't read the graph's recorded days.")
-        setGraphHistory({key:historyKey,days:next.days});setUpdatedAt(Date.now())
+        setGraphHistory({key:historyKey,days:next.days,repaymentRows:next.repaymentRows});setUpdatedAt(Date.now())
       }).catch(failure=>{if(live&&!controller.signal.aborted){if(failure instanceof RequestError&&[401,403].includes(failure.status)){setGraphHistory(null);handleError(failure)}setGraphError(failure instanceof Error?failure.message:"Couldn't load the graph.")}})
       .finally(()=>{if(live)setGraphLoading(false)})
     },search?250:0)
     return()=>{live=false;window.clearTimeout(timer);controller.abort()}
   },[active,historyEnabled,historyKey])
+  // Warm SQL overlays keep Undo responsive. Once projection finishes, one
+  // source refresh also discovers newly created receipt rows, not just changes
+  // to rows already present in the cache.
+  useEffect(()=>{
+    if(!projectionRefresh.current||reimbursementDisplay.read(ownerName)?.projectionPending)return
+    freshNext.current=projectionRefresh.current==='source';projectionRefresh.current=false;setRevision(value=>value+1)
+  },[ledgerDisplay,revision,ownerName])
   useEffect(() => {
     let live=true
-    const refresh = () => {
+    const refresh = (event:Event) => {
       if(ownChange.current)return
-      freshNext.current=true; setRevision(value => value + 1)
+      const operation=(event as CustomEvent<{operation?:string}>).detail?.operation
+      const canonicalOnly=['queue_undo','reverse_operation','reverse','reset','undo_reset','redo_reset'].includes(operation??'')
+      projectionRefresh.current=projectionRefresh.current==='source'||!canonicalOnly?'source':'canonical';freshNext.current=false; setRevision(value => value + 1)
       // Bills can finish a canonical request recovered by this retained tab.
       // Verify that exact owner-scoped receipt before releasing its old guard;
       // a successful change elsewhere is not itself proof of this outcome.
@@ -403,7 +420,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const listDays=listing?.listDays??days
   const groups=useMemo(()=>recordedDays(listing?.items??[],listDays,displayScope.month).filter(group=>!day||group.day===day||group.key===day||day==='Undated'&&!Number.isFinite(Number(group.day))),[listing,listDays,displayScope.month,day])
   const periodChart=useMemo(()=>recordedChart(days,displayScope.month),[days,displayScope.month])
-  const historyChart=useMemo(()=>recordedChartWindow(graphHistory?.key===historyKey?graphHistory.days:[],initialMonth,chartMonths),[graphHistory,historyKey,initialMonth,chartMonths])
+  const historyChart=useMemo(()=>recordedChartWindow(graphHistory?.key===historyKey?(ledgerDisplay?displayDays(graphHistory.days,graphHistory.repaymentRows??[],ledgerDisplay):graphHistory.days):[],initialMonth,chartMonths),[graphHistory,historyKey,initialMonth,chartMonths,ledgerDisplay])
   const chart=historyEnabled?historyChart:periodChart
   useEffect(()=>{if(selected&&!operation&&!commit&&!uncertain&&listing){const current=listing.items.find(row=>row.id===selected.id);if(current)setSelected(current);else discard()}},[listing,operation,commit?.phase,uncertain])
   const rows=useMemo(()=>new Map(listing?.items.map(row=>[row.id,row])??[]),[listing])

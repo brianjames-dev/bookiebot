@@ -17,7 +17,7 @@ from typing import Any
 from bookiebot.reports.app_access import PostgresAppAccessStore, build_app_access_store
 from bookiebot.reports.phone_history import parse_phone_report_month
 from bookiebot.reports.worksheet_reads import read_workbook_tabs
-from bookiebot.reports.transaction_repayments import accounted_amount, attach_repayment, purchase_context, repayment_details
+from bookiebot.reports.transaction_repayments import accounted_amount, attach_repayment, purchase_context, repayment_details, display_rows, receipt_addresses
 from bookiebot.reimbursements import service as shared
 from bookiebot.sheets import undo
 from bookiebot.sheets.auth import get_gspread_client
@@ -291,24 +291,32 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
     from bookiebot.sheets.bill_payment_evidence import settled_bill_dates
     as_of = now_pacific().date()
     key = (actor, month, as_of.isoformat(), include_scheduled)
+    owner = get_user_config(actor).budget_owner_key
     with _READ_LOCKS.setdefault(actor, threading.RLock()):
+        ledger = shared.build_reimbursement_store().snapshot(owner, include_inactive=True) if shared.enabled() else None
+        if ledger is not None:
+            from bookiebot.reimbursements.presentation import display_snapshot
+            shown_ledger = display_snapshot({**ledger, 'ownerKey': owner})
+        else:
+            shown_ledger = None
         with _CACHE_LOCK:
             if not fresh and key in _CACHE and time.monotonic() - _CACHE[key][0] < 30:
-                return _CACHE[key][1]
+                cached = _CACHE[key][1]
+                return display_rows(cached, shown_ledger, month) if shown_ledger is not None else cached
         periods = [parse_phone_report_month(month)] if month != "all" else []
         years = sorted({p.year for p in periods}) if periods else sorted(configured_reimbursement_workbooks(actor, now_pacific().year), reverse=True)
         client, result = get_gspread_client(), []
         owner = get_user_config(actor).budget_owner_key
         allocations, events = [], []
-        if shared.enabled():
-            snapshot = shared.build_reimbursement_store().snapshot(owner, include_inactive=True)
-            allocations, events = snapshot["allocations"], snapshot["events"]
+        if ledger is not None:
+            allocations, events = ledger["allocations"], ledger["events"]
         allocation_by_id = {value["id"]: value for value in allocations}
         paid_bill_dates = settled_bill_dates(allocations, events, owner=owner, as_of=as_of)
         aliases = actor_key_aliases(actor)
         from bookiebot.sheets import savings_transfers as transfer_ledger
         transfer_plans, transfer_goal_names, transfer_goals = None, {}, []
         for year in years:
+            receipt_ids = receipt_addresses(client, get_shared_expenses_spreadsheet_id(year), owner, year, allocations, events)
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
             logs = [f"_BookieBot Action Log - {year:04d}-{number:02d}" for number in numbers]
@@ -377,6 +385,15 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
                             continue
                     occupied.add(address)
                     row = _public(actor, period, logged, rows, manual=manual)
+                    receipt = receipt_ids.get((title, a.row, min(a.columns) - 1)) if a.worksheet == 'expense' and a.columns else None
+                    if receipt:
+                        row.update(canonicalAllocationId=receipt[0], canonicalEventId=receipt[1])
+                    if a.worksheet == 'income' and row.get('notice', '').startswith('This is a linked repayment.'):
+                        matching = [value for value in allocations if value['partnerOwner'] == owner and value['sourceYear'] == year
+                                    and value.get('sourceSheetTitle') == title and value['sourceWorksheet'] == 'income'
+                                    and bill_label_key(value.get('partnerSourceLabel') or value['category']) == bill_label_key(row['category'])]
+                        if len(matching) == 1:
+                            row.update(canonicalAllocationId=matching[0]['id'], canonicalBillCash=True)
                     allocation = allocation_by_id.get(a.metadata.get("allocation_id"))
                     if allocation:
                         if str(allocation["version"]) != a.metadata.get("canonical_version"):
@@ -425,7 +442,7 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
             if len(_CACHE) >= 32:
                 _CACHE.pop(next(iter(_CACHE)))
             _CACHE[key] = time.monotonic(), result
-        return result
+        return display_rows(result, shown_ledger, month) if shown_ledger is not None else result
 
 
 def public_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -446,6 +463,20 @@ def _daily_totals(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             day["wantsCents" if row["category"] in {"food", "shopping", "subscriptions_wants"} else "needsCents"] += amount
     return list(days.values())
+
+
+def _repayment_row_state(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result = []
+    for index, row in enumerate(rows):
+        allocation_id = row.get('canonicalAllocationId') or row.get('repayment', {}).get('id')
+        if allocation_id:
+            result.append({'id': row['id'], 'allocationId': allocation_id,
+                           **({'allocationVersion': row['canonicalAllocationVersion']} if 'canonicalAllocationVersion' in row else {'allocationVersion': row['repayment']['version']} if row.get('repayment') else {}),
+                           **({'eventId': row['canonicalEventId']} if row.get('canonicalEventId') else {}),
+                           'cashKind': 'receipt' if row.get('canonicalEventId') else 'context' if row.get('contextOnly') else 'bill' if row.get('canonicalBillCash') else 'purchase',
+                           'date': row['date'], 'month': row['month'], 'category': row['category'],
+                           'amountCents': accounted_amount(row), 'index': index})
+    return result
 
 
 def listing(actor: str, query: Any) -> dict[str, Any]:
@@ -495,8 +526,10 @@ def listing(actor: str, query: Any) -> dict[str, Any]:
         result["snapshotVersion"] = digest([(row["id"],row["version"]) for row in selected + (visible if cross_month else [])])
         chart_rows = [row for row in selected if row['kind'] != 'transfer'] if query.get('scope')=='spending_or_transfers' else selected
         result["days"] = _daily_totals(selected)
+        result["repaymentRows"] = _repayment_row_state(selected)
         if day or len(chart_rows)!=len(selected):
             result["listDays"] = _daily_totals(visible)
+            result["repaymentListRows"] = _repayment_row_state(visible)
         result["totalAmountCents"] = sum(accounted_amount(row) for row in chart_rows)
         if any(row['kind']=='transfer' for row in selected):
             result['transferAmountCents'] = sum(accounted_amount(row) for row in selected if row['kind']=='transfer')

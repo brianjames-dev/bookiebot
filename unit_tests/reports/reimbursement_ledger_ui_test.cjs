@@ -152,6 +152,31 @@ async function queuedFeedbackContracts(){
  assert.equal(feedback.notice,null,'Dismissed completion stays dismissed on later reads')
  await act(async()=>{tree.unmount();await flush()})
 }
+async function immediateUndoAndRollback(){
+ const {reimbursementDisplay}=load(path.join(frontend,'src/reimbursement-display-state.ts'))
+ for(const failure of [409,503,401,403]){
+  const held=deferred();let reads=0
+  const state=fixture({post:(body,state)=>{
+   if(body.operation==='reverse_operation')return held.promise
+   for(const entry of body.entries){const row=state.snapshot.allocations.find(r=>r.id===entry.allocationId);row.settledCents+=entry.amountCents;row.outstandingCents-=entry.amountCents;row.version++;row.projectedVersion=row.version}
+   state.snapshot.events.push(...body.entries.map((e,i)=>receipt({id:'new-offset-'+i,operationId:'new-offset',allocationId:e.allocationId,kind:'offset',amountCents:e.amountCents})))
+   state.snapshot.operationId='new-offset';state.snapshot.resetState='after-offset'
+   return response(clone(state.snapshot))
+  }})
+  const tree=await mount({balanceFirst:true}),initial=clone(reimbursementDisplay.read('brian').allocations).map(r=>r.outstandingCents)
+  await tap(button(tree.root,'Offset & settle'));await tap(button(tree.root,'Confirm offset'))
+  const saved=clone(reimbursementDisplay.read('brian').allocations).map(r=>r.outstandingCents)
+  assert.notDeepEqual(saved,initial)
+  await tap(button(tree.root,'Undo'))
+  assert.deepEqual(clone(reimbursementDisplay.read('brian').allocations).map(r=>r.outstandingCents),initial,'Visible balances and shared row state change before the Undo response')
+  assert.equal(writes(state).length,2)
+  await act(async()=>{held.resolve(response({error:'Undo rejected'},failure));await flush()})
+  if([401,403].includes(failure))assert.equal(reimbursementDisplay.read('brian'),null,'Lost access purges the shared private display')
+  else assert.deepEqual(clone(reimbursementDisplay.read('brian').allocations).map(r=>r.outstandingCents),failure===409?saved:initial,'Known rejection restores canonical state; uncertain response retains exact-request recovery')
+  if(failure===503){const original=clone(writes(state)[1].body);await tap(button(tree.root,'Retry this record'));assert.deepEqual(clone(writes(state)[2].body),original)}
+  await unmount(tree)
+ }
+}
 async function acknowledgedUndoDoesNotWaitForDuplicateRead(){
  const never=deferred();let reads=0
  const state=fixture({get:state=>++reads===1?response(clone(state.snapshot)):never.promise,post:(body,state)=>{
@@ -1265,6 +1290,7 @@ async function lazyRetainedExpansionContracts(){
   await balanceFirstFastLoadingContracts()
   await queuedFeedbackContracts()
   await acknowledgedUndoDoesNotWaitForDuplicateRead()
+  await immediateUndoAndRollback()
   await balanceFirstPendingRecoveryContracts()
   await balanceFirstHiddenRecoveryContracts()
   await reimbursementUpdatedTimeContracts()

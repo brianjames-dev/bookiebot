@@ -102,7 +102,7 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
   const cash = paymentReview ? Math.abs(paymentReview.to - paymentReview.from) : 0
   const sent = paymentReview ? paymentReview.from > paymentReview.to : false
   const dateValid = Boolean(sharedExpenseDate(date)) && date >= (paymentReview?.min ?? "1900-01-01") && date <= today()
-  const primary = (label: string, click: () => void, off = false, operation = "") => <ReimbursementSaveButton operation={operation} aria-label={label} type="button" className={scene === "summary" ? "sr-primary" : "bi-primary"} disabled={locked || off} onClick={click}>{label}{scene === "summary" && <ChevronRight />}</ReimbursementSaveButton>
+  const primary = (label: string, click: () => void, off = false, operation = "") => <ReimbursementSaveButton operation={operation} aria-label={label} type="button" className={scene === "summary" ? "sr-primary" : "bi-primary"} disabled={locked || off} onClick={click}><span className="sr-primary-copy">{label}</span>{scene === "summary" && <ChevronRight aria-hidden="true"/>}</ReimbursementSaveButton>
   const flow = <div className="sr-editor" data-stage={scene}>
     <EditorScenes scene={scene} direction={navigation} sceneClassName={name => name === "summary" ? "" : `bi-editor sr-settlement-editor${!wide ? " sp-inline-editor" : ""}`}>
       {scene === "offset" && review ? <>

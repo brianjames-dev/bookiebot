@@ -239,3 +239,72 @@ def test_fast_income_review_keeps_exact_reviewed_shares_bound_on_save(purchase,m
         'requestId':'isolated-fast-review-income-check'})
     assert not result['success'] and 'review changed' in result['detail'].lower()
     assert ledger.snapshot('brian') == before
+
+
+def test_warm_listing_uses_guarded_undo_without_sheet_reads(purchase, monkeypatch):
+    saved, ledger, allocation = purchase
+    initial = listing(purchase)
+    paid = ledger.command('brian', payment(allocation, 100, 'receive'))
+    # The original source cache is retained; SQL cash overlays do not require
+    # another Sheets read, even before the forward projection finishes.
+    monkeypatch.setattr(tx, 'read_workbook_tabs', lambda *a, **k: pytest.fail('Warm canonical display must not read Sheets'))
+    query = {'month': saved.month, 'view': 'daily', 'scope': 'spending'}
+    after = tx.listing(B, query)
+    assert managed(after)['displayAmountCents'] == 200
+    queued = ledger.command('brian', command('queue_undo', action='reverse_operation', operationId=paid['operationId'], expectedUndoState=ledger.snapshot('brian')['undoState']))
+    shown = tx.listing(B, query)
+    assert managed(shown)['displayAmountCents'] == 300
+    assert shown['totalAmountCents'] == initial['totalAmountCents']
+    assert shown['days'] == initial['days']
+    assert not managed(shown)['capabilities']['split']
+    assert ledger.get_allocation(allocation['id'])['settledCents'] == 100
+    assert queued['undoJob']['status'] == 'queued'
+    ledger.fail_undo_job(queued['undoJob']['id'], 'Reimbursements changed')
+    assert managed(tx.listing(B, query))['displayAmountCents'] == 200
+
+
+def test_fully_paid_debtor_context_returns_from_sql_after_undo(purchase, monkeypatch):
+    saved, ledger, allocation = purchase
+    paid = ledger.command('brian', payment(allocation, allocation['partnerShareCents']))
+    result = listing(purchase, H)
+    assert not any(row.get('repayment', {}).get('id') == allocation['id'] for row in result['items'])
+    monkeypatch.setattr(tx, 'read_workbook_tabs', lambda *a, **k: pytest.fail('Undo context must not reread Sheets'))
+    ledger.command('brian', command('queue_undo', action='reverse_operation', operationId=paid['operationId'], expectedUndoState=ledger.snapshot('brian')['undoState']))
+    shown = tx.listing(H, {'month': saved.month, 'view': 'daily', 'scope': 'spending'})
+    context = managed(shown)
+    assert context['contextOnly'] and context['displayAmountCents'] == 0
+    assert shown['totalAmountCents'] == result['totalAmountCents']
+    assert len([row for row in shown['items'] if row.get('repayment', {}).get('id') == allocation['id']]) == 1
+    assert ledger.get_allocation(allocation['id'])['settledCents'] == allocation['partnerShareCents']
+
+
+def test_receipt_identity_uses_exact_named_range_and_category_column():
+    from types import SimpleNamespace
+    from bookiebot.reimbursements.projection import _name
+    from bookiebot.reports.transaction_repayments import receipt_addresses
+    metadata = {'sheets': [{'properties': {'sheetId': 7, 'title': 'November'}}], 'namedRanges': [
+        {'name': _name('receipt', 'r1'), 'range': {'sheetId': 7, 'startRowIndex': 2, 'endRowIndex': 3, 'startColumnIndex': 0}},
+        {'name': _name('receipt', 'r2'), 'range': {'sheetId': 7, 'startRowIndex': 2, 'endRowIndex': 3, 'startColumnIndex': 8}}]}
+    client = SimpleNamespace(open_by_key=lambda _: SimpleNamespace(fetch_sheet_metadata=lambda **_: metadata))
+    allocations = [{'id': 'a', 'sourceWorksheet': 'expense'}]
+    events = [{'id': identifier, 'allocationId': 'a', 'debtorOwner': 'hannah', 'date': '2026-11-01'} for identifier in ('r1', 'r2', 'unknown')]
+    assert receipt_addresses(client, 'isolated', 'hannah', 2026, allocations, events) == {('November', 3, 0): ('a', 'r1'), ('November', 3, 8): ('a', 'r2')}
+    assert receipt_addresses(client, 'isolated', 'brian', 2026, allocations, events) == {}
+
+
+def test_warm_undo_restores_source_split_capabilities(purchase, monkeypatch):
+    from unit_tests.reimbursements.test_store import sync_allocations
+    saved, ledger, allocation = purchase
+    paid = ledger.command('brian', payment(allocation, 100))
+    sync_allocations(ledger)
+    paid_row = managed(listing(purchase))
+    assert not paid_row['capabilities']['split']
+    ledger.command('brian', command('reverse_operation', operationId=paid['operationId'], expectedState=ledger.snapshot('brian')['resetState']))
+    sync_allocations(ledger)
+    monkeypatch.setattr(tx, 'read_workbook_tabs', lambda *a, **k: pytest.fail('Restoring split controls must not require Sheets'))
+    restored = managed(tx.listing(B, {'month': saved.month, 'view': 'daily', 'scope': 'spending'}))
+    assert restored['repayment']['canEdit']
+    assert restored['capabilities']['split'] and restored['capabilities']['cancel_split']
+    assert restored['reasons']['split'] == ''
+    assert restored['displayAmountCents'] == 300
+    assert not any(key.startswith('_') for key in restored)

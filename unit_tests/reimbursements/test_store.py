@@ -762,6 +762,9 @@ def test_queued_undo_survives_restart_waits_for_projection_and_replays_once(stor
     assert store.command("brian", body) == queued
     assert store.command("brian", command("queue_undo", expectedUndoState=before["undoState"], **target))["undoJob"]["id"] == job["id"]
     assert store.snapshot("hannah")["allocations"] == before["allocations"]
+    from bookiebot.reimbursements.presentation import display_snapshot
+    displayed = display_snapshot(store.snapshot('brian'))
+    assert displayed['displayPending']
     restarted = ReimbursementStore(store.access)
     restarted.initialize()
     apply = {"operation": "queued_undo", "requestId": "queued-undo-" + job["id"]}
@@ -774,6 +777,9 @@ def test_queued_undo_survives_restart_waits_for_projection_and_replays_once(stor
     assert result["undoJob"]["status"] == "completed"
     assert restarted.command("brian", apply, _undo_job_id=job["id"]) == result
     assert restarted.pending_undo_jobs() == []
+    for expected, current in zip(displayed['allocations'], restarted.snapshot('brian')['allocations'], strict=True):
+        for key in ('settledCents', 'clearedCents', 'outstandingCents', 'status'):
+            assert current[key] == expected[key]
     both = [restarted.snapshot(owner) for owner in ("brian", "hannah")]
     assert both[0]["allocations"] == both[1]["allocations"]
     for old, current in zip(original["allocations"], both[0]["allocations"], strict=True):
@@ -797,6 +803,7 @@ def test_queued_undo_rejects_stale_preview_and_changed_target_without_partial_re
     with pytest.raises(ReimbursementConflictError):
         store.command("brian", command("queue_undo", action="reverse_operation", operationId=saved["operationId"], expectedUndoState=before["undoState"]))
     after = store.snapshot("brian")
+    assert 'display' not in after['undoJobs'][0], 'Changed targets must remove the speculative display'
     with pytest.raises(ReimbursementConflictError):
         store.command("brian", {"operation": "queued_undo", "requestId": "queued-undo-" + job["id"]}, _undo_job_id=job["id"])
     assert store.snapshot("brian") == after

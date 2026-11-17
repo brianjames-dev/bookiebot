@@ -1,6 +1,6 @@
 import {ReportLoading} from "./report-loading"
 import { ratioShareCents } from "./split-ratio"
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
@@ -14,6 +14,7 @@ import { transactionMotion } from "./transaction-inline-editor"
 import { ArrowLeft } from "lucide-react"
 import { UndoPopup } from "./transaction-undo-popup"
 import { ReimbursementSavingContext, ReimbursementSaveButton, useReimbursementFeedback } from "./reimbursement-feedback"
+import {applyDisplayChange,inverseDisplay,pendingDisplay,reimbursementDisplay,validDisplayChange,type ReimbursementDisplayChange} from './reimbursement-display-state'
 import { ReimbursementSplitEditor } from "./reimbursement-split-editor"
 
 export interface LedgerAllocation {
@@ -36,10 +37,11 @@ export interface LedgerSnapshot {
   enabled: true; ownerKey: string; allocations: LedgerAllocation[]; events: LedgerEvent[]
   currency: "USD"; projectionPending?: boolean; error?: string; resetState?: string; resets?: LedgerReset[]
   operationId?: string; reset?: LedgerReset
+  displayPending?: boolean;displayAllocationIds?:string[]
   undoState?: string; undoJob?: LedgerUndoJob; undoJobs?: LedgerUndoJob[]
   splitOptions?: Record<string, { incomePayerCents: number }>
 }
-export interface LedgerUndoJob {id:string;actorOwner:string;operation:string;status:'queued'|'completed'|'failed';error:string;createdAt:string;updatedAt:string}
+export interface LedgerUndoJob {id:string;actorOwner:string;operation:string;status:'queued'|'completed'|'failed';error:string;createdAt:string;updatedAt:string;display?:ReimbursementDisplayChange}
 export interface LedgerReset {
   id: string; version: number; status: "active" | "undone"; actorOwner: string
   createdAt: string; updatedAt: string; note: string; canUndo: boolean; canRedo: boolean
@@ -169,7 +171,7 @@ function validate(snapshot: LedgerResponse) {
     }
   }
   if(snapshot.undoJobs!==undefined&&(!Array.isArray(snapshot.undoJobs)||snapshot.undoJobs.some(job=>
-    !job.id||!['brian','hannah'].includes(job.actorOwner)||!['queued','completed','failed'].includes(job.status))))throw new Error('Incomplete Undo status')
+    (job.display!==undefined&&!validDisplayChange(job.display))||!job.id||!['brian','hannah'].includes(job.actorOwner)||!['queued','completed','failed'].includes(job.status))))throw new Error('Incomplete Undo status')
   return snapshot
 }
 
@@ -179,6 +181,10 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
   balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void; headerActions?: HTMLElement | null
 }) {
   const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
+  const [immediate,setImmediate] = useState<ReimbursementDisplayChange|null>(null)
+  const displayed=useMemo(()=>snapshot?(immediate?applyDisplayChange(snapshot,immediate):pendingDisplay(snapshot)):null,[snapshot,immediate])
+  const ownerScope=useRef('')
+  useLayoutEffect(()=>{if(displayed){ownerScope.current=displayed.ownerKey;reimbursementDisplay.publish(displayed.ownerKey,displayed)}else if(ownerScope.current){reimbursementDisplay.clear(ownerScope.current);setImmediate(null)}},[displayed])
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   useEffect(() => { onUpdated?.(updatedAt) }, [updatedAt, onUpdated])
   const feedback = useReimbursementFeedback(snapshot)
@@ -267,7 +273,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     void load()
   }, [balanceFirst, snapshot, busy, uncertain, refreshing, error, load])
   // Job polling is SQL-only, bounded, and never blocks reading the list or folding.
-  const queuedJob = snapshot?.undoJobs?.filter(job=>job.status==='queued').map(job=>job.id).join('|') ?? ''
+  const queuedJob = (snapshot?.undoJobs?.filter(job=>job.status==='queued').map(job=>job.id).join('|') ?? '')+(snapshot?.projectionPending?'|'+snapshot.resetState:'')
   useEffect(()=>{
     if(!queuedJob)return
     let stopped=false,timer:number|undefined,attempt=0
@@ -290,16 +296,18 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       if (!mounted.current) return
       pending.current = null; setUncertain(false); change.done(true)
       setSnapshot(result); setLegacy(false); setUpdatedAt(Date.now())
+      setImmediate(null)
       feedback.acknowledge(change.body, result)
-      window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
+      window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed",{detail:{operation:change.body.operation}}))
       // The command already contains the complete authoritative snapshot. Do
       // not delay an immediately clickable Undo behind a duplicate display read.
       if (!balanceFirst && change.body.operation !== "receive_all") await load(false)
     } catch (failure) {
       if (!mounted.current) return
       if (failure instanceof LedgerRequestError && failure.status < 500) {
+        setImmediate(null)
         pending.current = null; setUncertain(false)
-        if (matchedReceipt && [401, 403].includes(failure.status)) { setSnapshot(null); onRejectAccess?.(failure.message) }
+        if ([401, 403].includes(failure.status)) { setSnapshot(null); setUpdatedAt(null); if(matchedReceipt)onRejectAccess?.(failure.message) }
         if (failure.status === 401) { setSnapshot(null); setUpdatedAt(null); setSignedOut(true); change.done(false) }
         if (failure.status === 409) { change.done(false); await load() }
         setError(failure.message)
@@ -314,7 +322,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     pending.current = { body: { ...body, requestId: crypto.randomUUID() }, done }
     void execute()
   }
-  const undo = () => { if(!feedback.command)return; const command=feedback.command; feedback.dismiss(); run(command,saved=>{if(saved)setUndoVersion(value=>value+1)}) }
+  const undo = () => { if(!feedback.command||!snapshot||pending.current||executing.current||signedOut)return; const command=feedback.command;setImmediate(inverseDisplay(snapshot,command));setUndoVersion(value=>value+1);feedback.dismiss(); run(command,()=>{}) }
   if (legacy && !uncertain) return <>{fallback}{matchedReceipt && <button type="button" className="bb-reconcile-action" onClick={onClose}>Back to reconciliation</button>}</>
   if (matchedReceipt) return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt" aria-label="Receive shared payment">
     {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
@@ -332,8 +340,8 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
       {!snapshot && !error && <ReportLoading label="Loading reimbursements…"/>}
-      {snapshot && (balanceFirst ? <BalanceFirstReimbursements snapshot={snapshot} disabled={busy || uncertain || refreshing || feedback.modal} selectDisabled={busy || uncertain || feedback.modal} headerActions={headerActions} undoVersion={undoVersion} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
-        : <LedgerContents snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run}
+      {displayed && (balanceFirst ? <BalanceFirstReimbursements snapshot={displayed} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending)} selectDisabled={busy || uncertain} headerActions={headerActions} undoVersion={undoVersion} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
+        : <LedgerContents snapshot={displayed} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending)} run={run}
           refresh={() => void load()} refreshing={refreshing} />)}
       {feedback.notice&&<div className="sr-native-toast bi-product"><UndoPopup key={feedback.notice.id} notice={feedback.notice} modal={feedback.modal} detail={feedback.detail} undoAvailable={Boolean(feedback.command)} onUndo={undo} onDismiss={feedback.dismiss} returnFocus={()=>[...document.querySelectorAll<HTMLButtonElement>('.sr-row-main[data-selected=true],.sr-editor .bi-primary,.sr-primary,.sr-options')].find(el=>!el.disabled&&!el.closest('[aria-hidden=true]')&&getComputedStyle(el).visibility!=='hidden'&&el.getClientRects().length>0)??null}/></div>}
     </CardContent>
