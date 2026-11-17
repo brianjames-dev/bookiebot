@@ -246,7 +246,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </header>
 
 
-      <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screen==='shared'?'Shared Reimbursements':screenTitles[screen]} projected={preferences.mode === "projected"}
+      <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screen==='shared'?'Reimbursements':screenTitles[screen]} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
         disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible}
         controls={<div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} />} />

@@ -30,8 +30,8 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
      await page.evaluate(name=>localStorage.setItem('bookiebot:duo-layout:'+name.toLowerCase(),'true'),name);await page.reload();await page.locator('.bb-metrics-grid').waitFor();
      await tap(page,page.getByRole('button',{name:'Shared',exact:true}));await page.locator('.sr-balance-first').waitFor();await settle(page);
      await page.emulateMedia({reducedMotion:'no-preference'});
-     assert.equal(await page.locator('.bb-report-header h1').innerText(),'Shared Reimbursements');
-     assert.equal(await page.getByRole('heading',{name:'Shared Reimbursements',exact:true}).count(),1);
+     assert.equal(await page.locator('.bb-report-header h1').innerText(),'Reimbursements');
+     assert.equal(await page.getByRole('heading',{name:'Reimbursements',exact:true}).count(),1);
      assert.equal(await page.locator('.sr-row-main').count(),6);assert.equal(await page.locator('.sr-row-main .bb-transaction-icon').count(),6);
      assert.equal(await page.locator('.sr-summary-sides').evaluate(el=>getComputedStyle(el).display),'grid');
      assert.equal(await page.locator('.sr-hero>strong').first().evaluate(el=>getComputedStyle(el).fontSize),height<=550?'38px':'42px');
