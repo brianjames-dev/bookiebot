@@ -26,13 +26,14 @@ const browserDocument = { ...events("document"), visibilityState: "visible" }
 class FixtureDate extends Date {
   constructor(...args) { super(...(args.length ? args : ["2026-10-01T06:30:00Z"])) }
 }
-let fetchRequest = () => { throw Error("No HTTP fixture") }
+let fetchRequest = () => { throw Error("No HTTP fixture") }, latestPageRefresh
 const modules = new Map()
 function load(file) {
   if (modules.has(file)) return modules.get(file)
   const exports = {}; modules.set(file, exports)
   const localRequire = name => {
     if (name.endsWith(".css")) return {}
+    if (name === "./page-refresh") { const hooks=load(path.join(frontend,"src/page-refresh.tsx"));return {...hooks,usePageRefresh:(screen,handler)=>{latestPageRefresh=handler;return hooks.usePageRefresh(screen,handler)}} }
     if (name === './transaction-step-motion') return {StepMotion:({review,edit,confirm})=>React.createElement('div',null,React.createElement('div',{'aria-hidden':review,inert:review},edit),React.createElement('div',{'aria-hidden':!review,inert:!review},confirm))}
     if (name === "./transaction-editor-workspace") return {
       EditorScenes: ({children}) => children,
@@ -49,7 +50,7 @@ function load(file) {
     target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } })
   vm.runInNewContext(outputText, { exports, require: localRequire, AbortController, Error, Date: FixtureDate,
-    window: browserWindow, document: browserDocument, matchMedia: () => ({matches:true}), requestAnimationFrame: cb => browserWindow.setTimeout(cb,16), cancelAnimationFrame: id => browserWindow.clearTimeout(id), fetch: (...args) => fetchRequest(...args),
+    window: browserWindow, document: browserDocument, matchMedia: () => ({matches:true,addEventListener(){},removeEventListener(){}}), requestAnimationFrame: cb => browserWindow.setTimeout(cb,16), cancelAnimationFrame: id => browserWindow.clearTimeout(id), fetch: (...args) => fetchRequest(...args),
     crypto: { randomUUID: () => `record-${++requestId}` }, CustomEvent: class { constructor(type) { this.type = type } },
   })
   return exports
@@ -134,10 +135,10 @@ function fixture({ get, post } = {}) {
   for (const scope of Object.values(listeners)) scope.clear()
   const state = { snapshot: clone(sample), calls: [] }
   fetchRequest = async (url, options) => {
-    assert.equal(url, "/app/reimbursements")
+    assert.equal(new URL(url,"https://bookie.test").pathname, "/app/reimbursements")
     for (const [key, value] of Object.entries({ credentials: "same-origin", mode: "same-origin", referrerPolicy: "same-origin", cache: "no-store", redirect: "error" })) assert.equal(options[key], value)
     const body = options.body ? JSON.parse(options.body) : undefined
-    state.calls.push({ body, options })
+    state.calls.push({ url, body, options })
     if (!body) return get ? get(state) : response(clone(state.snapshot))
     assert.equal(options.headers["X-BookieBot-App"], "1")
     assert.ok(body.requestId)
@@ -1074,11 +1075,101 @@ async function balanceFirstZeroShareRetentionContracts(){
   await unmount(tree)
 }
 
+async function balanceFirstFastLoadingContracts(){
+  const first=deferred(), recovery=deferred()
+  const state=fixture({get:state=>state.calls.length===1?first.promise:recovery.promise})
+  state.snapshot.events=[]
+  state.snapshot.allocations=Array.from({length:16},(_,i)=>allocation({id:'active-'+i,item:'Active '+i,expenseDate:i<10?'2026-09-03':`2026-${String(8-(i-10)).padStart(2,'0')}-03`,settledCents:0,outstandingCents:10000}))
+  const tree=await mount({balanceFirst:true})
+  assert.equal(state.calls.length,1);assert.equal(state.calls[0].url,'/app/reimbursements?snapshot=1')
+  const initialSignal=state.calls[0].options.signal
+  let queued,joined
+  await act(async()=>{
+    for(const callback of listeners.window.get('focus')){callback();callback()}
+    queued=latestPageRefresh.refresh();joined=latestPageRefresh.refresh();await flush()
+  })
+  assert.equal(state.calls.length,1,'Focus/report reads coalesce without cancelling the first paint')
+  assert.equal(initialSignal.aborted,false)
+  await act(async()=>{first.resolve(response(clone(state.snapshot)));await flush()})
+  assert.equal(state.calls.length,2);assert.equal(state.calls[1].url,'/app/reimbursements','Full recovery queues behind the display snapshot')
+  const rows=()=>tree.root.findAllByType('button').filter(node=>node.props.className==='sr-row-main')
+  assert.equal(rows().length,16,'Every active expense and month is present before recovery finishes')
+  assert(rows().every(node=>!node.props.disabled),'Rows stay available for inspection while the fresh read verifies financial actions')
+  assert.equal(button(tree.root,'Load all expenses'),undefined);assert.equal(button(tree.root,'Load all months'),undefined)
+  await tap(rows()[9])
+  const detail=tree.root.findAll(node=>node.props.className==='sr-detail-host'&&node.props['data-open']===true)[0]
+  assert.equal(button(detail,'Record received').props.disabled,true,'A read still locks the payment action')
+  await act(async()=>{recovery.resolve(response(clone(state.snapshot)));await queued;await joined;await flush()})
+  assert.equal(rows().length,16);assert.equal(state.calls.length,2)
+  assert.equal(button(detail,'Record received').props.disabled,false)
+  await unmount(tree)
+
+  const held=deferred();const abandoned=fixture({get:()=>held.promise});const closed=await mount({balanceFirst:true})
+  const pending=latestPageRefresh.refresh();await unmount(closed)
+  assert.equal(await pending,false,'Unmount cancels queued recovery before starting another read')
+  assert.equal(abandoned.calls.length,1)
+  held.resolve(response(clone(abandoned.snapshot)))
+}
+
+async function balanceFirstPendingRecoveryContracts(){
+  const state=fixture();state.snapshot.projectionPending=true
+  const tree=await mount({balanceFirst:true})
+  const full=()=>state.calls.filter(call=>call.url==='/app/reimbursements'&&!call.body)
+  assert.equal(full().length,1,'Pending work receives one automatic full recovery')
+  await act(async()=>{for(const cb of listeners.window.get('focus')){cb();cb()}await flush()})
+  assert.equal(full().length,1,'The same pending version cannot cause a recovery loop')
+  await act(async()=>{await latestPageRefresh.refresh();await flush()})
+  assert.equal(full().length,2,'Explicit refresh can retry a pending version')
+  await unmount(tree)
+}
+
+async function balanceFirstFreshReadContracts(){
+  const held=deferred(),next=deferred(),last=deferred();let reads=0
+  const state=fixture({get:state=>++reads===1?response(clone(state.snapshot)):reads===2?held.promise:reads===3?next.promise:last.promise})
+  const tree=await mount({balanceFirst:true});let first,fresh,same
+  await act(async()=>{first=latestPageRefresh.refresh();await flush()})
+  const before=clone(state.snapshot)
+  state.snapshot.allocations[0].settledCents+=100;state.snapshot.allocations[0].outstandingCents-=100;state.snapshot.allocations[0].version++;state.snapshot.allocations[0].projectedVersion++
+  state.snapshot.events.push(receipt({id:'new-receipt',operationId:'new-receipt',amountCents:100}))
+  await act(async()=>{fresh=latestPageRefresh.refresh();same=latestPageRefresh.refresh();await flush()})
+  assert.equal(state.calls.length,2,'Concurrent fresh refreshes queue once behind an older full read')
+  await act(async()=>{held.resolve(response(before));await first;await flush()})
+  assert.equal(state.calls.length,3,'The newer refresh gets a separate source read')
+  let late
+  await act(async()=>{late=latestPageRefresh.refresh();await flush()})
+  assert.equal(state.calls.length,3,'A later invalidation queues behind the running recovery')
+  await act(async()=>{next.resolve(response(before));await fresh;await same;await flush()})
+  assert.equal(state.calls.length,4,'A refresh requested after the queued read began receives its own source read')
+  await act(async()=>{last.resolve(response(clone(state.snapshot)));await late;await flush()})
+  const row=tree.root.findAllByType('button').find(node=>node.props.className==='sr-row-main'&&node.props['aria-label'].startsWith('PG&E,'))
+  assert.ok(text(row).includes('$79.00'),'Only the final fresh version wins');assert.equal(state.calls.length,4);await unmount(tree)
+}
+
+async function lazyRetainedExpansionContracts(){
+  const {EditorExpansion}=load(path.join(frontend,'src/transaction-editor-workspace.tsx'))
+  for(const retain of [false,true]){
+    let mounts=0,unmounts=0
+    function Draft(){const [value,setValue]=React.useState('');React.useEffect(()=>{mounts++;return()=>{unmounts++}},[]);return React.createElement('input',{value,onChange:e=>setValue(e.target.value)})}
+    const render=open=>React.createElement(EditorExpansion,{open,retain},React.createElement(Draft))
+    let tree;await act(async()=>{tree=Renderer.create(render(false));await flush()});assert.equal(mounts,0,'Cold closed editors are never constructed')
+    await act(async()=>{tree.update(render(true));await flush()});assert.equal(mounts,1)
+    await act(async()=>{tree.root.findByType('input').props.onChange({target:{value:'Retain this draft'}});tree.update(render(false));await flush()})
+    assert.equal(unmounts,retain?0:1,'Only opted-in visited editors retain their controller')
+    await act(async()=>{tree.update(render(true));await flush()});assert.equal(mounts,retain?1:2)
+    assert.equal(tree.root.findByType('input').props.value,retain?'Retain this draft':'')
+    await act(async()=>{tree.unmount();await flush()})
+  }
+}
+
 ;(async () => {
+  await lazyRetainedExpansionContracts()
   await balanceFirstRejectedCommandContracts()
   await balanceFirstRetainedDraftContracts()
   await balanceFirstNativeSplitContracts()
   await balanceFirstZeroShareRetentionContracts()
+  await balanceFirstFastLoadingContracts()
+  await balanceFirstPendingRecoveryContracts()
+  await balanceFirstFreshReadContracts()
   await splitEditorContracts()
   await matchedReceiptContracts()
   await bulkReceiveContracts()

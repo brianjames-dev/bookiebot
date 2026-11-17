@@ -33,7 +33,8 @@ async def _reimbursements(request: web.Request) -> web.Response:
                 raise ReimbursementValidationError("Invalid settlement request.")
             result = await asyncio.to_thread(service.command, session.owner_key, body)
         else:
-            result = await asyncio.to_thread(service.snapshot, session.owner_key, retry_projection=True)
+            result = await asyncio.to_thread(service.snapshot, session.owner_key,
+                                            retry_projection=request.query.get("snapshot") != "1")
         current = await _session(request)
         if current is None or current.owner_key != session.owner_key:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)

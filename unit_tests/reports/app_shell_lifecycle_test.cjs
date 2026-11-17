@@ -123,7 +123,7 @@ request = async (url, options = {}) => {
   }
   if (options.body) { writes.push({ url, body: JSON.parse(options.body) }); return pending.promise }
   if (url === '/app/goals') { reads.goals++; return response({ goals: [] }) }
-  if (url === '/app/reimbursements') { reads.reimbursements++; return response({ enabled: true, ownerKey: owner, currency: 'USD', allocations: [allocation], events: [] }) }
+  if (new URL(url,'https://bookie.test').pathname === '/app/reimbursements') { reads.reimbursements++; return response({ enabled: true, ownerKey: owner, currency: 'USD', allocations: [allocation], events: [] }) }
   throw Error(`Unexpected fixture URL ${url}`)
 }
 async function main() {
