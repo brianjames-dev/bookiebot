@@ -325,3 +325,9 @@
 }
 
 .sr-reset-note {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}
+.sr-options-anchor { display:flex;align-items:center;gap:6px; }
+.sr-options-anchor>.sr-refresh { display:grid;place-items:center;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;color:hsl(var(--primary));font:inherit; }
+.sr-refresh svg { width:18px;height:18px; }
+@keyframes sr-refresh-turn { to {transform:rotate(360deg)} }
+.sr-refresh-spinning { animation:sr-refresh-turn 800ms linear infinite; }
+@media(prefers-reduced-motion:reduce) { .sr-refresh-spinning {animation-duration:1600ms} }

@@ -34,6 +34,10 @@ class ReimbursementConflictError(RuntimeError):
     pass
 
 
+class ReimbursementUndoPendingError(ReimbursementConflictError):
+    pass
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="microseconds")
 
@@ -244,6 +248,14 @@ class ReimbursementStore:
                 CHECK(actor_owner IN ('brian','hannah'))
             )""")
 
+            db.execute("""CREATE TABLE IF NOT EXISTS app_reimbursement_undo_jobs (
+                id TEXT PRIMARY KEY, owner_key TEXT NOT NULL, target_key TEXT NOT NULL,
+                payload_json TEXT NOT NULL, status TEXT NOT NULL, error TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                CHECK(status IN ('queued','completed','failed')), CHECK(owner_key IN ('brian','hannah'))
+            )""")
+            db.execute("CREATE INDEX IF NOT EXISTS app_reimbursement_undo_status ON app_reimbursement_undo_jobs(status,created_at)")
+
     def _lock(self, db: Any) -> None:
         # Also take this lock for multi-query reads: PG's default READ COMMITTED
         # would otherwise mix an allocation from before a receipt with later events.
@@ -348,7 +360,9 @@ class ReimbursementStore:
             result = {"allocations": [self._payload(row) for row in rows],
                     "events": [self._event_payload(event, allocations[event["allocation_id"]]) for event in events
                                if event["allocation_id"] in allocations], "currency": "USD",
-                    "resetState": self._reset_state(db), "resets": self._resets(db)}
+                    "resetState": self._reset_state(db), "undoState": self._reset_state(db, projection=False),
+                    "resets": self._resets(db), "undoJobs": [self._undo_job_payload(row) for row in db.execute(
+                        "SELECT * FROM app_reimbursement_undo_jobs WHERE status = 'queued' OR id IN (SELECT id FROM app_reimbursement_undo_jobs ORDER BY updated_at DESC,id DESC LIMIT 20) ORDER BY created_at,id").fetchall()]}
             if include_projection_status:
                 # Inactive corrections still need their source/mirror repair.
                 # Read this under the same lock/cursor without loading history
@@ -599,14 +613,15 @@ class ReimbursementStore:
         if json.loads(row["payload_json"]).get("clearedCents", 0):
             raise ReimbursementConflictError("Undo the balance reset first before changing this expense or its repayments.")
 
-    def _reset_state(self, db: Any) -> str:
+    def _reset_state(self, db: Any, *, projection: bool = True) -> str:
         """Fingerprint the complete household preview while holding its lock."""
         rows = db.execute("SELECT * FROM app_reimbursement_allocations ORDER BY id").fetchall()
         allocations = []
         for row in rows:
             value = self._payload(row)
             allocations.append({key: value[key] for key in (
-                "id", "version", "projectedVersion", "status", "accounting", "outstandingCents", "clearedCents")})
+                "id", "version", "status", "accounting", "outstandingCents", "clearedCents",
+                *(("projectedVersion",) if projection else ()))})
         pending = db.execute("SELECT id,allocation_id,amount_cents FROM app_reimbursement_events WHERE status = 'pending' ORDER BY id").fetchall()
         value = {"allocations": allocations,
                  "pending": [[row["id"], row["allocation_id"], int(row["amount_cents"])] for row in pending]}
@@ -722,6 +737,94 @@ class ReimbursementStore:
         db.execute("UPDATE app_reimbursement_allocations SET settled_cents = settled_cents + ?, version = version + 1, updated_at = ? WHERE id = ?",
                    (amount, now, allocation_id))
 
+    @staticmethod
+    def _undo_job_payload(row: Any) -> dict[str, Any]:
+        payload = json.loads(row["payload_json"])
+        return {"id": row["id"], "actorOwner": row["owner_key"], "operation": payload["action"],
+                "status": row["status"], "error": row["error"], "createdAt": row["created_at"], "updatedAt": row["updated_at"]}
+
+    def pending_undo_jobs(self) -> list[dict[str, Any]]:
+        with self.access.connect(write=True) as db:
+            self._lock(db)
+            return [self._undo_job_payload(row) for row in db.execute(
+                "SELECT * FROM app_reimbursement_undo_jobs WHERE status = 'queued' ORDER BY created_at,id").fetchall()]
+
+    def fail_undo_job(self, identifier: str, message: str) -> None:
+        with self.access.connect(write=True) as db:
+            self._lock(db)
+            db.execute("UPDATE app_reimbursement_undo_jobs SET status = 'failed', error = ?, updated_at = ? WHERE id = ? AND status = 'queued'",
+                       (message[:500], _now(), identifier))
+
+    def _queue_undo(self, db: Any, owner: str, body: dict[str, Any], now: str) -> dict[str, Any]:
+        expected = _text(body.get("expectedUndoState"), "Undo preview", 64, required=True)
+        if expected != self._reset_state(db, projection=False):
+            raise ReimbursementConflictError("Reimbursements changed. Review history before undoing this action.")
+        action = body.get("action")
+        inverse: dict[str, Any] = {"action": action}
+        if action == "reverse_operation":
+            if "resetId" in body or "version" in body:
+                raise ReimbursementValidationError("Choose one Undo target.")
+            target = _text(body.get("operationId"), "Operation identifier", 200, required=True)
+            events = db.execute("SELECT * FROM app_reimbursement_events WHERE operation_id = ? OR confirmation_operation_id = ? ORDER BY id", (target, target)).fetchall()
+            if not events:
+                raise ReimbursementNotFoundError("This payment operation is unavailable.")
+            rows = {event["allocation_id"]: self._row(db, event["allocation_id"]) for event in events}
+            if any(e["status"] == "reversed" for e in events):
+                raise ReimbursementConflictError("This payment was already reversed.")
+            if not (all(owner in (e["actor_owner"], rows[e["allocation_id"]]["payer_owner"]) for e in events)
+                    or all(e["kind"] == "offset" for e in events) and any(row["payer_owner"] == owner for row in rows.values())):
+                raise ReimbursementValidationError("Only the original actor or payee can reverse this event.")
+            for row in rows.values():
+                self._writable(row)
+                self._not_cleared(row)
+            inverse["operationId"] = target
+        elif action in ("undo_reset", "redo_reset"):
+            if "operationId" in body:
+                raise ReimbursementValidationError("Choose one Undo target.")
+            target = _text(body.get("resetId"), "Reset identifier", 200, required=True)
+            reset = db.execute("SELECT * FROM app_reimbursement_resets WHERE id = ?", (target,)).fetchone()
+            if reset is None:
+                raise ReimbursementNotFoundError("This balance reset is unavailable.")
+            self._version(reset, body.get("version"))
+            if reset["status"] != ("active" if action == "undo_reset" else "undone"):
+                raise ReimbursementConflictError("This balance reset changed. Review history again.")
+            entries = json.loads(reset["entries_json"])
+            rows = {entry["allocationId"]: self._row(db, entry["allocationId"]) for entry in entries}
+            for entry in entries:
+                row = rows[entry["allocationId"]]
+                self._writable(row)
+                if row["version"] != entry["version"] or self._reset_event_state(db, row["id"]) != entry["eventState"]:
+                    raise ReimbursementConflictError("This reset's expenses changed. Review history again.")
+            inverse.update(resetId=target, version=int(reset["version"]))
+        else:
+            raise ReimbursementValidationError("Choose a valid Undo action.")
+        inverse["guards"] = [{"id": row["id"], "version": int(row["version"]), "events": self._reset_event_state(db, row["id"])} for row in rows.values()]
+        target_key = str(action) + ":" + target + ":" + str(inverse.get("version", ""))
+        existing = db.execute("SELECT * FROM app_reimbursement_undo_jobs WHERE target_key = ? AND status = 'queued' ORDER BY created_at LIMIT 1", (target_key,)).fetchone()
+        if existing is not None:
+            return self._undo_job_payload(existing)
+        identifier = uuid4().hex
+        db.execute("INSERT INTO app_reimbursement_undo_jobs(id,owner_key,target_key,payload_json,status,created_at,updated_at) VALUES (?,?,?,?,'queued',?,?)",
+                   (identifier, owner, target_key, _json(inverse, maximum=20_000_000), now, now))
+        return self._undo_job_payload(db.execute("SELECT * FROM app_reimbursement_undo_jobs WHERE id = ?", (identifier,)).fetchone())
+
+    def _queued_inverse(self, db: Any, owner: str, identifier: str) -> dict[str, Any]:
+        job = db.execute("SELECT * FROM app_reimbursement_undo_jobs WHERE id = ?", (identifier,)).fetchone()
+        if job is None or job["owner_key"] != owner or job["status"] != "queued":
+            raise ReimbursementConflictError("This queued Undo is no longer available.")
+        inverse = json.loads(job["payload_json"])
+        for guard in inverse.pop("guards"):
+            row = self._row(db, guard["id"])
+            if int(row["version"]) != guard["version"] or self._reset_event_state(db, row["id"]) != guard["events"]:
+                raise ReimbursementConflictError("This payment or its expenses changed before Undo. Review history.")
+            self._writable(row)
+            if int(row["projected_version"]) != int(row["version"]):
+                raise ReimbursementUndoPendingError("Undo is waiting for the saved sheet update.")
+        action = inverse.pop("action")
+        if action == "reverse_operation":
+            inverse["expectedState"] = self._reset_state(db)
+        return {"operation": action, **inverse}
+
     def get_command_result(self, owner: str, request_id: str) -> dict[str, Any] | None:
         """Recover a known transport request without rebuilding its old inputs."""
         owner = _owner(owner)
@@ -736,7 +839,7 @@ class ReimbursementStore:
                 raise ReimbursementConflictError("This request identifier belongs to another account.")
             return json.loads(row["result_json"])
 
-    def command(self, owner: str, body: dict[str, Any]) -> dict[str, Any]:
+    def command(self, owner: str, body: dict[str, Any], *, _undo_job_id: str | None = None) -> dict[str, Any]:
         owner = _owner(owner)
         if not isinstance(body, dict):
             raise ReimbursementValidationError("A reimbursement request must be an object.")
@@ -756,6 +859,8 @@ class ReimbursementStore:
             # all changes, success caches the exact original result in the same tx.
             db.execute("INSERT INTO app_reimbursement_commands(request_id,owner_key,fingerprint,result_json,created_at) VALUES (?,?,?,'',?)",
                        (request_id, owner, fingerprint, now))
+            if _undo_job_id is not None:
+                body = {**self._queued_inverse(db, owner, _undo_job_id), "requestId": request_id}
             operation = body.get("operation")
             common = {"operation", "requestId"}
             allowed = {"receive": {"allocationId", "version", "amountCents", "date", "note"},
@@ -763,6 +868,7 @@ class ReimbursementStore:
                        "confirm_payment": {"allocationId", "version", "eventId"},
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
                        "reverse_operation": {"operationId", "expectedState"},
+                       "queue_undo": {"action", "operationId", "resetId", "version", "expectedUndoState"},
                        "receive_all": {"expectedState", "date", "note"},
                        "report_all": {"expectedState", "date", "note"},
                        "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints", "payerShareCents", "method"},
@@ -773,7 +879,10 @@ class ReimbursementStore:
             changed: list[str] = []
             event_ids: list[str] = []
             reset_id = ""
-            if operation == "edit_split":
+            undo_job = None
+            if operation == "queue_undo":
+                undo_job = self._queue_undo(db, owner, body, now)
+            elif operation == "edit_split":
                 allocation_id = _text(body.get("allocationId"), "Allocation identifier", 200, required=True)
                 self._writable(self._row(db, allocation_id))
                 gross = _cents(body.get("grossCents"), "Expense total")
@@ -968,6 +1077,11 @@ class ReimbursementStore:
             if reset_id:
                 reset = db.execute("SELECT * FROM app_reimbursement_resets WHERE id = ?", (reset_id,)).fetchone()
                 result["reset"] = self._reset_payload(db, reset)
+            if _undo_job_id is not None:
+                db.execute("UPDATE app_reimbursement_undo_jobs SET status = 'completed', error = '', updated_at = ? WHERE id = ?", (now, _undo_job_id))
+                undo_job = self._undo_job_payload(db.execute("SELECT * FROM app_reimbursement_undo_jobs WHERE id = ?", (_undo_job_id,)).fetchone())
+            if undo_job is not None:
+                result["undoJob"] = undo_job
             db.execute("UPDATE app_reimbursement_commands SET result_json = ? WHERE request_id = ?", (_json(result, maximum=20_000_000), request_id))
             return result
 

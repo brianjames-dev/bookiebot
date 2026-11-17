@@ -91,6 +91,80 @@ def test_split_then_partial_receipt_and_reversal_preserve_household_cash(setup):
     assert setup.store.snapshot("brian")["events"][0]["status"] == "reversed"
 
 
+def test_queued_undo_returns_without_sheets_then_projects_original_cash_exactly_once(setup, monkeypatch):
+    assert split(setup)[0]
+    original = setup.store.snapshot("brian")["allocations"][0]
+    real_sync = projection.sync_pending
+    monkeypatch.setattr(projection, "sync_pending", lambda _store: False)
+    saved = service.command("brian", payment(original, 5000))
+    assert saved["projectionPending"]
+    def forbidden(_store):
+        raise AssertionError("Queuing Undo must not wait for Sheets")
+    monkeypatch.setattr(projection, "sync_pending", forbidden)
+    queued = service.command("brian", command("queue_undo", action="reverse_operation", operationId=saved["operationId"], expectedUndoState=saved["undoState"]))
+    assert queued["undoJob"]["status"] == "queued"
+    assert queued["allocations"][0]["settledCents"] == 5000
+    monkeypatch.setattr(projection, "sync_pending", real_sync)
+    recovered = service.recover_queued_undos()
+    assert recovered == {"completed": [queued["undoJob"]["id"]], "pending": []}
+    assert service.recover_queued_undos() == {"completed": [], "pending": []}
+    assert setup.sheet.read(2, 31, 32) == [464.72]
+    event = service.snapshot("hannah")["events"][0]
+    assert event["status"] == "reversed"
+    assert receipt_row(setup.book, event["id"])[2] == 0
+    for owner in ("brian", "hannah"):
+        current = service.snapshot(owner)
+        assert not current["projectionPending"]
+        assert current["allocations"][0]["grossCents"] == original["grossCents"]
+        assert current["allocations"][0]["outstandingCents"] == original["outstandingCents"]
+        assert current["undoJobs"][0]["status"] == "completed"
+
+
+def test_queued_undo_reports_changed_expense_without_reversing_newer_cash(setup, monkeypatch):
+    assert split(setup)[0]
+    original = setup.store.snapshot("brian")["allocations"][0]
+    real_sync = projection.sync_pending
+    monkeypatch.setattr(projection, "sync_pending", lambda _store: False)
+    saved = service.command("brian", payment(original, 5000))
+    queued = service.command("brian", command("queue_undo", action="reverse_operation", operationId=saved["operationId"], expectedUndoState=saved["undoState"]))
+    monkeypatch.setattr(projection, "sync_pending", real_sync)
+    assert real_sync(setup.store)
+    current = setup.store.get_allocation(original["id"])
+    service.command("brian", payment(current, 1000))
+    assert service.recover_queued_undos() == {"completed": [], "pending": []}
+    snapshot = service.snapshot("hannah")
+    assert snapshot["allocations"][0]["settledCents"] == 6000
+    assert all(event["status"] == "confirmed" for event in snapshot["events"])
+    job = next(job for job in snapshot["undoJobs"] if job["id"] == queued["undoJob"]["id"])
+    assert job["status"] == "failed" and "changed" in job["error"]
+
+
+def test_unrelated_failed_bulk_projection_does_not_starve_individual_undo(setup, monkeypatch):
+    from bookiebot.reimbursements import batch_projection
+    from unit_tests.reimbursements.test_store import bulk_payment
+    first = setup.store.register_allocation(payload())
+    setup.store.mark_projected(first["id"], first["version"])
+    setup.store.command("brian", bulk_payment(setup.store))
+    second = setup.store.register_allocation(payload())
+    setup.store.mark_projected(second["id"], second["version"])
+    saved = setup.store.command("brian", payment(second))
+    queued = service.command("brian", command("queue_undo", action="reverse_operation", operationId=saved["operationId"], expectedUndoState=setup.store.snapshot("brian")["undoState"]))
+    attempts = []
+    monkeypatch.setattr(batch_projection, "sync_received", lambda _store, _ids: False)
+    def project(store, *, allocation_ids=None):
+        attempts.append(allocation_ids)
+        for row in store.pending_projections():
+            if row["id"] != first["id"] and (allocation_ids is None or row["id"] in allocation_ids):
+                store.mark_projected(row["id"], row["version"])
+        return False  # The unrelated bulk conflict remains unresolved.
+    monkeypatch.setattr(projection, "sync_pending", project)
+    assert service.recover_queued_undos() == {"completed": [queued["undoJob"]["id"]], "pending": []}
+    assert {second["id"]} in attempts
+    assert setup.store.get_allocation(second["id"])["settledCents"] == 0
+    still_pending = setup.store.get_allocation(first["id"])
+    assert still_pending["settledCents"] == 4000 and still_pending["projectedVersion"] < still_pending["version"]
+
+
 def test_debtor_report_does_not_reduce_source_before_confirmation(setup):
     split(setup)
     allocation = setup.store.snapshot("hannah")["allocations"][0]
