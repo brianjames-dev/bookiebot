@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module');
 const req=createRequire(path.resolve('web/expense-report/package.json')),ts=req('typescript'),cache=new Map();
-function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;vm.runInNewContext(code,{exports,Intl,Date,require:name=>name.startsWith('.')?load(path.resolve(path.dirname(file),name)+'.ts'):req(name)});return exports;}
+function load(file){if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText;vm.runInNewContext(code,{exports,Intl,Date,require:name=>name.startsWith('.')?load(path.resolve(path.dirname(file),name)+'.ts'):req(name)});return exports;}
 const {validRepayment,repaymentLabel}=load(path.resolve('web/expense-report/src/transaction-repayment-model.ts'));
 const {displayedAmount,accountedAmount,recordedDays}=load(path.resolve('web/expense-report/src/recorded-transaction-view.ts'));
 const details={id:'fixture',version:1,direction:'outgoing',accounting:'cash_v1',payerName:'Hannah',partnerName:'Brian',grossCents:10000,payerShareCents:4000,partnerShareCents:6000,settledCents:1000,clearedCents:500,outstandingCents:4500,pendingCents:500,method:'custom',canEdit:false,editReason:'Only the payer can edit.'};
@@ -11,3 +11,14 @@ assert.equal(displayedAmount(row),1000);assert.equal(accountedAmount(row),0);ass
 const groups=recordedDays([row],[],'2026-10');assert.equal(groups[0].entries[0].amount,10);assert.equal(groups[0].total,0,'Purchase context never enters fallback day totals');
 assert.equal(repaymentLabel(row),'Custom split');
 console.log('PASS repayment validation, confirmed cash, context totals and split labels');
+
+const React=req('react'),{renderToStaticMarkup}=req('react-dom/server');
+const {RepaymentAllocation}=load(path.resolve('web/expense-report/src/repayment-allocation.tsx'));
+for(const incoming of [true,false]){
+ const html=renderToStaticMarkup(React.createElement(RepaymentAllocation,{payerName:'Brian',partnerName:'Hannah',payerCents:4000,partnerCents:6000,incoming,method:'Custom'}));
+ assert(html.includes(incoming?'Brian (You)':'Hannah (You)'));
+ assert(html.indexOf(incoming?'$40.00':'$60.00')<html.lastIndexOf(incoming?'$60.00':'$40.00'),'Shared native allocation preserves viewer-relative dollar shares');
+}
+const fronted=renderToStaticMarkup(React.createElement(RepaymentAllocation,{payerName:'Brian',partnerName:'Hannah',payerCents:0,partnerCents:10000,incoming:true,method:'Fronted'}));
+assert(fronted.includes('flex:0;display:none')&&fronted.includes('$100.00'));
+console.log('PASS native repayment allocation direction, integer cents and fronted zero share');

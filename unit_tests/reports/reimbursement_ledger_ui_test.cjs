@@ -33,6 +33,7 @@ function load(file) {
   const exports = {}; modules.set(file, exports)
   const localRequire = name => {
     if (name.endsWith(".css")) return {}
+    if (name === './transaction-step-motion') return {StepMotion:({review,edit,confirm})=>React.createElement('div',null,React.createElement('div',{'aria-hidden':review,inert:review},edit),React.createElement('div',{'aria-hidden':!review,inert:!review},confirm))}
     if (name === "./transaction-editor-workspace") return {
       EditorScenes: ({children}) => children,
       EditorExpansion: ({open,retain,children}) => React.createElement("div", {"aria-hidden":!open,inert:!open}, (retain||open) ? children : null),

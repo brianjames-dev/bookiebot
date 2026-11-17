@@ -10,12 +10,12 @@ export function StepMotion({review,open,mode,duration,edit,confirm}:{review:bool
   const generation=++s.generation
   s.animations.forEach(animation=>animation.cancel());s.animations=[]
   s.target=target;s.open=open;s.width=box.getBoundingClientRect().width
-  const settle=()=>{s.running=false;box.dataset.moving='false';s.height=panes[s.target].offsetHeight;box.style.height=s.height+'px';panes.forEach((pane,index)=>{pane.style.visibility=index===s.target?'visible':'hidden';pane.style.transform='none';pane.style.opacity='1';pane.style.zIndex=index===s.target?'2':'1'})}
+  const settle=()=>{s.running=false;box.dataset.moving='false';s.height=panes[s.target].offsetHeight;box.style.height=s.height+'px';panes.forEach((pane,index)=>{pane.dataset.visible=String(index===s.target);pane.style.visibility=index===s.target?'visible':'hidden';pane.style.transform='none';pane.style.opacity='1';pane.style.zIndex=index===s.target?'2':'1'})}
   s.settle=()=>{++s.generation;s.animations.forEach(animation=>animation.cancel());s.animations=[];settle()}
   if(!changed||matchMedia('(prefers-reduced-motion: reduce)').matches||!s.width){s.initialized=true;settle();return}
   s.initialized=true;s.running=true;box.dataset.moving='true'
   const forward=target===1,direction=forward?1:-1,incoming=panes[target],outgoing=panes[1-target],height=incoming.offsetHeight,easing='cubic-bezier(.22,.8,.25,1)'
-  panes.forEach((pane,index)=>{pane.style.visibility='visible';pane.style.zIndex=index===target?'2':'1';pane.style.transform=snapshots[index].transform;pane.style.opacity=snapshots[index].opacity})
+  panes.forEach((pane,index)=>{pane.dataset.visible='true';pane.style.visibility='visible';pane.style.zIndex=index===target?'2':'1';pane.style.transform=snapshots[index].transform;pane.style.opacity=snapshots[index].opacity})
   const from=snapshots[target].visible?snapshots[target]:{transform:`translate3d(${direction*s.width}px,0,0)`,opacity:'1'}
   const to=`translate3d(${-direction*s.width}px,0,0)`
   const options:KeyframeAnimationOptions={duration,easing,fill:'both'}

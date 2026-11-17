@@ -8,6 +8,7 @@ import {StepMotion} from './transaction-step-motion'
 import {ChangedMoney,ChangedText} from './transaction-value-motion'
 import {splitMoney} from './transaction-split-model'
 import {repaymentLabel} from './transaction-repayment-model'
+import {RepaymentAllocation} from './repayment-allocation'
 import './transaction-repayment.css'
 
 /** Two native row tracks keep the pill below the price without moving metadata. */
@@ -42,7 +43,6 @@ export function TransactionRepaymentEditor({row,open,compact,editing,editor,onCl
   const changed=open&&(previous.current.open?previous.current.mode!==mode:mode!=='summary');previous.current={mode,open};if(!changed)return
   const frame=requestAnimationFrame(()=>{const selector=mode==='review'?'.sp-management .bi-step-review .bi-primary':editing?'.sp-management .bi-step-edit .bi-cancel':'.sp-summary-footer .bi-primary:not(:disabled),.sp-summary-footer .bi-cancel';rootRef.current?.querySelector<HTMLButtonElement>(selector)?.focus({preventScroll:true})});return()=>cancelAnimationFrame(frame)
  },[mode,open])
- const yourShare=incoming?details.payerShareCents:details.partnerShareCents,otherShare=details.grossCents-yourShare
  const status=<span className="rp-status"><Clock3 aria-hidden="true"/>{details.outstandingCents===0?'Settled':details.pendingCents?'Payment reported':details.settledCents?'Partly repaid':compact?'Pending':'Awaiting repayment'}</span>
  const method=<ChangedText value={repaymentLabel(shown)} motionKey={key+'method'}/>
  const balance=<div className="rp-balance"><span className="rp-person-name">{incoming?details.partnerName+' owes you':'You owe '+details.payerName}</span><strong className="rp-balance-amount"><ChangedMoney value={splitMoney(details.outstandingCents)} motionKey={key+'remaining'}/></strong>{!compact&&status}</div>
@@ -51,10 +51,7 @@ export function TransactionRepaymentEditor({row,open,compact,editing,editor,onCl
    <header className="sp-detail-heading">{compact?balance:<h2>Split details</h2>}</header>
    {!compact&&<><div className="rp-purchase"><TransactionIcon entry={recordedEntry(shown)} eager/><div className="rp-merchant"><strong>{shown.location||shown.title}</strong><span>{shown.categoryLabel} · {shown.date}</span></div></div>{balance}</>}
    {compact&&<div className="rp-inline-status">{status}<span>{method}</span></div>}
-   <section className="rp-allocation" aria-label="Purchase allocation"><div className="rp-split-heading"><span>Purchase split</span><span>{!compact&&method}</span></div>
-    <div className="rp-split-track" role="img" aria-label={`${details.payerName}'s share ${splitMoney(details.payerShareCents)}; ${details.partnerName}'s share ${splitMoney(details.partnerShareCents)}`}><span data-person="you" style={{flex:yourShare,display:yourShare||locked?'block':'none'}}/><span data-person="partner" style={{flex:otherShare,display:otherShare||locked?'block':'none'}}/></div>
-    <div className="rp-shares">{[[incoming?details.payerName:details.partnerName,yourShare,'you'],[incoming?details.partnerName:details.payerName,otherShare,'partner']].map(([name,amount,person])=><div className="rp-share" key={person}><span className="rp-avatar" data-person={person} aria-hidden="true">{String(name)[0]}</span><div><span>{name}{person==='you'?' (You)':''}</span><strong><ChangedMoney value={splitMoney(Number(amount))} motionKey={key+person}/></strong></div></div>)}</div>
-   </section>
+   <RepaymentAllocation payerName={details.payerName} partnerName={details.partnerName} payerCents={details.payerShareCents} partnerCents={details.partnerShareCents} incoming={incoming} method={!compact&&method} locked={locked} renderAmount={(cents,person)=><ChangedMoney value={splitMoney(cents)} motionKey={key+person}/>}/>
    <dl className="rp-payment-summary" aria-label="Purchase and repayments"><div><dt>Purchase total</dt><dd>{splitMoney(details.grossCents)}</dd></div><div><dt>{incoming?'Received back':'Repaid by you'}</dt><dd>{splitMoney(details.settledCents)}</dd></div></dl>
    {details.pendingCents>0&&<p className="sp-pending-note">{splitMoney(details.pendingCents)} reported, awaiting confirmation. Only confirmed repayments count as paid.</p>}
    {details.clearedCents>0&&<p className="sp-pending-note">{splitMoney(details.clearedCents)} cleared without a repayment.</p>}

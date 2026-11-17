@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-16 — Share repayment presentation and retained native editor routes
+
+Transactions and the canonical Shared workspace render one RepaymentAllocation component for viewer-relative shares, initials and the allocation bar, preserving Transactions’ existing ChangedMoney keys and zero/fronted/locked behavior. Shared uses the same bi-product fields, materials, footers and StepMotion duration/easing. Its summary/payment/split/history panes remain mounted after first use so a parent close, row switch or fold retains a draft; explicit Cancel resets it. Gate nested motions by the active route so exactly one slide layer runs. Expose each StepMotion pane’s actual settled paint visibility and scope descendant hiding to Shared, preventing an inactive nested pane from re-enabling itself while preserving outgoing paint during the transition. Make the retained open-DUO balance summary inert while details occupy that pane, and hide its explicitly visible motion descendants so it cannot repaint over the editor. No changes to request bodies, canonical writers, review/confirm boundaries, original cash/offset semantics, source versions or persistence.
+
 ## 2026-11-16 — Balance-first Shared presentation and explicit bulk sent reports
 
 Port the approved Balance first code/CSS into the existing canonical Sheets-backed phone workspace, retaining the shell’s Overview title and DUO geometry/dock ownership. The complete authoritative snapshot chooses outstanding reimbursements across months, then current-Pacific-month activity when all debt is settled; older settled history stays explicitly accessible. Pagination never controls financial totals or scope. Keep a selected row’s native detail/payment controller mounted while CSS moves it between compact inline and unfolded right-pane placement, preserving drafts through folding.
