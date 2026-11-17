@@ -74,6 +74,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [transactionsHeaderActions, setTransactionsHeaderActions] = useState<HTMLDivElement | null>(null)
   const [transactionsUpdated, setTransactionsUpdated] = useState<{ owner: string; time: number | null } | null>(null)
   const onTransactionsUpdated = useCallback((time: number | null) => setTransactionsUpdated({ owner, time }), [owner])
+  const [sharedUpdated, setSharedUpdated] = useState<{ owner: string; time: number | null } | null>(null)
+  const onSharedUpdated = useCallback((time: number | null) => setSharedUpdated({ owner, time }), [owner])
   const askTriggerRef = useRef<HTMLButtonElement>(null)
   const screenRef = useRef(screen)
   const displayedScreen = useRef(screen)
@@ -215,8 +217,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
 
   const reportVisible = screen === "overview"
   const transactionsUpdatedAt = transactionsUpdated?.owner === owner ? transactionsUpdated.time : null
-  const brandStatus = screen === "transactions" ? <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
-    {transactionsUpdatedAt === null ? <span>Not updated yet</span> : <AppUpdatedTime updatedAt={transactionsUpdatedAt} />}
+  const pageUpdatedAt = screen === "shared" ? sharedUpdated?.owner === owner ? sharedUpdated.time : null : transactionsUpdatedAt
+  const brandStatus = screen === "transactions" || screen === "shared" ? <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
+    {pageUpdatedAt === null ? <span>Not updated yet</span> : <AppUpdatedTime updatedAt={pageUpdatedAt} />}
   </div> : controls
   const fallback = report && <SharedReimbursementsCard hideTitle items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
     receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
@@ -238,7 +241,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           if(configurationOpen){widgetGuideRef.current=false;setBillsOpen(false);setTransfersOpen(false)}
           else if(widgetGuideOpen)selectScreen('settings')
           else selectScreen(lastMain)
-        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions"}
+        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions" && screen !== "shared"}
           onChat={() => setAskOpen(true)} chatRef={askTriggerRef} chatOpen={askOpen && monthlyReady} chatDisabled={!report || !monthlyReady} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)} avatarUrl={avatarUrl} showPortrait={screen === 'settings'}
@@ -261,7 +264,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
-        {report && <ReimbursementLedger balanceFirst aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} />}
+        {report && <ReimbursementLedger key={report.ownerName} balanceFirst aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} onUpdated={onSharedUpdated} />}
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
         {report && <><SavingsGoals /><Investments report={report} ready={monthlyReady} /></>}

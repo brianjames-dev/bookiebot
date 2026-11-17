@@ -1,4 +1,5 @@
-import { useId, useState, type CSSProperties } from "react"
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
 import { TransactionIcon } from "./daily-transactions"
 import { transactionCategory, type DailyTransaction } from "./transaction-identity"
@@ -45,6 +46,7 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
 }) {
   const { allocations, events, ownerKey } = snapshot
   const wide = useAppNavigation()?.duoLandscape === true
+  const [detailPane, setDetailPane] = useState<HTMLDivElement | null>(null)
   const [selected, setSelected] = useState("")
   const [history, setHistory] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -158,25 +160,26 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
     {snapshot.error && <p className="sr-sync bb-ledger-note" role="status">{snapshot.error}</p>}
     <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope"><span>{history ? "All reimbursement history" : active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span></div>
       {!shown.length && <p className="bb-ledger-empty">No reimbursements for this month.</p>}
-      {page.visible.map(group => <BalanceMonth key={group.key} group={group} paginate={history} selected={selected} onSelect={id => { if (!selectDisabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} selectDisabled={selectDisabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
+      {page.visible.map(group => <BalanceMonth key={group.key} group={group} paginate={history} selected={selected} onSelect={id => { if (!selectDisabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} selectDisabled={selectDisabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide} detailPane={detailPane}/>)}
       {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all months</button>}
     </section>
     <aside className="sr-right" aria-label="Shared balance and settlement" aria-hidden={wide && Boolean(selected) || undefined} inert={wide && Boolean(selected) || undefined}>{flow}</aside>
+    <div className="sr-detail-layer" ref={setDetailPane} aria-label="Expense details" aria-hidden={!wide || !selected} inert={!wide || !selected}/>
   </div>
 }
 
-function BalanceMonth({ group, paginate, selected, onSelect, disabled, selectDisabled, snapshot, reversibleIds, run, aliases, wide }: {
-  group: { key: string; items: LedgerAllocation[] }; paginate: boolean; selected: string; onSelect: (id: string) => void; disabled: boolean; selectDisabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
+function BalanceMonth({ group, paginate, selected, onSelect, disabled, selectDisabled, snapshot, reversibleIds, run, aliases, wide, detailPane }: {
+  group: { key: string; items: LedgerAllocation[] }; paginate: boolean; selected: string; onSelect: (id: string) => void; disabled: boolean; selectDisabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean; detailPane: HTMLDivElement | null
 }) {
   const page = useReimbursementPage(group.items, item => item.id, true, paginate ? 5 : group.items.length)
   return <section className="sr-month" aria-label={group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}><h3>{group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}</h3>
-    {page.visible.map(item => <BalanceRow key={item.id} item={item} selected={selected} onSelect={onSelect} disabled={disabled} selectDisabled={selectDisabled} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
+    {page.visible.map(item => <BalanceRow key={item.id} item={item} selected={selected} onSelect={onSelect} disabled={disabled} selectDisabled={selectDisabled} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide} detailPane={detailPane}/>)}
     {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all expenses</button>}
   </section>
 }
 
-function BalanceRow({ item, selected, onSelect, disabled, selectDisabled, snapshot, reversibleIds, run, aliases, wide }: {
-  item: LedgerAllocation; selected: string; onSelect: (id: string) => void; disabled: boolean; selectDisabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
+function BalanceRow({ item, selected, onSelect, disabled, selectDisabled, snapshot, reversibleIds, run, aliases, wide, detailPane }: {
+  item: LedgerAllocation; selected: string; onSelect: (id: string) => void; disabled: boolean; selectDisabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean; detailPane: HTMLDivElement | null
 }) {
   const opened = selected === item.id, isPayer = item.payerOwner === snapshot.ownerKey
   const { shown, plan } = useReimbursementValueMotion(item, opened, isPayer), key = reimbursementMotionKey(item.id)
@@ -197,8 +200,21 @@ function BalanceRow({ item, selected, onSelect, disabled, selectDisabled, snapsh
   return <ChangeMotionContext.Provider value={plan}><div className="sr-row-group" data-feedback={plan ? "animating" : undefined}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={selectDisabled} data-selected={opened} onClick={() => onSelect(item.id)}>
     <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
     <span className="sr-row-value"><strong><ChangedMoney value={money(shown.outstandingCents || shown.partnerShareCents)} motionKey={key + "remaining"}/></strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronDown className="sr-row-chevron" aria-hidden="true"/>
-  </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened} retain>
+  </button><ReimbursementDetailHost wide={wide} pane={detailPane}><div className="sr-detail-host" data-open={opened} data-feedback={plan ? "animating" : undefined}><EditorExpansion open={opened} retain>
     <LedgerRow allocation={item} events={ownEvents} reversibleIds={reversibleIds} owner={snapshot.ownerKey} open={opened} onOpenChange={() => onSelect(item.id)} disabled={disabled} run={run} detailOnly detailSummary={detailSummary} compact={!wide} incomePayerCents={snapshot.splitOptions?.[item.id]?.incomePayerCents}/>
-  </EditorExpansion></div>
+  </EditorExpansion></div></ReimbursementDetailHost>
   </div></ChangeMotionContext.Provider>
+}
+
+/** Move one stable portal target, not its React controller, when folding.
+ * Open details must never remain inside the left pane's scroll/paint clip. */
+function ReimbursementDetailHost({ wide, pane, children }: { wide: boolean; pane: HTMLDivElement | null; children: ReactNode }) {
+  const inline = useRef<HTMLDivElement>(null)
+  const [container] = useState(() => typeof document !== "undefined" && document.createElement ? document.createElement("div") : null)
+  useLayoutEffect(() => {
+    const target = wide ? pane : inline.current
+    if (container && target) { container.className = "sr-detail-mount"; target.appendChild(container) }
+    return () => container?.remove()
+  }, [wide, pane, container])
+  return <><div className="sr-inline-host" ref={inline}/>{container ? createPortal(children, container) : children}</>
 }
