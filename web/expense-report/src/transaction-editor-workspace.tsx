@@ -3,19 +3,19 @@ import {StepMotion} from './transaction-step-motion'
 import {transactionMotion} from './transaction-inline-editor'
 
 /** Keep the expansion and both moving surfaces alive while editor routes change. */
-export function EditorScenes({scene,open=true,children,fill=false}:{scene:string;open?:boolean;children:ReactNode;fill?:boolean}){
- const retained=useRef<{current:string;target:0|1;visit:number;slots:Array<{scene:string;node:ReactNode;visit:number}|null>}>({current:scene,target:0,visit:0,slots:[{scene,node:children,visit:0},null]})
+export function EditorScenes({scene,open=true,children,fill=false,direction,sceneClassName}:{scene:string;open?:boolean;children:ReactNode;fill?:boolean;direction?:"forward"|"backward";sceneClassName?:(scene:string)=>string}){
+ const retained=useRef<{current:string;target:0|1;visit:number;path:string[];direction:"forward"|"backward";slots:Array<{scene:string;node:ReactNode;visit:number}|null>}>({current:scene,target:0,visit:0,path:[scene],direction:"forward",slots:[{scene,node:children,visit:0},null]})
  const state=retained.current
  if(open){
-  if(scene!==state.current){state.target=state.target===0?1:0;state.current=scene;state.visit++}
+  if(scene!==state.current){const previous=state.path.lastIndexOf(scene);state.direction=direction??(previous>=0?"backward":"forward");state.path=previous>=0?state.path.slice(0,previous+1):state.direction==="backward"?[scene]:[...state.path,scene];state.target=state.target===0?1:0;state.current=scene;state.visit++}
   state.slots[state.target]={scene,node:children,visit:state.visit}
  }
  // Each incoming visit starts at its requested inner view. Reusing an old
  // summary/review instance would replay its own slide inside this outer one.
  // Current-view updates keep their visit, preserving drafts and native review.
- const slot=(index:number)=>{const entry=state.slots[index];return entry?<div className="bi-editor-scene" data-editor-scene={entry.scene} key={entry.visit}>{entry.node}</div>:null}
+ const slot=(index:number)=>{const entry=state.slots[index];return entry?<div className={"bi-editor-scene "+(sceneClassName?.(entry.scene)??"")} data-editor-scene={entry.scene} key={entry.visit}>{entry.node}</div>:null}
  return <div className="bi-editor-scenes" data-active-scene={state.current} data-fill={fill}>
-  <StepMotion review={state.target===1} open mode="slide" duration={transactionMotion.duration} edit={slot(0)} confirm={slot(1)}/>
+  <StepMotion direction={state.direction} review={state.target===1} open mode="slide" duration={transactionMotion.duration} edit={slot(0)} confirm={slot(1)}/>
  </div>
 }
 

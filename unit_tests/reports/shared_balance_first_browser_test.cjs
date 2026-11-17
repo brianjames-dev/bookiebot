@@ -35,7 +35,7 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
      assert.equal(await page.locator('.sr-row-main').count(),6);assert.equal(await page.locator('.sr-row-main .bb-transaction-icon').count(),6);
      assert.equal(await page.locator('.sr-summary-sides').evaluate(el=>getComputedStyle(el).display),'grid');
      assert.equal(await page.locator('.sr-hero>strong').first().evaluate(el=>getComputedStyle(el).fontSize),height<=550?'38px':'42px');
-     if(width>800){const dock=await page.locator('.bb-navigation-pane').boundingBox(),more=await page.locator('.sr-summary-tools').boundingBox();assert(more.y+more.height<=dock.y-5,'Summary actions fit above the dock');}
+     if(width>800){const dock=await page.locator('.bb-navigation-pane').boundingBox(),more=await page.locator('.sr-options').boundingBox();assert(more.y+more.height<=dock.y-5,'Summary actions fit above the dock');}
      await page.screenshot({path:path.join(output,`${engine.name()}-${width}-${dark?'dark':'light'}-${owner}-summary.png`)});
      await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));
      const detail=page.locator('.sr-detail-host[data-open=true]');await detail.locator('.rp-balance').waitFor();
@@ -63,7 +63,7 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
      await page.setViewportSize({width,height});await settle(page);
      await press(page,page.getByRole('button',{name:owner==='brian'?'Confirm received':'Record sent',exact:true}));
      await page.getByRole('button',{name:'Retry this record',exact:true}).waitFor();await press(page,page.getByRole('button',{name:'Retry this record',exact:true}));
-     await page.getByRole('heading',{name:owner==='brian'?'Balances updated':'Payment reported',exact:true}).waitFor();await press(page,page.getByRole('button',{name:'View reimbursements',exact:true}));
+     await page.locator('.sr-editor[data-stage=summary]').waitFor();
      assert.equal(writes.length,3);
      assert.equal(await page.locator('.sr-row-main').count(),owner==='brian'?6:4,owner==='brian'?'Current-month settled activity replaces active scope':'Pending sent amounts stay outstanding');
      assert.match(await page.locator('.sr-scope').innerText(),owner==='brian'?/activity/:/Outstanding/);
@@ -78,7 +78,7 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
        await press(p,p.getByRole('button',{name:'Record received',exact:true}));assert(!confirmed,'Recipient review is read only');
        assert.match(await p.locator('.sr-editor[data-stage=payment]').innerText(),/\$514.07/);
        await press(p,p.getByRole('button',{name:'Confirm received',exact:true}));assert(confirmed,'One recipient confirmation settles the reported lump payment');
-       await p.getByRole('heading',{name:'Balances updated',exact:true}).waitFor();await press(p,p.getByRole('button',{name:'View reimbursements',exact:true}));assert.equal(await p.locator('.sr-row-main').count(),6);
+       await p.locator('.sr-editor[data-stage=summary]').waitFor();assert.equal(await p.locator('.sr-row-main').count(),6);
        assert.deepEqual(recipient.errors,[]);assert.deepEqual(recipient.unexpected,[]);
       }finally{await recipient.page.close()}
      }

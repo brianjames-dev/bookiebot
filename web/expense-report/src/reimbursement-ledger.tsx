@@ -12,6 +12,8 @@ import { BalanceFirstReimbursements } from "./shared-balance-first"
 import { StepMotion } from "./transaction-step-motion"
 import { transactionMotion } from "./transaction-inline-editor"
 import { ArrowLeft } from "lucide-react"
+import { UndoPopup, type UndoNotice } from "./transaction-undo-popup"
+import { reimbursementUndo, type ReimbursementUndo } from "./reimbursement-undo"
 import { ReimbursementSplitEditor } from "./reimbursement-split-editor"
 
 export interface LedgerAllocation {
@@ -24,6 +26,7 @@ export interface LedgerAllocation {
   customPayerRatio?: [number, number]
 }
 export interface LedgerEvent {
+  confirmationOperationId?: string
   id: string; operationId: string; allocationId: string; kind: "receive" | "report_payment" | "offset"
   actorOwner: string; payeeOwner: string; debtorOwner: string; amountCents: number; date: string; note: string
   status: "pending" | "confirmed" | "reversed"; createdAt: string; confirmedAt: string
@@ -32,9 +35,10 @@ export interface LedgerEvent {
 export interface LedgerSnapshot {
   enabled: true; ownerKey: string; allocations: LedgerAllocation[]; events: LedgerEvent[]
   currency: "USD"; projectionPending?: boolean; error?: string; resetState?: string; resets?: LedgerReset[]
+  operationId?: string; reset?: LedgerReset
   splitOptions?: Record<string, { incomePayerCents: number }>
 }
-interface LedgerReset {
+export interface LedgerReset {
   id: string; version: number; status: "active" | "undone"; actorOwner: string
   createdAt: string; updatedAt: string; note: string; canUndo: boolean; canRedo: boolean
   entries: { allocationId: string; amountCents: number; payerOwner: string; partnerOwner: string }[]
@@ -166,13 +170,16 @@ function validate(snapshot: LedgerResponse) {
 }
 
 export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number; review?: boolean }
-export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess, balanceFirst = false, aliases, onUpdated }: {
+export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess, balanceFirst = false, aliases, onUpdated, headerActions }: {
   fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; onClose?: () => void; onRejectAccess?: (message: string) => void
-  balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void
+  balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void; headerActions?: HTMLElement | null
 }) {
   const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   useEffect(() => { onUpdated?.(updatedAt) }, [updatedAt, onUpdated])
+  const [toast,setToast] = useState<{notice:UndoNotice;undo:ReimbursementUndo}|null>(null)
+  const [undoVersion,setUndoVersion] = useState(0)
+  const noticeId = useRef(0)
   const [legacy, setLegacy] = useState(false)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -205,7 +212,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     } catch (failure) {
       if (!mounted.current || id !== readId.current || controller.signal.aborted) return false
       if (failure instanceof LedgerRequestError && [401, 403].includes(failure.status)) {
-        setSnapshot(null); setUpdatedAt(null); setLegacy(false); setSignedOut(failure.status === 401)
+        setSnapshot(null); setToast(null); setUpdatedAt(null); setLegacy(false); setSignedOut(failure.status === 401)
         if (matchedReceipt) onRejectAccess?.(failure.message)
       }
       setError(failure instanceof LedgerRequestError ? failure.message : "Couldn’t refresh reimbursements. Previously loaded balances may be out of date.")
@@ -265,11 +272,13 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     writeController.current = controller
     updateWork({ label: "Reimbursements", pending: true, uncertain })
     setBusy(true); setError("")
+    let notice: ReimbursementUndo | null = null
     try {
       const result = validate(await request<LedgerResponse>(change.body, controller.signal))
       if (!mounted.current) return
       pending.current = null; setUncertain(false); change.done(true)
       setSnapshot(result); setLegacy(false); setUpdatedAt(Date.now())
+      if (balanceFirst) notice = reimbursementUndo(change.body, result)
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
       if (change.body.operation !== "receive_all") await load(false)
     } catch (failure) {
@@ -277,20 +286,21 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       if (failure instanceof LedgerRequestError && failure.status < 500) {
         pending.current = null; setUncertain(false)
         if (matchedReceipt && [401, 403].includes(failure.status)) { setSnapshot(null); onRejectAccess?.(failure.message) }
-        if (failure.status === 401) { setSnapshot(null); setUpdatedAt(null); setSignedOut(true); change.done(false) }
+        if (failure.status === 401) { setSnapshot(null); setToast(null); setUpdatedAt(null); setSignedOut(true); change.done(false) }
         if (failure.status === 409) { change.done(false); await load() }
         setError(failure.message)
       } else {
         setUncertain(true)
         setError("This record may have saved. Retry this same record safely before making another change.")
       }
-    } finally { executing.current = false; if (mounted.current) setBusy(false) }
+    } finally { executing.current = false; if (mounted.current) { setBusy(false); if(notice) { const seconds=transactionMotion.undoSeconds; setToast({undo:notice,notice:{id:++noticeId.current,title:notice.title,seconds,deadline:Date.now()+seconds*1000}}) } } }
   }
   const run: Run = (body, done) => {
     if (pending.current || executing.current || signedOut) return
     pending.current = { body: { ...body, requestId: crypto.randomUUID() }, done }
     void execute()
   }
+  const undo = () => { if(!toast)return; const command=toast.undo.command; setToast(null); run(command,saved=>{if(saved)setUndoVersion(value=>value+1)}) }
   if (legacy && !uncertain) return <>{fallback}{matchedReceipt && <button type="button" className="bb-reconcile-action" onClick={onClose}>Back to reconciliation</button>}</>
   if (matchedReceipt) return <section className="bb-canonical-reimbursements bb-reconcile-receipt" aria-label="Receive shared payment">
     {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
@@ -308,9 +318,10 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
       {!snapshot && !error && <ReportLoading label="Loading reimbursements…"/>}
-      {snapshot && (balanceFirst ? <BalanceFirstReimbursements snapshot={snapshot} disabled={busy || uncertain || refreshing} selectDisabled={busy || uncertain} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
+      {snapshot && (balanceFirst ? <BalanceFirstReimbursements snapshot={snapshot} disabled={busy || uncertain || refreshing || Boolean(toast)} selectDisabled={busy || uncertain || Boolean(toast)} headerActions={headerActions} undoVersion={undoVersion} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
         : <LedgerContents snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run}
           refresh={() => void load()} refreshing={refreshing} />)}
+      {balanceFirst&&toast&&<div className="sr-native-toast bi-product"><UndoPopup key={toast.notice.id} notice={toast.notice} onUndo={undo} onDismiss={()=>setToast(null)} returnFocus={()=>[...document.querySelectorAll<HTMLButtonElement>('.sr-row-main[data-selected=true],.sr-editor .bi-primary,.sr-primary,.sr-options')].find(el=>!el.disabled&&!el.closest('[aria-hidden=true]')&&getComputedStyle(el).visibility!=='hidden'&&el.getClientRects().length>0)??null}/></div>}
     </CardContent>
   </Card>
 }
@@ -504,8 +515,8 @@ export function LedgerRow({ allocation: item, events, reversibleIds, owner, open
       {!canWrite && <p className="bb-ledger-note">Historical split · read only</p>}
       {sheetPending && <p className="bb-ledger-note" role="status">Change saved; budget and reimbursement sheets still need to update. Refresh Shared to retry.</p>}
       {pendingSent && <p className="bb-ledger-note">{isPayer ? "Review the pending payment above before recording another receipt." : "Sent payment awaiting confirmation. The balance changes when received."}</p>}
-      {cleared > 0 && <p className="bb-ledger-note">Undo the balance reset before changing this expense or reversing its payments.</p>}
-      {isPayer && canWrite && item.settledCents > 0 && <p className="bb-ledger-note">Reverse confirmed repayments before editing the split or expense total.</p>}
+      {cleared > 0 && <p className="bb-ledger-note">Undo reset to edit this expense.</p>}
+      {isPayer && canWrite && item.settledCents > 0 && <p className="bb-ledger-note">Reverse repayment to edit this split.</p>}
       <div className="bb-ledger-actions">
         {canWrite && isPayer && <button type="button" disabled={disabled || splitBlocked} aria-expanded={mode === "split"} aria-controls={splitId}
           onClick={() => { if (mode !== "split") setSplitReview(value => value + 1); setMode(mode === "split" ? "" : "split") }}>Edit split</button>}
@@ -522,8 +533,8 @@ export function LedgerRow({ allocation: item, events, reversibleIds, owner, open
     summary={detailSummary} close={() => onOpenChange(false)} isPayer={isPayer} canWrite={canWrite} settled={settled} pendingSent={pendingSent} splitBlocked={splitBlocked}
     notices={<>{!canWrite && <p className="bi-footnote">Historical split · read only</p>}{sheetPending && <p className="bi-footnote" role="status">Change saved; sheets are still syncing.</p>}
       {pendingSent && <p className="bi-footnote">{isPayer ? "Review the pending payment before recording another receipt." : "Sent payment awaiting confirmation. The balance changes when received."}</p>}
-      {cleared > 0 && <p className="bi-footnote">Undo the balance reset before changing this expense or reversing its payments.</p>}
-      {isPayer && canWrite && item.settledCents > 0 && <p className="bi-footnote">Reverse confirmed repayments before editing the split or expense total.</p>}</>}/>
+      {cleared > 0 && <p className="bi-footnote">Undo reset to edit this expense.</p>}
+      {isPayer && canWrite && item.settledCents > 0 && <p className="bi-footnote">Reverse repayment to edit this split.</p>}</>}/>
     : <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={summary}>{detail}</AnimatedDisclosure>
 }
 
@@ -537,9 +548,7 @@ function LedgerDetailScenes({ allocation, events, reversibleIds, open, compact, 
   const choose = (next: "payment" | "split" | "history") => { setVisits(value => ({ ...value, [next]: value[next] + 1 })); setMode(next) }
   const back = () => setMode("")
   const editing = mode !== "", alternate = mode === "split" || mode === "history"
-  const title = mode === "payment" ? isPayer ? "Record money received" : "Record sent payment" : mode === "split" ? "Edit split" : mode === "history" ? "Payment history" : "Reimbursement"
   return <div className={`sr-detail-native bi-editor${compact ? " sp-inline-editor" : ""}`} data-detail-mode={mode || "summary"}>
-    {(mode === "payment" || mode === "history") && <header className="sr-detail-heading sp-flow-heading"><h2>{title}</h2></header>}
     <section className={`sp-detail${compact ? " sp-detail-inline" : ""}`} data-direction={isPayer ? "receive" : "send"} aria-label="Reimbursement editor" onKeyDown={event => { if (event.key === "Escape" && !disabled) { event.preventDefault(); close() } }}>
       <StepMotion review={editing} open={open} mode="slide" duration={transactionMotion.duration} edit={<div className="sp-summary">
         {summary}{notices}
@@ -549,10 +558,10 @@ function LedgerDetailScenes({ allocation, events, reversibleIds, open, compact, 
           {canWrite && !settled && <button type="button" className="bi-primary" disabled={disabled || pendingSent} onClick={() => choose("payment")}>{isPayer ? "Record received" : "Record sent payment"}</button>}</footer>
       </div>} confirm={<div className="bi-editor bi-editor-embedded">
         <StepMotion review={alternate} open={open && editing} mode="slide" duration={transactionMotion.duration}
-          edit={visits.payment > 0 && <PaymentEditor key={`${allocation.version}:${visits.payment}`} allocation={allocation} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={back} native/>}
+          edit={visits.payment > 0 && <><header className="sr-detail-heading sp-flow-heading"><h2>{isPayer ? "Record money received" : "Record sent payment"}</h2></header><PaymentEditor key={`${allocation.version}:${visits.payment}`} allocation={allocation} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={back} native/></>}
           confirm={<StepMotion review={mode === "history"} open={open && alternate} mode="slide" duration={transactionMotion.duration}
             edit={visits.split > 0 && <ReimbursementSplitEditor key={visits.split} active={open && mode === "split"} allocation={allocation} incomePayerCents={incomePayerCents} disabled={disabled} blocked={splitBlocked} run={run} close={back}/>}
-            confirm={visits.history > 0 && <><PaymentHistory allocation={allocation} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run}/><footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={disabled} onClick={back}><ArrowLeft/>Back</button></footer></>}/>} />
+            confirm={visits.history > 0 && <><header className="sr-detail-heading sp-flow-heading"><h2>Payment history</h2></header><PaymentHistory allocation={allocation} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run}/><footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={disabled} onClick={back}><ArrowLeft/>Back</button></footer></>}/>} />
       </div>} />
     </section>
   </div>
@@ -629,17 +638,17 @@ export function ResetEditor({ snapshot, disabled, run, close }: { snapshot: Ledg
   const [note, setNote] = useState("")
   const stale = snapshot.resetState !== review.expectedState
   useAppWorkStatus({ label: "Reimbursement reset", dirty: Boolean(note), onDiscard: () => { setNote(""); close() } })
-  return <form className="bb-ledger-form bb-ledger-reset-form" onSubmit={event => {
+  return <form className="bi-fields sr-native-form sr-reset-form" onSubmit={event => {
     event.preventDefault()
     if (disabled || stale || !review.expectedState || !review.count) return
     run({ operation: "reset", expectedState: review.expectedState, note }, close)
-  }}><fieldset disabled={disabled}><legend>Review balance reset</legend>
+  }}><fieldset disabled={disabled}><legend className="bi-sr-only">Review balance reset</legend>
     <ResetAmounts {...review.totals} />
-    <p className="bb-ledger-note">Clear the remaining balances on {review.count} shared expense{review.count === 1 ? "" : "s"} across all months. Both directions will be $0.00.</p>
-    <p className="bb-ledger-note">Recorded expenses and receipts stay unchanged. No payment or transfer is recorded. New shared expenses start a new balance. You can undo this reset from Reset history.</p>
+    <p className="bb-ledger-note">Clear {review.count} outstanding expenses across all months.</p>
+    <p className="bb-ledger-note">Purchases and receipts stay unchanged. No payment is recorded. Undo from Reset history.</p>
     <label>Note (optional)<input maxLength={200} value={note} onChange={event => setNote(event.target.value)} placeholder="Settled outside BookieBot" /></label>
     {stale && <p className="bb-ledger-note" role="status">Reimbursements changed while this review was open. Cancel and open Reset balances again to review the latest amounts.</p>}
-    <div className="bb-ledger-actions"><button type="submit" disabled={stale || !review.count}>Confirm reset to $0.00</button><button type="button" onClick={close}>Cancel</button></div>
+    <footer className="bi-editor-footer"><button className="bi-cancel" type="button" onClick={close}>Cancel</button><button className="bi-primary" type="submit" disabled={stale || !review.count}>Confirm reset to $0.00</button></footer>
   </fieldset></form>
 }
 export function ResetHistory({ resets, owner, disabled, run }: { resets: LedgerReset[]; owner: string; disabled: boolean; run: Run }) {

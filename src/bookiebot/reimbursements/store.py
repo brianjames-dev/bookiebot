@@ -762,6 +762,7 @@ class ReimbursementStore:
                        "report_payment": {"allocationId", "version", "amountCents", "date", "note"},
                        "confirm_payment": {"allocationId", "version", "eventId"},
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
+                       "reverse_operation": {"operationId", "expectedState"},
                        "receive_all": {"expectedState", "date", "note"},
                        "report_all": {"expectedState", "date", "note"},
                        "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints", "payerShareCents", "method"},
@@ -919,16 +920,29 @@ class ReimbursementStore:
                     event_ids.append(self._add_event(db, row, operation_id, "offset", owner, amount, when, note, now, confirmed=True))
                     self._settle(db, row["id"], amount, now)
             else:
-                event_id = _text(body.get("eventId"), "Payment identifier", 200, required=True)
-                event = db.execute("SELECT * FROM app_reimbursement_events WHERE id = ?", (event_id,)).fetchone()
-                if event is None:
-                    raise ReimbursementNotFoundError("This payment is unavailable.")
-                events = (db.execute("SELECT * FROM app_reimbursement_events WHERE operation_id = ? ORDER BY id", (event["operation_id"],)).fetchall()
-                          if event["kind"] == "offset" else [event])
+                if operation == "reverse_operation":
+                    expected = _text(body.get("expectedState"), "Balance preview", 64, required=True)
+                    if expected != self._reset_state(db):
+                        raise ReimbursementConflictError("Reimbursements changed. Review payment history before reversing this action.")
+                    target = _text(body.get("operationId"), "Operation identifier", 200, required=True)
+                    # Bulk receipts can confirm existing sender reports as well
+                    # as create receipts. Reverse this exact command together.
+                    events = db.execute("""SELECT * FROM app_reimbursement_events
+                        WHERE confirmation_operation_id = ? OR operation_id = ? ORDER BY id""", (target, target)).fetchall()
+                    if not events:
+                        raise ReimbursementNotFoundError("This payment operation is unavailable.")
+                else:
+                    event_id = _text(body.get("eventId"), "Payment identifier", 200, required=True)
+                    event = db.execute("SELECT * FROM app_reimbursement_events WHERE id = ?", (event_id,)).fetchone()
+                    if event is None:
+                        raise ReimbursementNotFoundError("This payment is unavailable.")
+                    events = (db.execute("SELECT * FROM app_reimbursement_events WHERE operation_id = ? ORDER BY id", (event["operation_id"],)).fetchall()
+                              if event["kind"] == "offset" else [event])
                 rows = {item["allocation_id"]: self._row(db, item["allocation_id"]) for item in events}
                 for row in rows.values():
                     self._writable(row)
-                if not (owner == event["actor_owner"] or any(row["payer_owner"] == owner for row in rows.values())):
+                if not (all(owner in (item["actor_owner"], rows[item["allocation_id"]]["payer_owner"]) for item in events)
+                        or all(item["kind"] == "offset" for item in events) and any(row["payer_owner"] == owner for row in rows.values())):
                     raise ReimbursementValidationError("Only the original actor or payee can reverse this event.")
                 if any(item["status"] == "reversed" for item in events):
                     raise ReimbursementConflictError("This payment was already reversed.")

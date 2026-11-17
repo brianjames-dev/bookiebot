@@ -57,6 +57,21 @@ function load(file) {
 }
 const { ReimbursementLedger, reimbursementAmountCents, ledgerTotals, defaultOffsetEntries, canReverseLedgerEvent } = load(path.join(frontend, "src/reimbursement-ledger.tsx"))
 const { balanceFirstScope, sharedExpenseDate, reimbursementTransaction } = load(path.join(frontend, "src/shared-balance-first.tsx"))
+const {reimbursementUndo}=load(path.join(frontend,"src/reimbursement-undo.ts"))
+const undoResult={enabled:true,ownerKey:"brian",currency:"USD",allocations:[],resetState:"after-save",operationId:"receipt-op",events:[
+ {id:"old",operationId:"earlier-op",kind:"receive",status:"confirmed",amountCents:500},
+ {id:"confirmed-report",operationId:"sender-op",confirmationOperationId:"receipt-op",kind:"report_payment",status:"confirmed",amountCents:1000},
+ {id:"remainder",operationId:"receipt-op",confirmationOperationId:"receipt-op",kind:"receive",status:"confirmed",amountCents:2500}
+]}
+assert.deepEqual(JSON.parse(JSON.stringify(reimbursementUndo({operation:"receive_all"},undoResult))),{title:"$35.00 received",command:{operation:"reverse_operation",operationId:"receipt-op",expectedState:"after-save"}},"Receipt Undo includes its confirmed reports and remainder, excluding earlier cash")
+assert.equal(reimbursementUndo({operation:"receive_all"},{...undoResult,projectionPending:true}),null,"Syncing commands cannot offer an unsafe inverse")
+assert.equal(reimbursementUndo({operation:"reverse_operation"},undoResult),null,"An inverse does not recursively create another notice")
+assert.equal(reimbursementUndo({operation:"receive_all"},{...undoResult,operationId:undefined}),null,"A notice requires canonical operation lineage")
+for(const [operation,status,ready,inverse] of [["undo_reset","undone","canRedo","redo_reset"],["redo_reset","active","canUndo","undo_reset"],["reset","active","canUndo","undo_reset"]]){
+ const reset={id:"reset-id",status,version:4,[ready]:true};const result={...undoResult,reset,resets:[reset]}
+ assert.deepEqual(JSON.parse(JSON.stringify(reimbursementUndo({operation},result).command)),{operation:inverse,resetId:"reset-id",version:4})
+ assert.equal(reimbursementUndo({operation},{...result,resets:[{...reset,[ready]:false}]}),null,"Unavailable old resets cannot be undone from a toast")
+}
 const fallback = React.createElement("p", null, "Legacy reimbursement overview")
 const markup = renderToStaticMarkup(React.createElement(ReimbursementLedger, { fallback }))
 assert.ok(markup.includes("Loading reimbursements"))
@@ -629,10 +644,9 @@ async function resetLifecycleContracts() {
   assert.equal(writes(state).length, 0, "Reset opens an explicit review before writing")
   assert.ok(text(form(tree)).includes("Owed to you $105.00"))
   assert.ok(text(form(tree)).includes("You owe $60.00"))
-  assert.ok(text(form(tree)).includes("3 shared expenses across all months"))
-  assert.ok(text(form(tree)).includes("Both directions will be $0.00"))
-  assert.ok(text(form(tree)).includes("Recorded expenses and receipts stay unchanged"))
-  assert.ok(text(form(tree)).includes("No payment or transfer is recorded"))
+  assert.ok(text(form(tree)).includes("3 outstanding expenses across all months"))
+  assert.ok(text(form(tree)).includes("Purchases and receipts stay unchanged"))
+  assert.ok(text(form(tree)).includes("No payment is recorded"))
   await fill(tree, "Note", "Settled separately with Hannah")
   await submit(tree)
   assert.deepEqual({ ...writes(state)[0].body, requestId: undefined }, {

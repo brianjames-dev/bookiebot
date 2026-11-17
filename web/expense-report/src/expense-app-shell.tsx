@@ -71,6 +71,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [sourceRequest, setSourceRequest] = useState<{ section: string; id: number; scope: string } | null>(null)
   const [availableVersion, setAvailableVersion] = useState<string | null>(null)
   const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const [sharedHeaderActions, setSharedHeaderActions] = useState<HTMLDivElement | null>(null)
   const [transactionsHeaderActions, setTransactionsHeaderActions] = useState<HTMLDivElement | null>(null)
   const [transactionsUpdated, setTransactionsUpdated] = useState<{ owner: string; time: number | null } | null>(null)
   const onTransactionsUpdated = useCallback((time: number | null) => setTransactionsUpdated({ owner, time }), [owner])
@@ -252,7 +253,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screen==='shared'?'Reimbursements':screenTitles[screen]} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
         disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible}
-        controls={<div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} />} />
+        controls={<><div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} /><div className="sr-header-actions" ref={setSharedHeaderActions} hidden={screen !== "shared"}/></>} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
@@ -264,7 +265,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
-        {report && <ReimbursementLedger key={report.ownerName} balanceFirst aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} onUpdated={onSharedUpdated} />}
+        {report && <ReimbursementLedger key={report.ownerName} balanceFirst headerActions={sharedHeaderActions} aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} onUpdated={onSharedUpdated} />}
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
         {report && <><SavingsGoals /><Investments report={report} ready={monthlyReady} /></>}
