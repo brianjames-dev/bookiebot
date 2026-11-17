@@ -45,7 +45,7 @@ async function slide(page,node,reduced){
    if(width>800){
     assert.equal(await page.locator('.sr-right').getAttribute('inert'),'','The inactive balance summary is inert');
     assert.equal(await page.locator('.sr-right .bi-step-pane').first().evaluate(el=>getComputedStyle(el).visibility),'hidden','Nested motion panes cannot repaint the inactive balance summary');
-    const heading=native.getByRole('heading',{name:'Reimbursement',exact:true});
+    const heading=native.locator('.rp-person-name');
     assert(await heading.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+Math.min(8,r.width/2),r.y+r.height/2);return r.y>=0&&r.bottom<innerHeight&&el.contains(hit)}),'The reimbursement heading paints in the usable right pane');
    }
    assert.deepEqual(await style(native.locator('.rp-avatar').first(),['width','height','fontSize','backgroundColor']),allocationStyle);
@@ -60,7 +60,7 @@ async function slide(page,node,reduced){
    assert.deepEqual(await style(native.getByRole('button',{name:'Cancel',exact:true}),buttonProps),cancelStyle);
    await amount.fill('12.34');await visible(native.locator('input[maxlength="200"]')).fill('Native payment draft');
    await page.screenshot({path:path.join(output,`${engine.name()}-${width}-${dark?'dark':'light'}-payment.png`)});
-   await press(page,native.getByRole('button',{name:'Close reimbursement details'}));await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));assert.equal(await visible(detail.locator('input[inputmode=decimal]')).inputValue(),'12.34');
+   await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));assert.equal(await visible(detail.locator('input[inputmode=decimal]')).inputValue(),'12.34');
    await page.setViewportSize({width:width>800?382:867,height:width>800?657:480});await settle(page);assert.equal(await visible(detail.locator('input[inputmode=decimal]')).inputValue(),'12.34');await page.setViewportSize({width,height});await settle(page);
    await slide(page,native.getByRole('button',{name:'Cancel',exact:true}),reduced);assert.equal(writes.length,0);
    await slide(page,native.getByRole('button',{name:'Edit split',exact:true}),reduced);await slide(page,native.getByRole('button',{name:'Cancel',exact:true}),reduced);

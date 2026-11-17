@@ -49,7 +49,7 @@ function load(file) {
     target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } })
   vm.runInNewContext(outputText, { exports, require: localRequire, AbortController, Error, Date: FixtureDate,
-    window: browserWindow, document: browserDocument, fetch: (...args) => fetchRequest(...args),
+    window: browserWindow, document: browserDocument, matchMedia: () => ({matches:true}), requestAnimationFrame: cb => browserWindow.setTimeout(cb,16), cancelAnimationFrame: id => browserWindow.clearTimeout(id), fetch: (...args) => fetchRequest(...args),
     crypto: { randomUUID: () => `record-${++requestId}` }, CustomEvent: class { constructor(type) { this.type = type } },
   })
   return exports
@@ -1019,7 +1019,7 @@ async function balanceFirstRetainedDraftContracts() {
   const rowButton=()=>tree.root.findAllByType('button').find(node=>node.props.className==='sr-row-main')
   const detail=()=>tree.root.findAll(node=>node.props.className==='sr-detail-host'&&node.props['data-open']===true)[0]
   await tap(rowButton());await tap(button(detail(),'Record received'));await fill(tree,'Amount ($)','12.34');await fill(tree,'Note','Retained payment')
-  await tap(button(detail(),'Close reimbursement details'))
+  await tap(rowButton())
   await act(async()=>{for(const [id,timer]of [...timers])if(timer.delay===320){timers.delete(id);timer.callback()}await flush()})
   await tap(rowButton())
   assert.equal(form(tree).findAllByType('input')[0].props.value,'12.34','Both expansion levels retain the payment draft after closure completes')
@@ -1027,9 +1027,58 @@ async function balanceFirstRetainedDraftContracts() {
   await unmount(tree)
 }
 
+async function balanceFirstNativeSplitContracts() {
+  const state=fixture({post:body=>{
+    const item=state.snapshot.allocations[0];item.payerShareCents=body.payerShareCents;item.partnerShareCents=item.grossCents-body.payerShareCents;
+    item.outstandingCents=item.partnerShareCents;item.method=body.method;item.version++;item.projectedVersion=item.version;
+    return response(clone(state.snapshot))
+  }})
+  state.snapshot.allocations=[allocation({settledCents:0,outstandingCents:10000})];state.snapshot.events=[]
+  state.snapshot.splitOptions={a:{incomePayerCents:12946}}
+  const tree=await mount({balanceFirst:true}),rowButton=()=>tree.root.findAllByType('button').find(node=>node.props.className==='sr-row-main')
+  await tap(rowButton());assert.equal(button(tree.root,'Close reimbursement details'),undefined)
+  await tap(button(tree.root,'Edit split'))
+  assert.equal(form(tree).findAll(node=>hasClass(node,'bs-orb')).length,2,'The actual Transactions percentage circles render')
+  await act(async()=>{form(tree).findByProps({'aria-label':"Brian's share amount"}).props.onChange({target:{value:'.'}});await flush()})
+  assert.equal(button(tree.root,'Review split').props.disabled,true,'Incomplete share text cannot be reviewed')
+  await tap(rowButton());await tap(rowButton())
+  assert.equal(form(tree).findByProps({'aria-label':"Brian's share amount"}).props.value,'.','Parent closure retains incomplete share text')
+  await tap(button(tree.root,'Split by income'))
+  assert.equal(form(tree).findByProps({type:'range'}).props.value,12946,'Income uses the exact writer cents')
+  await tap(rowButton());await tap(rowButton())
+  assert.equal(form(tree).findByProps({type:'range'}).props.value,12946,'Parent close/reopen retains the split draft')
+  await submit(tree)
+  assert.equal(writes(state).length,0,'Review is read only')
+  assert.match(text(tree.root),/By income/)
+  await tap(button(tree.root,'Back'))
+  assert.equal(form(tree).findByProps({type:'range'}).props.value,12946,'Back retains the selected income amount')
+  await submit(tree);await tap(button(tree.root,'Confirm split'))
+  assert.deepEqual(clone(writes(state)[0].body),{operation:'edit_split',allocationId:'a',version:3,grossCents:20000,method:'income',payerShareCents:12946,requestId:writes(state)[0].body.requestId})
+  assert.match(text(tree.root),/\$70.54/)
+  assert.equal(state.snapshot.events.length,0,'Editing a split never records a reimbursement')
+  await unmount(tree)
+}
+
+async function balanceFirstZeroShareRetentionContracts(){
+  const state=fixture({post:body=>{const item=state.snapshot.allocations[0];item.payerShareCents=body.payerShareCents;item.partnerShareCents=item.grossCents-item.payerShareCents;item.outstandingCents=item.partnerShareCents;item.status=item.outstandingCents?'outstanding':'settled';item.method=body.method;item.customPayerRatio=[body.payerShareCents,item.grossCents];item.version++;item.projectedVersion=item.version;return response(clone(state.snapshot))}})
+  state.snapshot.allocations=[allocation({settledCents:0,outstandingCents:10000}),allocation({id:'b',item:'Other debt',settledCents:0,outstandingCents:10000})];state.snapshot.events=[]
+  const tree=await mount({balanceFirst:true}),rows=()=>tree.root.findAllByType('button').filter(node=>node.props.className==='sr-row-main')
+  await tap(rows()[0]);await tap(button(tree.root,'Edit split'))
+  assert.equal(button(tree.root,'Split by income').props.disabled,true,'Missing income metadata cannot masquerade as 50/50')
+  await act(async()=>{form(tree).findByProps({'aria-label':"Brian's share amount"}).props.onChange({target:{value:'200.00'}});await flush()})
+  await submit(tree);await tap(button(tree.root,'Confirm split'))
+  assert.equal(rows().length,2,'The selected zero-debt expense stays until its editor closes')
+  assert.ok(text(tree.root).includes('Settled'));assert.equal(state.snapshot.events.length,0)
+  await tap(button(tree.root,'Cancel'))
+  assert.equal(rows().length,1,'Closing returns to the default outstanding scope')
+  await unmount(tree)
+}
+
 ;(async () => {
   await balanceFirstRejectedCommandContracts()
   await balanceFirstRetainedDraftContracts()
+  await balanceFirstNativeSplitContracts()
+  await balanceFirstZeroShareRetentionContracts()
   await splitEditorContracts()
   await matchedReceiptContracts()
   await bulkReceiveContracts()

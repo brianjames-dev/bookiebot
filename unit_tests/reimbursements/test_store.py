@@ -959,6 +959,41 @@ def edit_split(value, **changes):
                    grossCents=10001, payerBasisPoints=3333, **changes)
 
 
+@pytest.mark.parametrize("owner", ["brian", "hannah"])
+@pytest.mark.parametrize("method", ["income", "equal", "fronted", "custom"])
+@pytest.mark.parametrize("gross", [1, 10001, 46472])
+def test_native_split_methods_preserve_exact_shares_and_replay(store, owner, method, gross):
+    from bookiebot.sheets.collaboration import split_amounts
+    value = store.register_allocation(payload(payerOwner=owner, partnerOwner="hannah" if owner == "brian" else "brian", payerPerson=owner.title()))
+    store.mark_projected(value["id"], value["version"])
+    payer = 0 if method == "custom" else round(split_amounts(gross / 100, method, owner)[0] * 100)
+    body = command("edit_split", allocationId=value["id"], version=value["version"], grossCents=gross,
+                   method=method, payerShareCents=payer)
+    result = store.command(owner, body)
+    saved = result["allocations"][0]
+    assert (saved["method"], saved["payerShareCents"], saved["partnerShareCents"]) == (method, payer, gross - payer)
+    assert saved["settledCents"] == 0 and result["events"] == []
+    assert saved["sourceRevision"]["before"]["grossCents"] == value["grossCents"]
+    assert store.command(owner, body) == result
+    assert store.get_allocation(value["id"])["version"] == value["version"] + 1
+    assert ("customPayerRatio" in saved) == (method == "custom")
+
+
+@pytest.mark.parametrize("changes", [{"method": "bogus"}, {"method": None}, {"method": "income", "payerShareCents": 1},
+                                     {"method": "equal", "payerShareCents": 4999}, {"method": "fronted", "payerShareCents": 1},
+                                     {"method": "income", "payerBasisPoints": 6473}, {"method": "income", "payerShareCents": True}])
+def test_native_split_method_rejects_forged_preview_without_writes(store, changes):
+    value = store.register_allocation(payload())
+    store.mark_projected(value["id"], value["version"])
+    before = store.get_allocation(value["id"])
+    body = command("edit_split", allocationId=value["id"], version=value["version"], grossCents=10000,
+                   method="income", payerShareCents=6473) | changes
+    with pytest.raises(ReimbursementValidationError):
+        store.command("brian", body)
+    assert store.get_allocation(value["id"]) == before
+    assert store.snapshot("brian")["events"] == []
+
+
 @pytest.mark.parametrize("gross,basis,expected", [(10001, 3333, 3333), (1, 5000, 1),
                                                     (10000, 0, 0), (10000, 10000, 10000),
                                                     (MAX_CENTS, 9999, 9_999_000_000)])
@@ -997,7 +1032,8 @@ def test_edit_split_rejects_invalid_or_forged_values_without_partial_revision(st
 
 
 @pytest.mark.parametrize("guard", ["debtor", "stale", "syncing", "legacy", "pending", "received", "cleared", "void"])
-def test_edit_split_preserves_existing_financial_guards(store, guard):
+@pytest.mark.parametrize("method", ["custom", "income"])
+def test_edit_split_preserves_existing_financial_guards(store, guard, method):
     value = store.register_allocation(payload(accounting="legacy_net" if guard == "legacy" else "cash_v1"))
     if guard != "syncing":
         store.mark_projected(value["id"], value["version"])
@@ -1014,7 +1050,8 @@ def test_edit_split_preserves_existing_financial_guards(store, guard):
         latest = store.get_allocation(value["id"])
         store.mark_projected(latest["id"], latest["version"])
     current = store.get_allocation(value["id"])
-    body = edit_split(current)
+    body = edit_split(current) if method == "custom" else command("edit_split", allocationId=current["id"], version=current["version"],
+                                                                 grossCents=10000, method="income", payerShareCents=6473)
     if guard == "stale":
         body["version"] = 0
     with pytest.raises((ReimbursementValidationError, ReimbursementConflictError)):

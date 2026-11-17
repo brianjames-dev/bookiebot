@@ -65,6 +65,32 @@ def assert_unchanged(client):
 
 
 @pytest.mark.asyncio
+async def test_native_split_income_preview_and_confirm_use_same_exact_cents(client):
+    from bookiebot.sheets.collaboration import split_amounts
+    connect(client)
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    before = client.store.get_allocation(client.allocation["id"])
+    response = await client.http.get("/app/reimbursements")
+    assert response.status == 200
+    data = await response.json()
+    payer = data["splitOptions"][before["id"]]["incomePayerCents"]
+    assert payer == round(split_amounts(before["grossCents"] / 100, "income", "brian")[0] * 100)
+    assert data["allocations"][0] == before
+    body = {"operation": "edit_split", "requestId": uuid4().hex, "allocationId": before["id"], "version": before["version"],
+            "method": "income", "grossCents": before["grossCents"], "payerShareCents": payer}
+    first = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert first.status == 200
+    saved = (await first.json())["allocations"][0]
+    assert saved["method"] == "income" and saved["payerShareCents"] == payer
+    assert saved["settledCents"] == 0
+    assert (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).status == 200
+    assert client.store.get_allocation(before["id"])["version"] == before["version"] + 1
+    connect(client, HANNAH, "hannah")
+    debtor = await client.http.get("/app/reimbursements")
+    assert (await debtor.json())["splitOptions"] == {}
+
+
+@pytest.mark.asyncio
 async def test_report_all_is_authenticated_pending_and_retry_safe(client):
     client.store.mark_projected(client.allocation["id"], client.allocation["version"])
     connect(client, HANNAH, "hannah")
