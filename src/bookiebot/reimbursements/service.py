@@ -58,7 +58,7 @@ def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
         else:
             from bookiebot.reimbursements.projection import sync_pending
             synced = sync_pending(store)
-    result = store.snapshot(owner)
+    result = store.snapshot(owner, include_projection_status=True)
     # Match Transactions' exact income notch without another Sheets read.
     # Keep presentation metadata separate from canonical allocation payloads.
     from bookiebot.sheets.collaboration import split_amounts
@@ -66,7 +66,7 @@ def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
                      for row in result["allocations"] if row["payerOwner"] == owner and row["accounting"] == "cash_v1"}
     return {**result, "enabled": True, "ownerKey": owner,
             "splitOptions": split_options,
-            "projectionPending": not synced or any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
+            "projectionPending": not synced or result["projectionPending"] or any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
 
 
 def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:

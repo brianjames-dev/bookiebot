@@ -65,6 +65,71 @@ def assert_unchanged(client):
 
 
 @pytest.mark.asyncio
+async def test_fast_display_snapshot_never_waits_for_sheets_recovery(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(projection, "sync_pending", lambda store: calls.append(store) or False)
+    assert (await client.http.get("/app/reimbursements?snapshot=1")).status == 401
+    connect(client)
+    before = client.store.snapshot("brian")
+    response = await client.http.get("/app/reimbursements?snapshot=1")
+    assert response.status == 200 and response.headers["Cache-Control"] == "private, no-store"
+    data = await response.json()
+    assert data["allocations"] == before["allocations"] and data["events"] == before["events"]
+    assert data["projectionPending"] is True
+    assert calls == [], "Display reads must not touch Sheets, even with pending projection"
+    assert (await client.http.get("/app/reimbursements")).status == 200
+    assert calls == [client.store], "An explicit refresh retains full recovery"
+    assert client.store.snapshot("brian")["allocations"] == before["allocations"]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_flag_cannot_skip_command_projection_or_duplicate_receipt(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(projection, "sync_pending", lambda store: calls.append(store) or False)
+    connect(client)
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    body = payment(client)
+    for _ in range(2):
+        response = await client.http.post("/app/reimbursements?snapshot=1", json=body, headers=HEADERS)
+        assert response.status == 200 and (await response.json())["projectionPending"] is True
+    assert calls == [client.store, client.store]
+    assert len(client.store.snapshot("brian")["events"]) == 1
+    assert client.store.get_allocation(client.allocation["id"])["settledCents"] == body["amountCents"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation,lifecycle", [("cancel", "void"), ("delete", "deleted")])
+async def test_fast_snapshot_reports_inactive_projection_backlog(client, monkeypatch, operation, lifecycle):
+    connect(client)
+    original = client.allocation
+    client.store.mark_projected(original["id"], original["version"])
+    pending = client.store.revise_allocation("brian", original["id"], original["version"], {"lifecycle": lifecycle}, operation=operation)
+    calls = []
+
+    def recover(store):
+        calls.append(store)
+        for item in store.pending_projections():
+            store.mark_projected(item["id"], item["version"])
+        return True
+
+    monkeypatch.setattr(projection, "sync_pending", recover)
+    first = await client.http.get("/app/reimbursements?snapshot=1")
+    data = await first.json()
+    assert first.status == 200 and data["allocations"] == [] and data["events"] == []
+    assert data["projectionPending"] is True, "Inactive corrections still require recovery"
+    assert calls == [], "Detecting the complete backlog remains SQL-only"
+    assert client.store.get_allocation(original["id"])["projectedVersion"] < pending["version"]
+    full = await client.http.get("/app/reimbursements")
+    synced = await full.json()
+    assert full.status == 200 and synced["projectionPending"] is False
+    assert synced["resetState"] != data["resetState"], "The existing complete cursor includes inactive projection progress"
+    assert calls == [client.store]
+    after = client.store.get_allocation(original["id"])
+    assert after["projectedVersion"] == pending["version"]
+    assert all(after[key] == original[key] for key in ("grossCents", "payerShareCents", "partnerShareCents", "settledCents"))
+
+
+@pytest.mark.asyncio
 async def test_native_split_income_preview_and_confirm_use_same_exact_cents(client):
     from bookiebot.sheets.collaboration import split_amounts
     connect(client)
@@ -323,7 +388,8 @@ async def test_session_invalidated_after_commit_hides_data_and_reconnect_retry_d
 
 
 @pytest.mark.asyncio
-async def test_revoked_session_during_read_drops_personal_data(client, monkeypatch):
+@pytest.mark.parametrize("query", ["", "?snapshot=1"])
+async def test_revoked_session_during_read_drops_personal_data(client, monkeypatch, query):
     connect(client)
     original = service.snapshot
 
@@ -333,7 +399,7 @@ async def test_revoked_session_during_read_drops_personal_data(client, monkeypat
         return result
 
     monkeypatch.setattr(service, "snapshot", revoke_during_read)
-    result = await client.http.get("/app/reimbursements")
+    result = await client.http.get("/app/reimbursements" + query)
     assert result.status == 401
     assert "Private shared expense" not in await result.text()
 

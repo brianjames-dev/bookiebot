@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react"
+import { useId, useState, type CSSProperties } from "react"
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
 import { TransactionIcon } from "./daily-transactions"
 import { transactionCategory, type DailyTransaction } from "./transaction-identity"
@@ -6,6 +6,7 @@ import { EditorExpansion, EditorScenes } from "./transaction-editor-workspace"
 import { useAppWorkStatus } from "./app-work-guard"
 import { useReimbursementPage } from "./reimbursement-pagination"
 import { useAppNavigation } from "./app-navigation"
+import { ReportLoading } from "./report-loading"
 import { RepaymentAllocation } from "./repayment-allocation"
 import { ChangeMotionContext, ChangedMoney, ChangedText } from "./transaction-value-motion"
 import { reimbursementMethod, reimbursementMotionKey, useReimbursementValueMotion } from "./reimbursement-value-motion"
@@ -39,13 +40,15 @@ export function reimbursementTransaction(item: LedgerAllocation): DailyTransacti
 type Review = { state: string | undefined; to: number; from: number; entries: ReturnType<typeof defaultOffsetEntries>; min: string }
 type Scene = "summary" | "offset" | "payment" | "done" | "reset"
 
-export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, refresh }: {
-  snapshot: LedgerSnapshot; disabled: boolean; run: Run; aliases?: Record<string, string>; refresh: () => void
+export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled = disabled, refreshing = false, run, aliases, refresh }: {
+  snapshot: LedgerSnapshot; disabled: boolean; selectDisabled?: boolean; refreshing?: boolean; run: Run; aliases?: Record<string, string>; refresh: () => void
 }) {
   const { allocations, events, ownerKey } = snapshot
   const wide = useAppNavigation()?.duoLandscape === true
   const [selected, setSelected] = useState("")
   const [history, setHistory] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreId = useId()
   const [scene, setScene] = useState<Scene>("summary")
   const [review, setReview] = useState<Review | null>(null)
   const [date, setDate] = useState(today)
@@ -64,7 +67,7 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
     .sort((a, b) => a === "undated" ? 1 : b === "undated" ? -1 : b.localeCompare(a))
     .map(key => ({ key, items: shown.filter(item => (sharedExpenseDate(item.expenseDate).slice(0, 7) || "undated") === key)
       .sort((a, b) => sharedExpenseDate(b.expenseDate).localeCompare(sharedExpenseDate(a.expenseDate)) || a.id.localeCompare(b.id)) }))
-  const page = useReimbursementPage(groups, group => group.key)
+  const page = useReimbursementPage(groups, group => group.key, true, history ? 5 : groups.length)
   const reversibleIds = new Set(events.filter(event => canReverseLedgerEvent(event, ownerKey, allocations, events)).map(event => event.id))
   const partnerKeys = [...new Set(allocations.flatMap(item => [item.payerOwner, item.partnerOwner]).filter(owner => owner !== ownerKey))]
   const partner = partnerKeys.length === 1 ? person(partnerKeys[0]) : "your household"
@@ -140,35 +143,40 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
         {active.length > 0 && <div className="sr-flow-caption"><span>Offset</span><ChevronRight/><span>Record payment</span><ChevronRight/><span>Settle</span></div>}
         {blocked && <p className="bi-footnote" role="status">{blocked}</p>}
         {incoming.length > 0 && <section className="bb-ledger-incoming" aria-label="Payments awaiting your confirmation"><h3>Awaiting your confirmation</h3>{incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={allocations.find(item => item.id === event.allocationId)!} disabled={disabled} run={run}/>)}</section>}
-        <details className="sr-more"><summary>More options</summary>{active.length > 0 && snapshot.resetState && <button type="button" className="bi-cancel" disabled={locked || Boolean(blocked) || pending.length > 0} onClick={() => setScene("reset")}>Reset balances</button>}
-          {Boolean(snapshot.resets?.length) && <ResetHistory resets={snapshot.resets!} owner={ownerKey} disabled={disabled} run={run}/>}</details>
+        <div className="sr-summary-tools" aria-label="Reimbursement options">
+          <button type="button" className="sr-tool" disabled={selectDisabled || scene !== "summary"} aria-pressed={history} onClick={() => { setHistory(!history); setSelected(""); setMoreOpen(false) }}>{history ? "Back" : "History"}</button>
+          <button type="button" className="sr-tool sr-more-trigger" disabled={selectDisabled} aria-expanded={moreOpen} aria-controls={moreId} onClick={() => setMoreOpen(!moreOpen)}>More options<ChevronDown aria-hidden="true"/></button>
+          {refreshing && <ReportLoading compact label="Refreshing reimbursements…"/>}
+        </div>
+        <div className="sr-more-content" id={moreId} hidden={!moreOpen}>{active.length > 0 && snapshot.resetState && <button type="button" className="bi-cancel" disabled={locked || Boolean(blocked) || pending.length > 0} onClick={() => { setMoreOpen(false); setScene("reset") }}>Reset balances</button>}
+          {Boolean(snapshot.resets?.length) && <ResetHistory resets={snapshot.resets!} owner={ownerKey} disabled={disabled} run={run}/>}</div>
       </>}
     </EditorScenes>
   </div>
-  return <div className="sr-balance-first bi-product" data-detail-open={Boolean(selected)} data-flow-open={scene !== "summary"}>
+  return <div className="sr-balance-first bi-product" data-detail-open={Boolean(selected)} data-flow-open={scene !== "summary"} data-refreshing={refreshing}>
     {snapshot.projectionPending && <div className="sr-sync bb-ledger-message" role="status"><p>Recorded. Expense sheets are still syncing.</p><button disabled={disabled} onClick={refresh}>Refresh</button></div>}
     {snapshot.error && <p className="sr-sync bb-ledger-note" role="status">{snapshot.error}</p>}
-    <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope"><span>{history ? "All reimbursement history" : active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span><button type="button" disabled={disabled || scene !== "summary"} onClick={() => { setHistory(!history); setSelected("") }}>{history ? "Back" : "History"}</button></div>
+    <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope"><span>{history ? "All reimbursement history" : active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span></div>
       {!shown.length && <p className="bb-ledger-empty">No reimbursements for this month.</p>}
-      {page.visible.map(group => <BalanceMonth key={group.key} group={group} selected={selected} onSelect={id => { if (!disabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
+      {page.visible.map(group => <BalanceMonth key={group.key} group={group} paginate={history} selected={selected} onSelect={id => { if (!selectDisabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} selectDisabled={selectDisabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
       {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all months</button>}
     </section>
     <aside className="sr-right" aria-label="Shared balance and settlement" aria-hidden={wide && Boolean(selected) || undefined} inert={wide && Boolean(selected) || undefined}>{flow}</aside>
   </div>
 }
 
-function BalanceMonth({ group, selected, onSelect, disabled, snapshot, reversibleIds, run, aliases, wide }: {
-  group: { key: string; items: LedgerAllocation[] }; selected: string; onSelect: (id: string) => void; disabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
+function BalanceMonth({ group, paginate, selected, onSelect, disabled, selectDisabled, snapshot, reversibleIds, run, aliases, wide }: {
+  group: { key: string; items: LedgerAllocation[] }; paginate: boolean; selected: string; onSelect: (id: string) => void; disabled: boolean; selectDisabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
 }) {
-  const page = useReimbursementPage(group.items, item => item.id)
+  const page = useReimbursementPage(group.items, item => item.id, true, paginate ? 5 : group.items.length)
   return <section className="sr-month" aria-label={group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}><h3>{group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}</h3>
-    {page.visible.map(item => <BalanceRow key={item.id} item={item} selected={selected} onSelect={onSelect} disabled={disabled} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
+    {page.visible.map(item => <BalanceRow key={item.id} item={item} selected={selected} onSelect={onSelect} disabled={disabled} selectDisabled={selectDisabled} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
     {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all expenses</button>}
   </section>
 }
 
-function BalanceRow({ item, selected, onSelect, disabled, snapshot, reversibleIds, run, aliases, wide }: {
-  item: LedgerAllocation; selected: string; onSelect: (id: string) => void; disabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
+function BalanceRow({ item, selected, onSelect, disabled, selectDisabled, snapshot, reversibleIds, run, aliases, wide }: {
+  item: LedgerAllocation; selected: string; onSelect: (id: string) => void; disabled: boolean; selectDisabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
 }) {
   const opened = selected === item.id, isPayer = item.payerOwner === snapshot.ownerKey
   const { shown, plan } = useReimbursementValueMotion(item, opened, isPayer), key = reimbursementMotionKey(item.id)
@@ -186,7 +194,7 @@ function BalanceRow({ item, selected, onSelect, disabled, snapshot, reversibleId
     <dl className="rp-payment-summary" aria-label="Purchase and repayments"><div><dt>Purchase total</dt><dd>{money(item.grossCents)}</dd></div><div><dt>Cash {isPayer ? "received" : "paid"}</dt><dd>{money(Math.max(0, item.settledCents - offset))}</dd></div>
       {offset > 0 && <div><dt>Settled by offset</dt><dd>{money(offset)}</dd></div>}{Boolean(item.clearedCents) && <div><dt>Cleared without payment</dt><dd>{money(item.clearedCents!)}</dd></div>}</dl>
   </>
-  return <ChangeMotionContext.Provider value={plan}><div className="sr-row-group" data-feedback={plan ? "animating" : undefined}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={disabled} data-selected={opened} onClick={() => onSelect(item.id)}>
+  return <ChangeMotionContext.Provider value={plan}><div className="sr-row-group" data-feedback={plan ? "animating" : undefined}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={selectDisabled} data-selected={opened} onClick={() => onSelect(item.id)}>
     <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
     <span className="sr-row-value"><strong><ChangedMoney value={money(shown.outstandingCents || shown.partnerShareCents)} motionKey={key + "remaining"}/></strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronDown className="sr-row-chevron" aria-hidden="true"/>
   </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened} retain>

@@ -35,7 +35,7 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
      assert.equal(await page.locator('.sr-row-main').count(),6);assert.equal(await page.locator('.sr-row-main .bb-transaction-icon').count(),6);
      assert.equal(await page.locator('.sr-summary-sides').evaluate(el=>getComputedStyle(el).display),'grid');
      assert.equal(await page.locator('.sr-hero>strong').first().evaluate(el=>getComputedStyle(el).fontSize),height<=550?'38px':'42px');
-     if(width>800){const dock=await page.locator('.bb-navigation-pane').boundingBox(),more=await page.locator('.sr-more>summary').boundingBox();assert(more.y+more.height<=dock.y-5,'Summary actions fit above the dock');}
+     if(width>800){const dock=await page.locator('.bb-navigation-pane').boundingBox(),more=await page.locator('.sr-summary-tools').boundingBox();assert(more.y+more.height<=dock.y-5,'Summary actions fit above the dock');}
      await page.screenshot({path:path.join(output,`${engine.name()}-${width}-${dark?'dark':'light'}-${owner}-summary.png`)});
      await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));
      const detail=page.locator('.sr-detail-host[data-open=true]');await detail.locator('.rp-balance').waitFor();

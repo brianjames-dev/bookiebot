@@ -1,4 +1,5 @@
 from decimal import Decimal
+from copy import deepcopy
 from dataclasses import replace
 import calendar
 from types import SimpleNamespace
@@ -529,6 +530,31 @@ def test_cancel_update_reactivate_then_delete_split_preserves_original_history(s
     assert setup.sheet.read(2, 29, 34) == [""] * 5
     assert len(setup.history) == 1
     assert setup.store.get_allocation(value["id"])["lifecycle"] == "deleted"
+
+
+@pytest.mark.parametrize("operation,lifecycle", [("cancel", "void"), ("delete", "deleted")])
+def test_fast_snapshot_detects_and_full_refresh_recovers_hidden_correction(setup, monkeypatch, operation, lifecycle):
+    split(setup)
+    original = setup.store.snapshot("brian")["allocations"][0]
+    real_sync = projection.sync_pending
+    monkeypatch.setattr(projection, "sync_pending", lambda *_args, **_kwargs: False)
+    ok, message = service.mutate_recent_action(BRIAN, selected(setup), operation)
+    assert ok and "syncing" in message
+    hidden = setup.store.get_allocation(original["id"])
+    assert hidden["lifecycle"] == lifecycle and hidden["version"] > hidden["projectedVersion"]
+    source_before = deepcopy(setup.sheet.rows)
+    for owner in ("brian", "hannah"):
+        fast = service.snapshot(owner)
+        assert fast["allocations"] == [] and fast["projectionPending"] is True
+    assert setup.sheet.rows == source_before, "Fast display reads cannot project a source or mirror"
+    monkeypatch.setattr(projection, "sync_pending", real_sync)
+    repaired = service.snapshot("brian", retry_projection=True)
+    assert repaired["allocations"] == [] and repaired["projectionPending"] is False
+    current = setup.store.get_allocation(original["id"])
+    assert current["version"] == current["projectedVersion"]
+    assert all(current[key] == original[key] for key in ("grossCents", "payerShareCents", "partnerShareCents", "settledCents"))
+    assert "void" in setup.book.worksheet("Shared Reimbursements").get_all_values()[1]
+    assert setup.sheet.read(2, 29, 34) == ([""] * 5 if operation == "delete" else [VALUES["date"], VALUES["item"], 464.72, VALUES["location"], VALUES["person"]])
 
 
 def test_correction_replay_recovers_lost_projection_response_without_duplicate_revision(setup):

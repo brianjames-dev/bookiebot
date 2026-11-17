@@ -678,8 +678,11 @@ def test_cancel_delete_remove_debt_preserve_audit_and_refuse_payments(store, ope
     assert revised["outstandingCents"] == 0 and revised["status"] == lifecycle
     assert store.snapshot("brian")["allocations"] == store.snapshot("hannah")["allocations"] == []
     assert len(store.pending_projections()) == 1
+    assert store.snapshot("brian", include_projection_status=True)["projectionPending"] is True
+    assert "projectionPending" not in store.snapshot("brian"), "Ordinary store snapshots keep their existing shape"
     assert revised["grossCents"] == 10000 and revised["partnerShareCents"] == 4000
     store.mark_projected(revised["id"], revised["version"])
+    assert store.snapshot("brian", include_projection_status=True)["projectionPending"] is False
     with pytest.raises(ReimbursementConflictError, match="no longer"):
         store.command("brian", payment(revised))
     if operation == "cancel":

@@ -24,12 +24,13 @@ export function EditorExpansion({open,children,onCollapsed,retain=false}:{open:b
  // An active row restored by a fold is already open. Ordinary row openings
  // still animate because their mounted expansion starts with open=false.
  const [shown,setShown]=useState(open),[present,setPresent]=useState(open)
+ const visited=useRef(open)
  const current=useRef({open,onCollapsed,notified:!open});current.current.open=open;current.current.onCollapsed=onCollapsed
  const complete=()=>{if(current.current.open||current.current.notified)return;current.current.notified=true;setPresent(false);current.current.onCollapsed?.()}
- useLayoutEffect(()=>{if(!open){setShown(false);if(matchMedia('(prefers-reduced-motion: reduce)').matches)complete();return}current.current.notified=false;setPresent(true);const frame=requestAnimationFrame(()=>setShown(true));return()=>cancelAnimationFrame(frame)},[open])
+ useLayoutEffect(()=>{if(!open){setShown(false);if(matchMedia('(prefers-reduced-motion: reduce)').matches)complete();return}visited.current=true;current.current.notified=false;setPresent(true);const frame=requestAnimationFrame(()=>setShown(true));return()=>cancelAnimationFrame(frame)},[open])
  useEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)'),change=()=>{if(media.matches&&!current.current.open)complete()};media.addEventListener('change',change);return()=>media.removeEventListener('change',change)},[])
  // Hidden/reflowed panes may never emit a transition event. Only presence
  // owners need this fallback; existing Transactions expansions stay unchanged.
  useEffect(()=>{if(open||!onCollapsed)return;const timer=window.setTimeout(complete,440);return()=>window.clearTimeout(timer)},[open,Boolean(onCollapsed)])
- return <div className="bi-expansion sp-inline-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open} onTransitionEnd={event=>{if(event.target===event.currentTarget&&event.propertyName==='grid-template-rows')complete()}}><div className="bi-expansion-clip">{(retain||present||open)&&children}</div></div>
+ return <div className="bi-expansion sp-inline-expansion" data-open={shown&&open} aria-hidden={!open} inert={!open} onTransitionEnd={event=>{if(event.target===event.currentTarget&&event.propertyName==='grid-template-rows')complete()}}><div className="bi-expansion-clip">{(retain&&visited.current||present||open)&&children}</div></div>
 }

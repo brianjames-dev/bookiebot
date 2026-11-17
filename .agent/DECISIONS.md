@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-16 — Fast canonical reimbursement display and retained lazy editors
+
+The phone Balance first controller uses authenticated GET snapshot=1 for SQL-only display reads, with the same private/no-store policy and post-read session recheck. Default GET remains full Sheets recovery for explicit refresh/legacy clients; POST always keeps its original verified writer/projection. Compute pending status from the complete projection backlog, including void/deleted allocations, under the same store lock/cursor; do not derive it only from visible rows. Show a pending snapshot before one automatic recovery attempt per ledger revision, retaining rows and drafts; errors/unknown writes cannot loop or start queued recovery after cancellation. In-flight display reads coalesce, while newer full refreshes queue behind older reads and release their queue identity when starting so later invalidations cannot reuse a stale result. No persistent browser financial cache or new storage/schema.
+
+Row inspection stays enabled and normally colored during reads; financial actions retain the existing read/write/uncertainty guards. The opted-in retain expansion mounts its editor only on first opening, preserving visited drafts afterward; default Transactions presence semantics stay unchanged. Default active/current-month views show every row and month; older settled History keeps paging while already revealed rows stay mounted. History/More options share one compact toolbar and Shared-only header spacing is reduced.
+
 ## 2026-11-16 — Reuse the native split view on canonical reimbursements
 
 The canonical phone Shared flow uses InlineTransactionEditor and NotchedSplitControl directly, including its read-only local Review, instead of styling a second range form. Purchase amount corrections stay in Transactions; the standalone ledger retains its existing total/percentage controller. Optional active gating keeps an embedded review’s outgoing paint intact while exactly one parent route slides. Successful split updates return to details before the existing ChangedMoney/ChangedText feedback; same-revision reads cannot reset an active plan; keep the selected row visible through a zero-debt result. Compact expansion owns the whole row’s bottom divider, with native up/down chevrons and no selection tint or redundant summary heading/X.

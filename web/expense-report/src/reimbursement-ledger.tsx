@@ -111,7 +111,7 @@ export function canReverseLedgerEvent(event: LedgerEvent, owner: string, allocat
 class LedgerRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message) }
 }
-async function request<T>(body?: Command, signal?: AbortSignal): Promise<T> {
+async function request<T>(body?: Command, signal?: AbortSignal, snapshotOnly = false): Promise<T> {
   const controller = new AbortController()
   const abort = () => controller.abort()
   let rejectAbort: () => void = () => {}
@@ -121,7 +121,7 @@ async function request<T>(body?: Command, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) abort()
   const timer = window.setTimeout(abort, 20_000)
   try {
-    return await Promise.race([cancelled, fetch("/app/reimbursements", {
+    return await Promise.race([cancelled, fetch("/app/reimbursements" + (!body && snapshotOnly ? "?snapshot=1" : ""), {
       method: body ? "POST" : "GET", credentials: "same-origin", mode: "same-origin", referrerPolicy: "same-origin",
       cache: "no-store", redirect: "error", signal: controller.signal,
       headers: body ? { "Content-Type": "application/json", "X-BookieBot-App": "1" } : undefined,
@@ -184,14 +184,17 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
   const writeController = useRef<AbortController | null>(null)
   const executing = useRef(false)
   const pending = useRef<{ body: Command; done: (saved: boolean) => void } | null>(null)
-  const load = useCallback(async () => {
+  const readFlight = useRef<{ promise: Promise<boolean> } | null>(null)
+  const queuedRecovery = useRef<Promise<boolean> | null>(null)
+  const recovered = useRef(new Set<string>())
+  const performRead = useCallback(async (recover: boolean) => {
     const id = ++readId.current
     readController.current?.abort()
     const controller = new AbortController()
     readController.current = controller
     setRefreshing(true)
     try {
-      const response = await request<LedgerResponse>(undefined, controller.signal)
+      const response = await request<LedgerResponse>(undefined, controller.signal, balanceFirst && !recover)
       if (!mounted.current || id !== readId.current) return false
       if (response.enabled === false) { setLegacy(true); setSnapshot(null) }
       else { setSnapshot(validate(response)); setLegacy(false) }
@@ -206,10 +209,33 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       setError(failure instanceof LedgerRequestError ? failure.message : "Couldn’t refresh reimbursements. Previously loaded balances may be out of date.")
       return false
     } finally { if (mounted.current && id === readId.current) setRefreshing(false) }
-  }, [matchedReceipt, onRejectAccess])
+  }, [matchedReceipt, onRejectAccess, balanceFirst])
+  const load = useCallback((recover = true): Promise<boolean> => {
+    if (!balanceFirst) return performRead(true)
+    // Retain the fast paint when explicit recovery arrives during its read.
+    // Concurrent display reads share one result; recovery still runs afterward.
+    if (readController.current?.signal.aborted) { readFlight.current = null; queuedRecovery.current = null }
+    const begin = (full: boolean) => {
+      const flight = { promise: Promise.resolve(false) }
+      flight.promise = performRead(full).finally(() => { if (readFlight.current === flight) readFlight.current = null })
+      readFlight.current = flight
+      return flight.promise
+    }
+    const active = readFlight.current
+    if (!active) return begin(recover)
+    if (!recover) return active.promise
+    if (queuedRecovery.current) return queuedRecovery.current
+    const queued = active.promise.then(ok => {
+      if (queuedRecovery.current === queued) queuedRecovery.current = null
+      return ok && mounted.current && !pending.current && !executing.current ? begin(true) : false
+    })
+      .finally(() => { if (queuedRecovery.current === queued) queuedRecovery.current = null })
+    queuedRecovery.current = queued
+    return queued
+  }, [balanceFirst, performRead])
   useEffect(() => {
     mounted.current = true
-    const refresh = () => { if (!pending.current && document.visibilityState === "visible") void load() }
+    const refresh = () => { if (!pending.current && document.visibilityState === "visible") void load(false) }
     window.addEventListener("focus", refresh); window.addEventListener("online", refresh)
     document.addEventListener("visibilitychange", refresh)
     return () => {
@@ -219,7 +245,14 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       document.removeEventListener("visibilitychange", refresh)
     }
   }, [load])
-  useEffect(() => { if (!pending.current) void load() }, [load, refreshKey])
+  useEffect(() => { if (!pending.current) void load(false) }, [load, refreshKey])
+  useEffect(() => {
+    if (!balanceFirst || !snapshot?.projectionPending || busy || uncertain || refreshing || error) return
+    const version = snapshot.resetState ?? snapshot.allocations.map(item => `${item.id}:${item.version}`).join("|")
+    if (recovered.current.has(version)) return
+    recovered.current.add(version)
+    void load()
+  }, [balanceFirst, snapshot, busy, uncertain, refreshing, error, load])
   const pageRefresh = usePageRefresh(matchedReceipt ? "reconcile" : "shared", { refresh: load, disabled: busy || uncertain || refreshing })
   const execute = async () => {
     const change = pending.current
@@ -236,7 +269,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       pending.current = null; setUncertain(false); change.done(true)
       setSnapshot(result); setLegacy(false)
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
-      if (change.body.operation !== "receive_all") await load()
+      if (change.body.operation !== "receive_all") await load(false)
     } catch (failure) {
       if (!mounted.current) return
       if (failure instanceof LedgerRequestError && failure.status < 500) {
@@ -273,7 +306,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
       {!snapshot && !error && <ReportLoading label="Loading reimbursements…"/>}
-      {snapshot && (balanceFirst ? <BalanceFirstReimbursements snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run} aliases={aliases} refresh={() => void load()} />
+      {snapshot && (balanceFirst ? <BalanceFirstReimbursements snapshot={snapshot} disabled={busy || uncertain || refreshing} selectDisabled={busy || uncertain} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
         : <LedgerContents snapshot={snapshot} disabled={busy || uncertain || refreshing} run={run}
           refresh={() => void load()} refreshing={refreshing} />)}
     </CardContent>
