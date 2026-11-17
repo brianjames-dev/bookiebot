@@ -140,6 +140,11 @@ async function main() {
   assert.ok(text(tree.root.findByProps({className:'bb-brand-status'})).includes('Refresh fixture'),'Overview retains its own status')
   await tap(tree,'Transactions');await run(()=>transactionProps.onUpdated(null))
   assert.equal(tree.root.findByProps({className:'bb-brand-status'}).findAllByType('time').length,0,'Cleared transaction access removes the old timestamp')
+  await tap(tree,'Shared')
+  const sharedTime=tree.root.findByProps({className:'bb-brand-status'}).findByType('time').props.dateTime
+  assert.ok(sharedTime,'Reimbursements exposes its own completed-read timestamp')
+  await run(()=>transactionProps.onUpdated(transactionTime+60000))
+  assert.equal(tree.root.findByProps({className:'bb-brand-status'}).findByType('time').props.dateTime,sharedTime,'Transactions freshness cannot replace reimbursement freshness')
   await run(()=>tree.unmount())
   reads={goals:0,reimbursements:0}
   await run(() => { tree = create(shell(report)) })

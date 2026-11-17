@@ -1136,6 +1136,23 @@ async function balanceFirstHiddenRecoveryContracts(){
   await unmount(tree)
 }
 
+async function reimbursementUpdatedTimeContracts(){
+  const initial=deferred(),seen=[];let fail=false,revoked=false,reads=0
+  fixture({get:state=>++reads===1?initial.promise:response(fail?{error:'Read failed'}:revoked?{error:'Sign in again'}:state.snapshot,fail?503:revoked?401:200)})
+  const tree=await mount({balanceFirst:true,onUpdated:value=>seen.push(value)})
+  assert.equal(seen.at(-1),null,'Loading cannot claim a successful update')
+  await act(async()=>{initial.resolve(response(clone(sample)));await flush()})
+  assert.equal(typeof seen.at(-1),'number','A verified reimbursement display read owns its update time')
+  const updated=seen.at(-1),count=seen.length;fail=true
+  await act(async()=>{for(const callback of listeners.window.get('focus'))callback();await flush()})
+  assert.equal(seen.length,count,'A failed refresh cannot advance freshness')
+  assert.equal(seen.at(-1),updated)
+  fail=false;revoked=true
+  await act(async()=>{for(const callback of listeners.window.get('focus'))callback();await flush()})
+  assert.equal(seen.at(-1),null,'Lost access clears the previous owner timestamp')
+  await unmount(tree)
+}
+
 async function balanceFirstFreshReadContracts(){
   const held=deferred(),next=deferred(),last=deferred();let reads=0
   const state=fixture({get:state=>++reads===1?response(clone(state.snapshot)):reads===2?held.promise:reads===3?next.promise:last.promise})
@@ -1183,6 +1200,7 @@ async function lazyRetainedExpansionContracts(){
   await balanceFirstFastLoadingContracts()
   await balanceFirstPendingRecoveryContracts()
   await balanceFirstHiddenRecoveryContracts()
+  await reimbursementUpdatedTimeContracts()
   await balanceFirstFreshReadContracts()
   await splitEditorContracts()
   await matchedReceiptContracts()

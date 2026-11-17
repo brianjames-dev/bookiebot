@@ -166,11 +166,13 @@ function validate(snapshot: LedgerResponse) {
 }
 
 export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number; review?: boolean }
-export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess, balanceFirst = false, aliases }: {
+export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onClose, onRejectAccess, balanceFirst = false, aliases, onUpdated }: {
   fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; onClose?: () => void; onRejectAccess?: (message: string) => void
-  balanceFirst?: boolean; aliases?: Record<string, string>
+  balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void
 }) {
   const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null)
+  useEffect(() => { onUpdated?.(updatedAt) }, [updatedAt, onUpdated])
   const [legacy, setLegacy] = useState(false)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
@@ -196,14 +198,14 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     try {
       const response = await request<LedgerResponse>(undefined, controller.signal, balanceFirst && !recover)
       if (!mounted.current || id !== readId.current) return false
-      if (response.enabled === false) { setLegacy(true); setSnapshot(null) }
-      else { setSnapshot(validate(response)); setLegacy(false) }
+      if (response.enabled === false) { setLegacy(true); setSnapshot(null); setUpdatedAt(null) }
+      else { setSnapshot(validate(response)); setLegacy(false); setUpdatedAt(Date.now()) }
       setSignedOut(false); setError("")
       return true
     } catch (failure) {
       if (!mounted.current || id !== readId.current || controller.signal.aborted) return false
       if (failure instanceof LedgerRequestError && [401, 403].includes(failure.status)) {
-        setSnapshot(null); setLegacy(false); setSignedOut(failure.status === 401)
+        setSnapshot(null); setUpdatedAt(null); setLegacy(false); setSignedOut(failure.status === 401)
         if (matchedReceipt) onRejectAccess?.(failure.message)
       }
       setError(failure instanceof LedgerRequestError ? failure.message : "Couldn’t refresh reimbursements. Previously loaded balances may be out of date.")
@@ -267,7 +269,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       const result = validate(await request<LedgerResponse>(change.body, controller.signal))
       if (!mounted.current) return
       pending.current = null; setUncertain(false); change.done(true)
-      setSnapshot(result); setLegacy(false)
+      setSnapshot(result); setLegacy(false); setUpdatedAt(Date.now())
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
       if (change.body.operation !== "receive_all") await load(false)
     } catch (failure) {
@@ -275,7 +277,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       if (failure instanceof LedgerRequestError && failure.status < 500) {
         pending.current = null; setUncertain(false)
         if (matchedReceipt && [401, 403].includes(failure.status)) { setSnapshot(null); onRejectAccess?.(failure.message) }
-        if (failure.status === 401) { setSnapshot(null); setSignedOut(true); change.done(false) }
+        if (failure.status === 401) { setSnapshot(null); setUpdatedAt(null); setSignedOut(true); change.done(false) }
         if (failure.status === 409) { change.done(false); await load() }
         setError(failure.message)
       } else {

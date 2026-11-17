@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-17 — Reimbursement detail ownership and independent freshness
+
+Keep one stable portal container per row, moving that DOM target between the compact inline anchor and a dedicated open-DUO right-pane sibling. Do not render right-side details inside the left scroll/paint clip or change portal targets and remount financial controllers on folds. Pass value-motion context and feedback through the portal; open selection alone uses Transactions' native panel highlight. Reimbursements owns its successful snapshot/command timestamp through the existing AppUpdatedTime masthead pattern; a failed read does not advance it, and revoked access clears it. Proposed options/reset-history layouts remain drafts until selected. No financial protocol, writer, storage or schema change.
+
 ## 2026-11-16 — Fast canonical reimbursement display and retained lazy editors
 
 The phone Balance first controller uses authenticated GET snapshot=1 for SQL-only display reads, with the same private/no-store policy and post-read session recheck. Default GET remains full Sheets recovery for explicit refresh/legacy clients; POST always keeps its original verified writer/projection. Compute pending status from the complete projection backlog, including void/deleted allocations, under the same store lock/cursor; do not derive it only from visible rows. Show a pending snapshot before one automatic recovery attempt per ledger revision, retaining rows and drafts; errors/unknown writes cannot loop or start queued recovery after cancellation. In-flight display reads coalesce, while newer full refreshes queue behind older reads and release their queue identity when starting so later invalidations cannot reuse a stale result. No persistent browser financial cache or new storage/schema.
