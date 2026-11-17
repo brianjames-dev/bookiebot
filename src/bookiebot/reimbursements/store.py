@@ -335,7 +335,7 @@ class ReimbursementStore:
                        (_json(value), _now(), allocation_id))
             return self._payload(self._row(db, allocation_id))
 
-    def snapshot(self, owner: str, *, include_inactive: bool = False) -> dict[str, Any]:
+    def snapshot(self, owner: str, *, include_inactive: bool = False, include_projection_status: bool = False) -> dict[str, Any]:
         owner = _owner(owner)
         with self.access.connect(write=True) as db:
             self._lock(db)
@@ -345,10 +345,18 @@ class ReimbursementStore:
             allocations = {row["id"]: row for row in rows}
             events = db.execute("""SELECT e.* FROM app_reimbursement_events e JOIN app_reimbursement_allocations a ON a.id = e.allocation_id
                                 WHERE a.payer_owner = ? OR a.partner_owner = ? ORDER BY e.created_at, e.id""", (owner, owner)).fetchall()
-            return {"allocations": [self._payload(row) for row in rows],
+            result = {"allocations": [self._payload(row) for row in rows],
                     "events": [self._event_payload(event, allocations[event["allocation_id"]]) for event in events
                                if event["allocation_id"] in allocations], "currency": "USD",
                     "resetState": self._reset_state(db), "resets": self._resets(db)}
+            if include_projection_status:
+                # Inactive corrections still need their source/mirror repair.
+                # Read this under the same lock/cursor without loading history
+                # payloads or making any Sheets request.
+                result["projectionPending"] = db.execute(
+                    "SELECT 1 FROM app_reimbursement_allocations WHERE projected_version < version LIMIT 1"
+                ).fetchone() is not None
+            return result
 
     def revise_allocation(self, owner: str, allocation_id: str, expected_version: int,
                           updates: dict[str, Any], *, operation: str) -> dict[str, Any]:

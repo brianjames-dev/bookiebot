@@ -1123,6 +1123,19 @@ async function balanceFirstPendingRecoveryContracts(){
   await unmount(tree)
 }
 
+async function balanceFirstHiddenRecoveryContracts(){
+  const state=fixture();state.snapshot.allocations=[];state.snapshot.events=[];state.snapshot.projectionPending=true;state.snapshot.resetState='inactive-revision-1'
+  const tree=await mount({balanceFirst:true}),full=()=>state.calls.filter(call=>call.url==='/app/reimbursements'&&!call.body)
+  assert.equal(full().length,1,'Hidden pending corrections recover even when the visible list is empty')
+  assert.ok(text(tree.root).includes('Recorded. Expense sheets are still syncing.'))
+  state.snapshot.resetState='inactive-revision-2'
+  await act(async()=>{for(const callback of listeners.window.get('focus'))callback();await flush()})
+  assert.equal(full().length,2,'An advanced complete cursor recovers another hidden correction')
+  await act(async()=>{for(const callback of listeners.window.get('focus'))callback();await flush()})
+  assert.equal(full().length,2,'Unchanged inactive work remains bounded')
+  await unmount(tree)
+}
+
 async function balanceFirstFreshReadContracts(){
   const held=deferred(),next=deferred(),last=deferred();let reads=0
   const state=fixture({get:state=>++reads===1?response(clone(state.snapshot)):reads===2?held.promise:reads===3?next.promise:last.promise})
@@ -1169,6 +1182,7 @@ async function lazyRetainedExpansionContracts(){
   await balanceFirstZeroShareRetentionContracts()
   await balanceFirstFastLoadingContracts()
   await balanceFirstPendingRecoveryContracts()
+  await balanceFirstHiddenRecoveryContracts()
   await balanceFirstFreshReadContracts()
   await splitEditorContracts()
   await matchedReceiptContracts()

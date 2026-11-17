@@ -98,6 +98,38 @@ async def test_snapshot_flag_cannot_skip_command_projection_or_duplicate_receipt
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("operation,lifecycle", [("cancel", "void"), ("delete", "deleted")])
+async def test_fast_snapshot_reports_inactive_projection_backlog(client, monkeypatch, operation, lifecycle):
+    connect(client)
+    original = client.allocation
+    client.store.mark_projected(original["id"], original["version"])
+    pending = client.store.revise_allocation("brian", original["id"], original["version"], {"lifecycle": lifecycle}, operation=operation)
+    calls = []
+
+    def recover(store):
+        calls.append(store)
+        for item in store.pending_projections():
+            store.mark_projected(item["id"], item["version"])
+        return True
+
+    monkeypatch.setattr(projection, "sync_pending", recover)
+    first = await client.http.get("/app/reimbursements?snapshot=1")
+    data = await first.json()
+    assert first.status == 200 and data["allocations"] == [] and data["events"] == []
+    assert data["projectionPending"] is True, "Inactive corrections still require recovery"
+    assert calls == [], "Detecting the complete backlog remains SQL-only"
+    assert client.store.get_allocation(original["id"])["projectedVersion"] < pending["version"]
+    full = await client.http.get("/app/reimbursements")
+    synced = await full.json()
+    assert full.status == 200 and synced["projectionPending"] is False
+    assert synced["resetState"] != data["resetState"], "The existing complete cursor includes inactive projection progress"
+    assert calls == [client.store]
+    after = client.store.get_allocation(original["id"])
+    assert after["projectedVersion"] == pending["version"]
+    assert all(after[key] == original[key] for key in ("grossCents", "payerShareCents", "partnerShareCents", "settledCents"))
+
+
+@pytest.mark.asyncio
 async def test_native_split_income_preview_and_confirm_use_same_exact_cents(client):
     from bookiebot.sheets.collaboration import split_amounts
     connect(client)
