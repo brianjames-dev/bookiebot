@@ -246,5 +246,28 @@ const cancel=async()=>{if(button('Back'))await click('Back');await click('Cancel
  assert.equal(undoPresentationTarget([prior],[restored],prior.id,{...summary,operation:'undo',after:row.fields}),restored.id)
  assert.equal(undoPresentationTarget([prior],[restored,{...restored,id:'identical-twin'}],prior.id,{...summary,operation:'undo',after:row.fields}),undefined)
  for(const {options}of requests){assert.equal(options.referrerPolicy,'same-origin');assert.equal(options.mode,'same-origin');assert.equal(options.credentials,'same-origin');assert.equal(options.headers['X-BookieBot-App'],'1')}
+ const resource=load(path.resolve('web/expense-report/src/reimbursement-display-state.ts')).reimbursementDisplay
+ await run(()=>resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:false}))
+ await run(()=>{tree=Renderer.create(fixture())});await tick();await respond(listing())
+ await run(()=>{resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:true});win.dispatchEvent({type:'bookiebot:reimbursements-changed'})});await tick()
+ assert.equal(new URL(latest().url,'https://bookie.test').searchParams.get('fresh'),'','Pending settlement uses the fast canonical overlay')
+ await respond(listing())
+ const beforeProjected=requests.length
+ await run(()=>resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:false}));await tick()
+ assert.equal(requests.length,beforeProjected+1)
+ assert.equal(new URL(latest().url,'https://bookie.test').searchParams.get('fresh'),'1','Projection completion discovers new receipt source rows exactly once')
+ await respond(listing([row,{...row,id:'new-receipt',title:'New receipt',amountCents:500}]))
+ assert.equal(tree.root.findAllByType(ActionFixture).length,2,'Newly projected receipts become visible')
+ const projectedReads=requests.length
+ await run(()=>resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:false}));await tick();assert.equal(requests.length,projectedReads,'Repeated canonical snapshots do not repeat the source refresh')
+ await run(()=>{resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:true});win.dispatchEvent({type:'bookiebot:reimbursements-changed',detail:{operation:'queue_undo'}})});await tick();await respond(listing())
+ await run(()=>resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:false}));await tick()
+ assert.equal(new URL(latest().url,'https://bookie.test').searchParams.get('fresh'),'','Completed Undo restores SQL capabilities without waiting on a source read')
+ await respond(listing())
+ await run(()=>{resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:true});win.dispatchEvent({type:'bookiebot:reimbursements-changed',detail:{operation:'receive_all'}});win.dispatchEvent({type:'bookiebot:reimbursements-changed',detail:{operation:'queue_undo'}})});await tick();await respond(listing())
+ await run(()=>resource.publish('Brian',{ownerKey:'brian',allocations:[],events:[],projectionPending:false}));await tick()
+ assert.equal(new URL(latest().url,'https://bookie.test').searchParams.get('fresh'),'1','A later inverse cannot discard another pending forward receipt refresh')
+ await respond(listing())
+ await run(()=>{tree.unmount();resource.clear('Brian')})
  console.log('Inline transaction review/cancel, combined Move, split cents/pie shortcut, explicit confirmation, immutable recovery, fresh reads, timed Undo handoff search races and Duo right-pane/fold/graph/draft recovery passed')
 })().catch(error=>{console.error(error);process.exitCode=1})

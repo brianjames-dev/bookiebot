@@ -290,3 +290,21 @@ def test_receipt_identity_uses_exact_named_range_and_category_column():
     events = [{'id': identifier, 'allocationId': 'a', 'debtorOwner': 'hannah', 'date': '2026-11-01'} for identifier in ('r1', 'r2', 'unknown')]
     assert receipt_addresses(client, 'isolated', 'hannah', 2026, allocations, events) == {('November', 3, 0): ('a', 'r1'), ('November', 3, 8): ('a', 'r2')}
     assert receipt_addresses(client, 'isolated', 'brian', 2026, allocations, events) == {}
+
+
+def test_warm_undo_restores_source_split_capabilities(purchase, monkeypatch):
+    from unit_tests.reimbursements.test_store import sync_allocations
+    saved, ledger, allocation = purchase
+    paid = ledger.command('brian', payment(allocation, 100))
+    sync_allocations(ledger)
+    paid_row = managed(listing(purchase))
+    assert not paid_row['capabilities']['split']
+    ledger.command('brian', command('reverse_operation', operationId=paid['operationId'], expectedState=ledger.snapshot('brian')['resetState']))
+    sync_allocations(ledger)
+    monkeypatch.setattr(tx, 'read_workbook_tabs', lambda *a, **k: pytest.fail('Restoring split controls must not require Sheets'))
+    restored = managed(tx.listing(B, {'month': saved.month, 'view': 'daily', 'scope': 'spending'}))
+    assert restored['repayment']['canEdit']
+    assert restored['capabilities']['split'] and restored['capabilities']['cancel_split']
+    assert restored['reasons']['split'] == ''
+    assert restored['displayAmountCents'] == 300
+    assert not any(key.startswith('_') for key in restored)

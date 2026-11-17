@@ -127,6 +127,7 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
   const [review, setReview] = useState<Review | null>(null), [reviewBody, setReviewBody] = useState<Change | null>(null)
   const [busy, setBusy] = useState(false), [result, setResult] = useState<Result | null>(null), [pending, setPending] = useState<(Change & {requestId: string; reviewVersion: string}) | null>(null)
   const [revision, setRevision] = useState(0)
+  const projectionRefresh=useRef<false|'source'|'canonical'>(false)
   const [needsFresh,setNeedsFresh]=useState(false)
   const [announcement,setAnnouncement]=useState('')
   const inFlight = useRef(false), generation = useRef(0), mounted = useRef(true)
@@ -210,11 +211,20 @@ export function TransactionsScreen({active, ownerName, initialMonth, aliases, he
     },search?250:0)
     return()=>{live=false;window.clearTimeout(timer);controller.abort()}
   },[active,historyEnabled,historyKey])
+  // Warm SQL overlays keep Undo responsive. Once projection finishes, one
+  // source refresh also discovers newly created receipt rows, not just changes
+  // to rows already present in the cache.
+  useEffect(()=>{
+    if(!projectionRefresh.current||reimbursementDisplay.read(ownerName)?.projectionPending)return
+    freshNext.current=projectionRefresh.current==='source';projectionRefresh.current=false;setRevision(value=>value+1)
+  },[ledgerDisplay,revision,ownerName])
   useEffect(() => {
     let live=true
-    const refresh = () => {
+    const refresh = (event:Event) => {
       if(ownChange.current)return
-      freshNext.current=false; setRevision(value => value + 1)
+      const operation=(event as CustomEvent<{operation?:string}>).detail?.operation
+      const canonicalOnly=['queue_undo','reverse_operation','reverse','reset','undo_reset','redo_reset'].includes(operation??'')
+      projectionRefresh.current=projectionRefresh.current==='source'||!canonicalOnly?'source':'canonical';freshNext.current=false; setRevision(value => value + 1)
       // Bills can finish a canonical request recovered by this retained tab.
       // Verify that exact owner-scoped receipt before releasing its old guard;
       // a successful change elsewhere is not itself proof of this outcome.

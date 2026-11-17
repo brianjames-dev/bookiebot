@@ -298,7 +298,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       setSnapshot(result); setLegacy(false); setUpdatedAt(Date.now())
       setImmediate(null)
       feedback.acknowledge(change.body, result)
-      window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
+      window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed",{detail:{operation:change.body.operation}}))
       // The command already contains the complete authoritative snapshot. Do
       // not delay an immediately clickable Undo behind a duplicate display read.
       if (!balanceFirst && change.body.operation !== "receive_all") await load(false)

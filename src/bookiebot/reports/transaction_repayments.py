@@ -28,8 +28,12 @@ def repayment_details(allocation: dict[str, Any], events: list[dict[str, Any]], 
 
 
 def attach_repayment(row: dict[str, Any], details: dict[str, Any]) -> None:
+    row.setdefault("_repaymentCapabilities", dict(row["capabilities"]))
+    row.setdefault("_repaymentReasons", dict(row["reasons"]))
+    changed = row.get("repayment") != details
     row["repayment"] = details
-    row["version"] = hashlib.sha256(json.dumps([row["version"], details], sort_keys=True).encode()).hexdigest()
+    if changed:
+        row["version"] = hashlib.sha256(json.dumps([row["version"], details], sort_keys=True).encode()).hexdigest()
     if not details["canEdit"]:
         for operation in ("split", "cancel_split"):
             row["capabilities"][operation] = False
@@ -76,7 +80,7 @@ def display_rows(rows: list[dict[str, Any]], snapshot: dict[str, Any], month: st
             continue
         if original.get('contextOnly') and allocation['outstandingCents'] <= 0:
             continue
-        row = {**original, 'canonicalAllocationVersion': allocation['version'], 'capabilities': dict(original['capabilities']), 'reasons': dict(original['reasons'])}
+        row = {**original, 'canonicalAllocationVersion': allocation['version'], 'capabilities': dict(original.get('_repaymentCapabilities', original['capabilities'])), 'reasons': dict(original.get('_repaymentReasons', original['reasons']))}
         event_id = row.get('canonicalEventId')
         if event_id:
             event = events.get(event_id)
@@ -93,7 +97,7 @@ def display_rows(rows: list[dict[str, Any]], snapshot: dict[str, Any], month: st
         if snapshot.get('displayPending'):
             details = {**details, 'canEdit': False, 'editReason': 'This entry is being updated.'}
             row['capabilities'] = {key: False for key in row['capabilities']}
-        if not event_id and details != row.get('repayment'):
+        if not event_id:
             attach_repayment(row, details)
         result.append(row)
     # A cached fully-paid purchase has no unpaid context row. Restore that
