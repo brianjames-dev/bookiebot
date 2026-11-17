@@ -38,7 +38,7 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
      if(width>800){const dock=await page.locator('.bb-navigation-pane').boundingBox(),more=await page.locator('.sr-more>summary').boundingBox();assert(more.y+more.height<=dock.y-5,'Summary actions fit above the dock');}
      await page.screenshot({path:path.join(output,`${engine.name()}-${width}-${dark?'dark':'light'}-${owner}-summary.png`)});
      await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));
-     const detail=page.locator('.sr-detail-host[data-open=true]');await detail.getByRole('heading',{name:'PG&E',exact:true}).waitFor();
+     const detail=page.locator('.sr-detail-host[data-open=true]');await detail.getByRole('heading',{name:'Reimbursement',exact:true}).waitFor();
      assert.match(await detail.innerText(),/Purchase total.*\$107.28/s);
      if(width>800){const rect=await detail.boundingBox(),overlay=await page.locator('.bb-page').first().evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--bb-duo-overlay'))||0);assert(rect.x>width*.48,'Detail belongs to usable right pane');assert(rect.x+rect.width<=width-overlay-16,'Native status strip remains unused');}
      await press(page,detail.getByRole('button',{name:'Record received',exact:true}).or(detail.getByRole('button',{name:'Record sent payment',exact:true})));

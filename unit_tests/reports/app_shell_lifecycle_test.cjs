@@ -41,6 +41,7 @@ function load(file) {
     if (name === './transaction-editor-workspace') return { EditorScenes: ({children}) => children, EditorExpansion: ({open,children}) => open ? children : null }
     if(name==='./bill-checkin')return {BillCheckin:()=>null}
     if (name.endsWith('.css')) return {}
+    if (name === './transaction-step-motion') return {StepMotion:({review,edit,confirm})=>React.createElement('div',null,React.createElement('div',{'aria-hidden':review,inert:review},edit),React.createElement('div',{'aria-hidden':!review,inert:!review},confirm))}
     if (name === 'konsta/react') return konsta.exports
     if (name === 'react-dom') return {...req(name),createPortal:(children,target)=>{assert.equal(target,doc.body,'Duo dock portals to the viewport outside page content');return children}}
     if (name === 'react' && file.endsWith('/expense-app-shell.tsx')) return {...React,startTransition:action=>holdPageTransitions?pageTransitions.push(action):React.startTransition(action)}

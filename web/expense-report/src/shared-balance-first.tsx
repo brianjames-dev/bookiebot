@@ -1,10 +1,12 @@
 import { useState, type CSSProperties } from "react"
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronRight, X } from "lucide-react"
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CheckCheck, ChevronRight, Clock3 } from "lucide-react"
 import { TransactionIcon } from "./daily-transactions"
 import { transactionCategory, type DailyTransaction } from "./transaction-identity"
 import { EditorExpansion, EditorScenes } from "./transaction-editor-workspace"
 import { useAppWorkStatus } from "./app-work-guard"
 import { useReimbursementPage } from "./reimbursement-pagination"
+import { useAppNavigation } from "./app-navigation"
+import { RepaymentAllocation } from "./repayment-allocation"
 import { canReverseLedgerEvent, defaultOffsetEntries, IncomingPayment, LedgerRow, ledgerTotals, ResetEditor, ResetHistory,
   type LedgerAllocation, type LedgerSnapshot, type Run } from "./reimbursement-ledger"
 
@@ -39,6 +41,7 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
   snapshot: LedgerSnapshot; disabled: boolean; run: Run; aliases?: Record<string, string>; refresh: () => void
 }) {
   const { allocations, events, ownerKey } = snapshot
+  const wide = useAppNavigation()?.duoLandscape === true
   const [selected, setSelected] = useState("")
   const [history, setHistory] = useState(false)
   const [scene, setScene] = useState<Scene>("summary")
@@ -85,9 +88,9 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
   const cash = paymentReview ? Math.abs(paymentReview.to - paymentReview.from) : 0
   const sent = paymentReview ? paymentReview.from > paymentReview.to : false
   const dateValid = Boolean(sharedExpenseDate(date)) && date >= (paymentReview?.min ?? "1900-01-01") && date <= today()
-  const primary = (label: string, click: () => void, off = false) => <button type="button" className="sr-primary" disabled={locked || off} onClick={click}>{label}<ChevronRight /></button>
-  const facts = (entries: [string, string][]) => <dl className="sr-facts">{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-  const flow = <div className="sr-editor" data-stage={scene}>
+  const primary = (label: string, click: () => void, off = false) => <button type="button" className={scene === "summary" ? "sr-primary" : "bi-primary"} disabled={locked || off} onClick={click}>{label}{scene === "summary" && <ChevronRight />}</button>
+  const facts = (entries: [string, string][]) => <dl className="rp-payment-summary">{entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+  const flow = <div className={`sr-editor${scene !== "summary" ? ` bi-editor sr-settlement-editor${!wide ? " sp-inline-editor" : ""}` : ""}`} data-stage={scene}>
     <EditorScenes scene={scene}>
       {scene === "offset" && review ? <>
         <div className="sr-editor-heading"><h2>Offset balances</h2></div>
@@ -110,7 +113,7 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
         <div className="sr-editor-heading"><h2>{sent ? "Record sent payment" : "Record money received"}</h2></div>
         <ol className="sr-steps"><li>1 · Offset</li><li data-current="true">2 · Record payment</li><li>3 · Settle</li></ol>
         <div className="sr-transfer-path"><span className="sr-person">{sent ? person(ownerKey)[0] : partner[0]}</span>{sent ? "You" : partner}<ArrowUpRight/>{sent ? partner : "You"}<span className="sr-person sr-partner">{sent ? partner[0] : person(ownerKey)[0]}</span></div>
-        <div className="sr-hero" data-side={sent ? "from" : "to"}><span className="sr-eyebrow">{sent ? `Sent to ${partner}` : `Received from ${partner}`}</span><strong>{money(cash)}</strong></div>
+        <div className="rp-balance"><span className="rp-person-name">{sent ? `Sent to ${partner}` : `Received from ${partner}`}</span><strong className="rp-balance-amount">{money(cash)}</strong></div>
         <label className="sr-date">Payment date<input type="date" required min={paymentReview.min} max={today()} value={date} disabled={disabled} onChange={event => {
           if (!review) setReview(paymentReview)
           setDate(event.target.value)
@@ -138,20 +141,20 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
       </>}
     </EditorScenes>
   </div>
-  return <div className="sr-balance-first" data-detail-open={Boolean(selected)} data-flow-open={scene !== "summary"}>
+  return <div className="sr-balance-first bi-product" data-detail-open={Boolean(selected)} data-flow-open={scene !== "summary"}>
     {snapshot.projectionPending && <div className="sr-sync bb-ledger-message" role="status"><p>Recorded. Expense sheets are still syncing.</p><button disabled={disabled} onClick={refresh}>Refresh</button></div>}
     {snapshot.error && <p className="sr-sync bb-ledger-note" role="status">{snapshot.error}</p>}
     <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope"><span>{history ? "All reimbursement history" : active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span><button type="button" disabled={disabled || scene !== "summary"} onClick={() => { setHistory(!history); setSelected("") }}>{history ? "Back" : "History"}</button></div>
       {!shown.length && <p className="bb-ledger-empty">No reimbursements for this month.</p>}
-      {page.visible.map(group => <BalanceMonth key={group.key} group={group} selected={selected} onSelect={id => { if (!disabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases}/>)}
+      {page.visible.map(group => <BalanceMonth key={group.key} group={group} selected={selected} onSelect={id => { if (!disabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide}/>)}
       {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all months</button>}
     </section>
-    <aside className="sr-right" aria-label="Shared balance and settlement">{flow}</aside>
+    <aside className="sr-right" aria-label="Shared balance and settlement" aria-hidden={wide && Boolean(selected) || undefined} inert={wide && Boolean(selected) || undefined}>{flow}</aside>
   </div>
 }
 
-function BalanceMonth({ group, selected, onSelect, disabled, snapshot, reversibleIds, run, aliases }: {
-  group: { key: string; items: LedgerAllocation[] }; selected: string; onSelect: (id: string) => void; disabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>
+function BalanceMonth({ group, selected, onSelect, disabled, snapshot, reversibleIds, run, aliases, wide }: {
+  group: { key: string; items: LedgerAllocation[] }; selected: string; onSelect: (id: string) => void; disabled: boolean; snapshot: LedgerSnapshot; reversibleIds: Set<string>; run: Run; aliases?: Record<string, string>; wide: boolean
 }) {
   const page = useReimbursementPage(group.items, item => item.id)
   return <section className="sr-month" aria-label={group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}><h3>{group.key === "undated" ? "Undated" : dateLabel(group.key + "-01", true)}</h3>
@@ -160,17 +163,23 @@ function BalanceMonth({ group, selected, onSelect, disabled, snapshot, reversibl
       const ownEvents = snapshot.events.filter(event => event.allocationId === item.id)
       const opened = selected === item.id
       const offset = ownEvents.filter(event => event.kind === "offset" && event.status === "confirmed").reduce((sum, event) => sum + event.amountCents, 0)
+      const method = item.method === "income" ? "By income" : item.method === "equal" ? "50/50" : item.method === "fronted" ? "Fronted" : "Custom split"
+      const pendingCents = ownEvents.filter(event => event.status === "pending").reduce((sum, event) => sum + event.amountCents, 0)
+      const status = <span className="rp-status"><Clock3/>{!item.outstandingCents ? "Settled" : pendingCents ? "Payment reported" : item.settledCents ? "Partly repaid" : "Awaiting repayment"}</span>
+      const balance = <div className="rp-balance"><span className="rp-person-name">{isPayer ? `${person(item.partnerOwner)} owes you` : `You owe ${person(item.payerOwner)}`}</span><strong className="rp-balance-amount">{money(item.outstandingCents)}</strong>{wide && status}</div>
+      const detailSummary = <>
+        <div className="rp-purchase"><TransactionIcon entry={entry} aliases={aliases} eager/><div className="rp-merchant"><strong>{entry.location || entry.item || entry.category}</strong><span>{category.label} · {dateLabel(item.expenseDate)}</span></div></div>
+        {balance}{!wide && <div className="rp-inline-status">{status}<span>{method}</span></div>}
+        <RepaymentAllocation payerName={person(item.payerOwner)} partnerName={person(item.partnerOwner)} payerCents={item.payerShareCents} partnerCents={item.partnerShareCents} incoming={isPayer} method={wide && method}/>
+        <dl className="rp-payment-summary" aria-label="Purchase and repayments"><div><dt>Purchase total</dt><dd>{money(item.grossCents)}</dd></div><div><dt>Cash {isPayer ? "received" : "paid"}</dt><dd>{money(Math.max(0, item.settledCents - offset))}</dd></div>
+          {offset > 0 && <div><dt>Settled by offset</dt><dd>{money(offset)}</dd></div>}{Boolean(item.clearedCents) && <div><dt>Cleared without payment</dt><dd>{money(item.clearedCents!)}</dd></div>}</dl>
+      </>
       return <div className="sr-row-group" key={item.id}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={disabled} data-selected={opened} onClick={() => onSelect(item.id)}>
         <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
         <span className="sr-row-value"><strong>{money(item.outstandingCents || item.partnerShareCents)}</strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronRight className="sr-row-chevron"/>
       </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened} retain>
-        <div className="sr-detail sr-editor"><div className="sr-editor-heading"><h2>{item.item || item.category}</h2><button className="sr-icon-button" disabled={disabled} aria-label="Close reimbursement details" onClick={() => onSelect(item.id)}><X/></button></div>
-          <span className="sr-eyebrow">{dateLabel(item.expenseDate)} · {category.label} · {item.method === "income" ? "By income" : item.method === "equal" ? "50/50" : item.method === "fronted" ? "Fronted" : "Custom split"}</span>
-          <div className="sr-detail-amount" data-side={isPayer ? "to" : "from"}>{money(item.outstandingCents)}<span>{item.outstandingCents ? isPayer ? `${person(item.partnerOwner)} owes you` : `You owe ${person(item.payerOwner)}` : "Settled"}</span></div>
-          <div className="sr-people"><div><span className="sr-person">{person(item.payerOwner)[0]}</span><span>{person(item.payerOwner)}<small>Pays the purchase</small></span></div><div><span className="sr-person sr-partner">{person(item.partnerOwner)[0]}</span><span>{person(item.partnerOwner)}<small>Repays their share</small></span></div></div>
-          <dl className="sr-facts"><div><dt>Purchase total</dt><dd>{money(item.grossCents)}</dd></div><div><dt>Your share</dt><dd>{money(isPayer ? item.payerShareCents : item.partnerShareCents)}</dd></div><div><dt>Cash {isPayer ? "received" : "paid"}</dt><dd>{money(Math.max(0, item.settledCents - offset))}</dd></div><div><dt>Offset</dt><dd>{money(offset)}</dd></div>{Boolean(item.clearedCents) && <div><dt>Cleared without payment</dt><dd>{money(item.clearedCents!)}</dd></div>}</dl>
-          <LedgerRow allocation={item} events={ownEvents} reversibleIds={reversibleIds} owner={snapshot.ownerKey} open={opened} onOpenChange={() => onSelect(item.id)} disabled={disabled} run={run} detailOnly/>
-        </div></EditorExpansion></div>
+        <LedgerRow allocation={item} events={ownEvents} reversibleIds={reversibleIds} owner={snapshot.ownerKey} open={opened} onOpenChange={() => onSelect(item.id)} disabled={disabled} run={run} detailOnly detailSummary={detailSummary} compact={!wide}/>
+      </EditorExpansion></div>
       </div>
     })}
     {page.hasMore && <button className="bb-reimbursement-load-more" type="button" onClick={page.loadAll}>Load all expenses</button>}
