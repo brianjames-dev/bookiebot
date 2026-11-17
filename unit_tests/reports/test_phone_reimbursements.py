@@ -509,3 +509,29 @@ async def test_split_editor_authenticates_payer_and_replays_combined_change(clie
     assert (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).status == 200
     assert client.store.snapshot("brian")["events"] == []
     assert client.store.get_allocation(changed["id"])["version"] == changed["version"]
+
+
+@pytest.mark.asyncio
+async def test_timed_operation_undo_uses_authenticated_canonical_projection(client, monkeypatch):
+    def recover(store):
+        for row in store.pending_projections():
+            store.mark_projected(row['id'], row['version'])
+        return True
+    monkeypatch.setattr(projection, 'sync_pending', recover)
+    connect(client)
+    recover(client.store)
+    received = await client.http.post('/app/reimbursements', json=payment(client), headers=HEADERS)
+    assert received.status == 200
+    receipt = await received.json()
+    body = {'operation': 'reverse_operation', 'requestId': uuid4().hex,
+            'operationId': receipt['operationId'], 'expectedState': receipt['resetState']}
+    response = await client.http.post('/app/reimbursements', json=body, headers=HEADERS)
+    assert response.status == 200
+    restored = await response.json()
+    assert restored['projectionPending'] is False
+    assert restored['allocations'][0]['settledCents'] == 0
+    assert restored['events'][0]['status'] == 'reversed'
+    replay = await client.http.post('/app/reimbursements', json=body, headers=HEADERS)
+    assert replay.status == 200
+    assert (await replay.json())['operationId'] == restored['operationId']
+    assert len(client.store.snapshot('brian')['events']) == 1
