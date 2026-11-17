@@ -33,12 +33,18 @@ function load(file) {
   const exports = {}; modules.set(file, exports)
   const localRequire = name => {
     if (name.endsWith(".css")) return {}
+    if (name === "./transaction-editor-workspace") return {
+      EditorScenes: ({children}) => children,
+      EditorExpansion: ({open,retain,children}) => React.createElement("div", {"aria-hidden":!open,inert:!open}, (retain||open) ? children : null),
+    }
     if (!name.startsWith(".")) return frontendRequire(name)
     const base = path.resolve(path.dirname(file), name)
     if (name.endsWith(".json")) return JSON.parse(fs.readFileSync(base, "utf8"))
     return load([base + ".tsx", base + ".ts"].find(fs.existsSync))
   }
-  const { outputText } = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: {
+  const baseline = file.endsWith("/reimbursement-ledger.tsx") ? process.env.BOOKIEBOT_LEDGER_BASELINE : file.endsWith("/shared-balance-first.tsx") ? process.env.BOOKIEBOT_SHARED_BASELINE : undefined
+  const source = fs.readFileSync(baseline || file, "utf8")
+  const { outputText } = ts.transpileModule(source, { compilerOptions: {
     target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
   } })
   vm.runInNewContext(outputText, { exports, require: localRequire, AbortController, Error, Date: FixtureDate,
@@ -990,7 +996,39 @@ async function splitEditorContracts() {
   await unmount(tree)
 }
 
+async function balanceFirstRejectedCommandContracts() {
+  for (const operation of ["offset","receive_all","report_all"]) for (const status of [401,409]) {
+    const state = fixture({post:body=>{assert.equal(body.operation,operation);return response({error:"Rejected review"},status)}})
+    state.snapshot.allocations = operation === "offset" ? [sample.allocations[0],sample.allocations[2]] : [sample.allocations[operation === "receive_all" ? 0 : 2]]
+    state.snapshot.events=[]
+    const tree=await mount({balanceFirst:true})
+    await tap(button(tree.root,operation === "offset" ? "Offset & settle" : operation === "receive_all" ? "Record received" : "Record sent payment"))
+    await tap(button(tree.root,operation === "offset" ? "Confirm offset" : operation === "receive_all" ? "Confirm received" : "Record sent"))
+    assert.equal(writes(state).length,1)
+    assert.ok(!text(tree.root).includes("Balances updated")&&!text(tree.root).includes("Payment reported"),`${status} ${operation} cannot display success or invent a receipt`)
+    assert.equal(button(tree.root,"View reimbursements"),undefined)
+    assert.equal(button(tree.root,"Confirm received"),undefined,"Rejected offset does not progress to the cash step")
+    await unmount(tree)
+  }
+}
+
+async function balanceFirstRetainedDraftContracts() {
+  const state=fixture();state.snapshot.allocations=[sample.allocations[0]];state.snapshot.events=[]
+  const tree=await mount({balanceFirst:true})
+  const rowButton=()=>tree.root.findAllByType('button').find(node=>node.props.className==='sr-row-main')
+  const detail=()=>tree.root.findAll(node=>node.props.className==='sr-detail-host'&&node.props['data-open']===true)[0]
+  await tap(rowButton());await tap(button(detail(),'Record received'));await fill(tree,'Amount ($)','12.34');await fill(tree,'Note','Retained payment')
+  await tap(button(detail(),'Close reimbursement details'))
+  await act(async()=>{for(const [id,timer]of [...timers])if(timer.delay===320){timers.delete(id);timer.callback()}await flush()})
+  await tap(rowButton())
+  assert.equal(form(tree).findAllByType('input')[0].props.value,'12.34','Both expansion levels retain the payment draft after closure completes')
+  assert.equal(form(tree).findAllByType('input')[2].props.value,'Retained payment')
+  await unmount(tree)
+}
+
 ;(async () => {
+  await balanceFirstRejectedCommandContracts()
+  await balanceFirstRetainedDraftContracts()
   await splitEditorContracts()
   await matchedReceiptContracts()
   await bulkReceiveContracts()

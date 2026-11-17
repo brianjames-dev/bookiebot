@@ -99,7 +99,8 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
         <div className="bi-editor-footer"><button className="bi-cancel" disabled={disabled} onClick={close}>Cancel</button>{primary("Confirm offset", () => {
           if (stale || blocked || !review) return
           const offset = Math.min(review.to, review.from)
-          run({ operation: "offset", entries: review.entries, date: today(), note: "" }, () => {
+          run({ operation: "offset", entries: review.entries, date: today(), note: "" }, saved => {
+            if (!saved) { close(); return }
             setOffsetReceipt(offset); setReview(null)
             if (review.to === review.from) { setReceipt({ cash: 0, sent: false }); setScene("done") }
             else setScene("payment")
@@ -118,7 +119,7 @@ export function BalanceFirstReimbursements({ snapshot, disabled, run, aliases, r
         {(stale || paymentReview.state !== snapshot.resetState) && <p role="status">Balances changed. Cancel and review again.</p>}
         <div className="bi-editor-footer"><button className="bi-cancel" disabled={disabled} onClick={close}>Cancel</button>{primary(sent ? "Record sent" : "Confirm received", () => {
           if (paymentReview.state !== snapshot.resetState || blocked || !dateValid) return
-          run({ operation: sent ? "report_all" : "receive_all", expectedState: paymentReview.state, date, note: "" }, () => { setReceipt({ cash, sent }); setScene("done"); setReview(null) })
+          run({ operation: sent ? "report_all" : "receive_all", expectedState: paymentReview.state, date, note: "" }, saved => { if (!saved) { close(); return }; setReceipt({ cash, sent }); setScene("done"); setReview(null) })
         }, !cash || !dateValid || Boolean(blocked) || paymentReview.state !== snapshot.resetState)}</div>
       </> : scene === "done" && receipt ? <>
         <div className="sr-success"><CheckCheck/><h2>{receipt.sent ? "Payment reported" : "Balances updated"}</h2><p>{receipt.sent ? "Awaiting the recipient’s confirmation." : "Original purchases, splits and dates are preserved."}</p></div>
@@ -162,7 +163,7 @@ function BalanceMonth({ group, selected, onSelect, disabled, snapshot, reversibl
       return <div className="sr-row-group" key={item.id}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={disabled} data-selected={opened} onClick={() => onSelect(item.id)}>
         <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
         <span className="sr-row-value"><strong>{money(item.outstandingCents || item.partnerShareCents)}</strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronRight className="sr-row-chevron"/>
-      </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened}>
+      </button><div className="sr-detail-host" data-open={opened}><EditorExpansion open={opened} retain>
         <div className="sr-detail sr-editor"><div className="sr-editor-heading"><h2>{item.item || item.category}</h2><button className="sr-icon-button" disabled={disabled} aria-label="Close reimbursement details" onClick={() => onSelect(item.id)}><X/></button></div>
           <span className="sr-eyebrow">{dateLabel(item.expenseDate)} · {category.label} · {item.method === "income" ? "By income" : item.method === "equal" ? "50/50" : item.method === "fronted" ? "Fronted" : "Custom split"}</span>
           <div className="sr-detail-amount" data-side={isPayer ? "to" : "from"}>{money(item.outstandingCents)}<span>{item.outstandingCents ? isPayer ? `${person(item.partnerOwner)} owes you` : `You owe ${person(item.payerOwner)}` : "Settled"}</span></div>

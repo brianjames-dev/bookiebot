@@ -36,7 +36,7 @@ interface LedgerReset {
 }
 type LedgerResponse = LedgerSnapshot | { enabled: false }
 type Command = Record<string, unknown>
-export type Run = (command: Command, done: () => void) => void
+export type Run = (command: Command, done: (saved: boolean) => void) => void
 type Direction = "to" | "from"
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
 const person = (owner: string) => owner ? owner[0].toUpperCase() + owner.slice(1) : "Partner"
@@ -178,7 +178,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
   const readController = useRef<AbortController | null>(null)
   const writeController = useRef<AbortController | null>(null)
   const executing = useRef(false)
-  const pending = useRef<{ body: Command; done: () => void } | null>(null)
+  const pending = useRef<{ body: Command; done: (saved: boolean) => void } | null>(null)
   const load = useCallback(async () => {
     const id = ++readId.current
     readController.current?.abort()
@@ -228,7 +228,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     try {
       const result = validate(await request<LedgerResponse>(change.body, controller.signal))
       if (!mounted.current) return
-      pending.current = null; setUncertain(false); change.done()
+      pending.current = null; setUncertain(false); change.done(true)
       setSnapshot(result); setLegacy(false)
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed"))
       if (change.body.operation !== "receive_all") await load()
@@ -237,8 +237,8 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
       if (failure instanceof LedgerRequestError && failure.status < 500) {
         pending.current = null; setUncertain(false)
         if (matchedReceipt && [401, 403].includes(failure.status)) { setSnapshot(null); onRejectAccess?.(failure.message) }
-        if (failure.status === 401) { setSnapshot(null); setSignedOut(true); change.done() }
-        if (failure.status === 409) { change.done(); await load() }
+        if (failure.status === 401) { setSnapshot(null); setSignedOut(true); change.done(false) }
+        if (failure.status === 409) { change.done(false); await load() }
         setError(failure.message)
       } else {
         setUncertain(true)
@@ -472,10 +472,10 @@ export function LedgerRow({ allocation: item, events, reversibleIds, owner, open
         {canWrite && !settled && <button type="button" disabled={disabled || pendingSent} aria-expanded={mode === "payment"} aria-controls={paymentId} onClick={() => setMode(mode === "payment" ? "" : "payment")}>{isPayer ? "Record received" : "Record sent payment"}</button>}
         <button type="button" aria-expanded={mode === "history"} aria-controls={historyId} onClick={() => setMode(mode === "history" ? "" : "history")}>History ({events.length})</button>
       </div>
-      <RetainedPanel id={splitId} open={open && mode === "split"}><SplitEditor key={splitReview} allocation={item}
+      <RetainedPanel id={splitId} open={(open || detailOnly) && mode === "split"}><SplitEditor key={splitReview} allocation={item}
         disabled={disabled} blocked={splitBlocked} run={run} close={() => setMode("")} /></RetainedPanel>
-      <RetainedPanel id={paymentId} open={open && mode === "payment"}><PaymentEditor key={item.version} allocation={item} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={() => setMode("")} /></RetainedPanel>
-      <RetainedPanel id={historyId} open={open && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
+      <RetainedPanel id={paymentId} open={(open || detailOnly) && mode === "payment"}><PaymentEditor key={item.version} allocation={item} isPayer={isPayer} disabled={disabled || pendingSent} run={run} close={() => setMode("")} /></RetainedPanel>
+      <RetainedPanel id={historyId} open={(open || detailOnly) && mode === "history"}><PaymentHistory allocation={item} events={events} reversibleIds={reversibleIds} disabled={disabled} run={run} /></RetainedPanel>
     </div>
   </>
   return detailOnly ? detail : <AnimatedDisclosure open={open} onOpenChange={onOpenChange} summary={summary}>{detail}</AnimatedDisclosure>

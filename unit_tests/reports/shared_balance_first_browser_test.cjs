@@ -42,6 +42,14 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
      assert.match(await detail.innerText(),/Purchase total.*\$107.28/s);
      if(width>800){const rect=await detail.boundingBox(),overlay=await page.locator('.bb-page').first().evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--bb-duo-overlay'))||0);assert(rect.x>width*.48,'Detail belongs to usable right pane');assert(rect.x+rect.width<=width-overlay-16,'Native status strip remains unused');}
      await press(page,detail.getByRole('button',{name:'Record received',exact:true}).or(detail.getByRole('button',{name:'Record sent payment',exact:true})));
+     await detail.locator('input[inputmode=decimal]').fill('12.34');await detail.locator('input[maxlength="200"]').fill('Retained partial payment draft');
+     await press(page,detail.getByRole('button',{name:'Close reimbursement details'}));
+     await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));
+     assert.equal(await detail.locator('input[inputmode=decimal]').count(),1,'Closing details keeps the visited payment editor mounted');
+     assert.equal(await detail.locator('input[inputmode=decimal]').inputValue(),'12.34','Closing/reopening retains partial payment');
+     assert.equal(await detail.locator('input[maxlength="200"]').inputValue(),'Retained partial payment draft');
+     await press(page,page.locator('.sr-row-main').filter({hasText:'Target'}));await press(page,page.locator('.sr-row-main').filter({hasText:'PG&E'}));
+     assert.equal(await detail.locator('input[inputmode=decimal]').inputValue(),'12.34','Selecting another expense retains the original draft');
      const originalDate=await detail.locator('input[type=date]').inputValue();
      await page.setViewportSize({width:width<800?867:382,height:width<800?480:657});await settle(page);
      assert.equal(await detail.locator('input[type=date]').inputValue(),originalDate,'Individual payment draft survives folding');
