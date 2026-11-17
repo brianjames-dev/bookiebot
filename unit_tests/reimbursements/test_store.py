@@ -11,6 +11,7 @@ from bookiebot.reports.app_access import AppAccessStore, PostgresAppAccessStore
 from bookiebot.reimbursements.store import (
     MAX_CENTS, ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementStore,
     ReimbursementValidationError,
+    ReimbursementUndoPendingError,
 )
 from bookiebot.sheets.routing import now_pacific
 
@@ -732,6 +733,73 @@ def reset_command(store, **changes):
 def sync_allocations(store):
     for allocation in store.pending_projections():
         assert store.mark_projected(allocation["id"], allocation["version"])
+
+
+@pytest.mark.parametrize("kind", ["payment", "offset", "reset", "undo_reset"])
+def test_queued_undo_survives_restart_waits_for_projection_and_replays_once(store, kind):
+    first = ready_allocation(store)
+    second = ready_allocation(store, payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah")
+    original = store.snapshot("brian")
+    if kind == "payment":
+        saved = store.command("brian", payment(first, 1500))
+    elif kind == "offset":
+        saved = store.command("brian", command("offset", entries=[
+            {"allocationId": row["id"], "version": row["version"], "amountCents": 1000}
+            for row in (first, second)], date=now_pacific().date().isoformat()))
+    else:
+        saved = store.command("brian", reset_command(store))
+        if kind == "undo_reset":
+            sync_allocations(store)
+            saved = toggle_reset(store, saved["reset"], "undo_reset")
+    before = store.snapshot("brian")
+    target = {"action": "reverse_operation", "operationId": saved["operationId"]} if kind in ("payment", "offset") else {
+        "action": "redo_reset" if kind == "undo_reset" else "undo_reset",
+        "resetId": saved["reset"]["id"], "version": saved["reset"]["version"]}
+    body = command("queue_undo", expectedUndoState=before["undoState"], **target)
+    queued = store.command("brian", body)
+    job = queued["undoJob"]
+    assert job["status"] == "queued"
+    assert store.command("brian", body) == queued
+    assert store.command("brian", command("queue_undo", expectedUndoState=before["undoState"], **target))["undoJob"]["id"] == job["id"]
+    assert store.snapshot("hannah")["allocations"] == before["allocations"]
+    restarted = ReimbursementStore(store.access)
+    restarted.initialize()
+    apply = {"operation": "queued_undo", "requestId": "queued-undo-" + job["id"]}
+    with pytest.raises(ReimbursementUndoPendingError):
+        restarted.command("brian", apply, _undo_job_id=job["id"])
+    assert restarted.pending_undo_jobs() == [job]
+    sync_allocations(restarted)
+    assert restarted.snapshot("brian")["undoState"] == before["undoState"]
+    result = restarted.command("brian", apply, _undo_job_id=job["id"])
+    assert result["undoJob"]["status"] == "completed"
+    assert restarted.command("brian", apply, _undo_job_id=job["id"]) == result
+    assert restarted.pending_undo_jobs() == []
+    both = [restarted.snapshot(owner) for owner in ("brian", "hannah")]
+    assert both[0]["allocations"] == both[1]["allocations"]
+    for old, current in zip(original["allocations"], both[0]["allocations"], strict=True):
+        for key in ("id", "item", "expenseDate", "grossCents", "payerShareCents", "partnerShareCents"):
+            assert current[key] == old[key]
+        assert current["settledCents"] == 0
+        assert current["outstandingCents"] == (0 if kind == "undo_reset" else old["outstandingCents"])
+
+
+def test_queued_undo_rejects_stale_preview_and_changed_target_without_partial_reversal(store):
+    first = ready_allocation(store)
+    saved = store.command("brian", payment(first, 1000))
+    before = store.snapshot("brian")
+    body = command("queue_undo", action="reverse_operation", operationId=saved["operationId"], expectedUndoState=before["undoState"])
+    with pytest.raises(ReimbursementValidationError):
+        store.command("hannah", body)
+    job = store.command("brian", body)["undoJob"]
+    sync_allocations(store)
+    current = store.get_allocation(first["id"])
+    store.command("brian", payment(current, 500))
+    with pytest.raises(ReimbursementConflictError):
+        store.command("brian", command("queue_undo", action="reverse_operation", operationId=saved["operationId"], expectedUndoState=before["undoState"]))
+    after = store.snapshot("brian")
+    with pytest.raises(ReimbursementConflictError):
+        store.command("brian", {"operation": "queued_undo", "requestId": "queued-undo-" + job["id"]}, _undo_job_id=job["id"])
+    assert store.snapshot("brian") == after
 
 
 def toggle_reset(store, reset, operation, owner="brian"):

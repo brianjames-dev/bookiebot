@@ -12,7 +12,7 @@ from typing import Any
 
 from bookiebot.reimbursements.store import (
     MAX_CENTS, build_reimbursement_store, ReimbursementConflictError,
-    ReimbursementNotFoundError, ReimbursementValidationError,
+    ReimbursementNotFoundError, ReimbursementValidationError, ReimbursementUndoPendingError,
 )
 from bookiebot.sheets.routing import get_user_config, now_pacific
 
@@ -72,6 +72,10 @@ def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
 def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
     store = build_reimbursement_store()
     result = store.command(owner, body)
+    if body.get("operation") == "queue_undo":
+        current = snapshot(owner)
+        job = next((job for job in current["undoJobs"] if job["id"] == result["undoJob"]["id"]), result["undoJob"])
+        return {**result, **current, "undoJob": job}
     if body.get("operation") == "receive_all":
         from bookiebot.reimbursements.batch_projection import sync_received
         synced = sync_received(store, {a["id"] for a in result["allocations"]})
@@ -80,6 +84,34 @@ def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
         synced = sync_pending(store)
     current = snapshot(owner)
     return {**result, **current, "projectionPending": not synced or current["projectionPending"]}
+
+
+
+def recover_queued_undos() -> dict[str, Any]:
+    """One bounded recovery pass. Intent and exactly-once application live in SQL."""
+    from bookiebot.reimbursements.projection import sync_pending
+    from bookiebot.reimbursements.batch_projection import sync_received
+    store = build_reimbursement_store()
+    jobs = store.pending_undo_jobs()
+    if not jobs:
+        return {"completed": [], "pending": []}
+    bulk = store.pending_bulk_projection_ids()
+    if bulk:
+        sync_received(store, bulk)
+    else:
+        sync_pending(store)
+    completed = []
+    for job in jobs[:10]:
+        try:
+            store.command(job["actorOwner"], {"operation": "queued_undo", "requestId": "queued-undo-" + job["id"]}, _undo_job_id=job["id"])
+            completed.append(job["id"])
+        except ReimbursementUndoPendingError:
+            continue
+        except (ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError):
+            store.fail_undo_job(job["id"], "This payment or its expenses changed before Undo. Review history.")
+    if completed:
+        sync_pending(store)
+    return {"completed": completed, "pending": store.pending_undo_jobs()}
 
 
 def record_split(user_key: str, logged: Any, ws: Any, fields: dict[str, int], values: dict[str, str],

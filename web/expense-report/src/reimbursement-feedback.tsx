@@ -1,0 +1,51 @@
+import {createContext,useContext,useEffect,useRef,useState,type ButtonHTMLAttributes,type ReactNode} from 'react'
+import type {LedgerSnapshot} from './reimbursement-ledger'
+import {reimbursementReceipt,reimbursementSyncPending,resolveReimbursementReceipt,type ReimbursementReceipt} from './reimbursement-undo'
+import type {UndoNotice} from './transaction-undo-popup'
+import {transactionMotion} from './transaction-inline-editor'
+import {ReportLoading} from './report-loading'
+
+export const ReimbursementSavingContext=createContext<string|undefined>(undefined)
+export function ReimbursementSaveButton({operation,children,className='',...props}:ButtonHTMLAttributes<HTMLButtonElement>&{operation:string;children:ReactNode}){
+ const saving=useContext(ReimbursementSavingContext)===operation
+ return <button {...props} className={className+' bb-saving-button'} aria-busy={saving||undefined} data-saving={saving||undefined} aria-label={props['aria-label']??(typeof children==='string'?children:undefined)}><span className="bb-saving-label">{children}</span>{saving&&<span className="bb-saving-indicator" aria-hidden="true"><ReportLoading compact label="Saving…"/></span>}</button>
+}
+type Phase='syncing'|'ready'|'changed'|'queued'|'undone-syncing'|'undone'|'failed'
+interface Feedback {notice:UndoNotice;receipt:ReimbursementReceipt|null;phase:Phase;dismissed:boolean;jobId?:string;detail?:string}
+const pendingPhase=(phase:Phase)=>['syncing','queued','undone-syncing'].includes(phase)
+export function useReimbursementFeedback(snapshot:LedgerSnapshot|null){
+ const [feedback,setFeedback]=useState<Feedback|null>(null),serial=useRef(0)
+ const notice=(title:string,phase:Phase):UndoNotice=>({id:++serial.current,title,seconds:transactionMotion.undoSeconds,deadline:pendingPhase(phase)?0:Date.now()+transactionMotion.undoSeconds*1000})
+ useEffect(()=>{
+  if(!snapshot){setFeedback(null);return}
+  setFeedback(previous=>{
+   const pending=reimbursementSyncPending(snapshot)
+   const job=snapshot.undoJobs?.find(j=>j.id===previous?.jobId)??(!previous?snapshot.undoJobs?.find(j=>j.status==='queued'):undefined)
+   if(job){
+    const phase:Phase=job.status==='queued'?'queued':job.status==='failed'?'failed':pending?'undone-syncing':'undone'
+    if(previous?.phase===phase&&previous.jobId===job.id)return previous
+    return {notice:notice(phase==='queued'?'Undo queued':phase==='failed'?'Couldn’t undo':'Undone',phase),receipt:null,phase,dismissed:false,jobId:job.id,detail:job.error}
+   }
+   if(previous?.receipt){const resolved=resolveReimbursementReceipt(previous.receipt,snapshot);if(previous.phase===resolved.phase)return previous
+    return {...previous,phase:resolved.phase,dismissed:false,notice:notice(previous.receipt.title,resolved.phase)}
+   }
+   if(previous?.phase==='undone-syncing'&&!pending)return {...previous,phase:'undone',dismissed:false,notice:notice('Undone','undone')}
+   if(!previous&&pending)return {notice:notice('Recorded changes','syncing'),receipt:null,phase:'syncing',dismissed:false}
+   if(previous?.phase==='syncing'&&!pending)return {...previous,phase:'ready',dismissed:false,notice:notice('Changes synced','ready')}
+   return previous
+  })
+ },[snapshot])
+ const acknowledge=(body:Record<string,unknown>,result:LedgerSnapshot)=>{
+  if(body.operation==='queue_undo'&&result.undoJob){const phase:Phase='queued';setFeedback({notice:notice('Undo queued',phase),receipt:null,phase,dismissed:false,jobId:result.undoJob.id});return}
+  const receipt=reimbursementReceipt(body,result),pending=reimbursementSyncPending(result)
+  const inverse=['reverse_operation','reverse'].includes(String(body.operation))
+  const phase:Phase=inverse?(pending?'undone-syncing':'undone'):pending?'syncing':'ready'
+  if(!receipt&&!pending&&!inverse){setFeedback(null);return}
+  setFeedback({notice:notice(receipt?.title??(inverse?'Undone':'Recorded changes'),phase),receipt,phase,dismissed:false})
+ }
+ const resolution=feedback?.receipt&&snapshot?resolveReimbursementReceipt(feedback.receipt,snapshot):null
+ const command=resolution?.undo?.command??null,pending=Boolean(feedback&&pendingPhase(feedback.phase)),visible=Boolean(feedback&&!feedback.dismissed)
+ return {acknowledge,dismiss:()=>setFeedback(previous=>previous&&pendingPhase(previous.phase)?{...previous,dismissed:true}:null),
+  notice:visible?feedback!.notice:null,pending,command,modal:visible&&!pending&&Boolean(command),
+  detail:feedback?.phase==='queued'?'Undo will run after syncing. You can keep using the app.':feedback?.phase==='failed'?feedback.detail:pending?'Saved · syncing sheets.':feedback?.phase==='changed'?'Balances changed. Review history to undo.':undefined}
+}

@@ -33,6 +33,9 @@ function load(file) {
   const exports = {}; modules.set(file, exports)
   const localRequire = name => {
     if (name.endsWith(".css")) return {}
+    // Browser suites exercise the native DOM animation/focus/countdown. This
+    // renderer checks the controller contract without fabricating layout refs.
+    if (name === './transaction-undo-popup') return {UndoPopup:({notice,detail,onUndo,onDismiss,undoAvailable})=>React.createElement('div',{'data-toast':true},notice.title,detail,undoAvailable&&React.createElement('button',{onClick:onUndo},'Undo'),React.createElement('button',{onClick:onDismiss},'Dismiss undo'))}
     if (name === "./page-refresh") { const hooks=load(path.join(frontend,"src/page-refresh.tsx"));return {...hooks,usePageRefresh:(screen,handler)=>{latestPageRefresh=handler;return hooks.usePageRefresh(screen,handler)}} }
     if (name === './transaction-step-motion') return {StepMotion:({review,edit,confirm})=>React.createElement('div',null,React.createElement('div',{'aria-hidden':review,inert:review},edit),React.createElement('div',{'aria-hidden':!review,inert:!review},confirm))}
     if (name === "./transaction-editor-workspace") return {
@@ -57,7 +60,7 @@ function load(file) {
 }
 const { ReimbursementLedger, reimbursementAmountCents, ledgerTotals, defaultOffsetEntries, canReverseLedgerEvent } = load(path.join(frontend, "src/reimbursement-ledger.tsx"))
 const { balanceFirstScope, sharedExpenseDate, reimbursementTransaction } = load(path.join(frontend, "src/shared-balance-first.tsx"))
-const {reimbursementUndo}=load(path.join(frontend,"src/reimbursement-undo.ts"))
+const {reimbursementUndo,reimbursementReceipt,resolveReimbursementReceipt}=load(path.join(frontend,"src/reimbursement-undo.ts"))
 const undoResult={enabled:true,ownerKey:"brian",currency:"USD",allocations:[],resetState:"after-save",operationId:"receipt-op",events:[
  {id:"old",operationId:"earlier-op",kind:"receive",status:"confirmed",amountCents:500},
  {id:"confirmed-report",operationId:"sender-op",confirmationOperationId:"receipt-op",kind:"report_payment",status:"confirmed",amountCents:1000},
@@ -65,6 +68,15 @@ const undoResult={enabled:true,ownerKey:"brian",currency:"USD",allocations:[],re
 ]}
 assert.deepEqual(JSON.parse(JSON.stringify(reimbursementUndo({operation:"receive_all"},undoResult))),{title:"$35.00 received",command:{operation:"reverse_operation",operationId:"receipt-op",expectedState:"after-save"}},"Receipt Undo includes its confirmed reports and remainder, excluding earlier cash")
 assert.equal(reimbursementUndo({operation:"receive_all"},{...undoResult,projectionPending:true}),null,"Syncing commands cannot offer an unsafe inverse")
+{
+ const pending={...undoResult,projectionPending:true,undoState:'financial-revision'},receipt=reimbursementReceipt({operation:'receive_all'},pending)
+ const resolution=resolveReimbursementReceipt(receipt,pending)
+ assert.equal(resolution.phase,'syncing')
+ assert.deepEqual(JSON.parse(JSON.stringify(resolution.undo.command)),{operation:'queue_undo',action:'reverse_operation',operationId:'receipt-op',expectedUndoState:'financial-revision'},'A pending Undo queues exact immutable intent, never a premature financial inverse')
+ const ready=resolveReimbursementReceipt(receipt,{...pending,projectionPending:false,resetState:'projected-revision'})
+ assert.equal(ready.phase,'ready');assert.equal(ready.undo.command.expectedState,'projected-revision','Projection progress may update the write preview')
+ assert.equal(resolveReimbursementReceipt(receipt,{...pending,events:[...pending.events,{id:'new-report',operationId:'new',amountCents:1,status:'pending'}]}).phase,'changed','An intervening financial change cannot rebind Undo')
+}
 assert.equal(reimbursementUndo({operation:"reverse_operation"},undoResult),null,"An inverse does not recursively create another notice")
 assert.equal(reimbursementUndo({operation:"receive_all"},{...undoResult,operationId:undefined}),null,"A notice requires canonical operation lineage")
 for(const [operation,status,ready,inverse] of [["undo_reset","undone","canRedo","redo_reset"],["redo_reset","active","canUndo","undo_reset"],["reset","active","canUndo","undo_reset"]]){
@@ -117,6 +129,37 @@ assert.equal(canReverseLedgerEvent(receipt(), "brian", [allocation(), allocation
 const flush = async () => { for (let i = 0; i < 24; i++) await Promise.resolve() }
 const response = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
+async function queuedFeedbackContracts(){
+ const {useReimbursementFeedback}=load(path.join(frontend,'src/reimbursement-feedback.tsx'))
+ let feedback,tree;const Harness=({snapshot})=>{feedback=useReimbursementFeedback(snapshot);return null}
+ const saved={...clone(undoResult),projectionPending:true,undoState:'financial-revision'},job={id:'durable-job',actorOwner:'brian',operation:'reverse_operation',status:'queued',error:'',createdAt:'',updatedAt:''}
+ await act(async()=>{tree=Renderer.create(React.createElement(Harness,{snapshot:saved}));await flush()});await act(async()=>{feedback.acknowledge({operation:'receive_all'},saved);await flush()})
+ assert.equal(feedback.command.operation,'queue_undo');assert.equal(feedback.modal,false);assert.equal(feedback.pending,true)
+ assert.equal(feedback.notice.deadline,0,'Syncing never expires Undo before it can be clicked')
+ await act(async()=>{feedback.dismiss();feedback.acknowledge({operation:'queue_undo'},{...saved,undoJob:job,undoJobs:[job]});tree.update(React.createElement(Harness,{snapshot:{...saved,undoJobs:[job]}}));await flush()})
+ assert.equal(feedback.notice.title,'Undo queued');assert.equal(feedback.command,null);assert.equal(feedback.modal,false)
+ await act(async()=>{tree.unmount();await flush();tree=Renderer.create(React.createElement(Harness,{snapshot:{...saved,undoJobs:[job]}}));await flush()})
+ assert.equal(feedback.notice.title,'Undo queued','Refresh reconstructs queued feedback from canonical SQL status')
+ await act(async()=>{tree.update(React.createElement(Harness,{snapshot:{...saved,projectionPending:false,undoJobs:[{...job,status:'completed'}]}}));await flush()})
+ assert.equal(feedback.notice.title,'Undone');assert.equal(feedback.pending,false);assert(feedback.notice.deadline>0);assert.equal(feedback.command,null)
+ await act(async()=>{tree.unmount();await flush()})
+}
+async function acknowledgedUndoDoesNotWaitForDuplicateRead(){
+ const never=deferred();let reads=0
+ const state=fixture({get:state=>++reads===1?response(clone(state.snapshot)):never.promise,post:(body,state)=>{
+  if(body.operation==='offset'){
+   for(const entry of body.entries){const row=state.snapshot.allocations.find(r=>r.id===entry.allocationId);row.settledCents+=entry.amountCents;row.outstandingCents-=entry.amountCents;row.version++;row.projectedVersion=row.version}
+   state.snapshot.events.push(...body.entries.map((e,i)=>receipt({id:'offset-'+i,operationId:'saved-offset',allocationId:e.allocationId,kind:'offset',amountCents:e.amountCents})))
+   state.snapshot.operationId='saved-offset';state.snapshot.resetState='after-offset'
+  }else assert.equal(body.operation,'reverse_operation')
+  return response(clone(state.snapshot))
+ }})
+ const tree=await mount({balanceFirst:true})
+ await tap(button(tree.root,'Offset & settle'));await tap(button(tree.root,'Confirm offset'))
+ assert.equal(reads,1,'A complete command snapshot needs no duplicate GET before Undo becomes usable')
+ await tap(button(tree.root,'Undo'));assert.equal(writes(state).length,2,'Undo is accepted immediately after acknowledgement')
+ await unmount(tree)
+}
 const visible = node => {
   for (let parent = node; parent; parent = parent.parent) if ([true, "true"].includes(parent.props["aria-hidden"]) || parent.props.inert === true || parent.props.inert === "") return false
   return true
@@ -358,7 +401,7 @@ async function emptyDirectionsAndMarkerContracts() {
   assert.ok(text(tree.root).includes("You don’t currently owe any money."))
   assert.equal(tree.root.findAll(node => hasClass(node, "bb-ledger-net")).length, 0, "An empty direction does not show the opposite direction's net balance")
   assert.equal(button(tree.root, "View ", true), undefined, "No records means no empty expandable list")
-  assert.ok(text(tree.root).includes("Recorded. Expense sheets are still syncing."))
+  assert.ok(text(tree.root).includes("Saved · syncing sheets."))
   assert.ok(text(tree.root).includes("The worksheet view needs another sync."))
   assert.ok(text(tree.root).includes("Awaiting your confirmation"), "Necessary incoming payment review remains available from an empty direction")
   await tap(button(tree.root, "Review")); await tap(button(tree.root, "Confirm received"))
@@ -369,7 +412,7 @@ async function emptyDirectionsAndMarkerContracts() {
   assert.ok(button(tree.root, "View 3 expenses"))
   assert.ok(text(tree.root).includes("Net owed to you$95.00"))
   await expand(tree, "PG&E")
-  assert.ok(text(tree.root).includes("Change saved; budget and reimbursement sheets still need to update."), "A recorded payment cannot appear fully synced while its sheet projection is pending")
+  assert.ok(text(tree.root).includes("Saved · syncing sheets."), "A recorded payment cannot appear fully synced while its sheet projection is pending")
   await unmount(tree)
 
   state = fixture()
@@ -471,9 +514,9 @@ async function confirmationAndOffsetContracts() {
   ])
   assert.equal(body.date, "2026-09-08")
   assert.ok(text(tree.root).includes("Net owed to you$45.00"), "An equal-sided offset preserves the net balance")
-  assert.ok(text(tree.root).includes("Recorded. Expense sheets are still syncing."))
+  assert.ok(text(tree.root).includes("Saved · syncing sheets."))
   state.snapshot.projectionPending = false
-  await tap(button(tree.root, "Refresh"))
+  await act(async()=>{await latestPageRefresh.refresh();await flush()})
   assert.equal(writes(state).length, 1, "Refreshing projection state does not repeat the saved offset")
   await unmount(tree)
 }
@@ -553,7 +596,7 @@ async function recoveryContracts() {
   })
   let tree = await mount(); await expand(tree, "PG&E"); await tap(button(tree.root, "Record received")); await fill(tree, "Amount", "1.01"); await submit(tree)
   assert.ok(text(tree.root).includes("Owed to you$103.99"), "A confirmed POST snapshot remains visible if the follow-up GET fails")
-  assert.ok(text(tree.root).includes("Recorded. Expense sheets are still syncing."))
+  assert.ok(text(tree.root).includes("Saved · syncing sheets."))
   assert.equal(button(tree.root, "Retry this record"), undefined, "A confirmed command does not become uncertain because its follow-up read fails")
   assert.equal(writes(state).length, 1)
   await unmount(tree)
@@ -1141,7 +1184,7 @@ async function balanceFirstHiddenRecoveryContracts(){
   const state=fixture();state.snapshot.allocations=[];state.snapshot.events=[];state.snapshot.projectionPending=true;state.snapshot.resetState='inactive-revision-1'
   const tree=await mount({balanceFirst:true}),full=()=>state.calls.filter(call=>call.url==='/app/reimbursements'&&!call.body)
   assert.equal(full().length,1,'Hidden pending corrections recover even when the visible list is empty')
-  assert.ok(text(tree.root).includes('Recorded. Expense sheets are still syncing.'))
+  assert.ok(text(tree.root).includes('Saved · syncing sheets.'))
   state.snapshot.resetState='inactive-revision-2'
   await act(async()=>{for(const callback of listeners.window.get('focus'))callback();await flush()})
   assert.equal(full().length,2,'An advanced complete cursor recovers another hidden correction')
@@ -1212,6 +1255,8 @@ async function lazyRetainedExpansionContracts(){
   await balanceFirstNativeSplitContracts()
   await balanceFirstZeroShareRetentionContracts()
   await balanceFirstFastLoadingContracts()
+  await queuedFeedbackContracts()
+  await acknowledgedUndoDoesNotWaitForDuplicateRead()
   await balanceFirstPendingRecoveryContracts()
   await balanceFirstHiddenRecoveryContracts()
   await reimbursementUpdatedTimeContracts()

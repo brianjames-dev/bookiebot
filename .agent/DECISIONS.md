@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-17 — Responsive durable Undo behind sheet synchronization
+
+An acknowledged reimbursement may show Undo immediately while its projection is pending. Queue the exact inverse in `app_reimbursement_undo_jobs`, under the existing household lock, with actor authority, a financial-only preview fingerprint, target IDs and allocation/event/version guards. Queuing performs SQL only. Projection progress may advance; changed financial targets fail safely. A deterministic internal command request applies the existing canonical inverse and marks the job completed atomically, so retries, multiple workers and response loss cannot apply it twice. Original purchase inputs and independent payments/offsets stay intact. No browser financial rollback or extra Sheets ledger.
+
+Resume accepted jobs at app startup and authenticated reads. Coalesce background workers with bounded retries/backoff; publish existing shared-account hints. Bounded quiet SQL-only status reads keep mounted rows, drafts and folding responsive without repeated loading states. Saved/syncing and queued notices use the native toast without modal focus or countdown; a fully projected actionable receipt starts the usual eight-second window. Unknown writes keep exact-request recovery. Financial action buttons retain geometry and accessible names while showing the common ring. Closed uses the existing pull refresh; open adds a rotating circular-arrow control. Sync-success information belongs in the toast, not a page banner.
+
 ## 2026-11-17 — Approved reimbursement tools and canonical timed reversals
 
 Use the selected title Header menu with choices only, rendered outside the alternating scene slots so its target and disabled state remain current. Reset history is a bounded compact list in the existing main editor, with reviewed canonical reset undo/redo and no arrow/page counter. Retained scenes own their geometry through entry/exit; optional semantic direction keeps forward/back independent of alternating render slots. Keep native Transactions materials, circular close, allocation view and UndoPopup, including its eight-second deadline and animations. No optimistic financial rollback or browser ledger copies.

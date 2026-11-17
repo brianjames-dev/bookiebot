@@ -4,12 +4,72 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from aiohttp import web
 
 from bookiebot.reimbursements import service
 from bookiebot.reimbursements.store import ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError
 
 logger = logging.getLogger(__name__)
+
+
+class _UndoRecovery:
+    """Coalesce background work; failed projections back off instead of looping."""
+    def __init__(self):
+        self.task: asyncio.Task | None = None
+        self.attempted: dict[str, float] = {}
+
+    def start(self, jobs: list[dict]) -> None:
+        queued = [job for job in jobs if job["status"] == "queued"]
+        if not queued or self.task is not None and not self.task.done():
+            return
+        now = time.monotonic()
+        if all(now - self.attempted.get(job["id"], -60) < 30 for job in queued):
+            return
+        self.attempted = {job["id"]: now for job in queued}
+        self.task = asyncio.create_task(self.run(queued))
+
+    async def run(self, jobs: list[dict]) -> None:
+        from bookiebot.reports.phone_shared_bills import publish_change
+        try:
+            for delay in (0, 5, 30):
+                if delay:
+                    await asyncio.sleep(delay)
+                self.attempted.update({job["id"]: time.monotonic() for job in jobs})
+                try:
+                    result = await asyncio.to_thread(service.recover_queued_undos)
+                except Exception:
+                    logger.exception("Queued reimbursement Undo remains recoverable")
+                    continue
+                await publish_change(jobs[0]["actorOwner"])
+                jobs = result["pending"]
+                if not jobs:
+                    break
+        except asyncio.CancelledError:
+            raise
+
+    async def close(self) -> None:
+        if self.task is not None:
+            self.task.cancel()
+            await asyncio.gather(self.task, return_exceptions=True)
+
+
+_UNDO_RECOVERY = web.AppKey("bookiebot_reimbursement_undo_recovery", _UndoRecovery)
+
+
+async def _resume_undo_jobs(app: web.Application) -> None:
+    if not service.enabled():
+        return
+    try:
+        jobs = await asyncio.to_thread(lambda: service.build_reimbursement_store().pending_undo_jobs())
+        app[_UNDO_RECOVERY].start(jobs)
+    except Exception:
+        logger.warning("Queued reimbursement Undo will resume on the next refresh")
+
+
+async def _close_undo_jobs(app: web.Application) -> None:
+    await app[_UNDO_RECOVERY].close()
+
 
 
 async def _reimbursements(request: web.Request) -> web.Response:
@@ -41,6 +101,7 @@ async def _reimbursements(request: web.Request) -> web.Response:
         if request.method == 'POST':
             from bookiebot.reports.phone_shared_bills import publish_change
             await publish_change(session.owner_key)
+        request.app[_UNDO_RECOVERY].start(result.get("undoJobs", []))
         return _json(result)
     except ReimbursementNotFoundError as exc:
         return _json({"error": str(exc)}, status=404)
@@ -54,5 +115,8 @@ async def _reimbursements(request: web.Request) -> web.Response:
 
 
 def register_phone_reimbursement_routes(app: web.Application) -> None:
+    app[_UNDO_RECOVERY] = _UndoRecovery()
+    app.on_startup.append(_resume_undo_jobs)
+    app.on_cleanup.append(_close_undo_jobs)
     app.router.add_get("/app/reimbursements", _reimbursements)
     app.router.add_post("/app/reimbursements", _reimbursements)

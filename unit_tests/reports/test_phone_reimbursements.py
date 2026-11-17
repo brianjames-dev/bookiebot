@@ -1,4 +1,6 @@
 from types import SimpleNamespace
+import asyncio
+from threading import Event
 from uuid import uuid4
 
 from aiohttp import CookieJar, web
@@ -62,6 +64,95 @@ def payment(client, **changes):
 def assert_unchanged(client):
     assert client.store.get_allocation(client.allocation["id"])["settledCents"] == 0
     assert client.store.snapshot("brian")["events"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["payment", "offset", "reset"])
+async def test_queued_undo_is_responsive_durable_and_refreshes_both_accounts(client, monkeypatch, kind):
+    from unit_tests.reimbursements.test_store import payload
+    connect(client)
+    original = client.allocation
+    client.store.mark_projected(original["id"], original["version"])
+    if kind == "offset":
+        other = client.store.register_allocation(payload(payerOwner="hannah", partnerOwner="brian", payerPerson="Hannah"))
+        client.store.mark_projected(other["id"], other["version"])
+        body = {"operation": "offset", "requestId": uuid4().hex, "date": now_pacific().date().isoformat(), "entries": [
+            {"allocationId": row["id"], "version": row["version"], "amountCents": 1025} for row in (original, other)]}
+    elif kind == "reset":
+        body = {"operation": "reset", "requestId": uuid4().hex, "expectedState": client.store.snapshot("brian")["resetState"]}
+    else:
+        body = payment(client)
+    saved = await (await client.http.post("/app/reimbursements", json=body, headers=HEADERS)).json()
+    assert saved["projectionPending"]
+    gate, started = Event(), Event()
+    recover = service.recover_queued_undos
+    def delayed():
+        started.set()
+        assert gate.wait(5)
+        return recover()
+    def project(store):
+        for row in store.pending_projections():
+            store.mark_projected(row["id"], row["version"])
+        return True
+    monkeypatch.setattr(service, "recover_queued_undos", delayed)
+    monkeypatch.setattr(projection, "sync_pending", project)
+    target = {"action": "undo_reset", "resetId": saved["reset"]["id"], "version": saved["reset"]["version"]} if kind == "reset" else {"action": "reverse_operation", "operationId": saved["operationId"]}
+    undo = {"operation": "queue_undo", "requestId": uuid4().hex, "expectedUndoState": saved["undoState"], **target}
+    try:
+        response = await asyncio.wait_for(client.http.post("/app/reimbursements", json=undo, headers=HEADERS), 1)
+        assert response.status == 200
+        queued = await response.json()
+        assert queued["undoJob"]["status"] == "queued"
+        for actor, owner in ((HANNAH, "hannah"), (BRIAN, "brian")):
+            connect(client, actor, owner)
+            refreshed = await asyncio.wait_for(client.http.get("/app/reimbursements?snapshot=1"), 1)
+            current = await refreshed.json()
+            assert current["allocations"] == saved["allocations"]
+            assert current["undoJobs"][0]["status"] == "queued"
+        gate.set()
+        for _ in range(100):
+            if not client.store.pending_undo_jobs():
+                break
+            await asyncio.sleep(.01)
+        assert not client.store.pending_undo_jobs()
+        for actor, owner in ((HANNAH, "hannah"), (BRIAN, "brian")):
+            connect(client, actor, owner)
+            current = await (await client.http.get("/app/reimbursements?snapshot=1")).json()
+            row = next(row for row in current["allocations"] if row["id"] == original["id"])
+            assert row["grossCents"] == original["grossCents"] and row["outstandingCents"] == 4000
+            assert row["settledCents"] == 0 and row["clearedCents"] == 0
+            assert current["undoJobs"][0]["status"] == "completed"
+        replay = await (await client.http.post("/app/reimbursements", json=undo, headers=HEADERS)).json()
+        assert replay["allocations"] == current["allocations"]
+        assert replay["undoJob"]["id"] == queued["undoJob"]["id"]
+    finally:
+        gate.set()
+
+
+@pytest.mark.asyncio
+async def test_server_restart_resumes_accepted_undo_without_another_phone_write(client, monkeypatch):
+    original = client.allocation
+    client.store.mark_projected(original["id"], original["version"])
+    saved = client.store.command("brian", payment(client))
+    job = client.store.command("brian", {"operation": "queue_undo", "requestId": uuid4().hex,
+        "action": "reverse_operation", "operationId": saved["operationId"],
+        "expectedUndoState": client.store.snapshot("brian")["undoState"]})["undoJob"]
+    def project(store):
+        for row in store.pending_projections():
+            store.mark_projected(row["id"], row["version"])
+        return True
+    monkeypatch.setattr(projection, "sync_pending", project)
+    app = web.Application()
+    phone_reimbursements.register_phone_reimbursement_routes(app)
+    async with TestClient(TestServer(app)):
+        for _ in range(100):
+            if not client.store.pending_undo_jobs():
+                break
+            await asyncio.sleep(.01)
+        assert client.store.pending_undo_jobs() == []
+        current = client.store.snapshot("hannah")
+        assert current["undoJobs"][0]["id"] == job["id"] and current["undoJobs"][0]["status"] == "completed"
+        assert current["allocations"][0]["outstandingCents"] == 4000
 
 
 @pytest.mark.asyncio
