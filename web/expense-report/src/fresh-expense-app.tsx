@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 
 import { KonstaProvider } from "konsta/react"
 import { ExpenseAppShell } from "./expense-app-shell"
+import {clearAppResources} from "./app-resource-state"
+import {reimbursementDisplay} from "./reimbursement-display-state"
 import { AppWorkGuardProvider } from "./app-work-guard"
 import { AuthFeedback } from "./account-settings"
 import type { ExpenseReportData } from "./types"
@@ -23,11 +25,24 @@ function useFreshExpenseReport(config: ExpenseAppConfig) {
     session.current = current
     const unsubscribe = current.subscribe(setState)
     const stopWatching = watchExpenseAppLifecycle(current)
-    const refreshSettlements = () => { void current.refresh(true) }
+    // Dependent sheet reports keep their last successful data until the shared
+    // canonical state is projected. Coalesce changes instead of rereading Sheets
+    // once for the action and again for its inverse.
+    let changed=false,refreshTimer:number|undefined
+    const flushChanges=()=>{
+      window.clearTimeout(refreshTimer)
+      if(!changed)return
+      if(["signed-out","expired"].includes(current.state.phase)){changed=false;return}
+      const owner=current.state.report?.ownerName??config.ownerName??''
+      if(reimbursementDisplay.read(owner)?.projectionPending){refreshTimer=window.setTimeout(flushChanges,1000);return}
+      changed=false;void current.refresh(true)
+    }
+    const refreshSettlements=()=>{changed=true;window.clearTimeout(refreshTimer);refreshTimer=window.setTimeout(flushChanges,0)}
     window.addEventListener("bookiebot:reimbursements-changed", refreshSettlements)
     window.addEventListener("bookiebot:transactions-changed", refreshSettlements)
     void current.refresh(true)
     return () => {
+      window.clearTimeout(refreshTimer)
       stopWatching()
       window.removeEventListener("bookiebot:reimbursements-changed", refreshSettlements)
       window.removeEventListener("bookiebot:transactions-changed", refreshSettlements)
@@ -73,6 +88,8 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
   if (disconnected) lastReport.current = null
   else if (state.report) lastReport.current = state.report
   const shellReport = state.report ?? lastReport.current
+  const resourceOwner=shellReport?.ownerName
+  useLayoutEffect(()=>{if(disconnected)clearAppResources();return clearAppResources},[disconnected,resourceOwner])
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
   // Learning the initial owner hydrates the existing chrome. A subsequent
   // owner change still disposes all previous financial controllers and drafts.

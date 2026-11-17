@@ -377,11 +377,11 @@ async function main() {
   // Exercise the real FreshExpenseApp ownership boundary, with only its network/catalog transport replaced.
   let session, bootPending = true
   class FixtureSession {
-    constructor() { session = this; this.listeners = new Set() }
+    constructor() { session = this; this.listeners = new Set();this.state=realSession.initialExpenseAppState;this.refreshes=0 }
     subscribe(fn) { this.listeners.add(fn); fn(bootPending ? realSession.initialExpenseAppState : { ...realSession.initialExpenseAppState, phase: 'ready', report }); return () => this.listeners.delete(fn) }
-    emitState(next) { this.listeners.forEach(fn => fn({ ...realSession.initialExpenseAppState, ...next })) }
+    emitState(next) { this.state={...realSession.initialExpenseAppState,...next};this.listeners.forEach(fn => fn(this.state)) }
     emit(next) { this.emitState({ phase: 'ready', report: next }) }
-    async refresh() {} dispose() {} async signOut() {} async selectMonth() {} expire() {}
+    async refresh() {this.refreshes++} dispose() {} async signOut() {} async selectMonth() {} expire() {}
   }
   mocks.set(src('expense-app-session.ts'), { ...realSession, ExpenseAppSession: FixtureSession, watchExpenseAppLifecycle: () => () => {} })
   mocks.set(src('app-refresh-control.tsx'), { AppRefreshControl: ({ state }) => h('p', { 'data-refresh-phase': state.phase }, state.message || state.phase) })
@@ -412,6 +412,14 @@ async function main() {
   assert.equal(tree.root.findByProps({className:'bb-page-header bb-report-header'}),initialHeader,'The real month/view header persists')
   assert.equal(tree.root.findByType('nav'),initialNav,'The real navigation persists')
   assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,0)
+  const resource=load(src('reimbursement-display-state.ts')).reimbursementDisplay
+  const previousResource=resource.read('Brian'),beforeRefreshes=session.refreshes
+  await run(()=>{resource.publish('Brian',{...previousResource,projectionPending:true});win.dispatchEvent(new Event('bookiebot:reimbursements-changed'));win.dispatchEvent(new Event('bookiebot:transactions-changed'))})
+  await run(()=>{for(const [id,timer]of [...timers])if(timer.delay===0){timers.delete(id);timer.cb()}})
+  assert.equal(session.refreshes,beforeRefreshes,'Dependent reports retain their successful view instead of hitting Sheets during projection')
+  await run(()=>{resource.publish('Brian',{...previousResource,projectionPending:false});for(const [id,timer]of [...timers])if(timer.delay===1000){timers.delete(id);timer.cb()}})
+  assert.equal(session.refreshes,beforeRefreshes+1,'Both settlement signals coalesce into one report read after projection')
+  if(previousResource)await run(()=>resource.publish('Brian',previousResource))
   await run(() => { win.location.hash = '#settings'; win.dispatchEvent(new Event('hashchange')) })
   assert.equal(screen(tree),'settings','Settings return routing becomes available after boot hydration')
   win.location.hash = ''
@@ -457,10 +465,12 @@ async function main() {
   const beforeOwnerReads = reads.goals
   owner = 'hannah'; await run(() => session.emit({ ...report, ownerName: 'Hannah', generatedAt: 'owner-changed' }))
   assert.equal(screen(tree), 'overview'); assert.equal(reads.goals, beforeOwnerReads + 1)
+  assert.equal(resource.read('Brian'),null,'Switching accounts purges owner-scoped display values')
   await tap(tree, 'Savings'); assert.equal(form(tree), undefined, 'Owner-keyed real shell disposes previous financial forms')
   await tap(tree, '＋ Goal'); assert.equal(input(tree, 'Goal name').props.value, '')
   await fill(tree, 'Goal name', 'Private Hannah draft')
   await run(() => session.emitState({ report: null, selectedMonth: '2026-07', phase: 'expired' }))
+  assert.equal(resource.read('Hannah'),null,'Session expiration purges financial display state')
   assert.equal(tree.root.findAllByType(ExpenseAppShell).length, 0, 'Expiration clears the retained owner shell and its financial drafts')
   assert.equal(tree.root.findAllByType('form').length, 0)
   assert.equal(tree.root.findAllByType('nav').length, 0)

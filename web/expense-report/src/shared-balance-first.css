@@ -44,6 +44,9 @@
 .sr-summary-sides>svg {width:18px;height:18px;color:hsl(var(--muted-foreground));}
 .sr-primary {display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;padding:10px 14px;border:0;border-radius:12px;font:inherit;font-size:13px;font-weight:500;color:hsl(var(--primary));background:hsl(var(--primary) / .14);}
 .sr-primary svg {width:16px;height:16px;}
+.sr-primary>.bb-saving-label {display:grid;grid-template-columns:16px minmax(0,1fr) 16px;align-items:center;gap:8px;width:100%;}
+.sr-primary .sr-primary-copy {grid-column:2;min-width:0;text-align:center;}
+.sr-primary>.bb-saving-label>svg {grid-column:3;}
 .sr-primary:disabled {opacity:.4;}
 .sr-flow-caption {display:flex;justify-content:center;gap:8px;align-items:center;color:hsl(var(--muted-foreground));font-size:11px;margin-top:8px;}
 .sr-flow-caption svg {width:12px;height:12px;}

@@ -361,7 +361,7 @@ class ReimbursementStore:
                     "events": [self._event_payload(event, allocations[event["allocation_id"]]) for event in events
                                if event["allocation_id"] in allocations], "currency": "USD",
                     "resetState": self._reset_state(db), "undoState": self._reset_state(db, projection=False),
-                    "resets": self._resets(db), "undoJobs": [self._undo_job_payload(row) for row in db.execute(
+                    "resets": self._resets(db), "undoJobs": [self._undo_job_payload(row, db=db) for row in db.execute(
                         "SELECT * FROM app_reimbursement_undo_jobs WHERE status = 'queued' OR id IN (SELECT id FROM app_reimbursement_undo_jobs ORDER BY updated_at DESC,id DESC LIMIT 20) ORDER BY created_at,id").fetchall()]}
             if include_projection_status:
                 # Inactive corrections still need their source/mirror repair.
@@ -737,11 +737,54 @@ class ReimbursementStore:
         db.execute("UPDATE app_reimbursement_allocations SET settled_cents = settled_cents + ?, version = version + 1, updated_at = ? WHERE id = ?",
                    (amount, now, allocation_id))
 
-    @staticmethod
-    def _undo_job_payload(row: Any) -> dict[str, Any]:
+    def _undo_job_payload(self, row: Any, *, db: Any = None) -> dict[str, Any]:
         payload = json.loads(row["payload_json"])
-        return {"id": row["id"], "actorOwner": row["owner_key"], "operation": payload["action"],
+        result = {"id": row["id"], "actorOwner": row["owner_key"], "operation": payload["action"],
                 "status": row["status"], "error": row["error"], "createdAt": row["created_at"], "updatedAt": row["updated_at"]}
+        if db is not None and row["status"] == "queued":
+            display = self._undo_display(db, payload)
+            if display is not None:
+                result["display"] = display
+        return result
+
+    def _undo_display(self, db: Any, inverse: dict[str, Any]) -> dict[str, Any] | None:
+        """Guarded presentation only; the canonical inverse remains ordered."""
+        rows = {}
+        for guard in inverse["guards"]:
+            row = self._row(db, guard["id"])
+            if (int(row["version"]) != guard["version"]
+                    or self._reset_event_state(db, row["id"]) != guard["events"]):
+                return None
+            value = self._payload(row)
+            if value["accounting"] != "cash_v1" or value.get("lifecycle", "active") != "active":
+                return None
+            rows[row["id"]] = value
+        reset, event_ids, deltas = None, [], {}
+        if inverse["action"] == "reverse_operation":
+            events = db.execute("SELECT * FROM app_reimbursement_events WHERE operation_id = ? OR confirmation_operation_id = ?",
+                                (inverse["operationId"], inverse["operationId"])).fetchall()
+            for event in events:
+                event_ids.append(event["id"])
+                deltas[event["allocation_id"]] = deltas.get(event["allocation_id"], 0) - (int(event["amount_cents"]) if event["status"] == "confirmed" else 0)
+        else:
+            saved = db.execute("SELECT * FROM app_reimbursement_resets WHERE id = ?", (inverse["resetId"],)).fetchone()
+            if saved is None or saved["version"] != inverse["version"]:
+                return None
+            undone = inverse["action"] == "undo_reset"
+            reset = {"id": saved["id"], "version": saved["version"], "status": "undone" if undone else "active"}
+            deltas = {entry["allocationId"]: entry["amountCents"] * (-1 if undone else 1) for entry in json.loads(saved["entries_json"])}
+        allocations = []
+        for identifier, delta in deltas.items():
+            value = rows[identifier]
+            settled = value["settledCents"] + (0 if reset else delta)
+            cleared = value["clearedCents"] + (delta if reset else 0)
+            outstanding = value["partnerShareCents"] - settled - cleared
+            if min(settled, cleared, outstanding) < 0:
+                return None
+            allocations.append({"id": identifier, "version": value["version"], "settledCents": settled,
+                                "clearedCents": cleared, "outstandingCents": outstanding,
+                                "status": "outstanding" if outstanding else "cleared" if cleared else "settled"})
+        return {"allocations": allocations, "eventIds": event_ids, **({"reset": reset} if reset else {})}
 
     def pending_undo_jobs(self) -> list[dict[str, Any]]:
         with self.access.connect(write=True) as db:
