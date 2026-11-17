@@ -35,6 +35,7 @@ function load(file) {
     if (name.endsWith(".css")) return {}
     if (!name.startsWith(".")) return frontendRequire(name)
     const base = path.resolve(path.dirname(file), name)
+    if (name.endsWith(".json")) return JSON.parse(fs.readFileSync(base, "utf8"))
     return load([base + ".tsx", base + ".ts"].find(fs.existsSync))
   }
   const { outputText } = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: {
@@ -47,6 +48,7 @@ function load(file) {
   return exports
 }
 const { ReimbursementLedger, reimbursementAmountCents, ledgerTotals, defaultOffsetEntries, canReverseLedgerEvent } = load(path.join(frontend, "src/reimbursement-ledger.tsx"))
+const { balanceFirstScope, sharedExpenseDate, reimbursementTransaction } = load(path.join(frontend, "src/shared-balance-first.tsx"))
 const fallback = React.createElement("p", null, "Legacy reimbursement overview")
 const markup = renderToStaticMarkup(React.createElement(ReimbursementLedger, { fallback }))
 assert.ok(markup.includes("Loading reimbursements"))
@@ -67,6 +69,14 @@ const sample = { enabled: true, ownerKey: "brian", currency: "USD", allocations:
   allocation({ id: "c", item: "Hannah groceries", payerOwner: "hannah", partnerOwner: "brian", payerPerson: "Hannah", grossCents: 12000, payerShareCents: 6000, partnerShareCents: 6000, settledCents: 0, outstandingCents: 6000, version: 1, projectedVersion: 1 }),
   allocation({ id: "old", item: "Historical rent", accounting: "legacy_net", grossCents: 10000, payerShareCents: 8000, partnerShareCents: 2000, settledCents: 2000, outstandingCents: 0, status: "settled" }),
 ], events: [receipt()], resets: [], resetState: "review-state-one" }
+assert.deepEqual(clone(balanceFirstScope(sample.allocations, "2026-09").map(item => item.id)), ["a", "b", "c"], "Active scope spans months and both directions, excluding settled rows")
+const settledSample = sample.allocations.map(item => ({ ...item, outstandingCents:0, status:"settled" }))
+assert.deepEqual(clone(balanceFirstScope(settledSample, "2026-09").map(item => item.id)), ["a", "c", "old"], "Settled scope shows only actual current-month activity")
+assert.equal(balanceFirstScope(settledSample, "2026-10").length, 0)
+assert.equal(balanceFirstScope(settledSample, "2026-09", true).length, 4, "Earlier settled history remains accessible")
+assert.equal(sharedExpenseDate("2/29/2025"), "")
+assert.equal(sharedExpenseDate("11/1/2026"), "2026-11-01")
+assert.equal(reimbursementTransaction(allocation()).category,"Needs")
 assert.deepEqual(clone(ledgerTotals(sample.allocations, "brian")), { to: 10500, from: 6000, net: 4500 })
 assert.deepEqual(clone(ledgerTotals(sample.allocations, "hannah")), { to: 6000, from: 10500, net: -4500 })
 assert.deepEqual(clone(defaultOffsetEntries(sample.allocations, "brian")), [

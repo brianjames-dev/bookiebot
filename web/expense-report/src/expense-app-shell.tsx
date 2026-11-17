@@ -218,7 +218,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const brandStatus = screen === "transactions" ? <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
     {transactionsUpdatedAt === null ? <span>Not updated yet</span> : <AppUpdatedTime updatedAt={transactionsUpdatedAt} />}
   </div> : controls
-  const fallback = report && <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
+  const fallback = report && <SharedReimbursementsCard hideTitle items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
     receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
     monthLabel={report.monthLabel} year={report.year} month={report.month} />
 
@@ -246,7 +246,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </header>
 
 
-      <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screenTitles[screen]} projected={preferences.mode === "projected"}
+      <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screen==='shared'?'Shared Reimbursements':screenTitles[screen]} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
         disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible}
         controls={<div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} />} />
@@ -261,7 +261,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
-        {report && <ReimbursementLedger fallback={fallback} refreshKey={report.generatedAt} />}
+        {report && <ReimbursementLedger balanceFirst aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} />}
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
         {report && <><SavingsGoals /><Investments report={report} ready={monthlyReady} /></>}

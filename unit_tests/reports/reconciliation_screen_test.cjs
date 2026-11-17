@@ -17,7 +17,7 @@ const cache = new Map()
 function load(file) {
   if (cache.has(file)) return cache.get(file)
   const exports = {}; cache.set(file, exports)
-  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText
+  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
   vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set, crypto: { randomUUID: () => `receipt-${++serial}-request` },
     Event: class { constructor(type) { this.type = type } }, CustomEvent: class { constructor(type) { this.type = type } }, window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
@@ -28,7 +28,7 @@ function load(file) {
         React.useEffect(() => () => { statuses.delete(id); updateWork() }, [id])
         return React.useCallback(next => { statuses.set(id, next); updateWork() }, [id])
       },
-    } : name.startsWith('.') ? load(['.tsx', '.ts'].map(ext => path.resolve(path.dirname(file), name) + ext).find(fs.existsSync)) : req(name),
+    } : name.endsWith('.json') ? JSON.parse(fs.readFileSync(path.resolve(path.dirname(file), name), 'utf8')) : name.startsWith('.') ? load(['.tsx', '.ts'].map(ext => path.resolve(path.dirname(file), name) + ext).find(fs.existsSync)) : req(name),
   })
   return exports
 }

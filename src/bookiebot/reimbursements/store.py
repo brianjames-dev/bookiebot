@@ -755,6 +755,7 @@ class ReimbursementStore:
                        "confirm_payment": {"allocationId", "version", "eventId"},
                        "offset": {"entries", "date", "note"}, "reverse": {"eventId"},
                        "receive_all": {"expectedState", "date", "note"},
+                       "report_all": {"expectedState", "date", "note"},
                        "edit_split": {"allocationId", "version", "grossCents", "payerBasisPoints", "payerShareCents"},
                        "reset": {"expectedState", "note"},
                        "undo_reset": {"resetId", "version"}, "redo_reset": {"resetId", "version"}}
@@ -783,6 +784,27 @@ class ReimbursementStore:
                 changed.append(allocation_id)
             elif operation in {"reset", "undo_reset", "redo_reset"}:
                 changed, reset_id = self._change_reset(db, owner, body, operation_id, now)
+            elif operation == "report_all":
+                if body.get("expectedState") != self._reset_state(db):
+                    raise ReimbursementConflictError("Reimbursements changed. Review the current total before reporting payment.")
+                when = _date(body.get("date"), "Payment date", past=True)
+                note = _text(body.get("note", ""), "Note", 500)
+                rows = db.execute("SELECT * FROM app_reimbursement_allocations WHERE partner_owner = ? ORDER BY id", (owner,)).fetchall()
+                rows = [row for row in rows if self._payload(row).get("lifecycle", "active") == "active"
+                        and self._payload(row)["outstandingCents"] > 0]
+                if not rows:
+                    raise ReimbursementConflictError("There are no outstanding expenses you owe.")
+                if len(rows) > 500:
+                    raise ReimbursementValidationError("This ledger is too large for one payment batch.")
+                for row in rows:
+                    self._writable(row)
+                    self._not_cleared(row)
+                    self._no_pending(db, row["id"])
+                    self._after_expense(row, when)
+                    if int(row["projected_version"]) != int(row["version"]):
+                        raise ReimbursementConflictError("An expense is still syncing. Refresh Shared before reporting payment.")
+                    event_ids.append(self._add_event(db, row, operation_id, "report_payment", owner,
+                                                    self._payload(row)["outstandingCents"], when, note, now, confirmed=False))
             elif operation == "receive_all":
                 if body.get("expectedState") != self._reset_state(db):
                     raise ReimbursementConflictError("Reimbursements changed. Review the current total before recording all received.")

@@ -65,6 +65,26 @@ def assert_unchanged(client):
 
 
 @pytest.mark.asyncio
+async def test_report_all_is_authenticated_pending_and_retry_safe(client):
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    connect(client, HANNAH, "hannah")
+    before = client.store.snapshot("hannah")
+    body = {"operation": "report_all", "requestId": uuid4().hex, "expectedState": before["resetState"],
+            "date": now_pacific().date().isoformat(), "note": ""}
+    first = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert first.status == 200
+    result = await first.json()
+    assert result["ownerKey"] == "hannah"
+    assert result["events"][0]["kind"] == "report_payment"
+    assert result["events"][0]["status"] == "pending"
+    assert result["allocations"] == before["allocations"]
+    again = await client.http.post("/app/reimbursements", json=body, headers=HEADERS)
+    assert again.status == 200
+    assert len(client.store.snapshot("hannah")["events"]) == 1
+    assert client.store.snapshot("hannah")["allocations"] == before["allocations"]
+
+
+@pytest.mark.asyncio
 async def test_bulk_received_uses_authenticated_payee_and_safe_repeat_request(client):
     connect(client)
     client.store.mark_projected(client.allocation["id"], client.allocation["version"])

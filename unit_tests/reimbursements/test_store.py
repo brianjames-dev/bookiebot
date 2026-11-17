@@ -100,6 +100,48 @@ def test_receive_all_confirms_pending_report_without_duplicate_payment(store):
     assert any(event["id"] == sent["events"][0]["id"] and event["status"] == "confirmed" for event in result["events"])
 
 
+def test_report_all_is_atomic_pending_and_idempotent_until_recipient_confirms(store):
+    values = [store.register_allocation(payload(expenseDate=f"2026-{month:02d}-03")) for month in (1, 2, 3)]
+    for value in values:
+        store.mark_projected(value["id"], value["version"])
+    other = opposite(store)
+    before = store.snapshot("hannah")
+    body = command("report_all", expectedState=before["resetState"], date=now_pacific().date().isoformat())
+    result = store.command("hannah", body)
+    assert len(result["events"]) == 3
+    assert all(event["kind"] == "report_payment" and event["status"] == "pending" for event in result["events"])
+    assert sum(event["amountCents"] for event in result["events"]) == 12000
+    assert store.snapshot("hannah")["allocations"] == before["allocations"]
+    assert store.command("hannah", body) == result
+    assert len(store.snapshot("brian")["events"]) == 3
+    assert store.get_allocation(other["id"])["outstandingCents"] == 4000
+    confirmed = store.command("brian", bulk_payment(store))
+    assert {event["id"] for event in confirmed["events"]} == {event["id"] for event in result["events"]}
+    assert all(event["status"] == "confirmed" for event in confirmed["events"])
+    assert all(row["outstandingCents"] == 0 for row in confirmed["allocations"])
+
+
+@pytest.mark.parametrize("problem", ["stale", "pending_projection", "historical", "pending_report", "future", "before_expense"])
+def test_report_all_rejects_entire_batch_without_partial_pending_events(store, problem):
+    values = [store.register_allocation(payload(accounting="legacy_net" if problem == "historical" and i == 1 else "cash_v1")) for i in range(2)]
+    for i, value in enumerate(values):
+        if not (problem == "pending_projection" and i == 1):
+            store.mark_projected(value["id"], value["version"])
+    if problem == "pending_report":
+        store.command("hannah", payment(values[1], operation="report_payment"))
+    body = command("report_all", expectedState=store.snapshot("hannah")["resetState"], date=now_pacific().date().isoformat())
+    if problem == "stale":
+        store.register_allocation(payload())
+    if problem == "future":
+        body["date"] = "2099-01-01"
+    if problem == "before_expense":
+        body["date"] = "2025-12-01"
+    before = store.snapshot("hannah")
+    with pytest.raises((ReimbursementConflictError, ReimbursementValidationError)):
+        store.command("hannah", body)
+    assert store.snapshot("hannah") == before
+
+
 @pytest.mark.parametrize("problem", ["stale", "pending_projection", "historical", "future", "before_expense"])
 def test_receive_all_rolls_back_entire_group_before_any_partial_receipts(store, problem):
     first = store.register_allocation(payload())

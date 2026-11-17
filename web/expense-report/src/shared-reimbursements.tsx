@@ -180,7 +180,7 @@ function ReimbursementEntry({ item, open, onOpenChange }: { item: SharedReimburs
   )
 }
 
-export function SharedReimbursementsCard({ items, openItems, receivedItems, coverage, monthLabel, year, month }: {
+export function SharedReimbursementsCard({ items, openItems, receivedItems, coverage, monthLabel, year, month, hideTitle = false }: {
   items: SharedReimbursementItem[]
   openItems?: SharedReimbursementItem[]
   receivedItems?: SharedReimbursementItem[]
@@ -188,6 +188,7 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
   monthLabel: string
   year: number
   month: number
+  hideTitle?: boolean
 }) {
   const [listOpen, setListOpen] = useState(false)
   const currentMonth = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }).slice(0, 7)
@@ -207,7 +208,7 @@ export function SharedReimbursementsCard({ items, openItems, receivedItems, cove
 
   return (
     <Card className="bb-report-section bb-reimbursement-section">
-      <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>
+      {!hideTitle && <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>}
       <CardContent className="bb-reimbursement-content">
         <div className="bb-reimbursement-at-glance">
           <div className="bb-reimbursement-overview">
