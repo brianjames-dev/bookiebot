@@ -247,10 +247,10 @@
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-balance {padding:2px 0;gap:1px 8px;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-person-name {font-size:12px;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-status {padding:3px 6px;}
- .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-allocation {padding:4px 0;}
+ .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-allocation {padding:2px 0;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-split-track {height:4px;margin:4px 0 6px;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-share {gap:5px;}
- .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-payment-summary {margin:4px 0;}
+ .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-payment-summary {margin:2px 0;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .rp-payment-summary dd {margin-top:1px;font-size:15px;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sr-detail-native .sp-summary {gap:2px 6px;min-height:0;align-content:start;}
  .bb-page[data-duo-landscape=true][data-screen=shared] .sp-management .bs-central {height:64px;margin-bottom:2px;}
@@ -323,3 +323,5 @@
 @media (min-width:600px) and (max-height:550px) {
  .sr-settlement-editor .sr-reset-row {min-height:56px;}
 }
+
+.sr-reset-note {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}

@@ -145,13 +145,13 @@ export function BalanceFirstReimbursements({ snapshot, disabled, selectDisabled 
         {active.length > 0 && <div className="sr-flow-caption">{totals.to > 0 && totals.from > 0 ? <><span>Offset</span>{totals.net !== 0 && <><ChevronRight/><span>Payment (optional)</span></>}</> : <span>{totals.to > 0 ? "Record received" : "Record sent"}</span>}</div>}
         {blocked && <p className="bi-footnote" role="status">{blocked}</p>}
         {incoming.length > 0 && <section className="bb-ledger-incoming" aria-label="Payments awaiting your confirmation"><h3>Awaiting your confirmation</h3>{incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={allocations.find(item => item.id === event.allocationId)!} disabled={disabled} run={run}/>)}</section>}
-        <ReimbursementOptions history={history} setHistory={setHistory} setSelected={setSelected} setScene={setScene} headerActions={headerActions} wide={wide} disabled={locked}/>
       </>}
     </EditorScenes>
   </div>
   return <div className="sr-balance-first bi-product" data-detail-open={Boolean(selected)} data-flow-open={scene !== "summary"} data-refreshing={refreshing}>
     {snapshot.projectionPending && <div className="sr-sync bb-ledger-message" role="status"><p>Recorded. Expense sheets are still syncing.</p><button disabled={disabled} onClick={refresh}>Refresh</button></div>}
     {snapshot.error && <p className="sr-sync bb-ledger-note" role="status">{snapshot.error}</p>}
+    <ReimbursementOptions history={history} setHistory={setHistory} setSelected={setSelected} setScene={setScene} headerActions={headerActions} wide={wide} disabled={locked || scene !== "summary"}/>
     <section className="sr-list" aria-label="Shared expenses"><div className="sr-scope">{history ? <HistoryFilter onClear={() => { setHistory(false); setSelected("") }}/> : <span>{active.length ? "Outstanding · all months" : `${dateLabel(currentMonth + "-01", true)} activity`}</span>}</div>
       {!shown.length && <p className="bb-ledger-empty">No reimbursements for this month.</p>}
       {page.visible.map(group => <BalanceMonth key={group.key} group={group} paginate={history} selected={selected} onSelect={id => { if (!selectDisabled && scene === "summary") setSelected(selected === id ? "" : id) }} disabled={disabled || scene !== "summary"} selectDisabled={selectDisabled || scene !== "summary"} snapshot={snapshot} reversibleIds={reversibleIds} run={run} aliases={aliases} wide={wide} detailPane={detailPane}/>)}
