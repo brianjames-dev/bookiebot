@@ -156,6 +156,43 @@ async def test_server_restart_resumes_accepted_undo_without_another_phone_write(
 
 
 @pytest.mark.asyncio
+async def test_new_undo_at_worker_completion_is_not_stranded_or_retried_by_polling(monkeypatch):
+    from bookiebot.reports import phone_shared_bills
+    publishing, release = asyncio.Event(), asyncio.Event()
+    calls = []
+    def recover():
+        calls.append(True)
+        return {"completed": [], "pending": []}
+    async def publish(_owner):
+        if len(calls) == 1:
+            publishing.set()
+            await release.wait()
+    monkeypatch.setattr(service, "recover_queued_undos", recover)
+    monkeypatch.setattr(phone_shared_bills, "publish_change", publish)
+    worker = phone_reimbursements._UndoRecovery()
+    first = {"id": "first", "actorOwner": "brian", "status": "queued"}
+    second = {"id": "second", "actorOwner": "hannah", "status": "queued"}
+    try:
+        worker.start([first])
+        await asyncio.wait_for(publishing.wait(), 1)
+        # The current pass already saw no pending work; the new POST and its
+        # duplicate status polls arrive during the final publication await.
+        for _ in range(4):
+            worker.start([first, second])
+        release.set()
+        for _ in range(100):
+            if worker.task is None:
+                break
+            await asyncio.sleep(.01)
+        assert len(calls) == 2 and not worker.waiting
+        worker.start([second])
+        assert worker.task is None, "Old status polls respect the retry backoff"
+    finally:
+        release.set()
+        await worker.close()
+
+
+@pytest.mark.asyncio
 async def test_fast_display_snapshot_never_waits_for_sheets_recovery(client, monkeypatch):
     calls = []
     monkeypatch.setattr(projection, "sync_pending", lambda store: calls.append(store) or False)

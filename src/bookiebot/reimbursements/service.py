@@ -98,6 +98,11 @@ def recover_queued_undos() -> dict[str, Any]:
     bulk = store.pending_bulk_projection_ids()
     if bulk:
         sync_received(store, bulk)
+        # A conflicted bulk receipt must not starve an unrelated payment or
+        # offset Undo. The batch projector intentionally touches only bulk IDs.
+        other = {row["id"] for row in store.pending_projections()} - bulk
+        if other:
+            sync_pending(store, allocation_ids=other)
     else:
         sync_pending(store)
     completed = []

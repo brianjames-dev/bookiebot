@@ -18,10 +18,17 @@ class _UndoRecovery:
     def __init__(self):
         self.task: asyncio.Task | None = None
         self.attempted: dict[str, float] = {}
+        self.waiting: dict[str, dict] = {}
+        self.closing = False
 
     def start(self, jobs: list[dict]) -> None:
         queued = [job for job in jobs if job["status"] == "queued"]
-        if not queued or self.task is not None and not self.task.done():
+        if self.closing or not queued:
+            return
+        if self.task is not None and not self.task.done():
+            # A POST can arrive after the worker's last pending-job read but
+            # before its shared refresh hint finishes. Do not strand that job.
+            self.waiting.update({job["id"]: job for job in queued if job["id"] not in self.attempted})
             return
         now = time.monotonic()
         if all(now - self.attempted.get(job["id"], -60) < 30 for job in queued):
@@ -47,11 +54,18 @@ class _UndoRecovery:
                     break
         except asyncio.CancelledError:
             raise
+        finally:
+            self.task = None
+            waiting = list(self.waiting.values())
+            self.waiting.clear()
+            self.start(waiting)
 
     async def close(self) -> None:
+        self.closing = True
         if self.task is not None:
-            self.task.cancel()
-            await asyncio.gather(self.task, return_exceptions=True)
+            task = self.task
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
 
 _UNDO_RECOVERY = web.AppKey("bookiebot_reimbursement_undo_recovery", _UndoRecovery)
