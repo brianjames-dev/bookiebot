@@ -95,7 +95,7 @@ export function watchDuoViewport(update:()=>void) {
     fitFrame=window.requestAnimationFrame(()=>{fitFrame=window.requestAnimationFrame(()=>restoreFit?.(true))})
     fitTimer=window.setTimeout(()=>restoreFit?.(true),100)
   }
-  const measure=(checkFit=false)=>{
+  const measure=()=>{
     if(document.visibilityState==='hidden')return
     recordDisplayFrame('measure')
     update()
@@ -111,7 +111,10 @@ export function watchDuoViewport(update:()=>void) {
     if(repair){lastPan=pan;window.scrollTo({left:0,top:0,behavior:'instant'})}
     if(!panned)lastPan=''
     if(repair&&reattachDuoCanvas()){reattach=false;recordDisplayFrame('repaired')}
-    if(checkFit)refreshViewportFit()
+    // Start the device-confirmed repair as soon as its guarded measurements
+    // are available. Waiting for a quiet 300ms resize window exposes the native
+    // gap during app return; resize/focus bursts can postpone it even further.
+    refreshViewportFit()
   }
   const cancel=()=>{window.cancelAnimationFrame(frame);window.cancelAnimationFrame(panFrame);frame=panFrame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}
   const pause=(event?:Event)=>{if(event)recordDisplayFrame(event.type,'background');if(seenVisible)suspended=true;fitPending=false;restoreFit?.(false);cancel()}
@@ -125,7 +128,7 @@ export function watchDuoViewport(update:()=>void) {
     measure()
     frame=window.requestAnimationFrame(()=>{measure();frame=window.requestAnimationFrame(()=>{frame=0;measure()})})
     // Orientation/resume values can settle after the first restored frame.
-    for(const delay of [100,300])timers.push(window.setTimeout(()=>measure(delay===300),delay))
+    for(const delay of [100,300])timers.push(window.setTimeout(measure,delay))
     timers.push(window.setTimeout(()=>recordDisplayFrame('settled'),1000))
   }
   const pan=()=>{recordDisplayFrame('visual-scroll');if(!panFrame)panFrame=window.requestAnimationFrame(()=>{panFrame=0;measure()})}

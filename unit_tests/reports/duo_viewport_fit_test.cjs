@@ -23,10 +23,13 @@ function fixture(options={}){
  const finish=()=>{for(let i=0;i<90;i++){tick();paint()}};
  const hide=()=>{doc.visibilityState='hidden';doc.send('visibilitychange')};
  const show=()=>{doc.visibilityState='visible';doc.send('visibilitychange')};
- return {win,doc,page,scroll,meta,original,changes,targets,timers,frames,stop,tick,paint,finish,hide,show,get content(){return content},get height(){return height}};
+ return {win,doc,page,scroll,meta,original,changes,targets,timers,frames,stop,tick,paint,finish,hide,show,get content(){return content},get height(){return height},set height(value){height=value}};
 }
 const f=fixture();f.finish();assert.equal(f.changes.length,0,'Cold/ordinary resize never reparses the viewport');
-f.hide();f.show();f.finish();
+f.hide();f.show();
+assert(f.content.includes('viewport-fit=auto'),'A known-bad resume starts recovery in the foreground event, before timers or the first paint');
+f.paint();assert(f.content.includes('viewport-fit=auto'),'Keep the alternate fit for the required committed frame');
+f.paint();assert.equal(f.height,669,'Finish recovery on the next frame, without waiting for 100/300ms settle timers');f.finish();
 assert.equal(f.height,669,'The reported 82px native inset is reclaimed');
 assert.deepEqual(f.changes.map(row=>row.value),[f.original.replace('cover','auto'),f.original]);
 assert(f.changes[1].paint>f.changes[0].paint,'The alternate fit must survive a committed frame, not a same-task toggle');
@@ -37,12 +40,15 @@ for(const options of [{standalone:false},{open:false},{width:382,outerWidth:457}
  const g=fixture(options);g.finish();g.hide();g.show();g.finish();assert.equal(g.changes.length,0,'Do not change unrelated/healthy/browser/keyboard/zoom/modal geometry: '+JSON.stringify(options));g.stop();
 }
 const deferred=fixture({focused:true});deferred.hide();deferred.show();deferred.finish();assert.equal(deferred.changes.length,0);deferred.doc.activeElement=null;deferred.doc.send('focusout');deferred.finish();assert.equal(deferred.height,669,'A focused editor defers the repair until blur');deferred.stop();
+const late=fixture({height:669});late.hide();late.show();assert.equal(late.changes.length,0);late.height=587;late.win.visualViewport.send('resize');assert(late.content.includes('viewport-fit=auto'),'Late native geometry starts recovery in its resize event, without restarting a settling delay');late.paint();late.paint();assert.equal(late.height,669);late.stop();
+const transientOptions={visualHeight:669},transient=fixture(transientOptions);transient.hide();transient.show();assert.equal(transient.changes.length,0,'Inconsistent first-resume dimensions remain guarded');transientOptions.visualHeight=587;transient.paint();assert(transient.content.includes('viewport-fit=auto'),'Retry the guarded measurement on the first foreground frame');transient.paint();transient.paint();assert.equal(transient.height,669);transient.stop();
+const focus=fixture();focus.hide();focus.doc.visibilityState='visible';focus.win.send('focus');assert(focus.content.includes('viewport-fit=auto'),'Focus-before-visibility begins the same immediate return');focus.doc.send('visibilitychange');focus.win.send('focus');focus.finish();assert.equal(focus.changes.length,2,'Duplicate focus/visibility events cannot restart or delay the native-fit cycle');focus.stop();
 const stuck=fixture({unrepairable:true});stuck.hide();stuck.show();stuck.finish();assert.equal(stuck.height,587);assert.equal(stuck.changes.length,2,'One attempt per real resume, even if the native host refuses');stuck.win.send('resize');stuck.finish();assert.equal(stuck.changes.length,2);stuck.stop();
 for(const action of ['hide','stop']){
- const g=fixture();g.hide();g.show();g.tick(300);assert(g.content.includes('viewport-fit=auto'));
+ const g=fixture();g.hide();g.show();assert(g.content.includes('viewport-fit=auto'));
  g[action]();assert.equal(g.content,g.original,'Interrupted repair immediately restores metadata on '+action);g.finish();assert.equal(g.content,g.original);g.stop();
  assert.equal(g.frames.size,0);assert.equal(g.timers.size,0);assert(g.targets.every(target=>[...target.listeners.values()].every(set=>set.size===0)));
 }
-const fallback=fixture();fallback.hide();fallback.show();fallback.tick(300);assert(fallback.content.includes('viewport-fit=auto'));fallback.tick(100);assert.equal(fallback.content,fallback.original,'A paused animation frame cannot leave auto fit behind');fallback.stop();
-const external=fixture();external.hide();external.show();external.tick(300);external.meta.setAttribute('content','width=device-width, viewport-fit=contain');external.stop();assert.equal(external.content,'width=device-width, viewport-fit=contain','Do not overwrite another viewport owner');
+const fallback=fixture();fallback.hide();fallback.show();assert(fallback.content.includes('viewport-fit=auto'));fallback.tick(100);assert.equal(fallback.content,fallback.original,'A paused animation frame cannot leave auto fit behind');fallback.stop();
+const external=fixture();external.hide();external.show();external.meta.setAttribute('content','width=device-width, viewport-fit=contain');external.stop();assert.equal(external.content,'width=device-width, viewport-fit=contain','Do not overwrite another viewport owner');
 console.log('Physical DUO viewport dimensions, committed native-fit recovery, state retention, one-shot guards and cleanup pass');
