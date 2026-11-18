@@ -36,10 +36,10 @@ function snapshot(reason:string) {
   }
 }
 type Frame=NonNullable<ReturnType<typeof snapshot>>
-let baseline:Frame|null=null,beforeBackground:Frame|null=null,resume:Frame[]=[],captureUntil=0
+let baseline:Frame|null=null,beforeBackground:Frame|null=null,beforeSettings:Frame|null=null,resume:Frame[]=[],captureUntil=0
 const events:{at:number|null;reason:string;visibility:string}[]=[]
 
-export function recordDisplayFrame(reason:string,phase?:'background'|'resume'|'focus') {
+export function recordDisplayFrame(reason:string,phase?:'background'|'resume'|'focus'|'manual') {
   // Reporting must never interrupt normal foreground/scroll recovery.
   try{
     if(!['measure','repaired','settled'].includes(reason)){
@@ -49,6 +49,7 @@ export function recordDisplayFrame(reason:string,phase?:'background'|'resume'|'f
     if(baseline&&!phase&&now()>captureUntil)return
     const frame=snapshot(reason);if(!frame)return
     baseline??=frame
+    if(phase==='manual'){beforeSettings=frame;return}
     if(phase==='background')beforeBackground=frame
     // A window-focus-only return is useful evidence too. Duplicate focus
     // delivery during a real resume must not erase its pre-repair first frame.
@@ -67,5 +68,5 @@ export function displayReport(version:string) {
   })
   return JSON.stringify({format:'BookieBot display report 1',build:version.slice(0,32),
     device:{agent:navigator.userAgent.slice(0,200),pixelRatio:number(window.devicePixelRatio),screen:[screen?.width,screen?.height,screen?.availWidth,screen?.availHeight].map(number),orientation:screen?.orientation?[screen.orientation.type,number(screen.orientation.angle)]:null,standalone:(navigator as Navigator&{standalone?:boolean}).standalone??window.matchMedia('(display-mode: standalone)').matches},
-    events,baseline,beforeBackground,resumeChanges,current})
+    events,baseline,beforeBackground,beforeSettings,resumeChanges,current})
 }
