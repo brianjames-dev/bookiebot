@@ -10,8 +10,51 @@ from bookiebot.reports.report_insights import compare_report_spending
 from bookiebot.sheets.bills import BILL_SCHEDULE_HEADERS
 from bookiebot.sheets.routing import PACIFIC_TZ
 from unit_tests.reports.test_batched_report_reads import ACTOR, client_for, configure
+from unit_tests.reimbursements.test_store import access, store, payload, payment, sync_allocations  # noqa:F401
 
 NOW = datetime(2026, 10, 29, 12, tzinfo=PACIFIC_TZ)
+
+
+@pytest.mark.parametrize('owner', ['brian', 'hannah'])
+@pytest.mark.parametrize('empty_rows', [[], [[], []]])
+def test_annual_comparison_retains_canonical_receipt_anchors_and_live_basis(store, monkeypatch, owner, empty_rows):
+    from bookiebot.reimbursements import service
+    from bookiebot.reimbursements.projection import _name
+    from bookiebot.sheets.config import category_layout
+    from gspread.utils import a1_to_rowcol
+    from unit_tests.reports.test_expense_breakdown import _row
+    columns = {key: a1_to_rowcol(col+'1')[1] for key, col in category_layout([])['shopping']['columns'].items()}
+    values = {'date': '2026-09-10', 'item': 'Shared purchase', 'amount': '100.00', 'location': 'Fixture store', 'person': 'Brian (BofA)'}
+    allocation = store.register_allocation(payload(id='comparison-source', item=values['item'], location=values['location'],
+        expenseDate=values['date'], category='shopping', sourceWorksheet='expense', sourceSheetTitle='September', sourceRow=3,
+        sourceColumnMap=columns, sourceValues=values))
+    sync_allocations(store)
+    paid = store.command('brian', {**payment(allocation, 3000), 'date': '2026-10-10'})
+    monkeypatch.setenv('BOOKIEBOT_REIMBURSEMENTS_ENABLED', 'true')
+    monkeypatch.setattr(service, 'build_reimbursement_store', lambda: store)
+    for module in (reports, comparison_reads):monkeypatch.setattr(module, 'now_pacific', lambda: NOW)
+    monkeypatch.setattr(comparison_reads, 'get_budget_spreadsheet_id_for_user', lambda *args: 'personal')
+    monkeypatch.setattr(comparison_reads, 'get_shared_expenses_spreadsheet_id', lambda *args: 'shared')
+    source = ['']*40
+    for field, column in columns.items():source[column-1] = values[field]
+    rows = [[], [], _row({'V':'9/11/2026', 'W':'Unrelated', 'X':'22', 'Y':'Other store', 'Z':'Brian (BofA)'}), source]
+    tabs = {'personal': {name: [['Monthly Income', '5000']] for name in ('September', 'October')},
+            'shared': {'September': rows, 'October': empty_rows}}
+    metadata = {'shared': {'sheets': [{'properties': {'title': title, 'sheetId': number}} for number,title in enumerate(('September','October'),1)],
+        'namedRanges': [{'name': _name('source', allocation['id']), 'range': {'sheetId':1, 'startRowIndex':3, 'endRowIndex':4}}]}}
+    client, calls = client_for(tabs, metadata=metadata)
+    monkeypatch.setattr('bookiebot.sheets.auth.get_gspread_client', lambda: client)
+    original = deepcopy(tabs)
+    results = comparison_reads.load_comparison_year(dict(actor_key=ACTOR if owner=='brian' else '830984827904851969', owner_name=owner.title(),
+        persons=['Brian (BofA)'] if owner=='brian' else ['Hannah'], year=2026))
+    assert len(calls) == 4, 'Canonical comparison uses the existing metadata/value batches only'
+    comparison = compare(results[10], results[9], now=NOW)
+    assert comparison['selected']['spending'] == (0 if owner=='brian' else 30)
+    assert comparison['baseline']['spending'] == (92 if owner=='brian' else 0)
+    assert comparison['selected']['reimbursementBasis']['ownerKey'] == owner
+    assert comparison['baseline']['reimbursementBasis']['ownerKey'] == owner
+    assert paid['events'][0]['id'] in {e['id'] for e in comparison['selected']['reimbursementBasis']['events']}
+    assert tabs == original
 
 
 def month(year, number, current, projected=None, saved=1000):

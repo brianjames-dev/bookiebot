@@ -87,6 +87,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   else if(name==='/app/account')value={id:'fixture-user',name:'Brian',googleEnabled:false,google:{connected:false,email:null}};
   else if(name==='/app/account/changes')value={revision:0};
   else if(name==='/app/auth/options')value={googleEnabled:false};
+  else if(name==='/app/icon.png')return route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'assets/avatars/avatar1.PNG'))});
   else if(name.includes('avatar'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'assets/avatars/avatar7.png'))});
   else {unexpected.push(request.method()+' '+url);return route.fulfill({status:404,json:{error:'Unknown fixture'}});}
   return route.fulfill({json:value});
@@ -250,12 +251,14 @@ async function pageScrollLifecycle(page){
  assert.equal(await surface.evaluate(el=>el.scrollTop),240,'returning restores the content scroll position');
  await page.getByRole('button',{name:'Talk to BookieBot',exact:true}).click();
  await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock==='true');
+ const messageScroll=await surface.evaluate(el=>el.scrollTop);
  assert.equal(await surface.evaluate(el=>getComputedStyle(el).overflowY),'hidden','Message locks the content surface');
- // Model native focus scrolling while the dialog owns the keyboard.
- await surface.evaluate(el=>el.scrollTop=0);
+ // The portrait now lives in the scrolling masthead, so native click may
+ // reveal it first. Restore the position actually captured when chat opens.
+ await surface.evaluate((el,y)=>el.scrollTop=y+80,messageScroll);
  await page.getByRole('button',{name:'Close Talk to BookieBot',exact:true}).click();
  await page.waitForFunction(()=>document.documentElement.dataset.bbModalScrollLock!=='true');
- assert.equal(await surface.evaluate(el=>el.scrollTop),240,'closing Message restores the actual content position');
+ assert.equal(await surface.evaluate(el=>el.scrollTop),messageScroll,'closing Message restores the actual content position');
  await surface.evaluate(el=>el.scrollTo(0,0));
  await page.getByRole('button',{name:'Explain Income',exact:true}).click();
  await page.locator('.bb-details-dialog[open]').waitFor();
