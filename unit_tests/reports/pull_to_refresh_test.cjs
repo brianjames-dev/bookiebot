@@ -44,7 +44,7 @@ function Handlers({disabled}) {
   usePageRefresh('savings',{refresh:async()=>{calls.push('investments'); return true}})
   return null
 }
-const fixture = ({screen = 'overview', disabled = false, blocked = false} = {}) => h(PageRefreshProvider,null,h(Handlers,{disabled}),h(PullToRefresh,{screen,blocked}))
+const fixture = ({screen = 'overview', disabled = false, blocked = false, canvasKey} = {}) => h(PageRefreshProvider,null,h(Handlers,{disabled}),h(PullToRefresh,{screen,blocked,canvasKey}))
 let renderer
 const phase = () => renderer.root.findByProps({className:'bb-pull-refresh'}).props['data-phase']
 const progress = () => renderer.root.findByProps({role:'progressbar'}).props['aria-valuenow']
@@ -211,6 +211,15 @@ const settle = async () => {await act(async()=>{await Promise.resolve();await Pr
   assert.equal(renderer.root.findByProps({className:'bb-pull-refresh'}).props.style['--bb-release-overscroll'],'32px','Duo bounce uses the native page offset')
   const inner = new Element({scrollable:true});inner.parentElement=duoSurface
   start({target:inner});move({y:290});await release({y:290});assert.equal(calls.length,beforeDuo+2,'Other nested scrollers keep their own gestures')
+  act(()=>renderer.update(fixture({screen:'transactions',canvasKey:'closed'})));pending=true
+  start({target:content});move({y:290});await release({y:290});assert.equal(phase(),'refreshing')
+  act(()=>renderer.update(fixture({screen:'transactions',canvasKey:'open'})))
+  assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'A fold must not carry a loading gap into the new canvas')
+  pending=false;await act(async()=>finish());await settle();assert.equal(phase(),'idle','Completing the old refresh cannot revive the gap')
+  pending=true;start({target:content});move({y:290});await release({y:290});assert.equal(phase(),'refreshing')
+  act(()=>listeners.get('window:pagehide').callback());assert.equal(renderer.root.findByProps({className:'bb-pull-refresh-space'}).props.style.height,0,'App switching clears an in-flight loading gap')
+  pending=false;await act(async()=>finish());await settle();assert.equal(phase(),'idle')
+  const beforeInterrupted=calls.length;start({target:content});move({y:290});assert.equal(phase(),'armed');act(()=>listeners.get('window:pagehide').callback());await release({y:290});assert.equal(calls.length,beforeInterrupted,'An interrupted finger cannot refresh after app return')
   duoSurface=null
   act(()=>renderer.unmount());assert.equal(listeners.size,0);assert.equal(timers.size,0);assert.equal(frames.size,0);assert.equal(classes.size,0)
 

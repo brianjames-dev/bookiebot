@@ -31,7 +31,7 @@ function excludedTarget(target: EventTarget | null) {
   return false
 }
 
-export function PullToRefresh({ screen, blocked = false, label }: { screen: AppScreen; blocked?: boolean;label?:string }) {
+export function PullToRefresh({ screen, blocked = false, label, canvasKey }: { screen: AppScreen; blocked?: boolean;label?:string;canvasKey?:string }) {
   const registry = usePageRefreshRegistry()!
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot)
   const [phase, setPhase] = useState<Phase>("idle"), [distance, setDistance] = useState(0)
@@ -40,9 +40,11 @@ export function PullToRefresh({ screen, blocked = false, label }: { screen: AppS
   const state = useRef({ screen, blocked }), gesture = useRef<Gesture | null>(null), pulled = useRef(0)
   const running = useRef(false), mounted = useRef(false), timer = useRef<number | undefined>(undefined)
   const refreshScreen = useRef<AppScreen | null>(null)
+  const presentation = useRef(0)
   state.current = { screen, blocked }
   const available = !blocked && registry.available(screen)
   const reset = () => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); if (!running.current) setPhase("idle") }
+  const suspend = () => { presentation.current++; reset(); setPhase('idle'); setReleaseOverscroll(0); setMessage('') }
   const cancelPull = () => {
     if (running.current || pulled.current <= 0) { reset(); return }
     // Keep the live indicator's viewport anchor until it has faded above the
@@ -53,6 +55,7 @@ export function PullToRefresh({ screen, blocked = false, label }: { screen: AppS
   }
   const refresh = async () => {
     const selected = state.current.screen
+    const generation = presentation.current
     if (running.current || state.current.blocked || pageIsBlocked() || !registry.available(selected)) return
     running.current = true; refreshScreen.current = selected; window.clearTimeout(timer.current)
     // Snapshot the bounce once for the icon's CSS handoff. Never feed later
@@ -61,7 +64,7 @@ export function PullToRefresh({ screen, blocked = false, label }: { screen: AppS
     const success = await registry.refresh(selected)
     running.current = false
     if (!mounted.current) return
-    if (state.current.screen !== selected) { reset(); return }
+    if (state.current.screen !== selected || presentation.current !== generation) { reset(); return }
     setPhase(success ? "done" : "error")
     setMessage(success ? `${label??screenTitles[selected]} refreshed` : `Couldn’t refresh ${label??screenTitles[selected]}. Pull down to try again.`)
     timer.current = window.setTimeout(() => {
@@ -73,7 +76,7 @@ export function PullToRefresh({ screen, blocked = false, label }: { screen: AppS
       timer.current = window.setTimeout(reset, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 500)
     }, success ? 900 : 4000)
   }
-  const actions = useRef({ reset, refresh, cancelPull }); actions.current = { reset, refresh, cancelPull }
+  const actions = useRef({ reset, refresh, cancelPull, suspend }); actions.current = { reset, refresh, cancelPull, suspend }
 
   useEffect(() => {
     mounted.current = true
@@ -141,22 +144,28 @@ export function PullToRefresh({ screen, blocked = false, label }: { screen: AppS
       else actions.current.cancelPull()
     }
     const cancel = () => { if (gesture.current) actions.current.cancelPull() }
+    const suspend = () => actions.current.suspend()
+    const visibility = () => { if(document.visibilityState==='hidden')suspend() }
     document.addEventListener("touchstart", start, { passive: true })
     document.addEventListener("touchmove", move, { passive: true })
     document.addEventListener("touchend", end, { passive: true })
     document.addEventListener("touchcancel", cancel, { passive: true })
     const stopScroll = observePageScroll(scroll)
-    window.addEventListener("pagehide", cancel)
+    window.addEventListener("pagehide", suspend)
+    window.addEventListener("pageshow", suspend)
+    window.addEventListener("orientationchange", suspend)
+    document.addEventListener('visibilitychange',visibility)
     return () => {
       mounted.current = false; window.clearTimeout(timer.current); gesture.current = null
       cancelAnimationFrame(frame)
       document.documentElement.classList.remove("bb-pull-refresh-enabled")
       document.removeEventListener("touchstart", start); document.removeEventListener("touchmove", move)
-      document.removeEventListener("touchend", end); document.removeEventListener("touchcancel", cancel); window.removeEventListener("pagehide", cancel)
+      document.removeEventListener("touchend", end); document.removeEventListener("touchcancel", cancel); window.removeEventListener("pagehide", suspend)
+      window.removeEventListener("pageshow", suspend); window.removeEventListener("orientationchange", suspend);document.removeEventListener('visibilitychange',visibility)
       stopScroll()
     }
   }, [registry])
-  useEffect(() => { window.clearTimeout(timer.current); gesture.current = null; pulled.current = 0; setDistance(0); setMessage(""); if (!running.current) setPhase("idle") }, [screen, blocked])
+  useEffect(() => { actions.current.suspend() }, [screen, blocked, canvasKey])
 
   const visible = !blocked && (phase !== "refreshing" || refreshScreen.current === screen) && (distance > 0 || phase === "refreshing" || phase === "done" || phase === "error")
   // Native rubber banding owns the page while the finger is down. After release,

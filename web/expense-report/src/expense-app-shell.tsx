@@ -4,6 +4,7 @@ import { AppNavigationContext, AppNavigationStore, nextScrollNavigation, screenF
 import { AppNavigationDock } from "./app-navigation-bar"
 import { NavigationViewport } from "./navigation-viewport"
 import { observePageScroll, readPageScroll, scrollPageTo } from "./page-scroll"
+import {useDuoListScroll} from './duo-list-scroll'
 import { AppHeaderBack, AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -169,6 +170,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     scrollState.current = { lastY: readPageScroll().y, travel: 0, compact: navigation.getSnapshot().compact }
   }, [screen, widgetGuideOpen, configurationOpen])
 
+  useDuoListScroll(duo.enabled,duo.landscape,screen)
+
   useEffect(() => {
     let frame = 0
     const readScroll = () => {
@@ -236,7 +239,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       data-duo-bills={duo.landscape && screen === "settings" && configurationOpen || undefined}
       data-bills-open={screen === 'settings'&&configurationOpen || undefined}
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
-      <PullToRefresh screen={screen} label={configurationOpen?settingsTitle:undefined} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen || configurationOpen&&duo.landscape} />
+      <PullToRefresh screen={screen} canvasKey={duo.landscape?'open':'compact'} label={configurationOpen?settingsTitle:undefined} blocked={!report || signingOut || askOpen || keyboardOpen || widgetGuideOpen || configurationOpen&&duo.landscape} />
       <header className="bb-masthead bb-shell-masthead">
         {screen === 'settings' ? <div className="bb-settings-masthead-title"><AppHeaderBack label={settingsTitle} disabled={configurationOpen&&(guard.pending||guard.uncertain)} onBack={()=>{
           if(configurationOpen){widgetGuideRef.current=false;setBillsOpen(false);setTransfersOpen(false)}
