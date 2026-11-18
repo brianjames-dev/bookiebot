@@ -46,8 +46,9 @@ async function geometry(page){return page.evaluate(()=>{
    Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'));
   });
   await page.setViewportSize({width:867,height:587});armed=true;
-  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'))});
-  await page.waitForFunction(()=>window.__fitChanges.length===2);for(let i=0;!recovered&&i<20;i++)await page.waitForTimeout(50);assert(recovered);
+  const firstFit=await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'));return document.querySelector('meta[name="viewport"]').content});
+  assert(firstFit.includes('viewport-fit=auto'),'Begin native recovery before yielding the foreground event to a paint/timer on '+tab);
+  await page.waitForFunction(()=>window.__fitChanges.length===2);for(let i=0;!recovered&&i<20;i++)await page.waitForTimeout(50);assert(recovered,JSON.stringify({errors,state:await page.evaluate(()=>({changes:window.__fitChanges,sawPaint:window.__fitSawPaint,content:document.querySelector('meta[name="viewport"]').content}))}));
   await wait(page);assert.deepEqual(await geometry(page),before,'Reclaim the lost height without changing normal chrome on '+tab);
   const state=await page.evaluate(()=>({same:window.__fitCanvas===document.querySelector('.bb-page'),inputSame:!window.__fitInput||window.__fitInput===document.querySelector('input[aria-label="Amount"]'),content:document.querySelector('meta[name="viewport"]').content,original:window.__fitOriginal,changes:window.__fitChanges.length,scroll:document.querySelector('.bb-page').scrollTop}));
   assert(state.same&&state.inputSame,'Retain the canvas and editor DOM');assert.equal(state.content,state.original);assert.equal(state.changes,2);assert.equal(state.scroll,0);

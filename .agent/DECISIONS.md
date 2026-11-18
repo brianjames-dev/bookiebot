@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-18 — Begin the confirmed DUO viewport repair on foreground
+
+The user confirms PR #206's native-fit cycle corrects the physical open-DUO gap, with a visible roughly half-second delay. Supersede only its settling prerequisite: a genuine return arms recovery, and every guarded measurement may start it immediately once the known signature is valid. Do not debounce native-fit initiation behind resize bursts. Retain the two animation-frame callbacks that commit the alternate fit before restoring cover; a same-task toggle previously failed to repair the native viewport. Existing late 100/300ms measurements remain fallbacks for delayed/inconsistent geometry. Keep one native-fit attempt per return, keyboard/field/zoom/modal guards, exact metadata/scroll restoration, cleanup and unchanged page/editor/dock identity. Do not add a splash, conceal the retained screen or promise control of an iOS app-switch snapshot before lifecycle delivery. Regression tests assert event/frame ordering rather than a flaky wall-clock deadline; physical timing acceptance is checklist 324.
+
 ## 2026-11-18 — Recover the measured native DUO viewport inset
 
 The physical iOS 27.2.1 report supplies the previously missing evidence: inner/root/visual height 587 vs outer window 669, page/header y=0, no root/visual pan or pull-refresh gap, top safe area 0. Width settles to 867 vs outer 951 (the separate native right rail); Screen API remains the closed 457×678 display. Treat this as native viewport sizing/inset loss, not DOM padding. Do not compensate with a negative top, synthetic height, forced reload, remount or stale screen dimensions.
