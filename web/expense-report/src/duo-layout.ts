@@ -23,9 +23,27 @@ export function duoRingGeometry(size:{width:number;height:number}) {
   return {cx:width/2,cy:height/2,outerRadius:radius,innerRadius:radius*(1-52/219)}
 }
 
-/** iOS can restore document pan/old geometry without delivering a resize. */
+// Rebuild the fixed positioning box, not the React tree. A retained iOS view
+// can keep its old native origin while reporting zero document/visual offsets.
+function reattachDuoCanvas() {
+  const page=document.querySelector<HTMLElement>('.bb-page[data-duo-enabled="true"]')
+  if(!page)return false
+  const scrolls=[page,...page.querySelectorAll<HTMLElement>('*')]
+    .filter(node=>node.scrollTop||node.scrollLeft)
+    .map(node=>({node,top:node.scrollTop,left:node.scrollLeft}))
+  const value=page.style.getPropertyValue('position'),priority=page.style.getPropertyPriority('position')
+  page.style.setProperty('position','absolute','important')
+  void page.offsetHeight
+  if(value)page.style.setProperty('position',value,priority)
+  else page.style.removeProperty('position')
+  void page.offsetHeight
+  for(const {node,top,left}of scrolls){node.scrollTop=top;node.scrollLeft=left}
+  return true
+}
+
+/** Reconnect a retained canvas; an app switch need not fire pageshow/resize. */
 export function watchDuoViewport(update:()=>void) {
-  let frame=0
+  let frame=0,panFrame=0,seenVisible=document.visibilityState!=='hidden',suspended=false,reattach=false,lastPan=''
   const viewport=window.visualViewport
   const timers:number[]=[]
   const measure=()=>{
@@ -33,26 +51,40 @@ export function watchDuoViewport(update:()=>void) {
     update()
     const visual=window.visualViewport
     const keyboard=document.activeElement?.matches('input,textarea,[contenteditable=true]')&&visual&&window.innerHeight-visual.height>140
-    // The Duo page owns content scroll. Never turn keyboard/zoom panning into
-    // a document reset, and never reset the page surface or its retained editor.
+    // Keep keyboard, pinch and modal scroll ownership authoritative.
+    if(keyboard||Math.abs((visual?.scale??1)-1)>=.01||document.documentElement.dataset.bbModalScrollLock==='true')return
     const panned=window.scrollX||window.scrollY||visual?.offsetTop||visual?.offsetLeft
-    if(!keyboard&&Math.abs((visual?.scale??1)-1)<.01&&panned)window.scrollTo({left:0,top:0,behavior:'instant'})
+    const pan=panned?[window.scrollX,window.scrollY,visual?.offsetTop,visual?.offsetLeft].join(':'):''
+    // Even scrollTo(0,0) can emit a visual scroll event without correcting an
+    // OS-owned offset. Do not create a feedback loop for an unchanged report.
+    const repair=reattach||Boolean(pan&&pan!==lastPan)
+    if(repair){lastPan=pan;window.scrollTo({left:0,top:0,behavior:'instant'})}
+    if(!panned)lastPan=''
+    if(repair&&reattachDuoCanvas())reattach=false
   }
-  const cancel=()=>{window.cancelAnimationFrame(frame);frame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}
+  const cancel=()=>{window.cancelAnimationFrame(frame);window.cancelAnimationFrame(panFrame);frame=panFrame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}
+  const pause=()=>{if(seenVisible)suspended=true;cancel()}
   const settle=()=>{
     cancel()
-    if(document.visibilityState==='hidden')return
+    if(document.visibilityState==='hidden'){pause();return}
+    seenVisible=true
+    if(suspended){suspended=false;reattach=true}
+    lastPan=''
     measure()
     frame=window.requestAnimationFrame(()=>{measure();frame=window.requestAnimationFrame(()=>{frame=0;measure()})})
     // Orientation/resume values can settle after the first restored frame.
     for(const delay of [100,300])timers.push(window.setTimeout(measure,delay))
   }
+  const pan=()=>{if(!panFrame)panFrame=window.requestAnimationFrame(()=>{panFrame=0;measure()})}
   const events=['resize','orientationchange','pageshow','focus']
   events.forEach(name=>window.addEventListener(name,settle))
+  window.addEventListener('pagehide',pause)
   document.addEventListener('visibilitychange',settle)
+  document.addEventListener('focusout',settle)
   viewport?.addEventListener('resize',settle)
+  viewport?.addEventListener('scroll',pan)
   settle()
-  return()=>{cancel();events.forEach(name=>window.removeEventListener(name,settle));document.removeEventListener('visibilitychange',settle);viewport?.removeEventListener('resize',settle)}
+  return()=>{cancel();events.forEach(name=>window.removeEventListener(name,settle));window.removeEventListener('pagehide',pause);document.removeEventListener('visibilitychange',settle);document.removeEventListener('focusout',settle);viewport?.removeEventListener('resize',settle);viewport?.removeEventListener('scroll',pan)}
 }
 
 export function useDuoLayout(owner:string) {

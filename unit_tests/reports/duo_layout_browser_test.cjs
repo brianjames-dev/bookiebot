@@ -49,7 +49,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   for(const key of ['height','width','offsetTop','offsetLeft','pageTop','pageLeft','scale'])Object.defineProperty(proxy,key,{get:()=>override[key]??native[key]});
   for(const name of ['resize','scroll'])native.addEventListener(name,()=>proxy.dispatchEvent(new Event(name)));
   Object.defineProperty(window,'visualViewport',{get:()=>proxy});
-  window.__testVisualViewport=values=>{override=values||{};proxy.dispatchEvent(new Event('resize'));proxy.dispatchEvent(new Event('scroll'));};
+  window.__testVisualViewport=(values,event)=>{override=values||{};for(const name of event?[event]:['resize','scroll'])proxy.dispatchEvent(new Event(name));};
  });
  if(safeRight)await page.addInitScript(inset=>{
   const native=window.getComputedStyle;
