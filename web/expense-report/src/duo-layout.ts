@@ -67,7 +67,7 @@ export function watchDuoViewport(update:()=>void) {
   const cancel=()=>{window.cancelAnimationFrame(frame);window.cancelAnimationFrame(panFrame);frame=panFrame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}
   const pause=(event?:Event)=>{if(event)recordDisplayFrame(event.type,'background');if(seenVisible)suspended=true;cancel()}
   const settle=(event?:Event)=>{
-    recordDisplayFrame(event?.type??'mount',document.visibilityState==='hidden'?'background':suspended?'resume':undefined)
+    recordDisplayFrame(event?.type??'mount',document.visibilityState==='hidden'?'background':suspended?'resume':event?.type==='focus'?'focus':undefined)
     cancel()
     if(document.visibilityState==='hidden'){pause();return}
     seenVisible=true
@@ -79,7 +79,7 @@ export function watchDuoViewport(update:()=>void) {
     for(const delay of [100,300])timers.push(window.setTimeout(measure,delay))
     timers.push(window.setTimeout(()=>recordDisplayFrame('settled'),1000))
   }
-  const pan=()=>{if(!panFrame)panFrame=window.requestAnimationFrame(()=>{panFrame=0;measure()})}
+  const pan=()=>{recordDisplayFrame('visual-scroll');if(!panFrame)panFrame=window.requestAnimationFrame(()=>{panFrame=0;measure()})}
   const events=['resize','orientationchange','pageshow','focus']
   events.forEach(name=>window.addEventListener(name,settle))
   window.addEventListener('pagehide',pause)
