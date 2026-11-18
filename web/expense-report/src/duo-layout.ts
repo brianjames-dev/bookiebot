@@ -1,4 +1,5 @@
 import {useEffect,useLayoutEffect,useState} from "react"
+import {recordDisplayFrame} from './display-diagnostics'
 
 export function duoPreferenceKey(owner:string) {
   return `bookiebot:duo-layout:${encodeURIComponent(owner.trim().toLowerCase())}`
@@ -48,6 +49,7 @@ export function watchDuoViewport(update:()=>void) {
   const timers:number[]=[]
   const measure=()=>{
     if(document.visibilityState==='hidden')return
+    recordDisplayFrame('measure')
     update()
     const visual=window.visualViewport
     const keyboard=document.activeElement?.matches('input,textarea,[contenteditable=true]')&&visual&&window.innerHeight-visual.height>140
@@ -60,11 +62,12 @@ export function watchDuoViewport(update:()=>void) {
     const repair=reattach||Boolean(pan&&pan!==lastPan)
     if(repair){lastPan=pan;window.scrollTo({left:0,top:0,behavior:'instant'})}
     if(!panned)lastPan=''
-    if(repair&&reattachDuoCanvas())reattach=false
+    if(repair&&reattachDuoCanvas()){reattach=false;recordDisplayFrame('repaired')}
   }
   const cancel=()=>{window.cancelAnimationFrame(frame);window.cancelAnimationFrame(panFrame);frame=panFrame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}
-  const pause=()=>{if(seenVisible)suspended=true;cancel()}
-  const settle=()=>{
+  const pause=(event?:Event)=>{if(event)recordDisplayFrame(event.type,'background');if(seenVisible)suspended=true;cancel()}
+  const settle=(event?:Event)=>{
+    recordDisplayFrame(event?.type??'mount',document.visibilityState==='hidden'?'background':suspended?'resume':event?.type==='focus'?'focus':undefined)
     cancel()
     if(document.visibilityState==='hidden'){pause();return}
     seenVisible=true
@@ -74,8 +77,9 @@ export function watchDuoViewport(update:()=>void) {
     frame=window.requestAnimationFrame(()=>{measure();frame=window.requestAnimationFrame(()=>{frame=0;measure()})})
     // Orientation/resume values can settle after the first restored frame.
     for(const delay of [100,300])timers.push(window.setTimeout(measure,delay))
+    timers.push(window.setTimeout(()=>recordDisplayFrame('settled'),1000))
   }
-  const pan=()=>{if(!panFrame)panFrame=window.requestAnimationFrame(()=>{panFrame=0;measure()})}
+  const pan=()=>{recordDisplayFrame('visual-scroll');if(!panFrame)panFrame=window.requestAnimationFrame(()=>{panFrame=0;measure()})}
   const events=['resize','orientationchange','pageshow','focus']
   events.forEach(name=>window.addEventListener(name,settle))
   window.addEventListener('pagehide',pause)
@@ -96,7 +100,8 @@ export function useDuoLayout(owner:string) {
     if(!enabled)return
     const safe=document.createElement("span")
     safe.setAttribute("aria-hidden","true")
-    safe.style.cssText="position:fixed;visibility:hidden;width:0;height:0;padding-right:env(safe-area-inset-right,0px)"
+    safe.setAttribute('data-bb-safe-area','')
+    safe.style.cssText="position:fixed;visibility:hidden;pointer-events:none;top:0;left:0;width:0;height:0;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)"
     document.body.append(safe)
     const update=()=>{
       const width=document.documentElement.clientWidth,height=window.innerHeight

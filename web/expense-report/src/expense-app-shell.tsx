@@ -5,6 +5,8 @@ import { AppNavigationDock } from "./app-navigation-bar"
 import { NavigationViewport } from "./navigation-viewport"
 import { observePageScroll, readPageScroll, scrollPageTo } from "./page-scroll"
 import {useDuoListScroll} from './duo-list-scroll'
+import {DisplayReport} from './display-report'
+import {recordDisplayFrame} from './display-diagnostics'
 import { AppHeaderBack, AppHeaderTools } from "./app-header-tools"
 import { ExpenseReportApp, useExpenseReportTheme } from "./report-app"
 import { useReportViewPreferences } from "./report-view-preferences"
@@ -249,7 +251,11 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           onChat={() => setAskOpen(true)} chatRef={askTriggerRef} chatOpen={askOpen && monthlyReady} chatDisabled={!report || !monthlyReady} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)} avatarUrl={avatarUrl} showPortrait={screen === 'settings'}
-          onSettings={() => selectScreen(screen === "settings" && !widgetGuideOpen && !configurationOpen ? lastMain : "settings")} />
+          onSettings={() => {
+            const next=screen === "settings" && !widgetGuideOpen && !configurationOpen ? lastMain : "settings"
+            if(duo.enabled&&next==='settings')recordDisplayFrame('settings-open','manual')
+            selectScreen(next)
+          }} />
       </header>
 
 
@@ -296,6 +302,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         <section className="bb-settings-section" aria-labelledby="bb-updates-title"><h2 id="bb-updates-title">About &amp; updates</h2>
           <div className="bb-setting-row"><span>BookieBot</span><span className="bb-app-version">{initialVersion ? `Version ${initialVersion.slice(0, 8)}` : "Web app"}</span></div>
           {availableVersion && <button type="button" className="bb-settings-action" disabled={guard.pending || guard.uncertain} onClick={() => window.dispatchEvent(new CustomEvent("bookiebot:request-app-update"))}>Update available · Update now</button>}
+          {duo.enabled&&<DisplayReport key={owner} version={initialVersion}/>}
         </section>
         </>}
       </main>
