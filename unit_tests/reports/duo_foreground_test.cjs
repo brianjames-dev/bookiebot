@@ -1,0 +1,33 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),path=require('node:path'),{createRequire}=require('node:module');
+const req=createRequire(path.resolve('web/expense-report/package.json'));
+const code=req('esbuild').buildSync({entryPoints:['web/expense-report/src/duo-layout.ts'],bundle:true,platform:'node',format:'cjs',write:false,external:['react']}).outputFiles[0].text;
+function fixture(initial='visible'){
+ const targets=[],frames=new Map(),timers=new Map();let serial=0,reattached=0,reset=0,stylePosition='',priority='',pan=0,stale=false;
+ const events=()=>{const listeners=new Map(),target={addEventListener(name,fn){const set=listeners.get(name)||new Set();set.add(fn);listeners.set(name,set)},removeEventListener(name,fn){listeners.get(name)?.delete(fn)},send(name){listeners.get(name)?.forEach(fn=>fn())},listeners};targets.push(target);return target};
+ const scroll={scrollTop:640,scrollLeft:32},page={scrollTop:120,scrollLeft:0,querySelectorAll:()=>[scroll],style:{getPropertyValue:()=>stylePosition,getPropertyPriority:()=>priority,setProperty(key,value,p=''){assert.equal(key,'position');stylePosition=value;priority=p},removeProperty(){stylePosition='';priority=''}},get offsetHeight(){if(stylePosition==='absolute'){reattached++;stale=false;scroll.scrollTop=0;scroll.scrollLeft=0;this.scrollTop=0}return 669}};
+ const win={...events(),innerHeight:669,scrollX:0,scrollY:0,scrollTo(){reset++;pan=0},visualViewport:{...events(),height:669,scale:1,get offsetTop(){return pan},offsetLeft:0},requestAnimationFrame(fn){frames.set(++serial,fn);return serial},cancelAnimationFrame(id){frames.delete(id)},setTimeout(fn){timers.set(++serial,fn);return serial},clearTimeout(id){timers.delete(id)}};
+ const doc={...events(),visibilityState:initial,activeElement:null,documentElement:{dataset:{}},querySelector:selector=>{assert.equal(selector,'.bb-page[data-duo-enabled="true"]');return page}};
+ const runtime={module:{exports:{}},require:req,window:win,document:doc};vm.runInNewContext(code,runtime);const stop=runtime.module.exports.watchDuoViewport(()=>{});
+ const paint=()=>{for(let i=0;frames.size&&i<10;i++){const batch=[...frames.values()];frames.clear();batch.forEach(fn=>fn())}assert.equal(frames.size,0,'No recovery frame loop')};
+ const finish=()=>{paint();const batch=[...timers.values()];timers.clear();batch.forEach(fn=>fn());paint()};
+ const hide=()=>{doc.visibilityState='hidden';doc.send('visibilitychange');stale=true};
+ const show=()=>{doc.visibilityState='visible';doc.send('visibilitychange');finish()};
+ return {win,doc,page,scroll,targets,frames,timers,stop,paint,finish,hide,show,get reattached(){return reattached},get resets(){return reset},get stale(){return stale},get position(){return stylePosition},set pan(value){pan=value}};
+}
+const f=fixture();f.finish();assert.equal(f.reattached,0,'Initial mount does not rebuild a healthy viewport');
+f.hide();assert.equal(f.reattached,0,'Hidden content stays untouched');f.show();
+assert.equal(f.stale,false,'Visibility-only return repairs the retained fixed layer even when every reported offset is zero');
+assert.equal(f.reattached,1);assert.equal(f.resets,1);assert.equal(f.position,'');assert.equal(f.page.scrollTop,120);assert.equal(f.scroll.scrollTop,640);assert.equal(f.scroll.scrollLeft,32,'Nested/horizontal scroll survives reattachment');
+f.win.send('focus');f.win.send('pageshow');f.finish();assert.equal(f.reattached,1,'Duplicate foreground notifications do not rebuild the canvas');
+const before=f.resets;f.pan=82;f.win.visualViewport.send('scroll');f.paint();assert.equal(f.resets,before+1,'Late visual viewport pan is repaired without resize, pageshow or reload');
+f.win.visualViewport.send('scroll');f.paint();assert.equal(f.resets,before+1,'Healthy visual scroll notifications do not reset anything');
+f.page.style.setProperty('position','fixed','important');
+f.hide();f.doc.activeElement={matches:()=>true};f.win.visualViewport.height=300;f.show();assert.equal(f.reattached,2,'Keyboard panning is preserved');
+f.doc.activeElement=null;f.win.visualViewport.height=669;f.doc.send('focusout');f.finish();assert.equal(f.reattached,3,'Deferred foreground recovery runs after keyboard dismissal');
+assert.equal(f.page.style.getPropertyValue('position'),'fixed');assert.equal(f.page.style.getPropertyPriority('position'),'important','Exact inline positioning priority is restored');
+f.hide();f.win.visualViewport.scale=2;f.show();assert.equal(f.reattached,3,'Zoom is preserved');f.win.visualViewport.scale=1;f.win.visualViewport.send('resize');f.finish();assert.equal(f.reattached,4);
+f.hide();f.doc.documentElement.dataset.bbModalScrollLock='true';f.show();assert.equal(f.reattached,4,'Modal locks are preserved');delete f.doc.documentElement.dataset.bbModalScrollLock;f.doc.send('focusout');f.finish();assert.equal(f.reattached,5);
+f.hide();f.stop();f.doc.visibilityState='visible';f.doc.send('visibilitychange');assert.equal(f.reattached,5);assert(f.targets.every(t=>[...t.listeners.values()].every(set=>set.size===0)));assert.equal(f.frames.size,0);assert.equal(f.timers.size,0);
+const cold=fixture('hidden');cold.finish();cold.show();assert.equal(cold.reattached,0,'A newly mounted background document is not a resumed canvas');cold.hide();cold.show();assert.equal(cold.reattached,1);cold.stop();
+const stuck=fixture();stuck.finish();const native=stuck.win.scrollTo.bind(stuck.win);stuck.win.scrollTo=()=>{native();stuck.pan=99;stuck.win.visualViewport.send('scroll')};stuck.pan=99;stuck.win.visualViewport.send('scroll');stuck.paint();assert.equal(stuck.resets,1,'An unchanged OS offset cannot start a scrollTo/event frame loop');stuck.stop();
+console.log('Retained foreground canvas, late scroll-only pan, state preservation, guards and cleanup pass');

@@ -31,6 +31,15 @@ const css=fs.readFileSync(path.join(assets,'expense-report-app.css'),'utf8'),js=
 const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 // Hold mobile emulation at 1× during pose changes; explicit viewport cases below exercise zoom-coordinate guards.
 const html=(dark,old,config={})=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout',...config})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
+// Font loading, responsive SVG sizing and finite startup motion can finish
+// after the old 200ms delay on busy WebKit runs. Compare settled geometry.
+async function settledGeometry(page){await page.evaluate(async()=>{
+ await document.fonts.ready;
+ await new Promise((resolve,reject)=>{let last='',stable=0;const end=performance.now()+5000;
+  const read=()=>{const key=JSON.stringify([...document.querySelectorAll('.bb-page,.bb-metrics-grid,.bb-comparison-card,.bb-chart-carousel-band,.bb-category-chart-box,.bb-duo-category-list,.bb-category-pie-surface path.recharts-sector')].map(el=>{const r=el.getBoundingClientRect();return [r.x,r.y,r.width,r.height,el.getAttribute('d')]}));
+   stable=key===last?stable+1:0;last=key;if(stable>=8)resolve();else if(performance.now()>end)reject(Error('Initial DUO geometry never settled'));else requestAnimationFrame(read)};requestAnimationFrame(read);
+ });
+})}
 async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0,options={}){
  const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[],comparison={hold:false,release:null};
  if(options.init)await options.init(page);
@@ -49,7 +58,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   for(const key of ['height','width','offsetTop','offsetLeft','pageTop','pageLeft','scale'])Object.defineProperty(proxy,key,{get:()=>override[key]??native[key]});
   for(const name of ['resize','scroll'])native.addEventListener(name,()=>proxy.dispatchEvent(new Event(name)));
   Object.defineProperty(window,'visualViewport',{get:()=>proxy});
-  window.__testVisualViewport=values=>{override=values||{};proxy.dispatchEvent(new Event('resize'));proxy.dispatchEvent(new Event('scroll'));};
+  window.__testVisualViewport=(values,event)=>{override=values||{};for(const name of event?[event]:['resize','scroll'])proxy.dispatchEvent(new Event(name));};
  });
  if(safeRight)await page.addInitScript(inset=>{
   const native=window.getComputedStyle;
@@ -92,7 +101,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   else {unexpected.push(request.method()+' '+url);return route.fulfill({status:404,json:{error:'Unknown fixture'}});}
   return route.fulfill({json:value});
  });
- await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':'')+(options.initialHash||''));if(options.waitForReady!==false){await page.locator('.bb-metrics-grid').waitFor({state:options.initialHash?'attached':'visible'});await page.waitForTimeout(200);}
+ await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':'')+(options.initialHash||''));if(options.waitForReady!==false){await page.locator('.bb-metrics-grid').waitFor({state:options.initialHash?'attached':'visible'});await page.waitForTimeout(200);await settledGeometry(page);}
  return {page,errors,unexpected,comparison};
 }
 async function geometry(page){return page.evaluate(()=>{
@@ -351,7 +360,7 @@ if(require.main===module)(async()=>{
    for(const dark of [false,true]){
     for(const [width,height,safe,safeRight] of [[382,657],[466,678],[867,669],[951,648],[867,669,0,84],[951,648,0,84],[867,553],[867,553,58],[867,480]].filter(p=>!process.env.BOOKIEBOT_DUO_POSE||process.env.BOOKIEBOT_DUO_POSE===p[0]+'x'+p[1])){
      const {page,errors,unexpected,comparison}=await fixture(browser,width,height,dark,false,false,safeRight);
-     if(safe){await page.evaluate(()=>document.querySelectorAll('.bb-app-shell').forEach(el=>el.style.setProperty('--bb-duo-nav-bottom','58px','important')));await page.waitForTimeout(100);}
+     if(safe){await page.evaluate(()=>document.querySelectorAll('.bb-app-shell').forEach(el=>el.style.setProperty('--bb-duo-nav-bottom','58px','important')));await settledGeometry(page);}
      const m=await geometry(page);checked++;console.log('PASS geometry',engine.name(),dark?'dark':'light',width,height,JSON.stringify({compareGap:m.compare.y-m.metrics.bottom,fold:m.band.x,ringHeight:m.chart.height}));
      assert.equal(m.scroll[0],width,'horizontal overflow');
      const titleGaps=await metricTitleGaps(page);assert(titleGaps.every(gap=>gap>=0&&gap<=10),'compact titles and numbers remain separated and close: '+JSON.stringify(titleGaps));
