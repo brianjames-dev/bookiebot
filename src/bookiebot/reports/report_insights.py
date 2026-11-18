@@ -258,7 +258,10 @@ def compare_report_spending(
         if ("totalExpenses" not in metrics or metrics["totalExpenses"] is None
                 or mode not in payload.get("comparisonData", {}).get("modeExpenses", {})):
             return None  # Missing source data must never become zero spending.
-        return _period(payload, through_day, mode=mode)
+        result = _period(payload, through_day, mode=mode)
+        if payload.get('reimbursementBasis'):
+            result['reimbursementBasis'] = payload['reimbursementBasis']
+        return result
 
     if baseline is not None:
         if selected.get("ownerName") != baseline.get("ownerName"):

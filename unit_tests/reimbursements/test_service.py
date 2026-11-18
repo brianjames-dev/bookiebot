@@ -677,6 +677,34 @@ def test_correction_after_reversed_receipt_keeps_old_receipt_zero_and_new_receip
     assert receipt_row(setup.book, event["id"])[2] == 0
 
 
+@pytest.mark.parametrize('correction', ['move', 'rename'])
+def test_overview_after_reversed_receipt_and_source_correction(setup, correction):
+    from bookiebot.reports.expense_breakdown import BudgetMonth, ReportWorksheets, build_expense_breakdown_report, expense_breakdown_client_payload
+    from unit_tests.support.sheets_repo_stub import InMemoryWorksheet
+    split(setup)
+    value = setup.store.snapshot('brian')['allocations'][0]
+    paid = service.command('brian', {**payment(value, 5000), 'date': '2026-01-10'})
+    event = paid['events'][0]
+    service.command('brian', command('reverse', eventId=event['id']))
+    ok, _ = service.mutate_recent_action(BRIAN, selected(setup), 'move' if correction == 'move' else 'update',
+        **({'destination_category': 'grocery'} if correction == 'move' else {'updates': {'item': 'Corrected purchase'}}))
+    assert ok
+    value = setup.store.snapshot('brian')['allocations'][0]
+    service.command('brian', {**payment(value, 2000), 'date': '2026-01-11'})
+    original = deepcopy(setup.sheet.rows)
+    metadata = {'sheets': [{'properties': {'sheetId': sheet.id, 'title': sheet.title}} for sheet in setup.book.sheets.values()],
+                'namedRanges': deepcopy(list(setup.book.names.values()))}
+    report = build_expense_breakdown_report(actor_key='830984827904851969', owner_name='Hannah', persons=['Hannah'], month=BudgetMonth(2026, 1),
+        worksheets=ReportWorksheets(shared_expenses=setup.sheet, personal_budget=InMemoryWorksheet([['Monthly Income', '5000']]),
+            shared_metadata=metadata, personal_metadata={}))
+    result = expense_breakdown_client_payload(report)
+    assert result['metrics']['totalExpenses'] == 20
+    assert [row['amount'] for row in result['dailyEntries']] == [20]
+    assert event['id'] not in {e['id'] for e in result['reimbursementBasis']['events']}
+    assert setup.sheet.rows == original
+    assert receipt_row(setup.book, event['id'])[2] == 0
+
+
 @pytest.mark.parametrize("operation", ["move", "delete"])
 def test_move_delete_retry_finishes_saved_correction_without_repeating_write(setup, operation):
     split(setup)

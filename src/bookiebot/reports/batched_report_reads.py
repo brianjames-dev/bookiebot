@@ -68,9 +68,10 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
         requested.setdefault(transfer_book_id, []).append(TRANSFER_TAB)
 
     loaded: dict[str, dict[str, list[list[str]]]] = {}
+    metadata: dict[str, dict[str, Any]] = {}
     for spreadsheet_id, titles in requested.items():
         try:
-            loaded[spreadsheet_id] = read_workbook_tabs(gc, spreadsheet_id, titles)
+            loaded[spreadsheet_id] = read_workbook_tabs(gc, spreadsheet_id, titles, metadata_out=metadata.setdefault(spreadsheet_id, {}))
         except Exception:
             if spreadsheet_id in (personal_id, shared_id):
                 raise
@@ -109,6 +110,7 @@ def batched_report_worksheets(actor_key: str, month: BudgetMonth, gc: Any) -> Re
     return ReportWorksheets(
         shared_expenses=ReportWorksheetRows(month.name, shared[month.name]),
         personal_budget=ReportWorksheetRows(month.name, personal[month.name]),
+        shared_metadata=metadata.get(shared_id), personal_metadata=metadata.get(personal_id),
         subscriptions=optional("Subscriptions"),
         bill_schedule=optional("_BookieBot Bill Schedule"),
         subscription_schedule=optional("_BookieBot Subscription Schedule"),

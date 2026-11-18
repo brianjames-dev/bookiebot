@@ -1,3 +1,4 @@
+import {useStartupSplash} from "./startup-splash"
 import {ReportLoading} from "./report-loading"
 import {api,useReview,ReviewPanel,type Flow,type Command} from './onboarding-review'
 import {useCallback,useEffect,useRef,useState,type CSSProperties} from 'react'
@@ -44,18 +45,20 @@ function inviteToken(value:string){try{return new URLSearchParams(new URL(value)
 
 export function GoogleFirstApp({config}:{config:ExpenseAppConfig}){
   const [state,setState]=useState<Bootstrap|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0)
+  useStartupSplash(Boolean(error)||state?.phase==='signed-out'||state?.phase==='onboarding')
   useState(readInvite)
   useEffect(()=>{const expired=()=>setState({phase:'signed-out'});window.addEventListener('bookiebot:managed-expired',expired);return()=>window.removeEventListener('bookiebot:managed-expired',expired)},[])
-  useEffect(()=>{const abort=new AbortController();void fetch(config.onboardingUrl!,{credentials:'same-origin',cache:'no-store',signal:abort.signal}).then(async response=>{
+  useEffect(()=>{const abort=new AbortController();let active=true;const timer=window.setTimeout(()=>abort.abort(),30000);void fetch(config.onboardingUrl!,{credentials:'same-origin',cache:'no-store',signal:abort.signal}).then(async response=>{
     if(response.status===401)return {phase:'signed-out'} as Bootstrap
     if(!response.ok)throw new Error('Could not open your account. Try again.')
     return await response.json() as Bootstrap
-  }).then(value=>{if(!abort.signal.aborted){if(value.provider==='sheets'&&readInvite())history.replaceState(history.state,'',location.pathname+location.search+'#settings');setState(value);setError('')}}).catch(()=>{if(!abort.signal.aborted)setError('Could not open your account. Try again.')});return()=>abort.abort()},[config.onboardingUrl,attempt])
+  }).then(value=>{if(!abort.signal.aborted){if(value.provider==='sheets'&&readInvite())history.replaceState(history.state,'',location.pathname+location.search+'#settings');setState(value);setError('')}}).catch(()=>{if(active)setError('Could not open your account. Try again.')}).finally(()=>window.clearTimeout(timer));return()=>{active=false;window.clearTimeout(timer);abort.abort()}},[config.onboardingUrl,attempt])
+  if(!state&&!error)return <div className="bb-startup-pending" aria-busy="true"/>
   if(state?.provider==='sheets')return <FreshExpenseApp config={config}/>
   return <KonstaProvider theme="ios" dark><AppWorkGuardProvider><AuthFeedback/>{state?.account
     ? <PageRefreshProvider><ManagedSession key={state.account.id} initial={state} onReady={()=>setAttempt(x=>x+1)} onSignedOut={()=>{setState({phase:'signed-out'});setAttempt(x=>x+1)}} version={config.version||''}/></PageRefreshProvider>
     : <div className="bb-page bb-managed-welcome"><ReportBrand owner="BookieBot" avatarUrl="/app/avatar.png" status="Your budget, together."/>
-      <main><h1>{state?'Welcome to BookieBot':'Opening BookieBot…'}</h1>{state&&<><p>Create a private budget, or join your household.</p><GoogleSignInButton/>
+      <main><h1>{state?'Welcome to BookieBot':'Couldn’t open BookieBot'}</h1>{state&&<><p>Create a private budget, or join your household.</p><GoogleSignInButton/>
         <details><summary>Already have a connected budget?</summary><p>Link Google from Settings in your connected app first. Signing in here with an unlinked Google account creates a separate budget.</p><ExpenseAppReconnect/></details></>}
         {error&&<><p role="alert">{error}</p><button onClick={()=>setAttempt(x=>x+1)}>Try again</button></>}</main></div>}
   </AppWorkGuardProvider></KonstaProvider>
@@ -102,6 +105,7 @@ function ManagedSession({initial,onReady,onSignedOut,version}:{initial:Bootstrap
   useEffect(()=>{if(initial.phase==='ready'){setState(null);void refresh()}},[month,initial.phase,refresh])
   useEffect(()=>{if(initial.phase!=='ready')return;const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&!editor&&!flow.review&&!flow.busy&&Date.now()-loaded.current>=20000)void refresh()},20000);return()=>clearInterval(timer)},[editor,flow.review,flow.busy,initial.phase,refresh])
   useEffect(()=>{let stopped=false,checking=false;const check=()=>{if(checking||document.visibilityState!=='visible')return;checking=true;void api<Bootstrap>('/app/bootstrap').then(value=>{if(!stopped&&(value.account?.id!==account.id||value.provider!=='managed')){setState(null);onSignedOut()}}).catch(()=>{}).finally(()=>checking=false)};window.addEventListener('focus',check);window.addEventListener('pageshow',check);document.addEventListener('visibilitychange',check);return()=>{stopped=true;window.removeEventListener('focus',check);window.removeEventListener('pageshow',check);document.removeEventListener('visibilitychange',check)}},[account.id])
+  useStartupSplash(Boolean(state)||Boolean(error)||flow.uncertain||initial.phase==='onboarding')
   if(initial.phase==='onboarding')return <Onboarding account={account} flow={flow} onSignOut={signOut}/>
   if(!state)return <div className="bb-page bb-managed-welcome"><h1>BookieBot</h1>{!error&&!flow.uncertain&&<ReportLoading label="Opening your budget…"/>}{flow.uncertain&&<ReviewPanel flow={flow}><h2>Check your last change</h2><p className="bi-footnote">Resolve the previous confirmation before making another change.</p></ReviewPanel>}{error&&<><p role="alert">{error}</p><button onClick={()=>void refresh()}>Try again</button><button onClick={signOut}>Sign out</button></>}</div>
   const selectScreen=(next:AppScreen)=>{if(flow.busy||flow.uncertain)return;setScreen(next);if(next!=='settings')setMain(next)}

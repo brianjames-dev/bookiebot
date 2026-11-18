@@ -65,6 +65,8 @@ class ReportWorksheets:
     bill_charges: Any | None = None
     transfer_plans: tuple[Any, ...] = ()
     shared_bill_forecasts: tuple[Any, ...] = ()
+    shared_metadata: dict[str, Any] | None = None
+    personal_metadata: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,7 @@ class ExpenseEntry:
     person: str
     item: str = ""
     location: str = ""
+    canonical_cash_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -212,6 +215,7 @@ class ExpenseBreakdownReport:
     shared_reimbursements: list[SharedAllocation] = field(default_factory=list)
     open_shared_reimbursements: list[SharedAllocation] | None = None
     reimbursement_coverage: dict[str, Any] | None = None
+    reimbursement_basis: dict[str, Any] | None = None
     raw_sheets: list[RawSheet] = field(default_factory=list)
     received_shared_reimbursements: list[SharedAllocation] | None = None
     savings_plan: SavingsPlan = field(default_factory=SavingsPlan)
@@ -498,6 +502,7 @@ def build_expense_breakdown_report(
     recurring_owner = get_user_config(actor_key).budget_owner_key if managed(bill_schedule_rows) or managed(hidden_subscriptions) or hidden_charges else actor_key
     bill_schedule_rows, subscription_rows, managed_bills = runtime_tables(
         recurring_owner, bill_schedule_rows, hidden_subscriptions, subscription_rows, hidden_charges)
+    source_shared_rows, source_personal_rows = shared_rows, personal_rows
     shared_reimbursement_rows = (
         next((ledger.rows for ledger in selected.reimbursement_history.ledgers if ledger.year == month.year), [])
         if selected.reimbursement_history is not None
@@ -516,6 +521,7 @@ def build_expense_breakdown_report(
     open_reimbursements = [record.allocation for record in reimbursement_history.outstanding_records]
     received_reimbursements = [record.allocation for record in reimbursement_history.received_records]
     reimbursement_coverage = reimbursement_history.coverage_payload()
+    overview_cash = None
     canonical_bill_allocations = []
     canonical_bill_events = []
     ledger_owner = recurring_owner
@@ -524,7 +530,8 @@ def build_expense_breakdown_report(
         from bookiebot.sheets.routing import get_user_config
         owner = get_user_config(actor_key).budget_owner_key
         ledger_owner = owner
-        ledger = reimbursement_service.snapshot(owner)
+        from bookiebot.reimbursements.presentation import display_snapshot
+        ledger = display_snapshot(reimbursement_service.snapshot(owner))
         canonical_bill_allocations = ledger["allocations"]
         canonical_bill_events = ledger.get("events", [])
         allocations = [reimbursement_service.allocation_as_legacy(value) for value in ledger["allocations"]
@@ -539,7 +546,16 @@ def build_expense_breakdown_report(
     from bookiebot.sheets.recurring_rows import with_recorded_months
     bill_schedule_rows = with_recorded_months(bill_schedule_rows, hidden_charges, canonical_bill_allocations,
         owner=ledger_owner, year=month.year)
-    entries = _shared_expense_entries(shared_rows, persons, month)
+    if reimbursement_service.enabled():
+        from bookiebot.reports.reimbursement_overview import normalize_cash
+        overview_cash = normalize_cash(owner=ledger_owner, period=f"{month.year:04d}-{month.month:02d}",
+            as_of=generated_at.date(), ledger=ledger, shared=shared_rows, personal=personal_rows,
+            schedules=bill_schedule_rows, forecasts=selected.shared_bill_forecasts,
+            shared_metadata=selected.shared_metadata if selected.shared_metadata is not None else _overview_metadata(selected.shared_expenses),
+            personal_metadata=selected.personal_metadata if selected.personal_metadata is not None else _overview_metadata(selected.personal_budget))
+        shared_rows, personal_rows = overview_cash.shared, overview_cash.personal
+    entries = _shared_expense_entries(shared_rows, persons, month,
+        identities=overview_cash.identities if overview_cash else None)
     from bookiebot.sheets.bill_payment_evidence import settled_bill_dates
     paid_bill_dates = settled_bill_dates(canonical_bill_allocations, canonical_bill_events,
         owner=ledger_owner, as_of=generated_at.date())
@@ -548,10 +564,16 @@ def build_expense_breakdown_report(
     payments = [item for item in entered_bills if item.status == "paid"]
     queued_bills = [item for item in entered_bills if item.status == "queued"]
     queued_total = round(sum(item.amount for item in queued_bills), 2)
+    reimbursement_basis = overview_cash.basis(entered_bills) if overview_cash else None
+    if reimbursement_basis is not None:
+        reimbursement_basis['itemCategories'] = [key for key, config in category_layout(shared_rows).items() if 'item' in config['columns']]
     subscriptions = _subscription_items(subscription_rows)
     current_month_subscriptions = _current_month_subscription_items(subscriptions, month)
     income_entries, income_total = _income_entries(personal_rows)
     budget_history = selected.budget_history or (BudgetHistoryRows(month, personal_rows),)
+    if overview_cash:
+        from dataclasses import replace
+        budget_history = tuple(replace(item, rows=personal_rows) if item.month==month else item for item in budget_history)
     savings_settings = selected.savings_settings_rows
     if savings_settings is None:
         savings_settings = next((item.savings_settings_rows for item in budget_history if item.month == month), None)
@@ -587,7 +609,7 @@ def build_expense_breakdown_report(
     legacy_need_expenses = _need_expense_items(personal_rows)
     need_expenses = (
         _need_expense_items_from_entries(shared_need_entries)
-        if shared_need_entries
+        if shared_need_entries or overview_cash and "need_expenses" in overview_cash.categories
         else legacy_need_expenses
     )
     static_needs_total, wants_total = _subscription_breakdown_totals(
@@ -614,6 +636,9 @@ def build_expense_breakdown_report(
         as_of=generated_at.date(),
         recorded_dates=paid_bill_dates,
     )
+    if overview_cash and reimbursement_basis is not None:
+        from bookiebot.reports.reimbursement_overview import history_basis
+        history_basis(overview_cash,reimbursement_basis,budget_history,bill_schedule_rows,month,paid_bill_dates)
     calendar_events = _calendar_events(
         month=month,
         subscriptions=current_month_subscriptions,
@@ -641,13 +666,16 @@ def build_expense_breakdown_report(
     breakdown_amounts["need_expenses"] = round(sum(item.amount for item in need_expenses), 2)
     breakdown_amounts["subscriptions_wants"] = round(wants_total + payment_totals["subscriptions_wants"], 2)
     for category in BUDGET_SHARED_CATEGORY_LABELS:
-        if category in budget_shared_totals:
+        if category in budget_shared_totals and (overview_cash is None or category not in overview_cash.categories):
             breakdown_amounts[category] = budget_shared_totals[category]
         else:
             breakdown_amounts[category] = itemized_shared_totals[category]
 
     calendar_events = _with_shared_bill_forecasts(calendar_events, selected.shared_bill_forecasts,
         month, entered_bills, bill_schedule_rows)
+    if overview_cash:
+        from bookiebot.reports.reimbursement_overview import cash_calendar
+        calendar_events = cash_calendar(calendar_events, overview_cash)
     budget_breakdown_amounts = dict(breakdown_amounts)
     entered_totals = _payment_totals_by_group(entered_bills)
     budget_breakdown_amounts["rent"] = entered_totals["rent"]
@@ -666,7 +694,7 @@ def build_expense_breakdown_report(
 
     shared_total = round(sum(entry.amount for entry in entries), 2)
     personal_expense_total = _personal_expense_subtotal_total(personal_rows)
-    personal_total = grand_total if grand_total > 0 else max(0.0, round((personal_expense_total or 0.0) - queued_total, 2))
+    personal_total = grand_total if grand_total > 0 or (overview_cash and (overview_cash.categories or overview_cash.bills)) else max(0.0, round((personal_expense_total or 0.0) - queued_total, 2))
     category_budgets = _category_budget_amounts(personal_rows, income_total)
     if savings_plan.present:
         savings_values = _calculate_month_savings(savings_plan, income_total, income_entries, month)
@@ -676,7 +704,7 @@ def build_expense_breakdown_report(
         personal_rows,
         breakdown,
         amount_saved=amount_saved,
-        use_sheet_subtotals=not subscriptions,
+        use_sheet_subtotals=not subscriptions and not (overview_cash and (overview_cash.categories or overview_cash.bills)),
         queued_bills_total=queued_total,
     )
     remaining_budget = round(category_budgets["needs"] - category_spending["needs"], 2)
@@ -754,9 +782,10 @@ def build_expense_breakdown_report(
         espp_history=_espp_history(savings_plan, personal_rows, budget_history, month, savings_settings),
         savings_transfers=savings_transfers,
         reimbursement_coverage=reimbursement_coverage,
+        reimbursement_basis=reimbursement_basis,
         raw_sheets=[
-            RawSheet("Shared Expenses", _compact_rows(shared_rows)),
-            RawSheet("Personal Budget", _compact_rows(personal_rows)),
+            RawSheet("Shared Expenses", _compact_rows(source_shared_rows)),
+            RawSheet("Personal Budget", _compact_rows(source_personal_rows)),
             RawSheet("Subscriptions", _compact_rows(subscription_rows)),
             RawSheet("Shared Reimbursements", _compact_rows(shared_reimbursement_rows)),
         ],
@@ -922,7 +951,17 @@ def _ordered_breakdown_amounts() -> dict[str, float]:
     return {key: 0.0 for key in CATEGORY_LABELS}
 
 
-def _shared_expense_entries(rows: list[list[str]], persons: list[str], month: BudgetMonth) -> list[ExpenseEntry]:
+def _overview_metadata(sheet: Any) -> dict[str, Any] | None:
+    book = getattr(sheet, 'spreadsheet', None)
+    read = getattr(book, 'fetch_sheet_metadata', None)
+    if callable(read):
+        metadata = read(params={'fields':'namedRanges,sheets.properties'})
+        if isinstance(metadata, dict):
+            return metadata
+    return None
+
+
+def _shared_expense_entries(rows: list[list[str]], persons: list[str], month: BudgetMonth, *, identities: dict[tuple[int,int],str] | None = None) -> list[ExpenseEntry]:
     person_filter = set(persons)
     entries: list[ExpenseEntry] = []
     for category, config in category_layout(rows).items():
@@ -938,7 +977,7 @@ def _shared_expense_entries(rows: list[list[str]], persons: list[str], month: Bu
         if location_idx is not None:
             required.append(location_idx)
 
-        for row in rows[config["start_row"] - 1 :]:
+        for row_number, row in enumerate(rows[config["start_row"] - 1 :], start=config["start_row"]-1):
             if not row or max(required) >= len(row):
                 continue
             amount = clean_money(_cell(row, amount_idx))
@@ -956,6 +995,7 @@ def _shared_expense_entries(rows: list[list[str]], persons: list[str], month: Bu
                     person=person,
                     item=_cell(row, item_idx) if item_idx is not None else "",
                     location=_cell(row, location_idx) if location_idx is not None else "",
+                    canonical_cash_id=(identities or {}).get((row_number,amount_idx)),
                 )
             )
     return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
@@ -2664,6 +2704,15 @@ def _report_activity_entries(report: ExpenseBreakdownReport) -> list[ExpenseEntr
     return sorted(entries, key=lambda entry: (_entry_sort_date(entry.date), entry.amount), reverse=True)
 
 
+def _bill_cash_id(report: ExpenseBreakdownReport, label: str) -> str | None:
+    from bookiebot.sheets.bills import bill_label_key
+    if report.reimbursement_basis:
+        match = next((b for b in report.reimbursement_basis['bills'] if bill_label_key(label) in {bill_label_key(b['label']),bill_label_key(b['displayName'])}),None)
+        if match:
+            return 'bill:'+match['allocationId']
+    return None
+
+
 def _report_highlight_entries(
     report: ExpenseBreakdownReport,
     activity_entries: list[ExpenseEntry],
@@ -2677,6 +2726,7 @@ def _report_highlight_entries(
             person=report.owner_name,
             item=payment.label,
             location="",
+            canonical_cash_id=_bill_cash_id(report, payment.label),
         )
         for payment in report.payments
         if payment.amount > 0
@@ -2885,6 +2935,11 @@ def _report_client_payload(
         payload["incomeProjection"]["savingsGoal"] = projected_savings["cashIdeal"]
         payload["metrics"].update(monthlyIncome=current_savings["takeHomeBeforeEspp"],
                                   amountSaved=current_savings["combinedContributions"])
+    if report.reimbursement_basis:
+        from bookiebot.reports.reimbursement_overview import tag_calendar
+        payload['reimbursementBasis'] = {**report.reimbursement_basis,
+            'categories': {key:{'label':label,'color':CATEGORY_COLORS.get(key,'#64748b'),'hasItem':key in report.reimbursement_basis.get('itemCategories',[])} for key,label in CATEGORY_LABELS.items()}}
+        tag_calendar(payload['calendarEvents'], report.reimbursement_basis)
     payload["modeViews"] = {
         "current": _report_mode_view_from_payload(payload, projected=False),
         "projected": _report_mode_view_from_payload(payload, projected=True),
@@ -3259,6 +3314,7 @@ def _expense_entry_payload(entry: ExpenseEntry) -> dict[str, Any]:
         "person": entry.person,
         "item": entry.item,
         "location": entry.location,
+        **({"canonicalCashId":entry.canonical_cash_id} if entry.canonical_cash_id else {}),
     }
 
 

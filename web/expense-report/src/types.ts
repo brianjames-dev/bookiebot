@@ -14,6 +14,7 @@ export interface BreakdownItem extends AmountRow {
 }
 
 export interface ExpenseEntry {
+  canonicalCashId?: string
   date: string
   category: string
   amount: number
@@ -89,6 +90,8 @@ export interface BillPrediction {
 }
 
 export interface CalendarEvent {
+  canonicalCashId?: string
+  sharedBillForecast?: boolean
   kind: CalendarEventKind
   label: string
   amount: number
@@ -223,6 +226,7 @@ export interface SavingsInvesting {
 }
 
 export interface ExpenseReportData {
+  reimbursementBasis?: import("./overview-display-state").OverviewBasis
   savingsPlan?: {
     status: "active" | "pending" | "invalid" | "off"
     source: string

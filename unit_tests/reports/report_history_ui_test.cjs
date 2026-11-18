@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict")
 const chart = require("./load_frontend_module.cjs")("comparison-chart.ts")
+const requireActualOverview = require("./load_frontend_module.cjs")("overview-display-state.ts")
 const reportLoading = require("./load_frontend_module.cjs")("report-loading.tsx")
 const fs = require("node:fs")
 const path = require("node:path")
@@ -38,7 +39,10 @@ function harness() {
     calls.push({ url, init, resolve, reject })
     init.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })
   })
-  const require = name => name === "react" ? hooks : name.endsWith(".css") ? {}
+  const require = name => name === './app-resource-state' ? {useAppResource:()=>null}
+    : name === './reimbursement-display-state' ? {reimbursementDisplay:{}}
+    : name === './overview-display-state' ? requireActualOverview
+    : name === "react" ? hooks : name.endsWith(".css") ? {}
     : name === "./report-loading" ? reportLoading
     : name === "./comparison-chart" ? chart
     : name === "./app-navigation" ? {useAppNavigation: () => null}
@@ -129,7 +133,10 @@ async function main() {
       calls.push({ url, init, resolve, reject })
       init.signal.addEventListener("abort", () => { if (!ignoreAbort) reject(new Error("aborted")) }, { once: true })
     }),
-    require: name => name === "react" ? React : name.endsWith(".css") ? {}
+    require: name => name === './app-resource-state' ? {useAppResource:()=>null}
+      : name === './reimbursement-display-state' ? {reimbursementDisplay:{}}
+      : name === './overview-display-state' ? requireActualOverview
+      : name === "react" ? React : name.endsWith(".css") ? {}
       : name === "./report-loading" ? reportLoading
       : name === "./comparison-chart" ? chart
       : name === "./app-navigation" ? {useAppNavigation: () => ({preferences: {mode},duoLandscape})}

@@ -230,7 +230,8 @@ def _page_head() -> str:
 async def _expense_app(_request: web.Request) -> web.Response:
     config = json.dumps({"reportUrl": "/app/expenses/data", "logoutUrl": "/app/logout", "ownerName": "BookieBot", "version": frontend_version(), "onboardingUrl": "/app/bootstrap", "householdEnabled": True})
     html = f'''<!doctype html><html lang="en"><head>{_page_head()}</head><body>
-<div id="bookiebot-expense-report-root"></div><noscript>Please enable JavaScript to open BookieBot.</noscript>
+<div id="bookiebot-startup-splash" class="bb-startup-splash"><div class="bb-report-loading" role="status"><span class="bb-pull-spinner bb-report-loading-spinner" aria-hidden="true"><svg viewBox="0 0 32 32"><circle class="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" stroke-dasharray="100" stroke-dashoffset="25"/></svg></span><span class="sr-only">Opening BookieBot…</span></div></div>
+<div id="bookiebot-expense-report-root" inert aria-hidden="true"></div><noscript><style>.bb-startup-splash{{display:none}}</style>Please enable JavaScript to open BookieBot.</noscript>
 <script id="bookiebot-expense-app-config" type="application/json">{config}</script>
 <script defer src="{_asset_url("expense-report-app.js")}"></script></body></html>'''
     return web.Response(text=html, content_type="text/html", headers=_PRIVATE_HEADERS)

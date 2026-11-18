@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from bookiebot.reimbursements import service, store as stores
+from bookiebot.reimbursements import projection, service, store as stores
 from bookiebot.reports import transactions as tx
 from bookiebot.sheets import bills, undo
 from bookiebot.sheets.routing import PACIFIC_TZ
@@ -148,7 +148,10 @@ def test_overview_and_calendar_restore_settled_bill_cash_for_both_people(bill, m
     monkeypatch.setattr(reports, "now_pacific", lambda: datetime(2026, 11, 13, tzinfo=PACIFIC_TZ))
     sheets = reports.ReportWorksheets(shared_expenses=InMemoryWorksheet([]),
         personal_budget=InMemoryWorksheet([["Monthly Income", "1000"], ["", "PG&E", amount]]),
-        bill_schedule=InMemoryWorksheet([bills.BILL_SCHEDULE_HEADERS, ["pge", display_name, "monthly", "22", "", "PG&E"]]))
+        bill_schedule=InMemoryWorksheet([bills.BILL_SCHEDULE_HEADERS, ["pge", display_name, "monthly", "22", "", "PG&E"]]),
+        personal_metadata={"sheets":[{"properties":{"sheetId":1,"title":"November"}}], "namedRanges":[{
+            "name":projection._name('source',bill.allocation['id']),
+            "range":{"sheetId":1,"startRowIndex":1,"endRowIndex":2,"startColumnIndex":1,"endColumnIndex":3}}]})
     before = deepcopy(sheets.personal_budget._rows)
     result = reports.build_expense_breakdown_report(actor_key=actor,
         owner_name="Brian" if actor == B else "Hannah", persons=[], month=reports.BudgetMonth(2026, 11), worksheets=sheets)

@@ -12,7 +12,7 @@ from typing import Any
 from gspread.utils import absolute_range_name, fill_gaps
 
 
-def read_workbook_tabs(gc: Any, spreadsheet_id: str, titles: Iterable[str]) -> dict[str, list[list[str]]]:
+def read_workbook_tabs(gc: Any, spreadsheet_id: str, titles: Iterable[str], *, metadata_out: dict[str, Any] | None = None) -> dict[str, list[list[str]]]:
     """Read existing requested tabs in one metadata call and one values batch.
 
     Use the HTTP transport directly: opening a gspread Spreadsheet and then
@@ -21,6 +21,8 @@ def read_workbook_tabs(gc: Any, spreadsheet_id: str, titles: Iterable[str]) -> d
     """
     transport = gc.http_client
     metadata = transport.fetch_sheet_metadata(spreadsheet_id)
+    if metadata_out is not None and isinstance(metadata, dict):
+        metadata_out.update(metadata)
     sheets = metadata.get("sheets") if isinstance(metadata, dict) else None
     if not isinstance(sheets, list):
         raise ValueError("Incomplete workbook metadata")
