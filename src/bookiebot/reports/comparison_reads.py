@@ -26,9 +26,11 @@ def load_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
     gc = get_gspread_client()
     # All baseline months in this annual workbook share four actual HTTP reads.
     # Required batch failures propagate: a quota error is never an empty month.
+    personal_metadata, shared_metadata = {}, {}
     personal = read_workbook_tabs(gc, get_budget_spreadsheet_id_for_user(actor, year),
-                                 [*titles, "Subscriptions", "_BookieBot Bill Schedule", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges"])
-    shared = read_workbook_tabs(gc, get_shared_expenses_spreadsheet_id(year), titles)
+                                 [*titles, "Subscriptions", "_BookieBot Bill Schedule", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges"],
+                                 metadata_out=personal_metadata)
+    shared = read_workbook_tabs(gc, get_shared_expenses_spreadsheet_id(year), titles, metadata_out=shared_metadata)
     history = tuple(BudgetHistoryRows(BudgetMonth(year, number), personal[calendar.month_name[number]])
                     for number in months if calendar.month_name[number] in personal)
     results = {}
@@ -49,11 +51,13 @@ def load_comparison_year(payload: dict) -> dict[int, dict[str, Any]]:
                 subscription_schedule=ReportWorksheetRows("_BookieBot Subscription Schedule", personal.get("_BookieBot Subscription Schedule", [])),
                 bill_charges=ReportWorksheetRows("_BookieBot Bill Charges", personal.get("_BookieBot Bill Charges", [])),
                 budget_history=history,
+                shared_metadata=shared_metadata, personal_metadata=personal_metadata,
             ),
         )
         canonical = expense_breakdown_client_payload(report)
         results[number] = {"ownerName": canonical["ownerName"], "year": year, "month": number,
                            "comparisonData": canonical["comparisonData"],
+                           **({"reimbursementBasis": canonical["reimbursementBasis"]} if canonical.get("reimbursementBasis") else {}),
                            "modeViews": {mode: {"metrics": {"totalExpenses": view["metrics"]["totalExpenses"]}}
                                          for mode, view in canonical["modeViews"].items()}}
     return results

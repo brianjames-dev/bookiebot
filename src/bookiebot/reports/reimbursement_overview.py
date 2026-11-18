@@ -156,7 +156,7 @@ def normalize_cash(*, owner: str, period: str, as_of: date, ledger: dict[str, An
         elif event['status']!='confirmed':
             continue
         else:
-            row = len(result.shared)+1
+            row = max(config['start_row'], len(result.shared)+1)
             for field,col in fields.items():
                 if field!='amount':
                     _write(result.shared,row,col,expected.get(field,''))

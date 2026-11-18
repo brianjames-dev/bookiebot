@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-17 — Branded startup and bounded DUO resume recovery
+
+The first-paint splash uses the existing app-icon endpoint, BookieBot wordmark/tagline and native spinner, preserving the existing readiness/accessibility/exit ownership. Keep comparison identity metadata and canonical cash baselines through every transport, including the four-read annual path; do not infer receipt identity or make extra per-month Sheets reads. A virtual receipt in an empty read model must start in the category’s data range.
+
+Preserve the stationary Duo document, content scroller and body-level CSS navigation surface. Resume/visibility/focus/orientation events may remeasure geometry and clear a stray document pan immediately and over bounded settling frames; they must not reset content scroll, remount drafts, assign JS dock height/position or interfere with active keyboard/pinch panning. Transactions’ masthead uses the same explicit open height, zero margin and inset as Overview. Ordinary non-DUO scrolling is unchanged.
+
 ## 2026-11-17 — Canonical cash presentation in Overview and one startup surface
 
 Extend the existing owner-scoped memory resource to Overview, preserving raw financial commands and ordinary sheet activity. Reports carry a compact canonical cash baseline, exact allocation/event identities and existing payment/history timing. Before report calculation, normalize only ledger-owned source/receipt cells in copied rows, using existing named anchors and identity verification; retain original diagnostic rows and reuse batch metadata without extra production Sheets reads. The frontend applies absolute version-guarded cash differences, rebases its display baseline, and shares the existing category/burn formulas. Current follows actual receipts and payer autopay evidence; Projected includes the recipient’s outstanding obligation. Offsets/clears are not cash or savings. Selected and baseline comparison periods use the same identities; transient display updates must not invalidate their network cache. No new financial schema, browser persistence or financial writes. Apply the existing projection source-revision boundary to reversed historical receipts: their zero rows keep their original category/identity and cannot be reinterpreted using a later corrected purchase.

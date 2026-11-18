@@ -710,6 +710,10 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ## Shared Expense Responsibility And Reimbursements
 
+### 2026-11-17 Comparison Transport And DUO Lifecycle Follow-up — Implemented
+
+Carry existing named anchors and canonical cash baselines through annual comparisons without additional reads or sheet writes; preserve moved source rows, pending cross-month receipts and empty-table data-row boundaries. Add the existing app portrait/wordmark to the shared first-paint splash, align the open Transactions masthead and restore Duo canvas geometry/document origin after resume/folding while keeping inner scroll, drafts and the released navigation surface. Backend/read-only regressions and native layout/lifecycle checks are recorded in STATUS/task PR; checklist 319 includes physical iOS resume acceptance. No financial mutations or unrelated backlog changes.
+
 ### 2026-11-17 Live Overview Cash And Startup — Implemented
 
 Overview now consumes the canonical shared display for payments, offsets and Undo, with exact represented-cash baselines and immutable source normalization. Preserve original purchase/date/receipt identities and writer guards; share batch metadata without additional production read calls. Update affected Current/Projected totals, category cascade/mix, burn/activity, bill history, Calendar and both comparison periods while Sheets catches up; preserve income/Saved and existing autopay/early-recipient rules. Regression fixtures compare independent rebuilt reports for both owners against untouched and materialized source cells, queued inverse states, idempotence and stale snapshots. One server-painted native spinner spans account/provider/report startup and exits smoothly at readiness, error or sign-in without exposing the large bootstrap heading. Native/type/full/CI/release evidence is recorded in STATUS/task PR; checklist 318. No live financial writes or unrelated backlog changes. Review follow-up preserves pre-correction zero receipts using the existing writer’s revision/event filter; real receipt reversal followed by source move/rename and a new payment remains readable without touching history.

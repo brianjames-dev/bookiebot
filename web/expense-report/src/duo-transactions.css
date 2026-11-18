@@ -6,7 +6,7 @@
   padding:0 var(--bb-duo-overlay) 16px 0;
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-shell-masthead {
-  grid-column:1; grid-row:1; width:100%; min-height:0; padding-inline:35px;
+  grid-column:1; grid-row:1; width:100%; height:var(--bb-duo-masthead); min-height:0; margin:0; padding-inline:var(--bb-duo-inset);
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-pull-refresh-space { grid-column:1; grid-row:1; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] > .bb-report-header {

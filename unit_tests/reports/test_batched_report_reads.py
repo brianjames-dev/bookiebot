@@ -18,7 +18,7 @@ ACTOR = "676638528590970917"
 NOW = datetime(2026, 9, 7, 12, tzinfo=PACIFIC_TZ)
 
 
-def client_for(tabs, failures=()):
+def client_for(tabs, failures=(), *, metadata=None):
     """Real gspread HTTP adapter; every request stops at this synthetic boundary."""
     client = gspread.Client(auth=AnonymousCredentials())
     calls = []
@@ -39,6 +39,8 @@ def client_for(tabs, failures=()):
         else:
             assert suffix == key
             result = {"sheets": [{"properties": {"title": title}} for title in source]}
+            if metadata:
+                result.update(metadata.get(key, {}))
         return SimpleNamespace(json=lambda: result)
     client.http_client.request = request
     return client, calls

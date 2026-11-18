@@ -14,6 +14,10 @@ async def test_first_paint_uses_the_native_spinner_before_javascript():
     assert 'bb-pull-spinner bb-report-loading-spinner' in html
     assert '<div id="bookiebot-expense-report-root" inert aria-hidden="true">' in html
     assert '<h1>Opening' not in html
+    assert '<h1>BookieBot</h1>' in html
+    assert 'class="bb-startup-logo" src="/app/icon.png"' in html
+    assert '<link rel="preload" as="image" href="/app/icon.png">' in html
+    assert '<p>Your budget, together.</p>' in html
     assert html.index('bookiebot-startup-splash')<html.index('bookiebot-expense-report-root')
     if target:=os.getenv('BOOKIEBOT_SPLASH_HTML'):
         Path(target).write_text(html)

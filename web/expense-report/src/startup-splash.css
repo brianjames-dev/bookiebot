@@ -1,7 +1,13 @@
-/* First paint, account lookup and report startup share this one native ring. */
+/* One branded first paint survives account lookup and report startup. */
 .bb-startup-splash { position:fixed; inset:0; z-index:2147483000; display:grid; place-items:center; background:hsl(var(--background)); opacity:1; transition:opacity 280ms var(--bb-motion-ease); }
-.bb-startup-splash>.bb-report-loading { min-height:52px; transition:transform 280ms var(--bb-motion-ease); }
+.bb-startup-brand { display:flex; flex-direction:column; align-items:center; width:min(280px,calc(100vw - 48px)); text-align:center; transition:transform 280ms var(--bb-motion-ease); }
+.bb-startup-logo { display:block; width:112px; height:112px; border-radius:32px; box-shadow:0 12px 36px hsl(var(--foreground)/.08); }
+.bb-startup-brand h1 { margin:22px 0 6px; font-family:inherit; font-size:32px; line-height:1.15; font-weight:600; letter-spacing:-.04em; color:hsl(var(--foreground)); }
+.bb-startup-brand p { margin:0; font-size:14px; line-height:1.5; color:hsl(var(--muted-foreground)); }
+.bb-startup-brand>.bb-report-loading { min-height:36px; margin-top:28px; }
+.bb-startup-brand .bb-report-loading-spinner { width:36px; height:36px; }
+.bb-startup-brand .bb-report-loading-spinner svg { width:100%; height:100%; }
 .bb-startup-splash[data-leaving] { opacity:0; pointer-events:none; }
-.bb-startup-splash[data-leaving]>.bb-report-loading { transform:scale(.92); }
+.bb-startup-splash[data-leaving]>.bb-startup-brand { transform:scale(.96); }
 #bookiebot-expense-report-root[inert] .bb-report-loading { visibility:hidden; }
-@media(prefers-reduced-motion:reduce) { .bb-startup-splash,.bb-startup-splash>.bb-report-loading { transition:none; } }
+@media(prefers-reduced-motion:reduce) { .bb-startup-splash,.bb-startup-brand { transition:none; } }

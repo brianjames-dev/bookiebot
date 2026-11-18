@@ -224,13 +224,18 @@ def _page_head() -> str:
 <meta name="robots" content="noindex,nofollow"><title>BookieBot</title>
 <link rel="manifest" href="/app/manifest.webmanifest"><link rel="apple-touch-icon" href="/app/icon.png">
 <link rel="icon" type="image/png" href="/app/icon.png"><script src="/app/assets/theme.js"></script>
+<link rel="preload" as="image" href="/app/icon.png">
 <link rel="stylesheet" href="{_asset_url("expense-report-app.css")}">'''
 
 
 async def _expense_app(_request: web.Request) -> web.Response:
     config = json.dumps({"reportUrl": "/app/expenses/data", "logoutUrl": "/app/logout", "ownerName": "BookieBot", "version": frontend_version(), "onboardingUrl": "/app/bootstrap", "householdEnabled": True})
     html = f'''<!doctype html><html lang="en"><head>{_page_head()}</head><body>
-<div id="bookiebot-startup-splash" class="bb-startup-splash"><div class="bb-report-loading" role="status"><span class="bb-pull-spinner bb-report-loading-spinner" aria-hidden="true"><svg viewBox="0 0 32 32"><circle class="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" stroke-dasharray="100" stroke-dashoffset="25"/></svg></span><span class="sr-only">Opening BookieBot…</span></div></div>
+<div id="bookiebot-startup-splash" class="bb-startup-splash"><div class="bb-startup-brand">
+<img class="bb-startup-logo" src="/app/icon.png" width="112" height="112" alt="" fetchpriority="high">
+<h1>BookieBot</h1><p>Your budget, together.</p>
+<div class="bb-report-loading" role="status"><span class="bb-pull-spinner bb-report-loading-spinner" aria-hidden="true"><svg viewBox="0 0 32 32"><circle class="bb-pull-progress" cx="16" cy="16" r="12" pathLength="100" stroke-dasharray="100" stroke-dashoffset="25"/></svg></span><span class="sr-only">Opening BookieBot…</span></div>
+</div></div>
 <div id="bookiebot-expense-report-root" inert aria-hidden="true"></div><noscript><style>.bb-startup-splash{{display:none}}</style>Please enable JavaScript to open BookieBot.</noscript>
 <script id="bookiebot-expense-app-config" type="application/json">{config}</script>
 <script defer src="{_asset_url("expense-report-app.js")}"></script></body></html>'''
