@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from bookiebot.reimbursements.projection import _name, _identity_matches, _source_identity, _PERSONAL_BILL_LABELS
+from bookiebot.reimbursements.projection import _name, _identity_matches, _source_identity, _PERSONAL_BILL_LABELS, _projection_events
 from bookiebot.sheets.bills import bill_label_key, bill_payment_state, list_bill_schedules
 from bookiebot.sheets.config import category_layout
 from gspread.utils import a1_to_rowcol
@@ -36,6 +36,16 @@ def _write(rows, row, col, value):
         rows.append([])
     rows[row-1].extend([''] * max(0, col-len(rows[row-1])))
     rows[row-1][col-1] = str(value)
+
+
+def _current_receipt_events(ledger: dict[str, Any]) -> list[dict[str, Any]]:
+    """Historical zero receipts keep the identity of their prior source revision."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for event in ledger['events']:
+        grouped.setdefault(event['allocationId'], []).append(event)
+    eligible = {event['id'] for allocation in ledger['allocations']
+                for event in _projection_events({**allocation, 'events': grouped.get(allocation['id'], [])})}
+    return [event for event in ledger['events'] if event['id'] in eligible]
 
 
 @dataclass
@@ -66,7 +76,7 @@ class OverviewCash:
                     'id','payerOwner','partnerOwner','payerPerson','item','location','expenseDate','category','grossCents',
                     'payerShareCents','partnerShareCents','settledCents','clearedCents','outstandingCents','version','accounting',
                     'sourceYear','sourceSheetTitle','sourceWorksheet','billCategory','lifecycle'}} for row in self.ledger['allocations'] if row.get('accounting')=='cash_v1'],
-                'events': [{key:value for key,value in event.items() if key in {'id','allocationId','kind','amountCents','status','date'}} for event in self.ledger['events']], 'bills': self.bills}
+                'events': [{key:value for key,value in event.items() if key in {'id','allocationId','kind','amountCents','status','date'}} for event in _current_receipt_events(self.ledger)], 'bills': self.bills}
 
 
 def normalize_cash(*, owner: str, period: str, as_of: date, ledger: dict[str, Any], shared: list[list[str]],
@@ -124,7 +134,7 @@ def normalize_cash(*, owner: str, period: str, as_of: date, ledger: dict[str, An
                 'schedulePaid': timing.paid, 'forecast': bool(forecast) or (not payer and period >= as_of.strftime('%Y-%m')), 'forecastDate': forecast.date if forecast else timing.withdrawal_date.isoformat() if timing.withdrawal_date else allocation['expenseDate']})
     # Receipt events are actual recorded cash, even if their Sheet projection
     # has not appended its row. Pending reports never create spending.
-    for event in ledger['events']:
+    for event in _current_receipt_events(ledger):
         allocation = by_id.get(event['allocationId'])
         if (not allocation or allocation.get('accounting')!='cash_v1' or allocation.get('lifecycle','active')!='active'
                 or allocation['sourceWorksheet']!='expense' or allocation['partnerOwner']!=owner or not event['date'].startswith(period)):
