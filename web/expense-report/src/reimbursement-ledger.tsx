@@ -18,6 +18,7 @@ import {applyDisplayChange,inverseDisplay,pendingDisplay,reimbursementDisplay,va
 import { ReimbursementSplitEditor } from "./reimbursement-split-editor"
 
 export interface LedgerAllocation {
+  sourceYear?:number;sourceSheetTitle?:string;sourceWorksheet?:string;billCategory?:string;lifecycle?:string
   id: string; payerOwner: string; partnerOwner: string; payerPerson: string
   item: string; location: string; expenseDate: string; category: string
   grossCents: number; payerShareCents: number; partnerShareCents: number

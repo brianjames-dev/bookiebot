@@ -33,6 +33,7 @@ const baseline=process.env.BOOKIEBOT_DUO_BASELINE;
 const html=(dark,old,config={})=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><style>${old?fs.readFileSync(path.join(baseline,'expense-report-app.css'),'utf8'):css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout',...config})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}');localStorage.setItem('bookiebot:duo-layout:brian','true');localStorage.setItem('bookiebot-report-view:v1:brian',JSON.stringify({version:1,mode:'projected',chartId:'category'}));</script><script type="module">${old?fs.readFileSync(path.join(baseline,'expense-report-app.js'),'utf8'):js}</script></body></html>`;
 async function fixture(browser,width,height,dark,old=false,pressure=false,safeRight=0,options={}){
  const page=await browser.newPage({viewport:{width,height},hasTouch:true,isMobile:true,reducedMotion:'reduce'}),errors=[],unexpected=[],comparison={hold:false,release:null};
+ if(options.init)await options.init(page);
  // A disclosure/fold may first measure these auto-sized grid items at 1px.
  // Verify real painted glyphs recover instead of leaving a zero-sized auto track.
  if(!old)await page.addInitScript(()=>{
@@ -90,7 +91,7 @@ async function fixture(browser,width,height,dark,old=false,pressure=false,safeRi
   else {unexpected.push(request.method()+' '+url);return route.fulfill({status:404,json:{error:'Unknown fixture'}});}
   return route.fulfill({json:value});
  });
- await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':'')+(options.initialHash||''));await page.locator('.bb-metrics-grid').waitFor({state:options.initialHash?'attached':'visible'});await page.waitForTimeout(200);
+ await page.goto('https://bookie.test/app/expenses'+(pressure?'?pressure=1':'')+(options.initialHash||''));if(options.waitForReady!==false){await page.locator('.bb-metrics-grid').waitFor({state:options.initialHash?'attached':'visible'});await page.waitForTimeout(200);}
  return {page,errors,unexpected,comparison};
 }
 async function geometry(page){return page.evaluate(()=>{

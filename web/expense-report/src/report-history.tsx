@@ -1,3 +1,6 @@
+import {useAppResource} from './app-resource-state'
+import {reimbursementDisplay} from './reimbursement-display-state'
+import {overviewComparisonDelta,type OverviewBasis} from './overview-display-state'
 import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { ArrowDownRight, ArrowLeftRight, ChevronDown } from "lucide-react"
@@ -15,6 +18,7 @@ export interface ReportMonthCatalog {
 }
 
 interface ComparisonPeriod {
+  reimbursementBasis?: OverviewBasis
   fromDate: string
   throughDate: string
   spending: number
@@ -311,10 +315,12 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
     })
   }, [open, baseline, mode, resultKey, requests, selectedMonth, revision, refreshing])
 
+  const liveReimbursements=useAppResource(reimbursementDisplay,report.ownerName)
   const frame = useComparisonFrame(open)
   const ready = !loading && !error && comparison?.selectedMonth === selectedMonth && comparison.baselineMonth === baseline && comparison.mode === mode ? comparison : null
-  const amounts = ready?.selected && ready.baseline ? [ready.selected.spending, ready.baseline.spending] : null
-  const change = amounts ? ready!.changeAmount : null
+  const amounts = ready?.selected && ready.baseline ? [ready.selected,ready.baseline].map(period=>Math.round((period.spending+overviewComparisonDelta(period.reimbursementBasis,liveReimbursements,mode,ready.throughDay))*100)/100) : null
+  const change = amounts ? Math.round((amounts[0]-amounts[1])*100)/100 : null
+  const changePercent = amounts&&amounts[1]>0&&change!==null?Math.round(change/amounts[1]*1000)/10:null
   const direction = change === null || change === 0 ? "same" : change < 0 ? "less" : "more"
   const chart = amounts ? comparisonChart(amounts) : null
   const monthName = (value: string) => value.startsWith(`${report.year}-`) ? reportMonthLabel(value).replace(/\s+\d{4}$/, "") : reportMonthLabel(value)
@@ -341,8 +347,8 @@ export function ReportComparison({ report, onExpired, catalog, catalogLoading = 
             {change !== null && <div className="bb-comparison-change">
               <div className="bb-comparison-hero-main">
                 <FittedAmount intrinsic className="bb-comparison-difference">{money(Math.abs(change))}</FittedAmount>
-                {ready!.changePercent !== null && <span className="bb-comparison-percent">
-                  {change !== 0 && <ArrowDownRight size={16} aria-hidden="true" />}{Math.abs(ready!.changePercent)}%
+                {changePercent !== null && <span className="bb-comparison-percent">
+                  {change !== 0 && <ArrowDownRight size={16} aria-hidden="true" />}{Math.abs(changePercent!)}%
                 </span>}
               </div>
               <p className="bb-comparison-direction">{change === 0 ? "Same spending" : `${direction} spending`}</p>

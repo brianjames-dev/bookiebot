@@ -1,0 +1,7 @@
+/* First paint, account lookup and report startup share this one native ring. */
+.bb-startup-splash { position:fixed; inset:0; z-index:2147483000; display:grid; place-items:center; background:hsl(var(--background)); opacity:1; transition:opacity 280ms var(--bb-motion-ease); }
+.bb-startup-splash>.bb-report-loading { min-height:52px; transition:transform 280ms var(--bb-motion-ease); }
+.bb-startup-splash[data-leaving] { opacity:0; pointer-events:none; }
+.bb-startup-splash[data-leaving]>.bb-report-loading { transform:scale(.92); }
+#bookiebot-expense-report-root[inert] .bb-report-loading { visibility:hidden; }
+@media(prefers-reduced-motion:reduce) { .bb-startup-splash,.bb-startup-splash>.bb-report-loading { transition:none; } }

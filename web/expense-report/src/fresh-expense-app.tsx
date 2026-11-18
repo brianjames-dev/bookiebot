@@ -1,7 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import { KonstaProvider } from "konsta/react"
 import { ExpenseAppShell } from "./expense-app-shell"
+import {useStartupSplash} from "./startup-splash"
+import {useAppResource} from "./app-resource-state"
+import {displayOverview} from "./overview-display-state"
 import {clearAppResources} from "./app-resource-state"
 import {reimbursementDisplay} from "./reimbursement-display-state"
 import { AppWorkGuardProvider } from "./app-work-guard"
@@ -82,12 +85,15 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
   const { state, refresh, signOut, selectMonth, expire } = useFreshExpenseReport(config)
   const busy = state.phase === "loading" || state.phase === "refreshing"
   const disconnected = state.phase === "expired" || state.phase === "signed-out"
+  useStartupSplash(Boolean(state.report)||["error","expired","signed-out","stale"].includes(state.phase))
   // Month selection intentionally clears the report while loading. Keep the
   // owner shell alive, but never present its old report as the requested month.
   const lastReport = useRef<ExpenseReportData | null>(null)
   if (disconnected) lastReport.current = null
   else if (state.report) lastReport.current = state.report
   const shellReport = state.report ?? lastReport.current
+  const liveReimbursements=useAppResource(reimbursementDisplay,shellReport?.ownerName??config.ownerName)
+  const displayedReport=useMemo(()=>displayOverview(shellReport,liveReimbursements),[shellReport,liveReimbursements])
   const resourceOwner=shellReport?.ownerName
   useLayoutEffect(()=>{if(disconnected)clearAppResources();return clearAppResources},[disconnected,resourceOwner])
   const avatarUrl = `/app/avatar.png?day=${new Date().toISOString().slice(0, 10)}`
@@ -108,7 +114,7 @@ function FreshExpenseContent({ config }: { config: ExpenseAppConfig }) {
   if (!disconnected) {
     return <ExpenseAppShell
       key={ownerScope.current.generation}
-      report={shellReport} ownerName={config.ownerName}
+      report={displayedReport} ownerName={config.ownerName}
       monthlyReady={Boolean(state.report)}
       onRefresh={refresh} reportBusy={busy}
       questionMonth={state.selectedMonth ?? history.catalog?.currentMonth ?? reportMonth}
