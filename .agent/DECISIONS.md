@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-18 — DUO list scroll ownership and transient refresh recovery
+
+The open Transactions/Reimbursements page is not a scroll container: use overflow:clip on both axes, with a dedicated list scroller and contained overscroll. The prior overflow:hidden page could still accept focus/programmatic scroll (34px in Reimbursements). See the [CSS overflow distinction](https://www.w3.org/TR/css-overflow-3/#valdef-overflow-clip). Compact mode retains its page scroller. A private owner-scoped UI controller transfers the visible row and offset between those two owners, retains the original anchor while responsive measurements settle, and cancels native momentum by temporarily removing/restoring the active scrolling box in the same layout turn. New user input cancels pending alignment; preserve keyboard/zoom/modal behavior and defer tab-position restoration to the existing shell. Do not remount editors, translate/resize the canvas or change the body-level dock.
+
+A pull-to-refresh visual presentation belongs to one screen/layout/lifecycle generation. App hide/show, orientation/fold or screen/block changes discard its gesture/gap/timers, while the registered data refresh continues once. An old response cannot resurrect its loading gap or completed animation in the new canvas. Keep ordinary touch cancellation animated and preserve normal success/error feedback for an uninterrupted gesture. No financial or persistent data change.
+
 ## 2026-11-17 — Branded startup and bounded DUO resume recovery
 
 The first-paint splash uses the existing app-icon endpoint, BookieBot wordmark/tagline and native spinner, preserving the existing readiness/accessibility/exit ownership. Keep comparison identity metadata and canonical cash baselines through every transport, including the four-read annual path; do not infer receipt identity or make extra per-month Sheets reads. A virtual receipt in an empty read model must start in the category’s data range.

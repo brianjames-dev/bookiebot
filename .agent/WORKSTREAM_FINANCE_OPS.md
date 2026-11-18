@@ -710,6 +710,10 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ## Shared Expense Responsibility And Reimbursements
 
+### 2026-11-18 Scrolled DUO Canvas And Interrupted Refresh — Implemented
+
+Make the open Transactions/Reimbursements outer canvas genuinely non-scrolling; transfer the visible row between compact page/open list and cancel the active surface’s retained motion on app return. Preserve row/editor DOM, financial commands, drafts, modal/keyboard/zoom guards and the existing dock/tab restoration. Invalidate stale pull-to-refresh visual gaps and interrupted touches across hide/show/fold, without canceling or duplicating the underlying data refresh. Readable regression failures reproduce lost row position, scrollable outer overflow and a retained 64px loading gap. Unit/native/full/type/CI/release evidence is in STATUS/task PR; checklist 320 includes actual iOS finger/app-switch acceptance. No live financial writes or unrelated backlog changes.
+
 ### 2026-11-17 Comparison Transport And DUO Lifecycle Follow-up — Implemented
 
 Carry existing named anchors and canonical cash baselines through annual comparisons without additional reads or sheet writes; preserve moved source rows, pending cross-month receipts and empty-table data-row boundaries. Add the existing app portrait/wordmark to the shared first-paint splash, align the open Transactions masthead and restore Duo canvas geometry and document/visual-viewport origin after resume/folding while keeping inner scroll, drafts and the released navigation surface. Backend/read-only regressions and native layout/lifecycle checks are recorded in STATUS/task PR; checklist 319 includes physical iOS resume acceptance. No financial mutations or unrelated backlog changes.
