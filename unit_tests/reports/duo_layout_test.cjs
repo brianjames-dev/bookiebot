@@ -37,6 +37,7 @@ win.visualViewport={height:400,scale:1,addEventListener(){},removeEventListener(
 doc.activeElement=null;win.visualViewport={height:669,scale:2,addEventListener(){},removeEventListener(){}};act(()=>listeners.get('focus').forEach(fn=>fn()));assert.equal(win.scrollY,80,'Pinch zoom keeps its pan');
 win.visualViewport.scale=.8;act(()=>listeners.get('focus').forEach(fn=>fn()));assert.equal(win.scrollY,80,'Zooming out also keeps its pan');
 win.visualViewport={height:669,scale:1,addEventListener(){},removeEventListener(){}};act(()=>listeners.get('orientationchange').forEach(fn=>fn()));assert.equal(win.scrollY,0);
+win.visualViewport.offsetTop=24;const callsBeforeVisualPan=resets;act(()=>listeners.get('pageshow').forEach(fn=>fn()));assert.equal(resets,callsBeforeVisualPan+1,'Resume repairs a visual viewport pan even when document scroll is already zero');win.visualViewport.offsetTop=0;
 act(()=>tree.update(React.createElement(Harness,{owner:'Hannah'})));assert.equal(layout.enabled,false,'The device preference is isolated by owner');assert.equal(removed,1);
 win.localStorage.setItem=()=>{throw Error('Storage blocked')};act(()=>layout.toggle());assert.equal(layout.enabled,true,'Blocked storage retains the session choice');
 act(()=>tree.unmount());assert.equal(removed,2);assert([...listeners.values()].every(set=>set.size===0),'Unmount clears owned listeners');assert.equal(frames.size,0);assert.equal(timers.size,0);

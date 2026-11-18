@@ -20,11 +20,13 @@ const settle=page=>page.waitForTimeout(400);
    // real lifecycle handler repair it without touching native inner scroll.
    let restored=28;const native=window.scrollTo.bind(window);
    Object.defineProperty(window,'scrollY',{configurable:true,get:()=>restored});
-   window.scrollTo=(...args)=>{if((typeof args[0]==='object'&&args[0].top===0)||(args[0]===0&&args[1]===0))restored=0;native(...args)};
+   window.__canvasResets=0;
+   window.scrollTo=(...args)=>{if((typeof args[0]==='object'&&args[0].top===0)||(args[0]===0&&args[1]===0)){restored=0;window.__canvasResets++;if(window.visualViewport.offsetTop||window.visualViewport.offsetLeft)window.__testVisualViewport({});}native(...args)};
   });assert.equal(await page.evaluate(()=>window.scrollY),28);
   const contentY=await surface.evaluate(el=>el.scrollTop);
   await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));await settle(page);
   assert.equal(await page.evaluate(()=>window.scrollY),0);assert.equal(await surface.evaluate(el=>el.scrollTop),contentY,'Resume preserves the user’s content position');
+  const resets=await page.evaluate(()=>window.__canvasResets);await page.evaluate(()=>window.__testVisualViewport({offsetTop:24,offsetLeft:0}));await settle(page);assert(await page.evaluate(()=>window.__canvasResets)>resets,'A restored visual offset is repaired even at document scroll zero');assert.equal(await page.evaluate(()=>window.visualViewport.offsetTop),0);assert.equal(await surface.evaluate(el=>el.scrollTop),contentY);
   assert.equal((await surface.boundingBox()).y,0);
   // A fold while backgrounded must be recognized even with no visible resize.
   await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'))});

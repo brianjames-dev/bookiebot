@@ -35,7 +35,8 @@ export function watchDuoViewport(update:()=>void) {
     const keyboard=document.activeElement?.matches('input,textarea,[contenteditable=true]')&&visual&&window.innerHeight-visual.height>140
     // The Duo page owns content scroll. Never turn keyboard/zoom panning into
     // a document reset, and never reset the page surface or its retained editor.
-    if(!keyboard&&Math.abs((visual?.scale??1)-1)<.01&&(window.scrollX||window.scrollY))window.scrollTo({left:0,top:0,behavior:'instant'})
+    const panned=window.scrollX||window.scrollY||visual?.offsetTop||visual?.offsetLeft
+    if(!keyboard&&Math.abs((visual?.scale??1)-1)<.01&&panned)window.scrollTo({left:0,top:0,behavior:'instant'})
   }
   const cancel=()=>{window.cancelAnimationFrame(frame);frame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}
   const settle=()=>{

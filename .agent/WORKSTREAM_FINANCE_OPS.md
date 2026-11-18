@@ -712,7 +712,7 @@ Status: Complete first pass as of 2026-06-20. Recent-action update, move, delete
 
 ### 2026-11-17 Comparison Transport And DUO Lifecycle Follow-up — Implemented
 
-Carry existing named anchors and canonical cash baselines through annual comparisons without additional reads or sheet writes; preserve moved source rows, pending cross-month receipts and empty-table data-row boundaries. Add the existing app portrait/wordmark to the shared first-paint splash, align the open Transactions masthead and restore Duo canvas geometry/document origin after resume/folding while keeping inner scroll, drafts and the released navigation surface. Backend/read-only regressions and native layout/lifecycle checks are recorded in STATUS/task PR; checklist 319 includes physical iOS resume acceptance. No financial mutations or unrelated backlog changes.
+Carry existing named anchors and canonical cash baselines through annual comparisons without additional reads or sheet writes; preserve moved source rows, pending cross-month receipts and empty-table data-row boundaries. Add the existing app portrait/wordmark to the shared first-paint splash, align the open Transactions masthead and restore Duo canvas geometry and document/visual-viewport origin after resume/folding while keeping inner scroll, drafts and the released navigation surface. Backend/read-only regressions and native layout/lifecycle checks are recorded in STATUS/task PR; checklist 319 includes physical iOS resume acceptance. No financial mutations or unrelated backlog changes.
 
 ### 2026-11-17 Live Overview Cash And Startup — Implemented
 

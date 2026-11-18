@@ -4,7 +4,7 @@
 
 The first-paint splash uses the existing app-icon endpoint, BookieBot wordmark/tagline and native spinner, preserving the existing readiness/accessibility/exit ownership. Keep comparison identity metadata and canonical cash baselines through every transport, including the four-read annual path; do not infer receipt identity or make extra per-month Sheets reads. A virtual receipt in an empty read model must start in the category’s data range.
 
-Preserve the stationary Duo document, content scroller and body-level CSS navigation surface. Resume/visibility/focus/orientation events may remeasure geometry and clear a stray document pan immediately and over bounded settling frames; they must not reset content scroll, remount drafts, assign JS dock height/position or interfere with active keyboard/pinch panning. Transactions’ masthead uses the same explicit open height, zero margin and inset as Overview. Ordinary non-DUO scrolling is unchanged.
+Preserve the stationary Duo document, content scroller and body-level CSS navigation surface. Resume/visibility/focus/orientation events may remeasure geometry and clear a stray document or visual-viewport pan immediately and over bounded settling frames; they must not reset content scroll, remount drafts, assign JS dock height/position or interfere with active keyboard/pinch panning. Transactions’ masthead uses the same explicit open height, zero margin and inset as Overview. Ordinary non-DUO scrolling is unchanged.
 
 ## 2026-11-17 — Canonical cash presentation in Overview and one startup surface
 
