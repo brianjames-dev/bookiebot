@@ -113,6 +113,7 @@
 .bb-account-action { display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:12px 0;border-top:1px solid hsl(var(--border));font-size:15px;line-height:1.4; }
 .bb-account-action > span { flex:1;min-width:0; }
 .bb-account-action > svg { flex:0 0 auto;width:18px;height:18px; }
+.bb-display-report-fallback { width:100%;max-width:100%;padding:10px;border:1px solid hsl(var(--border));border-radius:10px;background:transparent;color:inherit;font:12px/1.4 monospace;resize:vertical; }
 .bb-account-action:focus-visible { outline:2px solid currentColor;outline-offset:-2px;border-radius:4px; }
 .bb-account-sign-out { color:hsl(var(--destructive)); }
 .bb-app-shell[data-duo-landscape="true"] .bb-shell-bills { max-width:none; }
