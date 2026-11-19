@@ -310,6 +310,13 @@
 .sw-root[data-wide=true] .sg-editor.bi-editor{margin:0;padding:0;background:transparent;border-radius:0;--ss-editor-surface:hsl(var(--background));--bi-panel-surface:hsl(var(--background));}
 .sw-root[data-wide=true] .sg-editor .bi-step-pane{background:hsl(var(--background))}
 .sw-root[data-wide=true] .sg-close{top:0;right:0;}
+
+/* Nested editors set their own visibility. Hide the entire inactive surface
+   while retaining its layout and draft for the next transition. */
+.sw-root .bi-step-pane[data-visible="false"] {
+  opacity: 0 !important;
+}
+
 .sw-root[data-wide=true] .si-detail-actions{right:48px;}
 .sw-root[data-wide=true] .sg-left .sg-goal-row{padding-inline-end:var(--bi-right-inset,10px);}
 .sw-root[data-wide=true] .sg-left .sg-goal-row[data-selected=true]{background:var(--bi-panel-surface);}

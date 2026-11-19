@@ -31,6 +31,8 @@ The browser retains only owner-scoped in-memory data/drafts, coalesces reads, av
 
 ## Native acceptance
 
+- In both DUO modes, switch to another goal while editing, go through End goal → Review → Back → Cancel, and open and close the account’s institution picker. Once each slide settles, check that only the current editor is visible.
+
 - In closed DUO, scroll Savings: its title and buttons leave with the page. In open DUO, scroll many goals: the title/buttons, right detail and dock stay still.
 - Create a goal, choose an icon/account, enter amounts, Review and Back. Fold with a field/review open, then confirm and Undo. Amounts must remain conserved.
 - Inspect a goal: two-line row, percentage, icon-only pencil/red trash, no selected tint when closed, native selected tint/end inset when open. End with Subtract cash off and confirm that only the allocation moves. Toggle it on, enter a different amount, and check Review then Back. Confirm a real withdrawal when intended. Undo restores the cash and goal; original transfers remain in history.
