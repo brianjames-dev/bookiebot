@@ -85,10 +85,15 @@ def _view(store: GoalsStore, owner: str, db: Any, rows: Any) -> dict[str, Any]:
         cash[key] = {'id': key, 'name': r['name'], 'institutionId': r['institution_id'], 'openingCents': int(r['opening_cents']), 'kind': 'cash'}
     for a in cash.values():
         a.update(balanceCents=a['openingCents'], allocatedCents=0)
+    goal_account_shares: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    active = {g['id'] for g in goals if not g['archived']}
     for r in rows:
-        a = cash[account_id(r['toAccount'])]
+        key = account_id(r['toAccount'])
+        a = cash[key]
         a['balanceCents'] += r['amountCents']
-        if not next((g['archived'] for g in goals if g['id'] == r['goalId']), True):
+        if shares[r['id']]:
+            goal_account_shares[r['goalId']][key] += shares[r['id']]
+        if r['goalId'] in active:
             a['allocatedCents'] += shares[r['id']]
     enriched = []
     for g in goals:
@@ -96,11 +101,14 @@ def _view(store: GoalsStore, owner: str, db: Any, rows: Any) -> dict[str, Any]:
         key = m.get('account_id', 'cash')
         linked = [r for r in rows if r['goalId'] == g['id'] and shares[r['id']] > 0]
         cents = sum(shares[r['id']] for r in linked)
+        by_account = goal_account_shares[g['id']]
+        by_account[key] += g['balanceCents']
         if not g['archived']:
             cash[key]['allocatedCents'] += g['balanceCents']
         enriched.append({**g, 'accountId': key, 'iconKey': m.get('icon_key', 'target'), 'manualBalanceCents': g['balanceCents'],
             'balanceCents': g['balanceCents'] + cents, 'contributionCents': g['contributionCents'] + cents,
-            'contributionCount': g['contributionCount'] + len(linked), 'transferCents': cents, 'transferVersion': digest(linked)})
+            'contributionCount': g['contributionCount'] + len(linked), 'transferCents': cents, 'transferVersion': digest(linked),
+            'allocationsByAccount': dict(by_account)})
     for a in cash.values():
         a['availableCents'] = a['balanceCents'] - a['allocatedCents']
         a.pop('openingCents')
@@ -157,12 +165,7 @@ def validate_goal_change(view: dict[str, Any], body: dict[str, Any]):
         if amount > max(0, goal['targetCents'] - goal['balanceCents']):
             raise GoalValidationError('The allocation exceeds the remaining goal amount.')
     elif operation == 'restore' and goal and goal['archived']:
-        required = defaultdict(int)
-        required[goal['accountId']] += goal['manualBalanceCents']
-        for row in view['_rows']:
-            if row['goalId'] == goal['id']:
-                required[account_id(row['toAccount'])] += view['_shares'][row['id']]
-        for account, amount in required.items():
+        for account, amount in goal['allocationsByAccount'].items():
             if amount > next(a['availableCents'] for a in view['accounts'] if a['id'] == account):
                 raise GoalValidationError('There is not enough available cash to restore this goal. Release other allocations first.')
     return goal
@@ -187,9 +190,22 @@ def _apply(store: GoalsStore, owner: str, db: Any, body: dict[str, Any], view: d
             name=excluded.name,institution_id=excluded.institution_id,opening_cents=excluded.opening_cents''', (owner, a['id'], name, institution, balance - deposits))
         return {'operation': 'account', 'accountId': a['id'], 'name': a['name'], 'institutionId': a['institutionId'], 'balanceCents': a['balanceCents']}
     goal = validate_goal_change(view, body)
+    withdrawal = None
+    if operation == 'archive' and ('withdrawalCents' in body or 'withdrawalAccountId' in body):
+        amount = _cents(body.get('withdrawalCents'), 'Withdrawal')
+        account = next((a for a in view['accounts'] if a['id'] == body.get('withdrawalAccountId')), None)
+        if not account or not goal:
+            raise GoalValidationError('Choose a goal and a savings account.')
+        if goal['archived']:
+            raise GoalConflictError('This goal has already ended.')
+        released = goal['allocationsByAccount'].get(account['id'], 0)
+        if amount > account['availableCents'] + released:
+            raise GoalValidationError('The withdrawal exceeds available cash after ending this goal.')
+        withdrawal = {'accountId': account['id'], 'amountCents': amount}
     icon = body.get('iconKey', goal['iconKey'] if goal else 'target')
     key = body.get('accountId', goal['accountId'] if goal else 'cash')
-    clean = {k: v for k, v in body.items() if k not in {'workspaceVersion', 'iconKey', 'accountId'}}
+    clean = {k: v for k, v in body.items() if k not in {
+        'workspaceVersion', 'iconKey', 'accountId', 'withdrawalCents', 'withdrawalAccountId'}}
     before_ids = {r['id'] for r in db.execute('SELECT id FROM app_goal_contributions WHERE owner_key=?', (owner,)).fetchall()}
     result = store.command(owner, clean, connection=db)['goal']
     if operation in {'create', 'edit'}:
@@ -200,11 +216,20 @@ def _apply(store: GoalsStore, owner: str, db: Any, body: dict[str, Any], view: d
     if operation == 'edit' and goal:
         return {**{k: goal[k] for k in ('name', 'targetCents', 'startingCents', 'targetDate', 'iconKey', 'accountId')}, 'operation': 'edit', 'goalId': result['id']}
     if operation in {'archive', 'restore'}:
-        return {'operation': 'restore' if operation == 'archive' else 'archive', 'goalId': result['id']}
+        inverse: dict[str, Any] = {'operation': 'restore' if operation == 'archive' else 'archive', 'goalId': result['id']}
+        if withdrawal:
+            _adjust_cash(db, owner, withdrawal['accountId'], -withdrawal['amountCents'])
+            inverse['returnCash'] = withdrawal
+        return inverse
     if operation == 'contribute':
         inserted = next(r['id'] for r in db.execute('SELECT id FROM app_goal_contributions WHERE owner_key=?', (owner,)).fetchall() if r['id'] not in before_ids)
         return {'operation': 'reverse', 'goalId': result['id'], 'contributionId': inserted}
     return {}
+
+
+def _adjust_cash(db: Any, owner: str, account: str, delta: int) -> None:
+    db.execute('UPDATE app_savings_accounts SET opening_cents=opening_cents+? WHERE owner_key=? AND id=?',
+               (delta, owner, account))
 
 
 def command(store: GoalsStore, owner: str, body: dict[str, Any], source: Any, *, replay_source: Any = None) -> dict[str, Any]:
@@ -215,7 +240,7 @@ def command(store: GoalsStore, owner: str, body: dict[str, Any], source: Any, *,
     allowed = {'create': {'name', 'targetCents', 'startingCents', 'targetDate', 'iconKey', 'accountId'},
         'edit': {'goalId', 'version', 'name', 'targetCents', 'startingCents', 'targetDate', 'iconKey', 'accountId'},
         'contribute': {'goalId', 'version', 'amountCents', 'date', 'note'},
-        'archive': {'goalId', 'version'}, 'restore': {'goalId', 'version'},
+        'archive': {'goalId', 'version', 'withdrawalCents', 'withdrawalAccountId'}, 'restore': {'goalId', 'version'},
         'account': {'accountId', 'name', 'institutionId', 'balanceCents'}, 'undo': {'undoId'}}
     operation = body.get('operation')
     if not isinstance(operation, str) or operation not in allowed or set(body) - (allowed[operation] | {'operation', 'requestId', 'workspaceVersion'}):
@@ -256,6 +281,10 @@ def command(store: GoalsStore, owner: str, body: dict[str, Any], source: Any, *,
             inverse.update(requestId=request_id)
             if inverse.get('goalId'):
                 inverse['version'] = next(g['version'] for g in view['goals'] if g['id'] == inverse['goalId'])
+            returned = inverse.pop('returnCash', None)
+            if returned:
+                _adjust_cash(db, owner, returned['accountId'], returned['amountCents'])
+                view = _view(store, owner, db, rows)
             _apply(store, owner, db, inverse, view)
             undo = {}
         else:

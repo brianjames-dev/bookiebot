@@ -1,3 +1,5 @@
+2026-11-19 Savings follow-up — verified scheduled transfer/date/goal routing on the live application code using isolated fixture data. End goal can release allocations and record a cash withdrawal atomically with an idempotent Undo. November 6’s missing ESPP input was corrected and checked against the confirmed cumulative total. No bank reconciliation backlog status changes.
+
 2026-11-18 open-DUO first-foreground timing — user confirms #206 corrects the native gap after roughly half a second. Remove the 300ms quiet-resize gate and start its same guarded, single-attempt fit cycle directly on a valid foreground/frame/viewport measurement. Retain committed-frame restoration, late-geometry checks, metadata/scroll/draft/dock/fold ownership and all input guards. Event/frame regressions cover immediate start, late/transient dimensions, duplicate focus/visibility and cleanup; browser checks replay the host contract rather than actual iOS first-return presentation. Full/CI/release evidence belongs to STATUS/task PR; checklist 324 covers physical timing. Financial/reconciliation behavior and backlog are unchanged.
 
 ## 2026-11-18 Savings allocation workspace

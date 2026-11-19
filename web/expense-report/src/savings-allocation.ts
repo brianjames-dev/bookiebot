@@ -1,6 +1,6 @@
 import type {SavingsGoal} from './savings-goals'
 export type Account={id:string;name:string;institutionId:string;kind:'cash'|'investment';balanceCents:number;allocatedCents:number;availableCents:number}
-export type Goal=SavingsGoal&{accountId:string;iconKey:string;manualBalanceCents:number}
+export type Goal=SavingsGoal&{accountId:string;iconKey:string;manualBalanceCents:number;allocationsByAccount?:Record<string,number>}
 export type Transfer={id:string;accountId?:string;name:string;date:string;frequency:string;amountCents:number;goalId:string;toAccount:string;fromAccount:string}
 export type SavingsState={accounts:Account[];goals:Goal[];totals:{cash:number;goals:number;available:number};version:string;transfers:Transfer[];undoId?:string|null}
 export function goalView(s:SavingsState,id:string){return s.goals.find(g=>g.id===id)}

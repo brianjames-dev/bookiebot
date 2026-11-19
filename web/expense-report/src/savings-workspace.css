@@ -327,3 +327,18 @@
 .sw-feedback{color:hsl(var(--destructive));font-size:12px;line-height:1.45;padding-bottom:10px;overflow-wrap:anywhere;}
 .sw-feedback p{margin:0 0 6px;}
 .sw-feedback>button{margin-right:8px;}
+
+.sw-root .sw-end-form .sw-withdraw-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  font-size: 14px;
+  color: hsl(var(--foreground));
+}
+.sw-root .sw-end-form .sw-withdraw-option input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: hsl(var(--primary));
+}
