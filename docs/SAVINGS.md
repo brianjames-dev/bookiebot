@@ -1,0 +1,34 @@
+# Savings allocation workspace
+
+Savings shows **Total saved**, with separate **Goals**, **Invested**, and **Available** segments. Goals are allocations inside recorded cash, not extra deposits. Investments use confirmed cumulative payroll ESPP contributions; projected payroll and unknown bank values are never substituted. Missing investment history remains unavailable, and the contribution basis stays visible in its detail. Savings obtains current confirmed investment history even when Overview is on an older month; known current history is retained in memory through month changes.
+
+Open DUO keeps Savings and its buttons visible while the left list scrolls independently. Its transparent right pane reuses Transactions' editors, moving scenes, fields, review/footer, circle close and timed Undo. Closed DUO scrolls the title/buttons with the page and expands editors below their rows. New goal and Balance details expand directly below Savings, above the total, without a parent guide. Folding keeps the same editor DOM and draft/review; the existing DUO scroll controller hands its visible row between owners.
+
+Choose an icon explicitly when creating or editing a goal. Renaming does not change it. The two-line rows keep amount/target together and show progress percent. Delete removes a goal from active allocation while retaining its history under Removed goals; Restore remains available when each affected account still has enough unallocated cash; released funds cannot be promised to two goals. Cached older app sessions use the same conservation guard after account setup. Previously allocated cash becomes available; no bank movement or expense reversal occurs.
+
+Accounts show Transactions-style circular bank fallbacks. The institution choice list can scroll independently; the surrounding open editor controls stay fixed and fit above the dock. Choose an institution through the account's pencil → Institution. Institution IDs are independent of display names; approved bank-logo artwork can be attached later. This release does not connect a bank or ship a bank-logo catalog. **Recorded balance** is an explicit user-maintained cash value, reviewed before saving. Do not treat it as a verified bank balance. It cannot be reduced below current allocations. It never rewrites monthly Saved, transactions or reimbursements.
+
+## Existing records and transfer accounting
+
+Preserve all existing goal definitions, starting amounts and manual contribution history. Before first configuration, the original recorded manual goal amounts form the known cash baseline, including removed/archived goals. On the first confirmed workspace change, save that same baseline in owner-scoped account records atomically. Reads do not enroll or change financial records. Unrecorded cash and historical monthly Saved are not guessed or silently imported; use Recorded balance to declare additional known cash.
+
+The existing Sheets transfer occurrence remains the one deposit: its whole amount increases recorded account cash and monthly Saved once. Its goal allocation only partitions cash. Destinations create stable, normalized account buckets; generic Savings/empty destinations use the original cash bucket. A label change does not silently merge accounts or reroute the schedule. Edit the future schedule in Settings → Savings transfers when intended.
+
+Retain all goal allocations recorded through the November 18, 2026 rollout. New occurrences fund only the remaining target; completed, overfilled, removed or missing goals route the rest to Available. On confirmed goal/account changes, retain the exact already-counted allocations so changing a target/name/icon does not reinterpret old transfers. Explicit individual transfer corrections remain authoritative: a changed source amount/link is recalculated once without changing other original occurrence allocations. Original transaction amounts, dates, schedules, Shared debts and reimbursements are never modified by this workspace.
+
+## Persistence and recovery
+
+`GET/POST /app/savings` uses the existing authenticated personal owner, same-origin action checks, private/no-store responses, input limits, and a final session recheck. Four additive SQL tables hold account baselines/institution metadata, explicit goal icon/account metadata, retained allocation policy, and idempotent command/inverse receipts. The original goal/contribution tables and versions stay authoritative. Commands acquire the existing goal/financial owner locks, verify a fresh whole-workspace version, reject pending financial writers, and commit goal plus account changes atomically. Replay uses the same request identity and returns current state instead of replaying an older full snapshot over another device’s later changes. Partial investment coverage is indicated in both the summary and detail, with missing months preserved. Undo is version-guarded, retains contribution reversal history, and cannot reverse another owner's action or a later intervening change.
+
+The browser retains only owner-scoped in-memory data/drafts, coalesces reads, avoids loading the hidden tab, suppresses warm foreground rereads, and discards late reads after mutations. Save errors stay beside the selected editor instead of below the entire goal list. Uncertain results retain the exact request for Retry same change or Check latest. No financial data is persisted in browser storage. Explicit refresh uses closed pull-down or the native rotating arrow in open DUO.
+
+## Native acceptance
+
+- In closed DUO, scroll Savings: its title and buttons leave with the page. In open DUO, scroll many goals: the title/buttons, right detail and dock stay still.
+- Create a goal, choose an icon/account, enter amounts, Review and Back. Fold with a field/review open, then confirm and Undo. Amounts must remain conserved.
+- Inspect a goal: two-line row, percentage, icon-only pencil/red trash, no selected tint when closed, native selected tint/end inset when open. Remove/Undo/Restore without changing cash or original transfer history.
+- Edit an account's institution and recorded balance. Inspect Review; no change occurs until confirmation. Check the circular fallback and timed Undo.
+- Confirm a real future transfer only when intended. At its due date it increases cash once; goal receives only remaining room and excess is Available. Full/overfilled/removed goals receive no new allocation. An individual correction/delete/Undo in Transactions updates its source once.
+- Verify 951×669 and the already-excluded 867px drawable viewport, 480px short open height, 382px closed and 320px narrow layouts. Check review controls/hit targets fit above the existing dock. Refresh/reopen/fold without lost drafts or blank canvas offsets.
+
+Automated tests use isolated SQL, API and transfer fixtures. Release probes never write live financial data.

@@ -38,6 +38,9 @@ function load(file) {
   if (cache.has(file)) return cache.get(file)
   const exports = {}; cache.set(file, exports)
   const requireModule = name => {
+    // This DOM-free suite isolates shell/work-guard lifecycle using the existing
+    // real goal form. The production portal workspace has its own browser suite.
+    if(name==='./savings-workspace')return {SavingsWorkspace:()=>React.createElement(load(path.join(frontend,'src/savings-goals.tsx')).SavingsGoals)}
     if (name === './transaction-editor-workspace') return { EditorScenes: ({children}) => children, EditorExpansion: ({open,children}) => open ? children : null }
     if(name==='./bill-checkin')return {BillCheckin:()=>null}
     if (name.endsWith('.css')) return {}

@@ -1,6 +1,7 @@
 """Personal savings plans, separate from bank balances and monthly sheet savings."""
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import date, datetime, timezone
 from functools import lru_cache
 import hashlib
@@ -93,6 +94,9 @@ class GoalsStore:
                 PRIMARY KEY(owner_key, request_id)
             )""")
 
+            from bookiebot.reports.savings_workspace import initialize
+            initialize(db)
+
     @staticmethod
     def _owner(owner: str) -> None:
         if owner not in {"brian", "hannah"}:
@@ -136,18 +140,18 @@ class GoalsStore:
                                        "createdAt": row["created_at"], "reversedAt": row["reversed_at"]} for row in rows[:25]],
                     "nextOffset": offset + 25 if len(rows) > 25 else None}
 
-    def command(self, owner: str, body: dict[str, Any], *, before_archive: Callable[[str, str], None] | None = None) -> dict[str, Any]:
+    def command(self, owner: str, body: dict[str, Any], *, before_archive: Callable[[str, str], None] | None = None, connection: Any = None, before_change: Callable[[Any, str, dict[str, Any]], None] | None = None) -> dict[str, Any]:
         self._owner(owner)
         request_id = body.get("requestId")
         if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,80}", request_id):
             raise GoalValidationError("A request identifier is required. Reload and try again.")
         fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
-        with self.access.connect(write=True) as db:
+        with nullcontext(connection) if connection is not None else self.access.connect(write=True) as db:
             # Serialize all commands for one owner, including first-goal creation
             # and repeated requests. SQLite already reserves its writer above.
             db.execute("INSERT INTO app_goal_owners(owner_key) VALUES (?) ON CONFLICT(owner_key) DO NOTHING", (owner,))
             db.execute("SELECT owner_key FROM app_goal_owners WHERE owner_key = ?" + self.access._pairing_lock, (owner,)).fetchone()
-            if body.get('operation') == 'archive' and before_archive:
+            if (body.get('operation') == 'archive' and before_archive) or before_change:
                 db.execute('INSERT INTO app_transaction_owners VALUES (?) ON CONFLICT(owner_key) DO NOTHING', (owner,))
                 db.execute('SELECT owner_key FROM app_transaction_owners WHERE owner_key=?' + self.access._pairing_lock, (owner,)).fetchone()
             existing = db.execute("SELECT fingerprint, result_json FROM app_goal_commands WHERE owner_key = ? AND request_id = ?", (owner, request_id)).fetchone()
@@ -170,6 +174,8 @@ class GoalsStore:
                 raise GoalValidationError("Unknown savings goal action.")
             if set(body) - allowed:
                 raise GoalValidationError("Unexpected fields in the savings goal request.")
+            if before_change:
+                before_change(db, owner, body)
             now = _now()
             if operation == "create":
                 count = db.execute("SELECT COUNT(*) AS count FROM app_savings_goals WHERE owner_key = ?", (owner,)).fetchone()

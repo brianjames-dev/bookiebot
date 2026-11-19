@@ -125,9 +125,14 @@ def configuration_batch(source: WorkbookSnapshot, checked: dict[str, Any], reque
     return batch, result
 
 
-def goal_payload(actor: str, result: dict[str, Any], *, today: date | None = None) -> dict[str, Any]:
+def goal_payload(actor: str, result: dict[str, Any], *, today: date | None = None, store: Any = None, owner: str = "") -> dict[str, Any]:
     today = today or now_pacific().date()
     rows = ledger.occurrences(ledger.read_all(actor, today=today), date(2000, 1, 1), today)
+    if store is not None:
+        from bookiebot.reports import savings_workspace as workspace
+        owner = owner or get_user_config(actor).budget_owner_key
+        mapped = {g['id']: g for g in workspace.listing(store, owner, rows)['goals']}
+        return {**result, 'goals': [mapped.get(g['id'], g) for g in result['goals']]}
     goals = []
     for goal in result['goals']:
         linked = [r for r in rows if r['goalId'] == goal['id']]
@@ -157,8 +162,16 @@ def goal_history(actor: str, owner: str, identity: str, offset: int, *, store: A
         page = loaded['nextOffset']
         more_manual = page > offset + 25
     today = now_pacific().date()
-    automatic = [{**r, 'createdAt': r['date'] + 'T00:00:00', 'note': r['name'] + ' · Scheduled transfer', 'reversedAt': ''}
-                 for r in ledger.occurrences(ledger.read_all(actor, today=today), date(2000, 1, 1), today) if r['goalId'] == identity]
+    rows = ledger.occurrences(ledger.read_all(actor, today=today), date(2000, 1, 1), today)
+    from bookiebot.reports import savings_workspace as workspace
+    if hasattr(store, 'access'):
+        with store.access.connect() as db:
+            shares = workspace._view(store, owner, db, rows)['_shares']
+    else:
+        shares = {r['id']: r['amountCents'] for r in rows}
+    automatic = [{**r, 'amountCents': shares[r['id']], 'createdAt': r['date'] + 'T00:00:00',
+                  'note': r['name'] + ' · Scheduled transfer', 'reversedAt': ''}
+                 for r in rows if r['goalId'] == identity and shares[r['id']] > 0]
     combined = sorted([*manual, *automatic], key=lambda r: (r['createdAt'], r['id']), reverse=True)
     return {'contributions': combined[offset:offset + 25], 'nextOffset': offset + 25 if more_manual or len(combined) > offset + 25 else None}
 
