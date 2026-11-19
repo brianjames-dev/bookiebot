@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-19 — Estimate ESPP on an eligible entered paycheck
+
+Derive an estimate for blank withholding on an eligible paycheck in the current Pacific month. Scale by the latest earlier confirmed deduction-to-net-deposit ratio for the same payroll source and enrollment rate. The scheduled-paycheck matcher removes the fulfilled forecast. Apply the estimate only in Projected and show it separately in Savings and the Saved explanation. The existing withholding cell confirms the actual and supersedes estimation, including an explicit zero. Estimates never write to payroll or enter confirmed Current and lifetime Invested totals.
+
 ## 2026-11-19 — End a savings goal with an optional recorded withdrawal
 
 Release the goal allocations and optionally subtract an exact withdrawal from one selected recorded cash account. Review both post-action totals. Limit the withdrawal to this account’s available cash after releasing the goal’s actual allocation in that account. Archive and adjust the account’s opening balance in one guarded command. Undo adds back that same cash and restores the goal atomically under the existing receipt/version guards. Restore alone uses available cash and does not reverse a withdrawal. Scheduled inflows, monthly Saved, historical transactions and payroll remain separate sources.

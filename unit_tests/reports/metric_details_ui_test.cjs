@@ -134,6 +134,11 @@ const esppView={...view,savingsInvesting:investing,metrics:{...view.metrics,mont
 const esppDetails=render('saved',{value:1600,view:esppView})
 assert.deepEqual(rows(esppDetails),[['Cash saved','$1,200.00'],['SpaceX ESPP · calculated from payroll','$400.00'],['Cash saved + ESPP','$1,600.00']])
 assert.ok(!esppDetails.includes('Take-home before ESPP'))
+const pending = {date: '2026-11-20', amount: 278.04}
+const currentWithEstimate = render('saved', {value: 1600,
+  view: {...esppView, savingsInvesting: {...investing, postedEsppEstimates: [pending]}}})
+assert.ok(currentWithEstimate.includes('Logged paycheck estimate: $278.04. Confirm with your paystub.'))
+assert.deepEqual(rows(currentWithEstimate), rows(esppDetails), 'The pending estimate stays separate from confirmed Saved')
 const esppCard=renderToStaticMarkup(React.createElement(Card,{value:1600,progressValue:1200,minimum:700,ideal:1400,onExplain:()=>{}}))
 assert.ok(esppCard.includes('Explain Saved')&&!esppCard.includes('Explain Cash saved'))
 for(const surface of [esppCard,esppDetails])assert.ok(surface.includes(`width:${1200/1400*100}%`),'The progress bar uses recorded cash while the headline includes ESPP')

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 import calendar
 import html
 import json
@@ -31,7 +32,10 @@ from bookiebot.sheets.reimbursement_history import (
 )
 from bookiebot.sheets.routing import PACIFIC_TZ, now_pacific, resolve_sheet_context
 from bookiebot.sheets.utils import clean_money
-from bookiebot.sheets.savings_plan import SETTINGS_TAB, SavingsPlan, calculate_savings, read_savings_plan, recorded_deduction, parse_date, matches_payroll
+from bookiebot.sheets.savings_plan import (
+    CENT, SETTINGS_TAB, SavingsPlan, calculate_savings, matches_payroll, money as payroll_money,
+    parse_date, read_savings_plan, recorded_deduction,
+)
 
 
 @dataclass(frozen=True)
@@ -2909,7 +2913,15 @@ def _report_client_payload(
     }
     if report.savings_plan.present:
         current_savings = _calculate_month_savings(report.savings_plan, report.income_total, report.income_entries, report.month)
-        projected_entries = list(report.income_entries)
+        projected_entries = []
+        posted_estimates = []
+        for entry in report.income_entries:
+            posted_estimate = _posted_espp_estimate(report, entry)
+            if posted_estimate is not None:
+                payday, estimate = posted_estimate
+                posted_estimates.append({"date": payday.isoformat(), "amount": float(estimate)})
+                entry = replace(entry, espp_withheld=str(estimate))
+            projected_entries.append(entry)
         if report.savings_plan.matches_source(report.income_projection_config.source_label or ""):
             projected_entries.extend(PaymentItem(
                 report.income_projection_config.source_label or report.savings_plan.source, event.amount, "income",
@@ -2919,8 +2931,14 @@ def _report_client_payload(
         projected_savings = _calculate_month_savings(
             report.savings_plan, payload["incomeProjection"]["projectedAmount"], projected_entries, report.month,
         )
+        estimated_espp = round(max(0, projected_savings["esppContribution"] - current_savings["esppContribution"]), 2)
+        posted_total = round(sum(item["amount"] for item in posted_estimates), 2)
+        # An inconsistent income subtotal can invalidate the savings calculation.
+        # Explain only estimates that made it into the projected result.
         for is_projected, values in ((False, current_savings), (True, projected_savings)):
-            values["estimatedEsppContribution"] = round(max(0, values["esppContribution"] - current_savings["esppContribution"]), 2)
+            values["estimatedEsppContribution"] = estimated_espp if is_projected else 0
+            if posted_estimates and posted_total <= estimated_espp:
+                values["postedEsppEstimates"] = posted_estimates
             values["cashSaved"] = round(payload['savingsProjection']['projectedAmount' if is_projected else 'currentAmount'], 2)
             values["combinedContributions"] = round(values["cashSaved"] + values["esppContribution"], 2)
             values["combinedRate"] = (round(values["combinedContributions"] / values["takeHomeBeforeEspp"], 6)
@@ -3067,22 +3085,45 @@ def _calculate_month_savings(plan: SavingsPlan, income: float, entries: list[Pay
 
 def _projected_espp_withheld(report: ExpenseBreakdownReport, event: CalendarEvent) -> str | None:
     """A confirmed matching paycheck is an estimate only, never an actual entry."""
+    source = report.income_projection_config.source_label or report.savings_plan.source
+    received = date(report.month.year, report.month.month, event.day)
+    reference = _espp_reference(report, source, received)
+    return str(reference[1]) if reference else None
+
+
+def _espp_reference(report: ExpenseBreakdownReport, source: str, received: date) -> tuple[Decimal, Decimal] | None:
+    """Latest prior confirmed payroll, matched to the source and enrollment rate."""
     if not report.savings_plan.recorded_withholding:
         return None
-    source = report.income_projection_config.source_label or report.savings_plan.source
-    received = datetime(report.month.year, report.month.month, event.day).date()
     enrolled = report.savings_plan.for_paycheck(source, received)
     if not enrolled:
         return None
-    candidates = []
+    candidates: dict[date, tuple[Decimal, Decimal]] = {}
     for entry in report.income_projection_receipts:
         entry_date = parse_date(entry.date)
+        deposit = payroll_money(entry.amount)
         deduction = recorded_deduction(entry.espp_withheld)
         previous = report.savings_plan.for_paycheck(entry.label, entry_date)
-        if (entry.amount > 0 and entry_date and entry_date <= received and deduction is not None
+        if (deposit > 0 and entry_date and entry_date < received and deduction is not None
                 and previous and previous.rate == enrolled.rate and matches_payroll(entry.label, enrolled.source)):
-            candidates.append((entry_date, deduction))
-    return str(max(candidates, key=lambda value: value[0])[1]) if candidates else None
+            base, withheld = candidates.get(entry_date, (Decimal(0), Decimal(0)))
+            candidates[entry_date] = base + deposit, withheld + deduction
+    return candidates[max(candidates)] if candidates else None
+
+
+def _posted_espp_estimate(report: ExpenseBreakdownReport, entry: PaymentItem) -> tuple[date, Decimal] | None:
+    """Derive a provisional estimate without copying it into the payroll record."""
+    received = parse_date(entry.date)
+    today = report.generated_at.date()
+    if (entry.espp_withheld or not received or received > today
+            or (received.year, received.month) != (today.year, today.month)
+            or (report.month.year, report.month.month) != (today.year, today.month)):
+        return None
+    reference = _espp_reference(report, entry.label, received)
+    if not reference:
+        return None
+    deposit, withheld = reference
+    return received, (payroll_money(entry.amount) * withheld / deposit).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
 def _espp_history(plan: SavingsPlan, rows: list[list[str]], history: tuple[BudgetHistoryRows, ...], month: BudgetMonth,
