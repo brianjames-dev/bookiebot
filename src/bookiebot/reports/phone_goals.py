@@ -44,7 +44,8 @@ async def _goals(request: web.Request) -> web.Response:
                     from bookiebot.reports.bill_settings import _commands
                     commands = _commands(store.access)
                     before_archive = lambda owner, identity: can_archive_goal(session.actor_key, owner, identity, commands=commands)
-                value = store.command(session.owner_key, body, before_archive=before_archive)
+                value = store.command(session.owner_key, body, before_archive=before_archive,
+                    before_change=lambda db, owner, change: _guard_legacy_savings(session, store, db, owner, change))
                 enriched = goal_payload(session.actor_key, {'goals': [value['goal']]}, store=store, owner=session.owner_key)
                 return {**value, 'goal': enriched['goals'][0]}
             result = await asyncio.to_thread(command_goal)
@@ -97,11 +98,11 @@ def _workspace(session, store, body=None):
     if body is not None:
         from bookiebot.reports.bill_settings import _commands
         _commands(store.access)
-    def source():
+    def source(verify=True):
         nonlocal rules
         # The command owner lock is held before reading the transfer source.
         # A pending financial writer must finish before its source is adopted.
-        if body is not None:
+        if body is not None and verify:
             for table in ('app_transaction_commands', 'app_bill_commands'):
                 with store.access.connect() as db:
                     exists = db.execute("SELECT 1 FROM " + table + " WHERE owner_key=? AND state!='done'", (session.owner_key,)).fetchone()
@@ -110,8 +111,8 @@ def _workspace(session, store, body=None):
         rules = ledger.read_all(session.actor_key, today=today)
         return {'rows': ledger.occurrences(rules, date(2000, 1, 1), today),
             'destinations': sorted({r.to_account for r in ledger.current(rules) if r.active}), 'sourceVersion': ledger.version(rules)}
-    result = workspace.command(store, session.owner_key, body, source) if body is not None else workspace.listing(store, session.owner_key, source())
-    if rules is None:  # Replayed SQL receipt: retain the client’s current schedule preview.
+    result = workspace.command(store, session.owner_key, body, source, replay_source=lambda: source(False)) if body is not None else workspace.listing(store, session.owner_key, source())
+    if rules is None:
         return result
     upcoming = []
     for rule in ledger.current(rules):
@@ -120,3 +121,21 @@ def _workspace(session, store, body=None):
             upcoming.append({'id': rule.id, 'name': rule.name, 'date': due, 'amountCents': rule.amount_cents,
                 'goalId': rule.goal_id, 'accountId': workspace.account_id(rule.to_account), 'toAccount': rule.to_account, 'fromAccount': rule.from_account, 'frequency': rule.frequency})
     return {**result, 'transfers': sorted(upcoming, key=lambda r: (r['date'], r['id']))}
+
+
+def _guard_legacy_savings(session, store, db, owner, body):
+    # Cached older app sessions must not bypass the new envelope conservation.
+    if not db.execute('SELECT owner_key FROM app_savings_profiles WHERE owner_key=?', (owner,)).fetchone():
+        return
+    for table in ('app_transaction_commands', 'app_bill_commands'):
+        if db.execute("SELECT 1 FROM " + table + " WHERE owner_key=? AND state!='done'", (owner,)).fetchone():
+            raise GoalConflictError('Finish checking your financial change before changing savings.')
+    from datetime import date
+    from bookiebot.reports import savings_workspace as workspace
+    from bookiebot.sheets import savings_transfers as ledger
+    from bookiebot.sheets.routing import now_pacific
+    today = now_pacific().date()
+    rules = ledger.read_all(session.actor_key, today=today)
+    view = workspace._view(store, owner, db, ledger.occurrences(rules, date(2000, 1, 1), today))
+    workspace.validate_goal_change(view, body)
+    workspace._freeze(db, owner, view)

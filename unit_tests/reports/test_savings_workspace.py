@@ -152,3 +152,39 @@ def test_upcoming_account_metadata_can_be_configured_without_counting_future_mon
     source['rows']=[row(destination='Ally Savings',amount=500)]
     latest=workspace.listing(store,'brian',source)
     assert latest['accounts'][1]['id']==a['id'] and latest['accounts'][1]['balanceCents']==500
+
+
+def test_retry_of_saved_receipt_returns_current_state_after_other_device_changes(store):
+    first=view(store)
+    body=dict(operation='account',requestId=uuid4().hex,workspaceVersion=first['version'],accountId='cash',name='Savings',institutionId='other',balanceCents=1000)
+    receipt=workspace.command(store,'brian',body,lambda:[])
+    changed=change(store,'account',accountId='cash',name='New name',institutionId='ally',balanceCents=2000)
+    replay=workspace.command(store,'brian',body,lambda:[])
+    assert replay['totals']['cash']==2000 and replay['accounts'][0]['name']=='New name'
+    assert replay['version']==changed['version']
+    assert replay['undoId'] is None  # Never offer to undo over the intervening change.
+    assert receipt['totals']['cash']==1000
+
+
+def test_restore_cannot_reclaim_cash_reallocated_to_another_goal(store):
+    change(store,'account',accountId='cash',name='Savings',institutionId='other',balanceCents=10000)
+    made=change(store,'create',name='Original',targetCents=10000,startingCents=10000)
+    g=made['goals'][0]
+    change(store,'archive',goalId=g['id'],version=g['version'])
+    change(store,'create',name='Other goal',targetCents=10000,startingCents=10000)
+    archived=next(g for g in view(store)['goals'] if g['archived'])
+    with pytest.raises(GoalValidationError,match='available cash'):
+        change(store,'restore',goalId=archived['id'],version=archived['version'])
+    assert view(store)['totals']==dict(cash=10000,goals=10000,available=0)
+
+
+def test_restore_checks_each_account_not_only_combined_available(store):
+    g=create(store)
+    rows=[row(goal=g['id'],amount=1000,destination='Ally')]
+    change(store,'archive',rows,goalId=g['id'],version=g['version'])
+    account=next(a for a in view(store,rows)['accounts'] if a['id']!='cash')
+    change(store,'account',rows,accountId=account['id'],name='Ally',institutionId='ally',balanceCents=0)
+    archived=view(store,rows)['goals'][0]
+    assert view(store,rows)['totals']['available']==100000
+    with pytest.raises(GoalValidationError,match='available cash'):
+        change(store,'restore',rows,goalId=archived['id'],version=archived['version'])

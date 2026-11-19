@@ -135,25 +135,8 @@ def _freeze(db: Any, owner: str, view: dict[str, Any]) -> None:
     db.execute('UPDATE app_savings_profiles SET revision=revision+1,frozen_json=? WHERE owner_key=?', (json.dumps(frozen), owner))
 
 
-def _apply(store: GoalsStore, owner: str, db: Any, body: dict[str, Any], view: dict[str, Any]) -> dict[str, Any]:
+def validate_goal_change(view: dict[str, Any], body: dict[str, Any]):
     operation = body.get('operation')
-    if operation == 'account':
-        if set(body) - {'operation', 'requestId', 'workspaceVersion', 'accountId', 'name', 'institutionId', 'balanceCents'}:
-            raise GoalValidationError('Unexpected account fields.')
-        a = next((a for a in view['accounts'] if a['id'] == body.get('accountId')), None)
-        if not a:
-            raise GoalValidationError('Choose a savings account.')
-        name = _text(body.get('name'), 'Account name', 80, required=True)
-        institution = body.get('institutionId')
-        if institution not in INSTITUTIONS:
-            raise GoalValidationError('Choose an institution.')
-        balance = _cents(body.get('balanceCents', a['balanceCents']), 'Recorded balance', allow_zero=True)
-        if balance < a['allocatedCents']:
-            raise GoalValidationError('Release goal allocations before reducing the recorded balance below them.')
-        deposits = sum(r['amountCents'] for r in view['_rows'] if account_id(r['toAccount']) == a['id'])
-        db.execute('''INSERT INTO app_savings_accounts VALUES (?,?,?,?,?) ON CONFLICT(owner_key,id) DO UPDATE SET
-            name=excluded.name,institution_id=excluded.institution_id,opening_cents=excluded.opening_cents''', (owner, a['id'], name, institution, balance - deposits))
-        return {'operation': 'account', 'accountId': a['id'], 'name': a['name'], 'institutionId': a['institutionId'], 'balanceCents': a['balanceCents']}
     goal = next((g for g in view['goals'] if g['id'] == body.get('goalId')), None)
     if operation in {'create', 'edit'}:
         icon, key = body.get('iconKey', goal['iconKey'] if goal else 'target'), body.get('accountId', goal['accountId'] if goal else 'cash')
@@ -173,6 +156,39 @@ def _apply(store: GoalsStore, owner: str, db: Any, body: dict[str, Any], view: d
             raise GoalValidationError('There is not enough available cash in this account.')
         if amount > max(0, goal['targetCents'] - goal['balanceCents']):
             raise GoalValidationError('The allocation exceeds the remaining goal amount.')
+    elif operation == 'restore' and goal and goal['archived']:
+        required = defaultdict(int)
+        required[goal['accountId']] += goal['manualBalanceCents']
+        for row in view['_rows']:
+            if row['goalId'] == goal['id']:
+                required[account_id(row['toAccount'])] += view['_shares'][row['id']]
+        for account, amount in required.items():
+            if amount > next(a['availableCents'] for a in view['accounts'] if a['id'] == account):
+                raise GoalValidationError('There is not enough available cash to restore this goal. Release other allocations first.')
+    return goal
+
+def _apply(store: GoalsStore, owner: str, db: Any, body: dict[str, Any], view: dict[str, Any]) -> dict[str, Any]:
+    operation = body.get('operation')
+    if operation == 'account':
+        if set(body) - {'operation', 'requestId', 'workspaceVersion', 'accountId', 'name', 'institutionId', 'balanceCents'}:
+            raise GoalValidationError('Unexpected account fields.')
+        a = next((a for a in view['accounts'] if a['id'] == body.get('accountId')), None)
+        if not a:
+            raise GoalValidationError('Choose a savings account.')
+        name = _text(body.get('name'), 'Account name', 80, required=True)
+        institution = body.get('institutionId')
+        if institution not in INSTITUTIONS:
+            raise GoalValidationError('Choose an institution.')
+        balance = _cents(body.get('balanceCents', a['balanceCents']), 'Recorded balance', allow_zero=True)
+        if balance < a['allocatedCents']:
+            raise GoalValidationError('Release goal allocations before reducing the recorded balance below them.')
+        deposits = sum(r['amountCents'] for r in view['_rows'] if account_id(r['toAccount']) == a['id'])
+        db.execute('''INSERT INTO app_savings_accounts VALUES (?,?,?,?,?) ON CONFLICT(owner_key,id) DO UPDATE SET
+            name=excluded.name,institution_id=excluded.institution_id,opening_cents=excluded.opening_cents''', (owner, a['id'], name, institution, balance - deposits))
+        return {'operation': 'account', 'accountId': a['id'], 'name': a['name'], 'institutionId': a['institutionId'], 'balanceCents': a['balanceCents']}
+    goal = validate_goal_change(view, body)
+    icon = body.get('iconKey', goal['iconKey'] if goal else 'target')
+    key = body.get('accountId', goal['accountId'] if goal else 'cash')
     clean = {k: v for k, v in body.items() if k not in {'workspaceVersion', 'iconKey', 'accountId'}}
     before_ids = {r['id'] for r in db.execute('SELECT id FROM app_goal_contributions WHERE owner_key=?', (owner,)).fetchall()}
     result = store.command(owner, clean, connection=db)['goal']
@@ -191,7 +207,7 @@ def _apply(store: GoalsStore, owner: str, db: Any, body: dict[str, Any], view: d
     return {}
 
 
-def command(store: GoalsStore, owner: str, body: dict[str, Any], source: Any) -> dict[str, Any]:
+def command(store: GoalsStore, owner: str, body: dict[str, Any], source: Any, *, replay_source: Any = None) -> dict[str, Any]:
     store._owner(owner)
     request_id = body.get('requestId')
     if not isinstance(request_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{16,80}', request_id):
@@ -214,7 +230,11 @@ def command(store: GoalsStore, owner: str, body: dict[str, Any], source: Any) ->
         if previous:
             if previous['fingerprint'] != signature:
                 raise GoalConflictError('This request was already used for another change.')
-            return json.loads(previous['result_json'])
+            receipt = json.loads(previous['result_json'])
+            latest = public(_view(store, owner, db, (replay_source or source)()))
+            # A receipt proves the action happened once, not that its old full
+            # snapshot is still current after another device's later command.
+            return {**latest, 'undoId': receipt.get('undoId') if latest['version'] == receipt['version'] else None}
         rows = source()  # Under the same owner lock as transfer configuration claims.
         view = _view(store, owner, db, rows)
         if body.get('workspaceVersion') != view['version']:
