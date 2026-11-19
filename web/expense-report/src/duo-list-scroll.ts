@@ -3,6 +3,7 @@ import {useLayoutEffect,useRef} from 'react'
 const lists:Record<string,{container:string;rows:string}>={
  transactions:{container:'.bb-recorded-results',rows:'.bb-daily-day-group'},
  shared:{container:'.sr-list',rows:'.sr-row-group'},
+ savings:{container:'.sw-root .sg-left',rows:'.sg-goal-item,.ss-parent-item'},
 }
 type View={anchor:HTMLElement|null;offset:number;y:number;wide:boolean}
 

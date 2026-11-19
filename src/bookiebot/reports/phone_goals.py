@@ -37,15 +37,19 @@ async def _goals(request: web.Request) -> web.Response:
             from bookiebot.reports.savings_transfers import can_archive_goal, goal_payload
             def command_goal():
                 store = build_goals_store()
+                if request.path == '/app/savings':
+                    return _workspace(session, store, body)
                 before_archive = None
                 if body.get('operation') == 'archive':
                     from bookiebot.reports.bill_settings import _commands
                     commands = _commands(store.access)
                     before_archive = lambda owner, identity: can_archive_goal(session.actor_key, owner, identity, commands=commands)
                 value = store.command(session.owner_key, body, before_archive=before_archive)
-                enriched = goal_payload(session.actor_key, {'goals': [value['goal']]})
+                enriched = goal_payload(session.actor_key, {'goals': [value['goal']]}, store=store, owner=session.owner_key)
                 return {**value, 'goal': enriched['goals'][0]}
             result = await asyncio.to_thread(command_goal)
+        elif request.path == '/app/savings':
+            result = await asyncio.to_thread(lambda: _workspace(session, build_goals_store()))
         elif "goal_id" in request.match_info:
             try:
                 offset = int(request.query.get("offset", "0"))
@@ -57,7 +61,7 @@ async def _goals(request: web.Request) -> web.Response:
         else:
             result = await asyncio.to_thread(lambda: build_goals_store().list_goals(session.owner_key))
             from bookiebot.reports.savings_transfers import goal_payload
-            result = await asyncio.to_thread(goal_payload, session.actor_key, result)
+            result = await asyncio.to_thread(goal_payload, session.actor_key, result, store=build_goals_store(), owner=session.owner_key)
         current = await _session(request)
         if current is None or current.owner_key != session.owner_key:
             return _json({"error": "Reconnect this phone using /expense_app in Discord."}, status=401)
@@ -75,6 +79,44 @@ async def _goals(request: web.Request) -> web.Response:
 
 
 def register_phone_goal_routes(app: web.Application) -> None:
+    app.router.add_get("/app/savings", _goals)
+    app.router.add_post("/app/savings", _goals)
     app.router.add_get("/app/goals", _goals)
     app.router.add_post("/app/goals", _goals)
     app.router.add_get("/app/goals/{goal_id}/contributions", _goals)
+
+
+def _workspace(session, store, body=None):
+    from datetime import date, timedelta
+    from bookiebot.reports import savings_workspace as workspace
+    from bookiebot.reports.savings_transfers import next_date
+    from bookiebot.sheets import savings_transfers as ledger
+    from bookiebot.sheets.routing import now_pacific
+    today = now_pacific().date()
+    rules = None
+    if body is not None:
+        from bookiebot.reports.bill_settings import _commands
+        _commands(store.access)
+    def source():
+        nonlocal rules
+        # The command owner lock is held before reading the transfer source.
+        # A pending financial writer must finish before its source is adopted.
+        if body is not None:
+            for table in ('app_transaction_commands', 'app_bill_commands'):
+                with store.access.connect() as db:
+                    exists = db.execute("SELECT 1 FROM " + table + " WHERE owner_key=? AND state!='done'", (session.owner_key,)).fetchone()
+                    if exists:
+                        raise GoalConflictError('Finish checking your financial change before changing savings.')
+        rules = ledger.read_all(session.actor_key, today=today)
+        return {'rows': ledger.occurrences(rules, date(2000, 1, 1), today),
+            'destinations': sorted({r.to_account for r in ledger.current(rules) if r.active}), 'sourceVersion': ledger.version(rules)}
+    result = workspace.command(store, session.owner_key, body, source) if body is not None else workspace.listing(store, session.owner_key, source())
+    if rules is None:  # Replayed SQL receipt: retain the client’s current schedule preview.
+        return result
+    upcoming = []
+    for rule in ledger.current(rules):
+        due = next_date(rules, rule.id, today + timedelta(days=1))
+        if rule.active and due:
+            upcoming.append({'id': rule.id, 'name': rule.name, 'date': due, 'amountCents': rule.amount_cents,
+                'goalId': rule.goal_id, 'accountId': workspace.account_id(rule.to_account), 'toAccount': rule.to_account, 'fromAccount': rule.from_account, 'frequency': rule.frequency})
+    return {**result, 'transfers': sorted(upcoming, key=lambda r: (r['date'], r['id']))}
