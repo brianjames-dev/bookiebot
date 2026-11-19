@@ -322,3 +322,8 @@
  .sw-root[data-wide=true] .bi-review-change{min-width:0;padding-block:8px;}
  .sw-root[data-wide=true] .bi-review-change dd{min-width:0;overflow-wrap:anywhere;}
 }
+
+.sw-root .sg-editor>.bi-expansion::before{display:none;}
+.sw-feedback{color:hsl(var(--destructive));font-size:12px;line-height:1.45;padding-bottom:10px;overflow-wrap:anywhere;}
+.sw-feedback p{margin:0 0 6px;}
+.sw-feedback>button{margin-right:8px;}
