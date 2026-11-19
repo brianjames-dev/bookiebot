@@ -108,3 +108,35 @@ def test_saving_more_reduces_left_without_becoming_spending(monkeypatch):
         assert payload['savingsInvesting']['history']['totalContributed'] == 300
         views.append(view)
     assert views[0]['metrics']['incomeAfterExpenses'] - views[1]['metrics']['incomeAfterExpenses'] == 440
+
+
+def test_biweekly_deductions_keep_month_and_lifetime_totals_separate(monkeypatch):
+    october = report.BudgetHistoryRows(report.BudgetMonth(2026, 10),
+                                      rows(('10/23/2026', 'xAI income', '3500', '275.50')))
+    first = ('11/6/2026', 'xAI income', '3800', '310.75')
+
+    def november(day, *additional):
+        monkeypatch.setattr(report, 'now_pacific', lambda: datetime(2026, 11, day, tzinfo=PACIFIC_TZ))
+        source = build(rows(first, *additional, projection='biweekly'), [october],
+                       month=report.BudgetMonth(2026, 11))
+        return report.expense_breakdown_client_payload(source)
+
+    before = november(19)
+    assert [event['day'] for event in before['calendarEvents'] if event['kind'] == 'income' and event['projectedOnly']] == [20]
+    espp = before['savingsInvesting']
+    assert espp['current']['esppContribution'] == 310.75
+    assert espp['projected']['esppContribution'] == 621.50
+    assert espp['projected']['estimatedEsppContribution'] == 310.75
+    assert espp['history']['totalContributed'] == 586.25
+
+    missing = november(20, ('11/20/2026', 'xAI paycheck', '3400', ''))['savingsInvesting']
+    assert not missing['current']['complete']
+    assert missing['history']['coverage'] == 'partial'
+    assert missing['projected']['estimatedEsppContribution'] == 0
+    assert missing['history']['totalContributed'] == 586.25
+
+    actual = november(20, ('11/20/2026', 'xAI paycheck', '3400', '345.67'))['savingsInvesting']
+    assert actual['current']['esppContribution'] == 656.42
+    assert actual['projected']['esppContribution'] == 656.42
+    assert actual['projected']['estimatedEsppContribution'] == 0
+    assert actual['history']['totalContributed'] == 931.92
