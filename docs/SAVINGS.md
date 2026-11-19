@@ -31,6 +31,8 @@ The browser retains only owner-scoped in-memory data/drafts, coalesces reads, av
 
 ## Native acceptance
 
+- Log a current-month eligible paycheck with its take-home deposit, date and source. With a previously confirmed deduction at the same enrollment rate, Savings shows a dated paycheck estimate and Overview Projected counts it once. Enter the paystub withholding in the existing paycheck's **ESPP withheld** cell. The estimate clears, and the confirmed value moves into Current and Invested.
+
 - In both DUO modes, switch to another goal while editing, go through End goal → Review → Back → Cancel, and open and close the account’s institution picker. Once each slide settles, check that only the current editor is visible.
 
 - In closed DUO, scroll Savings: its title and buttons leave with the page. In open DUO, scroll many goals: the title/buttons, right detail and dock stay still.

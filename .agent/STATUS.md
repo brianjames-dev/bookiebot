@@ -1,5 +1,9 @@
 # Agent Status
 
+## Estimate ESPP when a paycheck is logged (2026-11-19)
+
+An eligible current-month paycheck with a blank withholding field now gets a preview proportional to its entered net deposit. Use the latest earlier confirmed same-source, same-rate payroll ratio, rounded to cents. Apply only in Projected; show the dated estimate separately in Savings and the Saved details. The posted paycheck takes over from the scheduled forecast, and a real withholding entry including zero takes over from the estimate. Preserve confirmed Current and lifetime totals. Focused payroll and display checks cover rounding, changed deposit, invalid and future entries, source/rate changes, and estimate replacement. Manual acceptance is the payroll step in docs/SAVINGS.md. Final checks and deployment evidence belong to the task PR.
+
 ## Savings editor visibility and signed-in verification (2026-11-19)
 
 The physical DUO screenshots show retained goal and account forms painting over the active editor. The existing nested slide can explicitly set visibility on a child of a hidden scene. Make the whole inactive Savings pane transparent while retaining layout and drafts for transitions. The built-app regression reproduces the visible End goal form after Cancel on the released WebKit bundle. Goal switching, Review/Back, Cancel and institution navigation now pass in both DUO layouts in Chromium and WebKit. Existing motion, fold draft retention and row collapse checks pass in both engines. Signed-in, read-only comparison confirmed that the Savings lifetime total adds recorded cash to confirmed investments, and the November Overview estimate appears only in Projected. Focused payroll, occurrence, transfer retry and withdrawal retry/Undo checks: 54 passed / 27 optional PostgreSQL skipped. See docs/SAVINGS.md for device acceptance. Final CI and release evidence belongs to the task PR.

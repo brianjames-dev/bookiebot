@@ -90,10 +90,15 @@ export function SavingsWorkspace({report,ready=true,active:isActive,headerAction
  const investmentButton=(nested=false)=>investmentPlan&&<button className="sa-account-row" data-selected={wide&&!nested&&anchor==='account:espp'&&opened} aria-expanded={!nested&&anchor==='account:espp'&&opened} onClick={()=>nested?open('investment'):select('investment')}><BankIcon account={s.accounts.find(a=>a.id==='espp')!}/><span className="sg-copy sr-row-copy"><strong>{s.accounts.find(a=>a.id==='espp')!.name}</strong></span><span className="sg-row-amount bb-daily-day-total">{investmentKnown?money(t.invested):'—'}</span><ChevronDown className="sg-row-chevron sr-row-chevron" data-open={anchor==='account:espp'&&opened} aria-hidden="true"/></button>
  const investmentRow=<article className="ss-parent-item" data-owner="account:espp">{investmentButton()}{inlineSlot('account:espp')}</article>
  const confirmedEspp = currentReport?.savingsInvesting?.current?.esppContribution
- const estimatedEspp = currentReport?.savingsInvesting?.projected?.estimatedEsppContribution ?? 0
+ const postedEspp = currentReport?.savingsInvesting?.current?.postedEsppEstimates ?? []
+ const scheduledEsppCents = Math.round((currentReport?.savingsInvesting?.projected?.estimatedEsppContribution ?? 0) * 100)
+   - postedEspp.reduce((sum, item) => sum + Math.round(item.amount * 100), 0)
  const investmentDetail=investmentPlan?<><header className="sg-scene-heading sp-flow-heading"><h2>Investments</h2><p className="sp-flow-context">Contribution value</p></header><div className="sa-account-row"><span className="sg-copy sr-row-copy"><strong>{s.accounts.find(a=>a.id==='espp')!.name}</strong></span><span className="sg-row-amount bb-daily-day-total">{investmentKnown?money(t.invested):'—'}</span></div>{typeof confirmedEspp === 'number' && <dl className="sa-total-facts">
    <div><dt>Confirmed this month</dt><dd>{money(Math.round(confirmedEspp * 100))}</dd></div>
-   {estimatedEspp > 0 && <div><dt>Estimated from remaining paychecks</dt><dd>{money(Math.round(estimatedEspp * 100))}</dd></div>}
+   {postedEspp.map(({date, amount}, index) => <div key={date + ':' + index}>
+     <dt>{dateLabel(date)} paycheck estimate</dt><dd>{money(Math.round(amount * 100))}</dd>
+   </div>)}
+   {scheduledEsppCents > 0 && <div><dt>Estimated from remaining paychecks</dt><dd>{money(scheduledEsppCents)}</dd></div>}
  </dl>}{!investmentKnown&&<p className="bi-footnote" role="status">Investment contributions are unavailable.</p>}{currentReport?.savingsInvesting?.history?.coverage==='partial'&&<p className="bi-footnote">Available history through {currentReport.savingsInvesting.history.throughMonth}. Missing months: {currentReport.savingsInvesting.history.unavailableMonths.join(', ')}.</p>}<footer className="bi-editor-footer">{navigationAction()}</footer></>:null
  const run=(value:any,done:()=>void)=>{setReview({body:{...value,...(value.operation==='create'||value.operation==='edit'?{iconKey:iconDraft}:{})},done})}
  const confirm = async () => {

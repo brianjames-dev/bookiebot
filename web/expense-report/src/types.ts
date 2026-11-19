@@ -213,6 +213,7 @@ export interface SavingsInvesting {
   takeHomeBeforeEspp: number
   esppContribution: number
   estimatedEsppContribution?: number
+  postedEsppEstimates?: {date: string; amount: number}[]
   cashIdeal: number
   cashMinimum: number
   cashSaved: number

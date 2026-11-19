@@ -1,7 +1,8 @@
 from datetime import datetime
+import pytest
 
 from bookiebot.reports import expense_breakdown as report
-from bookiebot.sheets.savings_plan import PLAN_LABELS, WITHHOLDING_HEADER
+from bookiebot.sheets.savings_plan import PLAN_LABELS, SETTINGS_HEADERS, WITHHOLDING_HEADER
 from bookiebot.sheets.routing import PACIFIC_TZ
 from unit_tests.reports.test_income_projection import build, income_rows
 
@@ -129,14 +130,49 @@ def test_biweekly_deductions_keep_month_and_lifetime_totals_separate(monkeypatch
     assert espp['projected']['estimatedEsppContribution'] == 310.75
     assert espp['history']['totalContributed'] == 586.25
 
-    missing = november(20, ('11/20/2026', 'xAI paycheck', '3400', ''))['savingsInvesting']
+    posted = november(20, ('11/20/2026', 'xAI paycheck', '3400', ''))
+    missing = posted['savingsInvesting']
     assert not missing['current']['complete']
     assert missing['history']['coverage'] == 'partial'
-    assert missing['projected']['estimatedEsppContribution'] == 0
+    assert missing['current']['esppContribution'] == 310.75
+    assert missing['projected']['estimatedEsppContribution'] == 278.04
+    assert missing['projected']['esppContribution'] == 588.79
+    assert missing['current']['postedEsppEstimates'] == [{'date': '2026-11-20', 'amount': 278.04}]
     assert missing['history']['totalContributed'] == 586.25
+    assert not any(event['kind'] == 'income' and event['projectedOnly'] for event in posted['calendarEvents'])
+    for metric in ('income', 'saved'):
+        explanation = posted['metricExplanations']['projected'][metric]
+        assert [part for part in explanation['components'] if 'ESPP estimate' in part['label']] == [
+            {'label': 'ESPP estimate for logged paycheck', 'amount': 278.04,
+             'source': 'calculated', 'date': '2026-11-20'},
+        ]
+        assert round(sum(part['amount'] for part in explanation['components']), 2) == explanation['value']
+
+    corrected = november(20, ('11/20/2026', 'xAI paycheck', '3800', ''))['savingsInvesting']
+    assert corrected['projected']['estimatedEsppContribution'] == 310.75
 
     actual = november(20, ('11/20/2026', 'xAI paycheck', '3400', '345.67'))['savingsInvesting']
     assert actual['current']['esppContribution'] == 656.42
     assert actual['projected']['esppContribution'] == 656.42
     assert actual['projected']['estimatedEsppContribution'] == 0
+    assert 'postedEsppEstimates' not in actual['current']
     assert actual['history']['totalContributed'] == 931.92
+
+
+@pytest.mark.parametrize('day,source,withheld,new_rate', [
+    (19, 'xAI paycheck', '', False),  # Future-dated deposit.
+    (20, 'xAI bonus', '', False),
+    (20, 'xAI paycheck', '0', False),  # A confirmed zero is authoritative.
+    (20, 'xAI paycheck', 'needs correction', False),
+    (20, 'xAI paycheck', '', True),  # No actual reference at the new rate.
+])
+def test_posted_espp_estimate_requires_matching_prior_payroll_and_empty_withholding(
+    monkeypatch, day, source, withheld, new_rate,
+):
+    monkeypatch.setattr(report, 'now_pacific', lambda: datetime(2026, 11, day, tzinfo=PACIFIC_TZ))
+    inputs = rows(('11/6/2026', 'xAI income', '3800', '310.75'), ('11/20/2026', source, '3400', withheld))
+    if new_rate:
+        inputs.extend([list(SETTINGS_HEADERS), ['10/23/2026', '', 'xAI', '5%'], ['11/20/2026', '', 'xAI', '6%']])
+    payload = report.expense_breakdown_client_payload(build(inputs, month=report.BudgetMonth(2026, 11)))
+    assert 'postedEsppEstimates' not in payload['savingsInvesting']['current']
+    assert payload['savingsInvesting']['projected']['estimatedEsppContribution'] == 0

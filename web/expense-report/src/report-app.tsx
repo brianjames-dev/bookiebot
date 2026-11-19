@@ -883,6 +883,7 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
   const {key, view} = detail
   if (key === "saved") {
     const {savingsMinimum: minimum, savingsIdeal: ideal} = view.metrics
+    const postedEspp = view.savingsInvesting?.postedEsppEstimates ?? []
     return <div className="bb-metric-explanation">
       <div className="bb-chart-total">{formatMoney(detail.value)}</div>
       <SavingsProgress value={view.savingsInvesting?.cashSaved ?? detail.value} minimum={minimum} ideal={ideal} showTargets={false} />
@@ -894,6 +895,9 @@ function MetricExplanationDetails({detail}: {detail:MetricInspection}) {
           <div><dt>Cash saved + ESPP</dt><dd>{formatMoney(view.savingsInvesting.combinedContributions)}</dd></div>
         </dl>
         <p className="bb-activity-footnote">ESPP is already withheld before deposit. The progress bar measures cash savings.</p>
+        {postedEspp.length > 0 && <p className="bb-activity-footnote">
+          Logged paycheck estimate: {formatMoney(postedEspp.reduce((sum, item) => sum + item.amount, 0))}. Confirm with your paystub.
+        </p>}
         {(view.savingsInvesting.warnings ?? []).map(warning => <p key={warning} role="status" className="bb-activity-footnote">{warning}</p>)}
       </>}
     </div>
