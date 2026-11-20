@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
+import { useAppNavigation } from "./app-navigation"
 import { useAppWorkStatus } from "./app-work-guard"
 import { usePageRefresh, usePageRefreshRegistry } from "./page-refresh"
 import { useReimbursementPage } from "./reimbursement-pagination"
@@ -283,6 +284,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     return()=>{stopped=true;window.clearTimeout(timer)}
   },[queuedJob,load])
   const pageRefresh = usePageRefresh(matchedReceipt ? "reconcile" : "shared", { refresh: load, disabled: busy || uncertain || refreshing })
+  const wide = useAppNavigation()?.duoLandscape
   const execute = async () => {
     const change = pending.current
     if (!change || executing.current) return
@@ -328,7 +330,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
   if (matchedReceipt) return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt" aria-label="Receive shared payment">
     {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
       {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
-        : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
+        : pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
     {!snapshot && !error && <ReportLoading label="Loading the matched shared payment…"/>}
     {snapshot && <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} disabled={busy || uncertain || refreshing}
       run={run} refresh={() => void load()} />}
@@ -339,7 +341,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, onCl
     <CardContent>
       {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
-        : pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
+        : pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh reimbursements</button>}</div>}
       {!snapshot && !error && <ReportLoading label="Loading reimbursements…"/>}
       {displayed && (balanceFirst ? <BalanceFirstReimbursements snapshot={displayed} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending)} selectDisabled={busy || uncertain} headerActions={headerActions} undoVersion={undoVersion} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
         : <LedgerContents snapshot={displayed} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending)} run={run}
@@ -353,6 +355,7 @@ function MatchedReceiptContents({ snapshot, scope, disabled, run, refresh }: {
   snapshot: LedgerSnapshot; scope: MatchedReceiptScope; disabled: boolean; run: Run; refresh: () => void
 }) {
   const pageRefresh = Boolean(usePageRefreshRegistry())
+  const wide = useAppNavigation()?.duoLandscape
   const item = snapshot.allocations.find(item => item.id === scope.allocationId && item.payerOwner === snapshot.ownerKey
     && writable(item) && item.grossCents === scope.bankAmountCents)
   const [editing, setEditing] = useState(Boolean(scope.review))
@@ -371,7 +374,7 @@ function MatchedReceiptContents({ snapshot, scope, disabled, run, refresh }: {
       <div><dt>{partner}’s share</dt><dd>{money(item.partnerShareCents)}</dd></div>
       <div><dt>Already received / settled</dt><dd>{money(item.settledCents)}</dd></div>
       <div><dt>Still owed</dt><dd>{money(item.outstandingCents)}</dd></div></dl>
-    {pendingSheet && <div role="status"><p className="bb-ledger-note">Payment recorded; sheet update pending.</p>{pageRefresh ? <p>Pull down from the top to refresh.</p> : <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={refresh}>Refresh payment</button>}</div>}
+    {pendingSheet && <div role="status"><p className="bb-ledger-note">Payment recorded; sheet update pending.</p>{pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={refresh}>Refresh payment</button>}</div>}
     {Boolean(item.clearedCents) && <p className="bb-ledger-note">Undo the balance reset in Shared before recording a receipt.</p>}
     {incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={item} disabled={disabled || pendingSheet || Boolean(item.clearedCents)} run={run} />)}
     {!item.outstandingCents && !pendingSheet && !item.clearedCents && <p role="status">{partner}’s share is settled.</p>}

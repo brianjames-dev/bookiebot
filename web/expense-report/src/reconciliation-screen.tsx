@@ -2,7 +2,7 @@ import { ReportLoading, SavingButton } from "./report-loading"
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { Check, ChevronDown, Circle, CircleCheck, EyeOff, ListChecks, Plus, RefreshCw, TriangleAlert, X } from "lucide-react"
-import { usePageRefresh } from "./page-refresh"
+import { PageRefreshButton, usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import { ReimbursementLedger } from "./reimbursement-ledger"
 import { TransactionIcon } from "./daily-transactions"
@@ -333,7 +333,7 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
     aria-label={wide ? needsRefresh ? "Check status" : "Check bank transactions" : undefined}
     disabled={snapshot?.enabled === false || (!snapshot && !error) || busy || Boolean(receiptTarget)} onClick={() => void refreshQueue()}>
     <RefreshCw className={busy&&!pendingReview?"sr-refresh-spinning":undefined} size={17} aria-hidden="true" />{!wide && (busy ? "Checking…" : needsRefresh ? "Check status" : "Check")}</button>
-  const toolbar = <>{filters}{check}</>
+  const toolbar = <>{filters}{wide && receiptTarget ? <PageRefreshButton screen="reconcile" label="Refresh payment" /> : check}</>
   const reviewContent = (item: ReconciliationItem, active: boolean) => {
     const detail = details[item.id], pending = pendingReview?.id === item.id ? pendingReview : null
     const failure = active && detailFailedId === item.id ? detailError : ""

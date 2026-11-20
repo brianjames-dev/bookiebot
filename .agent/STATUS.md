@@ -8,6 +8,8 @@ The Reconcile pane centers its loading ring under the sticky close button. Choos
 
 Local verification passed 3,558 tests with 915 optional PostgreSQL cases skipped, Python and frontend types, and the build. Chromium and WebKit passed short-queue pull/recovery, every open-tab refresh control, chooser and save visuals, and four interrupted-refresh fold cases. The older broad pull suite stops at the same startup-spinner assertion on the baseline and the new bundle.
 
+Review follow-up restores the mouse-accessible compact refresh control and routes the open-DUO shared-payment refresh directly to the receipt loader. The receipt's recovery text follows the active pose.
+
 ## Reconcile editor polish and recurring date review (2026-11-20)
 
 The signed-in November Bills view showed Recology’s recurring day as 18 and its recorded date as November 20, matching the Calendar. Provide an explicit current-charge date choice in the recurring review. It commits with the schedule in one batch and leaves amounts, repayment history and source identity intact. The existing current-month date editor still corrects an occurrence without changing the schedule. Combined reviewed amount/split changes verify the original transaction and the exact date change again before using its refreshed version.

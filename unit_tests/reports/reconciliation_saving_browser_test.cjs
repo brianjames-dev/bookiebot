@@ -281,6 +281,56 @@ async function verifyShortQueueRefresh(browser) {
   } finally { await page.close() }
 }
 
+async function verifyDesktopAndReceiptRefresh(browser) {
+  let checks = 0, receiptReads = 0, readingReceipt = false
+  const desktop = { newPage: options => browser.newPage({ ...options, hasTouch: false, isMobile: false }) }
+  const checked = { ...row, status: 'checked', receipt: {
+    allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 8000,
+  } }
+  const { page, errors, unexpected } = await fixture(desktop, 720, 850, true, false, false, 0, {
+    async request(route) {
+      const request = route.request(), path = new URL(request.url()).pathname
+      if (path === '/app/reconciliation') {
+        if (request.method() === 'POST') {
+          assert.equal(request.postDataJSON().operation, 'check')
+          checks++
+        }
+        await route.fulfill({ json: snapshot(checked) })
+      } else if (path === '/app/reconciliation/1') await route.fulfill({ json: { item: checked } })
+      else if (path === '/app/reimbursements') {
+        assert.equal(request.method(), 'GET')
+        if (readingReceipt && ++receiptReads === 1) await route.fulfill({ status: 503, json: { error: 'Receipt temporarily unavailable' } })
+        else await route.fulfill({ json: { enabled: true, ownerKey: 'brian', currency: 'USD', allocations: [], events: [], resets: [], resetState: 'fixture' } })
+      } else return false
+      return true
+    },
+  })
+  try {
+    await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
+    const desktopRefresh = page.getByRole('button', { name: 'Refresh Reconcile', exact: true })
+    await desktopRefresh.click()
+    assert.equal(checks, 1, 'Mouse users retain a clickable bank check')
+    await page.setViewportSize({ width: 867, height: 669 })
+    const toolbar = page.locator('.bb-reconcile-title-actions')
+    await toolbar.getByRole('button', { name: /Checked/ }).click()
+    await page.locator('.bb-reconcile-row-toggle').click()
+    const openReceipt = page.getByRole('button', { name: 'Mark Hannah’s share received' })
+    await openReceipt.waitFor()
+    readingReceipt = true
+    await openReceipt.click()
+    const receipt = page.getByRole('region', { name: 'Receive shared payment' })
+    await receipt.getByText('Receipt temporarily unavailable').waitFor()
+    assert.equal(await receipt.getByText(/Pull down/).count(), 0)
+    const refresh = toolbar.getByRole('button', { name: 'Refresh payment', exact: true })
+    await refresh.click()
+    await receipt.getByText('This shared payment changed.', { exact: false }).waitFor()
+    assert.equal(receiptReads, 2)
+    assert.equal(checks, 1, 'Receipt refresh only reads the receipt')
+    assert.deepEqual(errors, [])
+    assert.deepEqual(unexpected, [])
+  } finally { await page.close() }
+}
+
 ;(async () => {
   for (const engine of engines) {
     const browser = await engine.launch({ headless: true })
@@ -293,6 +343,8 @@ async function verifyShortQueueRefresh(browser) {
       console.log('PASS Reconcile scrollbar, selection transition and inline expansion', engine.name())
       await verifyShortQueueRefresh(browser)
       console.log('PASS Reconcile short-queue pull, header status and open refresh', engine.name())
+      await verifyDesktopAndReceiptRefresh(browser)
+      console.log('PASS desktop bank check and open receipt refresh', engine.name())
     } finally { await browser.close() }
   }
 })().catch(error => { console.error(error); process.exitCode = 1 })
