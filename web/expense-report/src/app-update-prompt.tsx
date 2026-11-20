@@ -30,8 +30,8 @@ export function AppUpdatePrompt({ initialVersion, onAvailabilityChange }: { init
       <button type="button" className="bb-app-update-now" disabled={guard.pending || guard.uncertain} onClick={() => requestUpdate.current()}>Update</button>
       <button type="button" className="bb-app-update-later" aria-label="Dismiss update notice for now" onClick={() => watcher.current?.dismiss()}>×</button>
     </div>}>
-    <div className="bb-app-update-message"><p role={version ? "status" : undefined}>A BookieBot update is ready.</p>
-      {(guard.pending || guard.uncertain) && <small>{guard.uncertain ? "Resolve your latest change before updating." : "Finish the current request before updating."}</small>}
+    <div className="bb-app-update-message"><p role={version ? "status" : undefined}>Update ready</p>
+      {(guard.pending || guard.uncertain) && <small>{guard.uncertain ? "Resolve the last change." : "Request in progress."}</small>}
     </div>
   </Toast>
 }

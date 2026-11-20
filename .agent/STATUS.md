@@ -1,5 +1,15 @@
 # Agent Status
 
+## Reconcile row loading and checked share details (2026-11-20)
+
+Put the exact-match or difference indicator above the comparison cards. A newly selected open-DUO row shows its spinner during the handoff and a warm preview appears immediately. Batch the four recurring-source tabs in one read-only workbook lookup and values request. Concurrent cold reads for one actor use the same load and failed sources remain retryable.
+
+Checked actions use native editor buttons. The share detail uses the merchant identity, allocation bar, both shares and separate cash and offset totals. Back returns to the checked row. Tap the selected row or the open-DUO close button to dismiss it, or tap another row to review that charge. An active or uncertain receipt confirmation retains its safe retry. The update banner uses shorter pending and uncertain copy in compact layouts.
+
+Verification passed 184 focused tests and the full local suite of 3,565 tests with 915 optional PostgreSQL skips. Python and frontend types, bundle build, and the Chromium and WebKit Reconcile fixtures passed. Browser coverage includes rapidly switching three delayed rows, returning to a warm preview, and dismissing a checked share through either DUO layout.
+
+Manual check. In open DUO tap through Needs review rows before the first load settles, then return to a recently opened row. Verify only the final row becomes actionable. In both poses verify an exact match and a mismatch above the cards. Open a checked share, fold, and test Back, another row, the same row, and the open-DUO close button. These checks require only browsing.
+
 ## Reconcile inline share and broader match suggestions (2026-11-20)
 
 Keep Add expense and Confirm match on one row. Make the Budget entry card open the chooser, use the bank source alone in Ignore, and slide from the matched row to its payment summary in either DUO layout. The selected payment's editor survives a fold, and Back returns to the same checked row. Payments still require their existing separate confirmation.
@@ -609,6 +619,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of Reconcile row switching, checked shares, and compact update message. Follow the top entry and docs/RECONCILIATION.md.
 
 Native acceptance of refresh and match clarity. Pull down in a short closed-DUO Reconcile queue and verify the arrow clears the portrait, then unfold and repeat the gesture to check that only the refresh button runs a check. Open a row with alternatives and confirm the chooser, warning icon and Add expense action. After a failed check, read the short status under the portrait and refresh once to verify the saved outcome.
 

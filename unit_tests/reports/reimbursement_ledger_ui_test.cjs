@@ -922,7 +922,9 @@ async function matchedReceiptContracts() {
   assert.equal(writes(state).length, 0)
   assert.ok(text(tree.root).includes("Full bank payment"))
   assert.ok(!text(tree.root).includes("The bank match is saved separately"))
-  assert.match(button(tree.root, "Back to reconciliation").props.className, /bb-reconcile-outline/)
+  assert.match(button(tree.root, "Back to reconciliation").props.className, /bi-cancel/)
+  assert.ok(text(tree.root).includes("Cash received"))
+  assert.equal(tree.root.findAllByProps({ "aria-label": "Purchase allocation" }).length, 1)
   assert.equal(button(tree.root, "Mark all received"), undefined)
   assert.equal(button(tree.root, "Reset balances"), undefined)
   await tap(button(tree.root, "Mark Hannah’s share received"))
@@ -974,13 +976,17 @@ async function matchedReceiptContracts() {
   await unmount(tree)
 
   let attempts = 0
+  let receiptLocked
   state = fixture({ post: () => { if (++attempts === 1) throw Error("Saved response lost"); return response(clone(state.snapshot)) } })
-  tree = await mount({ matchedReceipt })
+  tree = await mount({ matchedReceipt, onReceiptMutationLock: locked => { receiptLocked = locked } })
+  assert.equal(receiptLocked, false, "Viewing a share leaves the Reconcile list and close control available")
   await tap(button(tree.root, "Mark Hannah’s share received")); await submit(tree)
+  assert.equal(receiptLocked, true, "An uncertain write keeps the Reconcile list and close control locked")
   assert.ok(button(tree.root, "Back to reconciliation").props.disabled, "An uncertain receipt stays mounted for its safe retry")
   await tap(button(tree.root, "Retry this record"))
   assert.deepEqual(writes(state)[0].body, writes(state)[1].body)
   assert.ok(!button(tree.root, "Back to reconciliation").props.disabled)
+  assert.equal(receiptLocked, false)
   await unmount(tree)
 
   let rejected = ""

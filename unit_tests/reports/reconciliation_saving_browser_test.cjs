@@ -58,10 +58,12 @@ async function verify(browser, width, height, dark) {
 }
 
 async function verifyWorkspace(browser) {
-  let release, releaseFirst
+  let release, releaseFirst, releaseThird, requestedThird
   const held = new Promise(resolve => { release = resolve })
   const heldFirst = new Promise(resolve => { releaseFirst = resolve })
-  const items = Array.from({ length: 22 }, (_, i) => ({ ...row, id: i + 1, merchant: `Fixture charge ${i + 1}` }))
+  const heldThird = new Promise(resolve => { releaseThird = resolve })
+  const thirdStarted = new Promise(resolve => { requestedThird = resolve })
+  const items = Array.from({ length: 22 }, (_, i) => ({ ...row, id: i + 1, stateVersion: `fixture-state-${i + 1}`, merchant: `Fixture charge ${i + 1}` }))
   const { page, errors, unexpected } = await fixture(browser, 867, 669, true, false, false, 0, {
     async request(route) {
       const path = new URL(route.request().url()).pathname
@@ -74,6 +76,7 @@ async function verifyWorkspace(browser) {
       const id = Number(path.split('/').at(-1))
       if (id === 1) await heldFirst
       if (id === 2) await held
+      if (id === 3) { requestedThird(); await heldThird }
       await route.fulfill({ json: { item: {
         ...items[id - 1],
         suggestions: id === 1 ? [match, { ...match, id: 'alternative', item: 'Backup jacket', amountCents: 17000, amountMismatch: true }] : [],
@@ -103,6 +106,7 @@ async function verifyWorkspace(browser) {
     assert(scrollHeight > clientHeight, `The list owns vertical scroll (${scrollHeight}px in a ${clientHeight}px viewport)`)
     const first = queue.filter({ has: page.getByText('Fixture charge 1', { exact: true }) })
     const second = queue.filter({ has: page.getByText('Fixture charge 2', { exact: true }) })
+    const third = queue.filter({ has: page.getByText('Fixture charge 3', { exact: true }) })
     await first.click()
     const pane = page.getByRole('complementary', { name: 'Transaction review' })
     await pane.getByText('Finding sheet entries…').waitFor({ state: 'attached' })
@@ -121,6 +125,8 @@ async function verifyWorkspace(browser) {
     assert.equal(await ignore.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
     const direct = pane.locator('.bb-reconcile-entry-actions')
     const comparison = await pane.locator('.bb-reconcile-comparison').boundingBox()
+    const result = await pane.locator('.bb-reconcile-match-result').boundingBox()
+    assert(result.y + result.height <= comparison.y, 'The exact match appears above the comparison')
     assert((await direct.boundingBox()).y > comparison.y + comparison.height)
     assert.equal(await pane.locator('summary[aria-label="Review options"]').count(), 0)
     await pane.locator('button[data-budget]').click()
@@ -130,6 +136,7 @@ async function verifyWorkspace(browser) {
     await pane.getByRole('button', { name: /Backup jacket/ }).click()
     await pane.getByRole('heading', { name: 'Review match' }).waitFor()
     assert.equal(await pane.locator('.bb-reconcile-match-result svg.lucide-triangle-alert').count(), 1)
+    assert.equal(await pane.locator('.bb-reconcile-match-result + .bb-reconcile-comparison').count(), 1)
     const add = direct.getByRole('button', { name: 'Add expense', exact: true })
     assert.equal(await add.locator('.bb-saving-label').evaluate(el => getComputedStyle(el).columnGap), '8px')
     await add.click()
@@ -146,16 +153,36 @@ async function verifyWorkspace(browser) {
     await form.getByRole('button', { name: 'Cancel new entry' }).click()
     await pane.getByRole('heading', { name: 'Review match' }).waitFor()
     await second.click()
-    assert.equal(await pane.getAttribute('aria-busy'), 'true')
+    assert.equal(await pane.getAttribute('data-loading'), 'true')
+    await pane.getByRole('status').filter({ hasText: 'Finding sheet entries…' }).waitFor()
     assert(await pane.getByText('Backup jacket').filter({ visible: true }).first().isVisible(), 'Keep the first editor visible while the second loads')
-    release()
-    await page.waitForFunction(() => {
-      const old = document.querySelector('[data-review-layer=old]')
-      const current = document.querySelector('[data-review-layer=current]')
-      return old?.inert && current?.textContent.includes('Fixture charge 2') &&
-        [...current.getAnimations()].some(animation => animation.playState === 'running')
+    await third.click()
+    await thirdStarted
+    assert.equal(await third.getAttribute('aria-expanded'), 'true')
+    assert.equal(await pane.getAttribute('data-loading'), 'true')
+    assert.equal(await pane.getByRole('status').filter({ hasText: 'Finding sheet entries…' }).count(), 1)
+    await first.click()
+    await pane.getByText('Backup jacket').waitFor()
+    assert.equal(await pane.getAttribute('data-loading'), null)
+    releaseThird()
+    await second.click()
+    await page.evaluate(() => {
+      const animate = Element.prototype.animate
+      window.fixtureReviewTransitions = []
+      Element.prototype.animate = function (frames, timing) {
+        if (this.hasAttribute('data-review-layer')) {
+          window.fixtureReviewTransitions.push({
+            layer: this.dataset.reviewLayer, inert: this.inert, text: this.textContent,
+          })
+        }
+        return animate.call(this, frames, timing)
+      }
     })
+    release()
     await pane.getByText('No matching entry').waitFor()
+    const transitions = await page.evaluate(() => window.fixtureReviewTransitions)
+    assert(transitions.some(layer => layer.layer === 'old' && layer.inert && layer.text.includes('Fixture charge 1')))
+    assert(transitions.some(layer => layer.layer === 'current' && layer.text.includes('Fixture charge 2')))
     await pane.getByRole('button', { name: 'Close review' }).click()
     await pane.getByText('Choose a transaction to review.').waitFor()
     await page.setViewportSize({ width: 382, height: 852 })
@@ -349,8 +376,9 @@ async function verifyDesktopAndReceiptRefresh(browser) {
   const checked = { ...row, status: 'checked', receipt: {
     allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 0,
   } }
+  const other = { ...checked, id: 2, merchant: 'Another checked charge', receipt: undefined }
   const allocation = { id: 'fixture-shared-bill', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian',
-    item: 'Fixture store', expenseDate: '2026-10-20', grossCents: row.amountCents, payerShareCents: 8631,
+    item: 'Fixture store', location: '', category: 'shopping', expenseDate: '2026-10-20', grossCents: row.amountCents, payerShareCents: 8631,
     partnerShareCents: 8000, settledCents: 8000, outstandingCents: 0, accounting: 'cash_v1', method: 'equal',
     version: 1, projectedVersion: 1, status: 'settled' }
   const { page, errors, unexpected } = await fixture(desktop, 720, 850, true, false, false, 0, {
@@ -361,8 +389,9 @@ async function verifyDesktopAndReceiptRefresh(browser) {
           assert.equal(request.postDataJSON().operation, 'check')
           checks++
         }
-        await route.fulfill({ json: snapshot(checked) })
+        await route.fulfill({ json: { ...snapshot(checked), items: [checked, other] } })
       } else if (path === '/app/reconciliation/1') await route.fulfill({ json: { item: checked } })
+      else if (path === '/app/reconciliation/2') await route.fulfill({ json: { item: other } })
       else if (path === '/app/reimbursements') {
         assert.equal(request.method(), 'GET')
         if (readingReceipt && ++receiptReads === 1) await route.fulfill({ status: 503, json: { error: 'Receipt temporarily unavailable' } })
@@ -379,9 +408,11 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     await page.setViewportSize({ width: 867, height: 669 })
     const toolbar = page.locator('.bb-reconcile-title-actions')
     await toolbar.getByRole('button', { name: /Checked/ }).click()
-    await page.locator('.bb-reconcile-row-toggle').click()
+    const checkedRow = page.getByRole('button', { name: /^Fixture store/ })
+    await checkedRow.click()
     const openReceipt = page.getByRole('button', { name: 'View Hannah’s share' })
     await openReceipt.waitFor()
+    assert.match(await openReceipt.getAttribute('class'), /bi-primary/)
     readingReceipt = true
     await openReceipt.click()
     const receipt = page.getByRole('region', { name: 'Receive shared payment' })
@@ -393,16 +424,31 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     await refresh.click()
     await receipt.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).waitFor()
     assert.equal(await receipt.getByText(/The bank match is saved separately/).count(), 0)
+    assert.equal(await receipt.getByRole('img', { name: /Brian.*Hannah/ }).count(), 1)
+    assert.equal(await receipt.getByText('Cash received').count(), 1)
+    assert.equal(receiptReads, 2)
+    await page.getByRole('button', { name: /^Another checked charge/ }).click()
+    await page.locator('.bb-reconcile-comparison').getByText('Another checked charge').waitFor()
+    await checkedRow.click()
+    await openReceipt.click()
+    await page.getByRole('button', { name: 'Close review' }).click()
+    await page.getByText('Choose a transaction to review.').waitFor()
+    await checkedRow.click()
+    await openReceipt.click()
     await page.setViewportSize({ width: 382, height: 852 })
     const inline = page.locator('.bb-reconcile-row[data-open=true] [data-editor-scene=receipt] .bb-reconcile-receipt')
     await inline.waitFor()
-    assert.equal(await inline.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).count(), 1)
+    await inline.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).waitFor()
     const back = inline.getByRole('button', { name: 'Back to reconciliation' })
-    assert.equal(await back.evaluate(el => getComputedStyle(el).borderTopWidth), '1px')
+    assert.match(await back.getAttribute('class'), /bi-cancel/)
+    assert.equal(await back.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
     await back.click()
     await page.getByRole('heading', { name: 'Checked transaction', exact: true }).waitFor()
     assert.equal(await page.locator('.bb-reconcile-row[data-open=true]').count(), 1)
-    assert.equal(receiptReads, 2)
+    await openReceipt.click()
+    await inline.waitFor()
+    await checkedRow.click()
+    assert.equal(await checkedRow.getAttribute('aria-expanded'), 'false')
     assert.equal(checks, 1, 'Receipt refresh only reads the receipt')
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])

@@ -1404,11 +1404,11 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
 def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", lambda *_: ([], [], [["legacy visible rows"]], []))
     monkeypatch.setattr(
         banking_service,
         "parse_visible_subscription_schedules",
-        lambda: [
+        lambda _rows: [
             Subscription(
                 name="iCloud Storage",
                 amount=2.99,
@@ -1418,7 +1418,6 @@ def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "_read_bill_schedules", lambda: [])
     transaction = BankTransaction(
         **{
             **_transaction("Apple", 2.99).__dict__,
@@ -1434,42 +1433,13 @@ def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
     assert candidates[0].source_ref == "Subscriptions!J8:L8"
 
 
-def test_scheduled_pulls_fail_closed_when_subscriptions_fail(monkeypatch):
-    monkeypatch.setattr(banking_service, "_current_month_start", lambda: "2026-05-01")
+def test_scheduled_pulls_fail_closed_when_schedule_batch_fails(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(
-        banking_service,
-        "_read_subscription_schedules",
-        lambda: (_ for _ in ()).throw(RuntimeError("subscription sheet unavailable")),
-    )
-    monkeypatch.setattr(
-        banking_service,
-        "parse_visible_subscription_schedules",
-        lambda: (_ for _ in ()).throw(RuntimeError("visible sheet unavailable")),
-    )
-    monkeypatch.setattr(
-        banking_service,
-        "_read_bill_schedules",
-        lambda: [
-            BillSchedule(
-                bill_key="recology",
-                display_name="Recology",
-                recurrence="quarterly",
-                pull_day=20,
-                pull_months=(2, 5, 8, 11),
-                source_label="Recology",
-                source_range="_BookieBot Bill Schedule!A3:I3",
-            )
-        ],
-    )
-    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, True, 145.36) for bill in bills])
-    transaction = BankTransaction(
-        **{
-            **_transaction("Recology Sonoma", 145.36).__dict__,
-            "date": "2026-05-20",
-        }
-    )
+    def unavailable(*_args):
+        raise RuntimeError("schedule workbook unavailable")
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", unavailable)
+    transaction = _transaction("Recology Sonoma", 145.36)
 
     with pytest.raises(RuntimeError, match="source data is temporarily unavailable"):
         banking_service._scheduled_pulls_for_transactions([transaction], actor_key="brian")
@@ -1479,12 +1449,11 @@ def test_scheduled_pulls_fail_closed_when_subscriptions_fail(monkeypatch):
 def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
-    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", lambda *_: ([], [], [], []))
     monkeypatch.setattr(
         banking_service,
-        "_read_bill_schedules",
-        lambda: [
+        "_bill_schedules",
+        lambda *_: [
             BillSchedule(
                 bill_key="recology",
                 display_name="Recology",
@@ -1496,7 +1465,7 @@ def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeyp
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, True, 145.36) for bill in bills])
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills, _rows: [(bill, True, 145.36) for bill in bills])
     transaction = BankTransaction(
         **{
             **_transaction("Recology Sonoma", 145.36).__dict__,
@@ -1518,12 +1487,11 @@ def test_scheduled_pulls_include_entered_bill_amount_on_transaction_date(monkeyp
 def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
-    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", lambda *_: ([], [], [], []))
     monkeypatch.setattr(
         banking_service,
-        "_read_bill_schedules",
-        lambda: [
+        "_bill_schedules",
+        lambda *_: [
             BillSchedule(
                 bill_key="recology",
                 display_name="Recology",
@@ -1535,7 +1503,7 @@ def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, False, 0.0) for bill in bills])
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills, _rows: [(bill, False, 0.0) for bill in bills])
     transaction = BankTransaction(
         **{
             **_transaction("Recology Sonoma", 145.36).__dict__,
@@ -1557,12 +1525,11 @@ def test_scheduled_pulls_include_name_matched_bill_without_amount(monkeypatch):
 def test_reconciliation_schedule_debug_shows_loaded_bills(monkeypatch, tmp_path):
     banking_service._SCHEDULE_SOURCE_CACHE.clear()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor_key: nullcontext())
-    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
-    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", lambda *_: ([], [], [], []))
     monkeypatch.setattr(
         banking_service,
-        "_read_bill_schedules",
-        lambda: [
+        "_bill_schedules",
+        lambda *_: [
             BillSchedule(
                 bill_key="recology",
                 display_name="Recology",
@@ -1574,7 +1541,7 @@ def test_reconciliation_schedule_debug_shows_loaded_bills(monkeypatch, tmp_path)
             )
         ],
     )
-    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, False, 0.0) for bill in bills])
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills, _rows: [(bill, False, 0.0) for bill in bills])
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     service = BankingService(
         config=BankingConfig(

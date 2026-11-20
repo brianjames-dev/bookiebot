@@ -183,10 +183,9 @@ def setup_sources(monkeypatch, bill, *, recorded=True, amount=59.96):
     banking_service.clear_schedule_source_cache()
     monkeypatch.setattr(banking_service, "_current_month_start", lambda: "2026-09-01")
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda _actor: nullcontext())
-    monkeypatch.setattr(banking_service, "_read_subscription_schedules", lambda: [])
-    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", lambda: [])
-    monkeypatch.setattr(banking_service, "_read_bill_schedules", lambda: [bill])
-    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills: [(bill, recorded, amount) for bill in bills])
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", lambda *_: ([], [], [], []))
+    monkeypatch.setattr(banking_service, "_bill_schedules", lambda *_: [bill])
+    monkeypatch.setattr(banking_service, "_bill_amounts_for_schedules", lambda bills, _rows: [(bill, recorded, amount) for bill in bills])
 
 
 def test_recorded_bill_amount_does_not_leak_to_other_months(monkeypatch):
@@ -203,12 +202,14 @@ def test_failed_schedule_read_is_not_cached_as_empty_for_fifteen_minutes(monkeyp
     bill = BillSchedule("pge", "PG&E", "monthly", 12)
     setup_sources(monkeypatch, bill)
     reads = []
-    def subscriptions():
+    def sources(*_args):
         reads.append(1)
         if len(reads) == 1:
             raise RuntimeError("temporary timeout")
-        return [Subscription(name="Netflix", amount=19.99, cadence="monthly", pull_day=12)]
-    monkeypatch.setattr(banking_service, "_read_subscription_schedules", subscriptions)
+        return [], [], [["legacy visible rows"]], []
+    monkeypatch.setattr(banking_service, "_read_schedule_source_tabs", sources)
+    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules",
+                        lambda _rows: [Subscription(name="Netflix", amount=19.99, cadence="monthly", pull_day=12)])
     with pytest.raises(RuntimeError, match="source data is temporarily unavailable"):
         banking_service._scheduled_pulls_for_transactions([transaction()], actor_key="brian")
     second = banking_service._scheduled_pulls_for_transactions([transaction()], actor_key="brian")
@@ -231,19 +232,12 @@ def test_confirm_cannot_turn_expected_bill_into_recorded_expense(monkeypatch, tm
     assert saved is not None and saved.status == "needs_review"
 
 
-def test_bill_sources_read_the_budget_once_for_all_schedules(monkeypatch):
-    from types import SimpleNamespace
-    reads = []
-    def rows():
-        reads.append(1)
-        return [["PG&E", "59.96"], ["Water", "42.10"], ["Student Loan", "0"]]
-    monkeypatch.setattr(banking_service, "get_existing_personal_worksheet",
-                        lambda _title: SimpleNamespace(get_all_values=rows))
+def test_bill_sources_use_the_same_budget_rows_for_all_schedules():
+    rows = [["PG&E", "59.96"], ["Water", "42.10"], ["Student Loan", "0"]]
     bills = [BillSchedule(label, label, "monthly", 12, source_label=label)
              for label in ["PG&E", "Water", "Student Loan"]]
-    result = banking_service._bill_amounts_for_schedules(bills)
+    result = banking_service._bill_amounts_for_schedules(bills, rows)
     assert [(entered, amount) for _bill, entered, amount in result] == [(True, 59.96), (True, 42.10), (False, 0)]
-    assert len(reads) == 1
 
 
 def test_force_preview_cannot_borrow_a_confirmed_row(monkeypatch, tmp_path):
@@ -362,37 +356,15 @@ def test_action_candidates_keep_physical_row_and_schedule_claim_together(monkeyp
 
 
 def test_missing_schedule_sources_stay_absent_without_provisioning(monkeypatch):
-    from gspread.exceptions import WorksheetNotFound
-    def absent(_title):
-        raise WorksheetNotFound("not configured")
-    monkeypatch.setattr(banking_service, "get_existing_personal_worksheet", absent)
-    assert banking_service._read_subscription_schedules() == []
-    assert banking_service._read_bill_schedules() == []
-
-
-def test_missing_visible_fallback_is_optional_but_not_a_failed_check(monkeypatch):
-    from contextlib import nullcontext
-    from gspread.exceptions import WorksheetNotFound
-    def absent(*args):
-        raise WorksheetNotFound("not configured")
     banking_service.clear_schedule_source_cache()
     monkeypatch.setattr(banking_service, "sheet_user_context", lambda *_: nullcontext())
-    monkeypatch.setattr(banking_service, "get_existing_personal_worksheet", absent)
-    monkeypatch.setattr(banking_service, "parse_visible_subscription_schedules", absent)
+    monkeypatch.setattr(banking_service, "get_gspread_client", object)
+    monkeypatch.setattr(banking_service, "get_budget_spreadsheet_id_for_user", lambda *_: "fixture")
+    monkeypatch.setattr(banking_service, "read_workbook_tabs", lambda *_: {})
     try:
         assert banking_service._schedule_sources_for_actor("brian") == ([], [])
     finally:
         banking_service.clear_schedule_source_cache()
-
-
-def test_source_access_error_is_not_treated_as_missing_or_provisioned(monkeypatch):
-    def unavailable(_title):
-        raise RuntimeError("temporary API error")
-    monkeypatch.setattr(banking_service, "get_existing_personal_worksheet", unavailable)
-    with pytest.raises(RuntimeError, match="temporary API error"):
-        banking_service._read_subscription_schedules()
-    with pytest.raises(RuntimeError, match="temporary API error"):
-        banking_service._read_bill_schedules()
 
 
 def action_row(logged):

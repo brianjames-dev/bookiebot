@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-20 — Coalesce recurring preview sources and separate receipt viewing from saving
+
+Read an actor’s managed bill and subscription tabs, visible subscription fallback and current month in one read-only workbook batch. Serialize cold loads per actor, cache successful results for the existing preview lifetime and invalidate on the existing write and confirmation paths. Keep the managed-empty subscription marker authoritative and fail closed for an incomplete response.
+
+Opening a checked share is read-only navigation. The list and close button are available while viewing or loading it. Lock those actions during an actual receipt command or an uncertain result so the same request can be retried. A reviewed receipt continues to need explicit confirmation.
+
 ## 2026-11-20 — Broaden manual candidate evidence and keep receipts in the same editor
 
 The city descriptor is a manual Water hint. Recorded exact amounts can be suggested within 14 days. Nearby recorded amounts may appear with weaker text evidence, but weak-name candidates remain below the automatic UI selection threshold. Existing automatic decisions, source reservations, fresh confirmation, category direction, and separate payment confirmation remain in place.
