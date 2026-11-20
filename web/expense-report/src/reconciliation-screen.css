@@ -6,6 +6,7 @@
 .bb-reconcile-heading p { margin: 0; }
 .bb-reconcile button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
 .bb-reconcile button:disabled { opacity: .5; cursor: default; }
+.bb-reconcile .bb-saving-button[data-saving=true]:disabled { opacity: 1; }
 .bb-reconcile button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
 .bb-reconcile-check { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; flex-shrink: 0; padding: 9px 12px; border: 1px solid hsl(var(--border)); border-radius: 12px; color: hsl(var(--primary)); background: transparent; font: inherit; font-size: 14px; }
 .bb-reconcile-filters { display: flex; gap: 5px; padding: 4px; border-radius: 14px; background: hsl(var(--card)); margin-bottom: 20px; }

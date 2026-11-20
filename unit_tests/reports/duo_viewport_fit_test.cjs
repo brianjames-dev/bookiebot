@@ -14,7 +14,7 @@ function fixture(options={}){
  const page={dataset:{duoLandscape:options.open===false?'false':'true'},scrollTop:0,scrollLeft:0,querySelectorAll:()=>[scroll],getBoundingClientRect:()=>({top:0}),style:{getPropertyValue:()=>'',getPropertyPriority:()=>'',setProperty(){},removeProperty(){}},offsetHeight:587};
  const meta={getAttribute:()=>content,setAttribute(key,value){assert.equal(key,'content');changes.push({value,paint:paints});content=value;if(value===original&&sawAuto&&!options.unrepairable)height=669;setTimeout(()=>win.send('resize'))}};
  const win={...events(),navigator:{standalone:options.standalone??true},innerWidth:options.width??867,get innerHeight(){return height},outerWidth:options.outerWidth??951,outerHeight:options.outerHeight??669,scrollX:0,scrollY:0,scrollTo(){},visualViewport:{...events(),get height(){return options.visualHeight??height},scale:options.scale??1,offsetTop:0,offsetLeft:0},requestAnimationFrame(fn){frames.set(++serial,fn);return serial},cancelAnimationFrame(id){frames.delete(id)},setTimeout,clearTimeout(id){timers.delete(id)}};
- const doc={...events(),visibilityState:'visible',activeElement:options.focused?{matches:()=>true}:null,documentElement:{clientWidth:win.innerWidth,get clientHeight(){return height},dataset:options.modal?{bbModalScrollLock:'true'}:{}},querySelector(selector){if(selector==='[data-bb-safe-area]')return {};if(selector==='meta[name="viewport"]')return options.noMeta?null:meta;return page}};
+ const doc={...events(),visibilityState:'visible',activeElement:options.focused?{matches:()=>true}:null,documentElement:{get clientWidth(){return win.innerWidth},get clientHeight(){return height},dataset:options.modal?{bbModalScrollLock:'true'}:{}},querySelector(selector){if(selector==='[data-bb-safe-area]')return {};if(selector==='meta[name="viewport"]')return options.noMeta?null:meta;return page}};
  Object.defineProperty(win,'screen',{get(){throw Error('The stale closed-display screen size must never govern recovery')}});
  const runtime={module:{exports:{}},require:req,window:win,document:doc,getComputedStyle:()=>({paddingTop:(options.safeTop??0)+'px'})};vm.runInNewContext(code,runtime);
  const stop=runtime.module.exports.watchDuoViewport(()=>{});
@@ -23,7 +23,11 @@ function fixture(options={}){
  const finish=()=>{for(let i=0;i<90;i++){tick();paint()}};
  const hide=()=>{doc.visibilityState='hidden';doc.send('visibilitychange')};
  const show=()=>{doc.visibilityState='visible';doc.send('visibilitychange')};
- return {win,doc,page,scroll,meta,original,changes,targets,timers,frames,stop,tick,paint,finish,hide,show,get content(){return content},get height(){return height},set height(value){height=value}};
+ const resize=(width,remainingHeight,outerWidth,outerHeight)=>{
+  Object.assign(win,{innerWidth:width,outerWidth,outerHeight});height=remainingHeight;
+  page.dataset.duoLandscape=String(width>height);win.visualViewport.send('resize');
+ };
+ return {win,doc,page,scroll,meta,original,changes,targets,timers,frames,stop,tick,paint,finish,hide,show,resize,get content(){return content},get height(){return height},set height(value){height=value}};
 }
 const f=fixture();f.finish();assert.equal(f.changes.length,0,'Cold/ordinary resize never reparses the viewport');
 f.hide();f.show();
@@ -51,4 +55,20 @@ for(const action of ['hide','stop']){
 }
 const fallback=fixture();fallback.hide();fallback.show();assert(fallback.content.includes('viewport-fit=auto'));fallback.tick(100);assert.equal(fallback.content,fallback.original,'A paused animation frame cannot leave auto fit behind');fallback.stop();
 const external=fixture();external.hide();external.show();external.meta.setAttribute('content','width=device-width, viewport-fit=contain');external.stop();assert.equal(external.content,'width=device-width, viewport-fit=contain','Do not overwrite another viewport owner');
+const rotated=fixture({height:669,unrepairable:true});
+rotated.win.send('orientationchange'); // Orientation event precedes new geometry.
+rotated.resize(669,867,669,951);rotated.finish();assert.equal(rotated.changes.length,0);
+rotated.resize(867,669,951,669);assert.equal(rotated.changes.length,0,'First landscape report may be briefly healthy');
+rotated.resize(867,587,951,669);
+assert(rotated.content.includes('viewport-fit=auto'),'Unfolded portrait to landscape recovers without backgrounding');
+rotated.paint();rotated.paint();rotated.win.send('orientationchange');rotated.win.send('resize');rotated.finish();
+assert.equal(rotated.changes.length,2,'A burst of rotation and viewport events only attempts the native reset once');
+assert.equal(rotated.content,rotated.original);assert.equal(rotated.scroll.scrollTop,640);
+rotated.resize(669,867,669,951);rotated.resize(867,587,951,669);rotated.finish();
+assert.equal(rotated.changes.length,4,'A later rotation can trigger a new repair');rotated.stop();
+for(const portrait of [[457,678,457,678], [669,867,669,951]]){
+ const healthy=fixture({height:669});
+ healthy.resize(...portrait);healthy.resize(867,669,951,669);healthy.finish();
+ assert.equal(healthy.changes.length,0,'Healthy landscape must not reset the viewport');healthy.stop();
+}
 console.log('Physical DUO viewport dimensions, committed native-fit recovery, state retention, one-shot guards and cleanup pass');

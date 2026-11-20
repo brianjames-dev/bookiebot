@@ -67,6 +67,7 @@ function reattachDuoCanvas() {
 export function watchDuoViewport(update:()=>void) {
   let frame=0,panFrame=0,seenVisible=document.visibilityState!=='hidden',suspended=false,reattach=false,lastPan=''
   let fitPending=false,restoreFit:((notify:boolean)=>void)|null=null
+  let sawOpenPortrait=false
   const viewport=window.visualViewport
   const timers:number[]=[]
   const refreshViewportFit=()=>{
@@ -99,6 +100,14 @@ export function watchDuoViewport(update:()=>void) {
     if(document.visibilityState==='hidden')return
     recordDisplayFrame('measure')
     update()
+    const width=document.documentElement.clientWidth,height=window.innerHeight
+    // Resize can arrive before or after orientationchange. Arm the same native
+    // fit repair on the measured return from unfolded portrait, once per turn.
+    if(duoLandscapeGeometry(height,width).landscape)sawOpenPortrait=true
+    else if(sawOpenPortrait&&duoLandscapeGeometry(width,height).landscape){
+      sawOpenPortrait=false
+      fitPending=true
+    }
     const visual=window.visualViewport
     const keyboard=document.activeElement?.matches('input,textarea,[contenteditable=true]')&&visual&&window.innerHeight-visual.height>140
     // Keep keyboard, pinch and modal scroll ownership authoritative.
@@ -113,7 +122,7 @@ export function watchDuoViewport(update:()=>void) {
     if(repair&&reattachDuoCanvas()){reattach=false;recordDisplayFrame('repaired')}
     // Start the device-confirmed repair as soon as its guarded measurements
     // are available. Waiting for a quiet 300ms resize window exposes the native
-    // gap during app return; resize/focus bursts can postpone it even further.
+    // gap during app return or rotation; resize/focus bursts can prolong it.
     refreshViewportFit()
   }
   const cancel=()=>{window.cancelAnimationFrame(frame);window.cancelAnimationFrame(panFrame);frame=panFrame=0;timers.splice(0).forEach(id=>window.clearTimeout(id))}

@@ -5,6 +5,7 @@ import type {TransactionChangeSummary,TransactionOperation} from './transaction-
 import {StepMotion} from './transaction-step-motion'
 import {NotchedSplitControl,type SplitInputDraft} from './transaction-split-control'
 import {splitMoney,splitMethodLabel,type SplitMethod} from './transaction-split-model'
+import {SavingButton} from './report-loading'
 import './transaction-inline-editor.css'
 
 export const transactionMotion={duration:440,rollDuration:1200,strikeDelay:360,strikeDuration:300,strikeHold:700,fadeDuration:260,undoSeconds:8,reorderLift:160,reorderGap:220,reorderTravel:400,reorderLand:180,reorderHeight:6,reorderSpace:3}
@@ -71,7 +72,7 @@ export function InlineTransactionEditor(props:InlineEditorProps){
     {transfer?<p className="bi-footnote">Only this transfer changes. Its recurring schedule continues.</p>:operation==='delete'&&<p className="bi-footnote">{row.title} · {splitMoney(row.amountCents)}. Only this purchase will be removed.</p>}
     {(review.share||operation==='cancel_split')&&<p className="bs-review-note">No repayment will be marked received.</p>}
    </>}
-   <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={current.onBack}><ArrowLeft aria-hidden="true"/>Back</button><button type="button" className="bi-primary" disabled={locked||!review} onClick={current.onConfirm} aria-label={`Confirm ${operation==='move'?'update':operation}`}>{busy?'Saving…':operation==='delete'?(transfer?'Delete transfer':'Delete purchase'):operation==='split'?'Save':operation==='cancel_split'?'Remove split':operation==='undo'?'Undo change':'Save changes'}</button></footer>
+   <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={current.onBack}><ArrowLeft aria-hidden="true"/>Back</button><SavingButton type="button" className="bi-primary" disabled={locked||!review} saving={busy&&Boolean(review)} onClick={current.onConfirm} aria-label={`Confirm ${operation==='move'?'update':operation}`}>{operation==='delete'?(transfer?'Delete transfer':'Delete purchase'):operation==='split'?'Save':operation==='cancel_split'?'Remove split':operation==='undo'?'Undo change':'Save changes'}</SavingButton></footer>
   </>}/>
   {error&&<p role="alert" className="bs-error">{error}</p>}
  </section>

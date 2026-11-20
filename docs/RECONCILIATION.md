@@ -80,7 +80,7 @@ Use synthetic fixtures or Plaid Sandbox for financial-action testing; do not cre
 - Check Brian/Hannah isolation, disabled watching and a disconnected account.
 - Exercise a pending authorization followed by its posted replacement; confirm only the posted transaction is actionable.
 - Test exact bill/subscription names, merchant aliases, a one-cent difference, unrelated equal amounts, repeated purchases and a recurring payment next month.
-- Confirm an exact match; refresh and repeat the request. Verify no extra expense row and no duplicate claim.
+- Confirm an exact match and verify that the loading ring stays centered inside the disabled confirmation button until the response. Refresh and repeat the request. Verify no extra expense row and no duplicate claim.
 - Leave a row open, change its bank/logged amount, then confirm: require fresh review.
 - Ignore/reopen a row, run Check and verify confirmed/ignored/import lineage remains intact.
 - Simulate sync failure and lost responses; keep saved data visible and recover with Check status.

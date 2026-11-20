@@ -51,6 +51,7 @@
 .bi-cancel svg { width:14px; height:14px; }
 .bi-product .bi-editor .bi-primary { margin-left:0; background:hsl(var(--primary) / .14); color:hsl(var(--primary)); padding-inline:16px; }
 .bi-product .bi-editor .bi-primary:disabled { opacity:.4; cursor:default; }
+.bi-product .bi-editor .bi-primary[data-saving=true]:disabled { opacity:1; }
 .bi-review-changes { display:grid; gap:0; min-width:0; margin:0; }
 .bi-review-change { display:grid; gap:4px; min-width:0; padding:9px 0; border-bottom:1px solid hsl(var(--border) / .55); }
 .bi-review-change:first-child { padding-top:0; }
