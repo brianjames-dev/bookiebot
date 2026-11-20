@@ -1,5 +1,13 @@
 # Agent Status
 
+## Reconcile opens the share summary first (2026-11-20)
+
+The Checked row and the shortcut after confirming a match both say **View [name]’s share**. A share with a balance due offers **Back to reconciliation** and **Mark [name]’s share received** in the summary footer. The Mark action opens the separate receipt form. Matching a bank transaction and recording a repayment remain separate confirmed actions.
+
+Verification passed the 3 focused test entry points, 3,565 local tests with 915 optional PostgreSQL skips, Python and frontend type checks, and the report build. Chromium and WebKit covered opening the unpaid summary, folding while it is open, and canceling the receipt form in closed DUO. CI and production verification are tracked in the task PR.
+
+Manual check. In each DUO layout open a checked shared expense with a balance due, inspect the summary and tap **Mark [name]’s share received**. Cancel the receipt form and use **Back to reconciliation** to return to the same row.
+
 ## Reconcile row loading and checked share details (2026-11-20)
 
 Put the exact-match or difference indicator above the comparison cards. A newly selected open-DUO row shows its spinner during the handoff and a warm preview appears immediately. Batch the four recurring-source tabs in one read-only workbook lookup and values request. Concurrent cold reads for one actor use the same load and failed sources remain retryable.
@@ -619,6 +627,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of the checked share summary and repayment action in both DUO poses.
 
 Native acceptance of Reconcile row switching, checked shares, and compact update message. Follow the top entry and docs/RECONCILIATION.md.
 

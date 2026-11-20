@@ -1,3 +1,5 @@
+2026-11-20 Checked reimbursement entry — route checked split transactions and the just-matched shortcut through the same view-first summary. Place Back and the eligible receipt action in the summary footer. Device acceptance is in STATUS.
+
 2026-11-20 Reconcile row loading and checked shares — show a loader for the active selection while retaining the previous panel for the handoff. Batch recurring source reads by owner and preserve fresh confirmation and fail-closed evidence. Use the shared allocation visual and native actions in checked details. Inspecting a share allows immediate row changes and dismissal. Unresolved receipt writes keep their safe retry. Device acceptance is in STATUS.
 
 2026-11-20 Reconcile editor and recorded candidates — align the match footer, open the chooser from the Budget entry card, simplify Ignore, and keep checked shares in the same row/pane with fold retention. Manual review uses recorded amounts and the Santa Rosa Water descriptor hint. Automatic decisions and payment safeguards remain in place. STATUS tracks native acceptance; CI and deployment evidence belong to the task PR.

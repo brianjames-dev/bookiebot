@@ -374,13 +374,13 @@ async function verifyDesktopAndReceiptRefresh(browser) {
   let checks = 0, receiptReads = 0, readingReceipt = false
   const desktop = { newPage: options => browser.newPage({ ...options, hasTouch: false, isMobile: false }) }
   const checked = { ...row, status: 'checked', receipt: {
-    allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 0,
+    allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 8000,
   } }
   const other = { ...checked, id: 2, merchant: 'Another checked charge', receipt: undefined }
   const allocation = { id: 'fixture-shared-bill', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian',
     item: 'Fixture store', location: '', category: 'shopping', expenseDate: '2026-10-20', grossCents: row.amountCents, payerShareCents: 8631,
-    partnerShareCents: 8000, settledCents: 8000, outstandingCents: 0, accounting: 'cash_v1', method: 'equal',
-    version: 1, projectedVersion: 1, status: 'settled' }
+    partnerShareCents: 8000, settledCents: 0, outstandingCents: 8000, accounting: 'cash_v1', method: 'equal',
+    version: 1, projectedVersion: 1, status: 'outstanding' }
   const { page, errors, unexpected } = await fixture(desktop, 720, 850, true, false, false, 0, {
     async request(route) {
       const request = route.request(), path = new URL(request.url()).pathname
@@ -413,6 +413,7 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     const openReceipt = page.getByRole('button', { name: 'View Hannah’s share' })
     await openReceipt.waitFor()
     assert.match(await openReceipt.getAttribute('class'), /bi-primary/)
+    assert.equal(await page.getByRole('button', { name: 'Mark Hannah’s share received' }).count(), 0)
     readingReceipt = true
     await openReceipt.click()
     const receipt = page.getByRole('region', { name: 'Receive shared payment' })
@@ -423,6 +424,10 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     const refresh = toolbar.getByRole('button', { name: 'Refresh payment', exact: true })
     await refresh.click()
     await receipt.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).waitFor()
+    const receiptActions = receipt.locator('footer')
+    await receiptActions.getByRole('button', { name: 'Back to reconciliation' }).waitFor()
+    await receiptActions.getByRole('button', { name: 'Mark Hannah’s share received' }).waitFor()
+    assert.equal(await receipt.getByRole('button', { name: 'Confirm received record' }).count(), 0)
     assert.equal(await receipt.getByText(/The bank match is saved separately/).count(), 0)
     assert.equal(await receipt.getByRole('img', { name: /Brian.*Hannah/ }).count(), 1)
     assert.equal(await receipt.getByText('Cash received').count(), 1)
@@ -442,6 +447,11 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     const back = inline.getByRole('button', { name: 'Back to reconciliation' })
     assert.match(await back.getAttribute('class'), /bi-cancel/)
     assert.equal(await back.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
+    const markReceived = inline.locator('footer').getByRole('button', { name: 'Mark Hannah’s share received' })
+    await markReceived.click()
+    await inline.getByRole('button', { name: 'Confirm received record' }).waitFor()
+    await inline.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await markReceived.waitFor()
     await back.click()
     await page.getByRole('heading', { name: 'Checked transaction', exact: true }).waitFor()
     assert.equal(await page.locator('.bb-reconcile-row[data-open=true]').count(), 1)
