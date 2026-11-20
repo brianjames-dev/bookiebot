@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import calendar
 import logging
 import os
 import time
@@ -10,8 +11,6 @@ from functools import lru_cache
 from threading import Lock
 from typing import Any, Callable
 from uuid import uuid4
-
-from gspread.exceptions import WorksheetNotFound
 
 from bookiebot.banking.config import BankingConfig, load_banking_config
 from bookiebot.banking.crypto import TokenCipher
@@ -49,12 +48,13 @@ from bookiebot.banking.reconciliation import (
 )
 from bookiebot.sheets.auth import (
     BILL_SCHEDULE_WORKSHEET_TITLE, SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE,
-    get_existing_personal_worksheet, get_gspread_client,
+    get_gspread_client,
 )
 from bookiebot.sheets.bills import bill_source_amount, list_bill_schedules, next_bill_pull_date
 from bookiebot.sheets.config import expense_category_label, normalize_expense_category
+from bookiebot.sheets.recurring_rows import managed, runtime_tables
 from bookiebot.sheets.routing import (
-    now_pacific, sheet_user_context, actor_key_aliases, get_current_month_name,
+    now_pacific, sheet_user_context, actor_key_aliases, get_budget_spreadsheet_id_for_user, get_user_config,
     get_shared_expenses_spreadsheet_id, MissingYearConfigError,
 )
 from bookiebot.reports.worksheet_reads import read_workbook_tabs
@@ -73,6 +73,8 @@ from bookiebot.sheets.undo import (
 
 logger = logging.getLogger(__name__)
 _SCHEDULE_SOURCE_CACHE: dict[str, tuple[float, list[Any], list[tuple[Any, bool, float]], str]] = {}
+_SCHEDULE_SOURCE_LOCKS: dict[str, Lock] = {}
+_SCHEDULE_SOURCE_LOCK = Lock()
 _SERVICE_LOCK = Lock()
 
 
@@ -143,41 +145,22 @@ def read_active_logged_actions(actor_key: str) -> list[LoggedAction]:
                                     for_reconciliation=True, history=history)
 
 
-def _existing_schedule_rows(title: str) -> list[list[str]]:
-    try:
-        worksheet = get_existing_personal_worksheet(title)
-    except WorksheetNotFound:
-        return []
-    return worksheet.get_all_values()
+def _read_schedule_source_tabs(actor_key: str, month_start: str) -> tuple[list[list[str]], list[list[str]], list[list[str]], list[list[str]]]:
+    period = local_date.fromisoformat(month_start)
+    month_title = calendar.month_name[period.month]
+    titles = [SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE, BILL_SCHEDULE_WORKSHEET_TITLE, "Subscriptions", month_title]
+    workbook = get_budget_spreadsheet_id_for_user(actor_key, period.year)
+    tabs = read_workbook_tabs(get_gspread_client(), workbook, titles)
+    return tabs.get(titles[0], []), tabs.get(titles[1], []), tabs.get("Subscriptions", []), tabs.get(month_title, [])
 
 
-class _SubscriptionSources(list[Any]):
-    """Retain managed-empty provenance so legacy mirrors cannot reappear."""
-    def __init__(self, values: list[Any], managed: bool):
-        super().__init__(values)
-        self.managed = managed
-
-
-def _read_subscription_schedules() -> list[Any]:
-    from bookiebot.sheets.recurring_rows import managed
-    rows = _existing_schedule_rows(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE)
-    return _SubscriptionSources([s for s in list_subscription_schedules(rows, all_versions=managed(rows)) if not s.monthly_source], managed(rows))
-
-
-def _read_bill_schedules() -> list[Any]:
-    from bookiebot.sheets.recurring_rows import managed, runtime_tables
-    rows = _existing_schedule_rows(BILL_SCHEDULE_WORKSHEET_TITLE)
-    subscriptions = _existing_schedule_rows(SUBSCRIPTION_SCHEDULE_WORKSHEET_TITLE)
+def _bill_schedules(actor_key: str, rows: list[list[str]], subscriptions: list[list[str]]) -> list[Any]:
     if managed(rows) or managed(subscriptions):
-        from bookiebot.sheets.routing import get_current_discord_user_id, get_user_config
-        rows, _, _ = runtime_tables(get_user_config(get_current_discord_user_id()).budget_owner_key, rows, subscriptions, [])
+        rows, _, _ = runtime_tables(get_user_config(actor_key).budget_owner_key, rows, subscriptions, [])
     return list_bill_schedules(rows, all_versions=True)
 
 
-def _bill_amounts_for_schedules(bills: list[Any]) -> list[tuple[Any, bool, float]]:
-    if not bills:
-        return []
-    rows = _existing_schedule_rows(get_current_month_name())
+def _bill_amounts_for_schedules(bills: list[Any], rows: list[list[str]]) -> list[tuple[Any, bool, float]]:
     amounts = []
     for bill in bills:
         amount = (bill_source_amount(rows, bill.source_label, amount_column=4)
@@ -186,73 +169,42 @@ def _bill_amounts_for_schedules(bills: list[Any]) -> list[tuple[Any, bool, float
     return amounts
 
 
+def _schedule_source_lock(actor_key: str) -> Lock:
+    with _SCHEDULE_SOURCE_LOCK:
+        return _SCHEDULE_SOURCE_LOCKS.setdefault(actor_key, Lock())
+
+
 def _schedule_sources_for_actor(actor_key: str) -> tuple[list[Any], list[tuple[Any, bool, float]]]:
-    cached = _SCHEDULE_SOURCE_CACHE.get(actor_key)
-    now = time.monotonic()
-    if cached and cached[3] == _current_month_start() and now - cached[0] <= _schedule_cache_ttl_seconds():
-        return list(cached[1]), list(cached[2])
-
-    subscriptions: list[Any] = []
-    bills_with_amounts: list[tuple[Any, bool, float]] = []
-    load_failed = False
-    with sheet_user_context(actor_key):
-        subscription_load_failed = False
+    # Cancelled phone previews can still be reading in a server worker.
+    # Concurrent previews for this owner share the same workbook load.
+    with _schedule_source_lock(actor_key):
+        period = _current_month_start()
+        cached = _SCHEDULE_SOURCE_CACHE.get(actor_key)
+        if cached and cached[3] == period and time.monotonic() - cached[0] <= _schedule_cache_ttl_seconds():
+            return list(cached[1]), list(cached[2])
         try:
-            subscriptions = _read_subscription_schedules()
-        except Exception:
-            subscription_load_failed = True
-            load_failed = True
-            logger.warning(
-                "Failed to load normalized subscription schedules for bank reconciliation",
-                extra={"actor_key": actor_key},
-                exc_info=True,
-            )
-        if not subscriptions and not subscription_load_failed and not getattr(subscriptions, "managed", False):
-            try:
-                subscriptions = parse_visible_subscription_schedules()
-            except WorksheetNotFound:
-                # Both optional schedule formats may be absent in a new budget.
-                subscriptions = []
-            except Exception:
-                load_failed = True
-                logger.warning(
-                    "Failed to load visible subscription schedules for bank reconciliation",
-                    extra={"actor_key": actor_key},
-                    exc_info=True,
-                )
-                subscriptions = []
-
-        try:
-            bills = _read_bill_schedules()
-        except Exception:
-            load_failed = True
-            logger.warning(
-                "Failed to load bill schedules for bank reconciliation",
-                extra={"actor_key": actor_key},
-                exc_info=True,
-            )
-            bills = []
-
-        try:
-            bills_with_amounts = _bill_amounts_for_schedules(bills)
-        except Exception:
-            load_failed = True
-            logger.warning(
-                "Failed to load bill amounts for bank reconciliation",
-                extra={"actor_key": actor_key}, exc_info=True,
-            )
-            bills_with_amounts = [(bill, False, 0.0) for bill in bills]
-
-    if load_failed:
-        raise RuntimeError("Reconciliation source data is temporarily unavailable.")
-    _SCHEDULE_SOURCE_CACHE[actor_key] = (now, list(subscriptions), list(bills_with_amounts), _current_month_start())
-    return subscriptions, bills_with_amounts
+            with sheet_user_context(actor_key):
+                subscription_rows, bill_rows, visible_rows, month_rows = _read_schedule_source_tabs(actor_key, period)
+                managed_subscriptions = managed(subscription_rows)
+                subscriptions = [s for s in list_subscription_schedules(subscription_rows, all_versions=managed_subscriptions) if not s.monthly_source]
+                if not subscriptions and not managed_subscriptions and visible_rows:
+                    subscriptions = parse_visible_subscription_schedules(visible_rows)
+                bills_with_amounts = _bill_amounts_for_schedules(_bill_schedules(actor_key, bill_rows, subscription_rows), month_rows)
+        except Exception as exc:
+            logger.warning("Failed to load scheduled payments for bank reconciliation", extra={"actor_key": actor_key}, exc_info=True)
+            raise RuntimeError("Reconciliation source data is temporarily unavailable.") from exc
+        _SCHEDULE_SOURCE_CACHE[actor_key] = (time.monotonic(), list(subscriptions), list(bills_with_amounts), period)
+        return subscriptions, bills_with_amounts
 
 
 def clear_schedule_source_cache(actor_key: str | None = None) -> None:
     if actor_key is None:
-        _SCHEDULE_SOURCE_CACHE.clear()
-    else:
+        with _SCHEDULE_SOURCE_LOCK:
+            actors = tuple(_SCHEDULE_SOURCE_LOCKS)
+        for actor in actors:
+            clear_schedule_source_cache(actor)
+        return
+    with _schedule_source_lock(actor_key):
         _SCHEDULE_SOURCE_CACHE.pop(actor_key, None)
 
 

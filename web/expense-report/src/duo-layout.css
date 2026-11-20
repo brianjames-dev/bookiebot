@@ -242,8 +242,11 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-reconcile-inspector-tools > button { position:relative; top:3px; pointer-events:auto; }
 .bb-reconcile-right .bb-reconcile-detail-heading { padding-right:43px; }
 .bb-reconcile-right .bb-reconcile-detail-loading {
-  display:grid; place-items:center; min-height:clamp(150px, 38dvh, 272px);
+  display:grid; place-items:center; position:absolute; z-index:2; inset:0 0 auto; height:clamp(150px, 38dvh, 272px);
 }
+.bb-reconcile-right[data-loading=true] .bb-reconcile-pane { min-height:clamp(150px, 38dvh, 272px); }
+.bb-reconcile-right[data-loading=true] [data-review-layer] { filter:opacity(.32); }
+.bb-reconcile-right[data-loading=true] [data-review-layer].bb-reconcile-empty { visibility:hidden; }
 .bb-page[data-duo-landscape=true] .bb-transactions-title-actions { gap:6px; }
 .bb-reconcile-pane { position:relative; isolation:isolate; }
 .bb-reconcile-pane > [data-review-layer=old] { position:absolute; inset:0 0 auto; pointer-events:none; }

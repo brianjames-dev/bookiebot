@@ -363,7 +363,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.equal(latest().url, '/app/reconciliation/40')
   const savedBill = { ...checkedBill, receipt: receiptLink }
   await respond({ item: savedBill })
-  await respond({ enabled: true, ownerKey: 'brian', currency: 'USD', events: [], allocations: [{ id: 'shared-water', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian', item: 'Water', expenseDate: '2026-10-01', grossCents: 12500, payerShareCents: 8091, partnerShareCents: 4409, settledCents: 0, outstandingCents: 4409, accounting: 'cash_v1', method: 'income', version: 1, projectedVersion: 1, status: 'outstanding' }] }, 200, shareRead)
+  await respond({ enabled: true, ownerKey: 'brian', currency: 'USD', events: [], allocations: [{ id: 'shared-water', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian', item: 'Water', location: '', category: 'bills', expenseDate: '2026-10-01', grossCents: 12500, payerShareCents: 8091, partnerShareCents: 4409, settledCents: 0, outstandingCents: 4409, accounting: 'cash_v1', method: 'income', version: 1, projectedVersion: 1, status: 'outstanding' }] }, 200, shareRead)
   assert.ok(button('Check').props.disabled)
   assert.ok(button('Confirm received record'))
   assert.equal(requests.length, matchRequestCount + 2, 'The row and receipt both load without a write')

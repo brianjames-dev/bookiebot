@@ -9,14 +9,18 @@ import { useAppWorkStatus } from "./app-work-guard"
 import { usePageRefresh, usePageRefreshRegistry } from "./page-refresh"
 import { useReimbursementPage } from "./reimbursement-pagination"
 import "./reimbursement-ledger.css"
-import { BalanceFirstReimbursements } from "./shared-balance-first"
+import { BalanceFirstReimbursements, reimbursementTransaction } from "./shared-balance-first"
 import { StepMotion } from "./transaction-step-motion"
 import { transactionMotion } from "./transaction-inline-editor"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, CircleCheck, Clock3 } from "lucide-react"
 import { UndoPopup } from "./transaction-undo-popup"
 import { ReimbursementSavingContext, ReimbursementSaveButton, useReimbursementFeedback } from "./reimbursement-feedback"
 import {applyDisplayChange,inverseDisplay,pendingDisplay,reimbursementDisplay,validDisplayChange,type ReimbursementDisplayChange} from './reimbursement-display-state'
 import { ReimbursementSplitEditor } from "./reimbursement-split-editor"
+import { RepaymentAllocation } from "./repayment-allocation"
+import { reimbursementMethod } from "./reimbursement-value-motion"
+import { TransactionIcon } from "./daily-transactions"
+import { transactionCategory } from "./transaction-identity"
 
 export interface LedgerAllocation {
   sourceYear?:number;sourceSheetTitle?:string;sourceWorksheet?:string;billCategory?:string;lifecycle?:string
@@ -178,9 +182,10 @@ function validate(snapshot: LedgerResponse) {
 }
 
 export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number; review?: boolean }
-export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matchedReceiptActive = true, onClose, onRejectAccess, balanceFirst = false, aliases, onUpdated, headerActions }: {
+export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matchedReceiptActive = true, onClose, onRejectAccess, onReceiptMutationLock, balanceFirst = false, aliases, onUpdated, headerActions }: {
   fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; matchedReceiptActive?: boolean; onClose?: () => void; onRejectAccess?: (message: string) => void
   balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void; headerActions?: HTMLElement | null
+  onReceiptMutationLock?: (locked: boolean) => void
 }) {
   const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
   const [immediate,setImmediate] = useState<ReimbursementDisplayChange|null>(null)
@@ -197,6 +202,8 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
   const [busy, setBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [uncertain, setUncertain] = useState(false)
+  useLayoutEffect(() => { onReceiptMutationLock?.(busy || uncertain) }, [busy, uncertain, onReceiptMutationLock])
+  useLayoutEffect(() => () => onReceiptMutationLock?.(false), [onReceiptMutationLock])
   const updateWork = useAppWorkStatus({ label: "Reimbursements", pending: busy, uncertain })
   const [signedOut, setSignedOut] = useState(false)
   const mounted = useRef(false)
@@ -291,6 +298,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
     const change = pending.current
     if (!change || executing.current) return
     executing.current = true
+    onReceiptMutationLock?.(true)
     ++readId.current; readController.current?.abort(); setRefreshing(false)
     const controller = new AbortController()
     writeController.current = controller
@@ -328,17 +336,18 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
     void execute()
   }
   const undo = () => { if(!feedback.command||!snapshot||pending.current||executing.current||signedOut)return; const command=feedback.command;setImmediate(inverseDisplay(snapshot,command));setUndoVersion(value=>value+1);feedback.dismiss(); run(command,()=>{}) }
-  const receiptBack = <div className="bb-reconcile-form-actions"><button type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={busy || uncertain} onClick={onClose}>Back to reconciliation</button></div>
-  if (legacy && !uncertain) return <>{fallback}{matchedReceipt && receiptBack}</>
-  if (matchedReceipt) return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt" aria-label="Receive shared payment">
+  if (matchedReceipt) return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt bi-product" aria-label="Receive shared payment"><div className="bi-editor">
+    {legacy && !uncertain && fallback}
     {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
       {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
         : pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
-    {!snapshot && !error && <ReportLoading label="Loading the matched shared payment…"/>}
+    {!snapshot && !error && !legacy && <ReportLoading label="Loading the matched shared payment…"/>}
     {snapshot && <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} active={matchedReceiptActive} disabled={busy || uncertain || refreshing}
-      run={run} refresh={() => void load()} />}
-    {receiptBack}
-  </section></ReimbursementSavingContext.Provider>
+      run={run} refresh={() => void load()} aliases={aliases} />}
+    <footer className="bi-editor-footer bb-reconcile-native-actions"><button type="button" className="bi-cancel" disabled={busy || uncertain} onClick={onClose}>
+      <ArrowLeft aria-hidden="true"/>Back to reconciliation</button></footer>
+  </div></section></ReimbursementSavingContext.Provider>
+  if (legacy && !uncertain) return <>{fallback}</>
   return <ReimbursementSavingContext.Provider value={savingOperation}><Card className={`bb-report-section bb-reimbursement-section bb-canonical-reimbursements${balanceFirst ? " bb-balance-first-card" : ""}`}>
     {!balanceFirst && <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>}
     <CardContent>
@@ -354,8 +363,8 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
   </Card></ReimbursementSavingContext.Provider>
 }
 
-function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refresh }: {
-  snapshot: LedgerSnapshot; scope: MatchedReceiptScope; active: boolean; disabled: boolean; run: Run; refresh: () => void
+function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refresh, aliases }: {
+  snapshot: LedgerSnapshot; scope: MatchedReceiptScope; active: boolean; disabled: boolean; run: Run; refresh: () => void; aliases?: Record<string, string>
 }) {
   const pageRefresh = Boolean(usePageRefreshRegistry())
   const wide = useAppNavigation()?.duoLandscape
@@ -365,24 +374,35 @@ function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refres
   const [reviewVersion, setReviewVersion] = useState(scope.review ? item?.version : undefined)
   useAppWorkStatus({ label: "Matched payment review", dirty: active && editing, onDiscard: () => setEditing(false) })
   if (!item) return <p role="status">This shared payment changed. Review its current details in Shared.</p>
-  const incoming = snapshot.events.filter(event => event.allocationId === item.id && event.status === "pending")
+  const events = snapshot.events.filter(event => event.allocationId === item.id)
+  const incoming = events.filter(event => event.status === "pending")
+  const offset = events.filter(event => event.kind === "offset" && event.status === "confirmed").reduce((sum, event) => sum + event.amountCents, 0)
   const pendingSheet = item.projectedVersion !== item.version
   const stale = editing && reviewVersion !== item.version
   const blocked = disabled || pendingSheet || Boolean(item.clearedCents) || incoming.length > 0
   const partner = person(item.partnerOwner)
+  const entry = reimbursementTransaction(item)
   return <>
-    <h2>{partner}’s share · {item.item || item.category}</h2>
-    <dl className="bb-reconcile-receipt-amounts"><div><dt>Full bank payment</dt><dd>{money(item.grossCents)}</dd></div>
-      <div><dt>{partner}’s share</dt><dd>{money(item.partnerShareCents)}</dd></div>
-      <div><dt>Already received / settled</dt><dd>{money(item.settledCents)}</dd></div>
-      <div><dt>Still owed</dt><dd>{money(item.outstandingCents)}</dd></div></dl>
+    <div className="rp-purchase"><TransactionIcon entry={entry} aliases={aliases} eager/><div className="rp-merchant">
+      <h2>{partner}’s share · {entry.location || entry.item || item.category}</h2><span>{transactionCategory(entry).label} · {dateLabel(item.expenseDate)}</span>
+    </div></div>
+    <div className="rp-balance"><div><span className="rp-person-name">Remaining to receive</span><strong className="rp-balance-amount">{money(item.outstandingCents)}</strong></div>
+      <span className="rp-status">{item.outstandingCents ? <><Clock3 aria-hidden="true"/>{incoming.length ? "Payment reported" : "Awaiting repayment"}</>
+        : <><CircleCheck aria-hidden="true"/>{item.clearedCents ? "Balance cleared" : "Settled"}</>}</span>
+    </div>
+    <RepaymentAllocation payerName={person(item.payerOwner)} partnerName={partner} payerCents={item.payerShareCents}
+      partnerCents={item.partnerShareCents} incoming method={reimbursementMethod(item)}/>
+    <dl className="rp-payment-summary" aria-label="Bank payment and repayments"><div><dt>Full bank payment</dt><dd>{money(item.grossCents)}</dd></div>
+      <div><dt>Cash received</dt><dd>{money(Math.max(0, item.settledCents - offset))}</dd></div>
+      {offset > 0 && <div><dt>Settled by offset</dt><dd>{money(offset)}</dd></div>}
+      {Boolean(item.clearedCents) && <div><dt>Cleared without payment</dt><dd>{money(item.clearedCents ?? 0)}</dd></div>}</dl>
     {pendingSheet && <div role="status"><p className="bb-ledger-note">Payment recorded; sheet update pending.</p>{pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" className="bb-reconcile-action" disabled={disabled} onClick={refresh}>Refresh payment</button>}</div>}
     {Boolean(item.clearedCents) && <p className="bb-ledger-note">Undo the balance reset in Shared before recording a receipt.</p>}
     {incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={item} disabled={disabled || pendingSheet || Boolean(item.clearedCents)} run={run} />)}
     {stale && <p role="status">This payment changed. Go back and reopen it before confirming.</p>}
-    {item.outstandingCents > 0 && !editing && <button type="button" className="bb-reconcile-action bb-reconcile-primary" disabled={blocked} onClick={() => { setReviewVersion(item.version); setEditing(true) }}>Mark {partner}’s share received</button>}
+    {item.outstandingCents > 0 && !editing && <button type="button" className="bi-primary" disabled={blocked} onClick={() => { setReviewVersion(item.version); setEditing(true) }}>Mark {partner}’s share received</button>}
     {editing && item.outstandingCents > 0 && !pendingSheet && !item.clearedCents && !incoming.length
-      && <PaymentEditor allocation={item} isPayer disabled={blocked || stale} run={run} close={() => setEditing(false)} />}
+      && <PaymentEditor allocation={item} isPayer native disabled={blocked || stale} run={run} close={() => setEditing(false)} />}
   </>
 }
 

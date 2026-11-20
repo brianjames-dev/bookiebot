@@ -27,5 +27,5 @@
 @keyframes bb-work-dialog-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(8px) scale(.98); } }
 @keyframes bb-work-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes bb-work-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
-@media (max-width: 380px) { .bb-app-update > .k-glass > div { flex-wrap: wrap; gap: 4px; } .bb-app-update > .k-glass > div > div:last-child { margin-left: auto; } }
+@media (max-width: 380px) { .bb-app-update > .k-glass > div { gap: 4px; padding: 8px 10px; } }
 @media (prefers-reduced-motion: reduce) { .bb-app-update.k-toast { transition: none; } .bb-work-guard-dialog[open], .bb-work-guard-dialog[open]::backdrop { animation: none; } }
