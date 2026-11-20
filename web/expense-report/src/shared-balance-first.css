@@ -171,7 +171,7 @@
 .sr-options svg {width:18px;height:18px;}
 .sr-options[aria-expanded=true] {background:hsl(var(--primary) / .12);color:hsl(var(--primary));}
 .sr-editor[data-stage=summary] {position:relative;}
-.sr-options-panel {pointer-events:auto;min-width:0;background:hsl(var(--card));color:hsl(var(--foreground));border:1px solid hsl(var(--border));border-radius:16px;box-shadow:0 12px 40px hsl(var(--foreground) / .12);padding:12px;font-size:13px;}
+.sr-options-panel {pointer-events:auto;min-width:0;background:hsl(var(--card));color:hsl(var(--foreground));border:1px solid hsl(var(--border));border-radius:16px;padding:12px;font-size:13px;}
 .sr-options-menu {display:flex;flex-direction:column;}
 .sr-options-menu button {display:flex;align-items:center;gap:10px;min-height:46px;padding:8px 6px;background:transparent;border:0;color:inherit;text-align:left;font:inherit;font-size:13px;}
 .sr-options-menu button+button {border-top:1px solid hsl(var(--border));}

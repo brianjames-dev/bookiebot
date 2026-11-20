@@ -1,5 +1,9 @@
 # Agent Status
 
+## Flat options menus (2026-11-20)
+
+Remove the external shadow from the Savings and Reimbursements options menu and the Transactions month picker. The picker keeps a visible border after removing Konsta's glass shadow. Six Chromium/WebKit cases cover the three menus across closed/open DUO and light/dark themes. The focused month-picker, Savings workspace and Reconcile UI contracts, frontend types, and production build pass. On a phone, open the Transactions title picker and the ellipsis menus in Savings and Reimbursements to check their borders and surfaces. The combined Reconcile layout is a separate review draft.
+
 ## Unfolded DUO rotation and save feedback (2026-11-20)
 
 Arm the guarded native viewport-fit recovery when the open display returns from portrait to landscape, including late reduced-height reports. Preserve scroll positions, open editors and the settled navigation placement. Reconcile shows the shared saving ring inside the matched action button, and Bills, Transfers and Transactions use it on their confirmation buttons. Test with the Home Screen app unfolded: note the bottom of the list and dock in landscape, rotate fully to portrait, then back to landscape without folding or backgrounding. Repeat once with a Transactions editor open. In Reconcile, use the next intended confirmation to check that the spinner stays in the tapped button until it finishes. The automated rotation fixtures model the native viewport dimensions and no live financial changes are needed for these checks. CI and deployment evidence belong to the task PR.

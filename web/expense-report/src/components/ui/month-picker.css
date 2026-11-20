@@ -11,6 +11,10 @@
 .bb-month-popover[aria-hidden="true"] { opacity: 0; scale: .96; pointer-events: none; }
 .bb-month-popover[aria-hidden="false"] { opacity: 1; scale: 1; }
 .bb-month-popover > .k-glass { opacity: 1; translate: none; transition: none; }
+body:has(.bb-page[data-screen="transactions"]) .bb-month-popover > .k-glass {
+  border: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
 .bb-month-panel { padding: 12px; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
 .bb-month-year { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 4px; margin-bottom: 8px; }
 .bb-month-year strong { text-align: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }

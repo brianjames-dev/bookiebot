@@ -83,7 +83,7 @@
 .bb-transaction-period summary { width:max-content; min-height:32px; display:flex; align-items:center; list-style:none; cursor:pointer; }
 .bb-transaction-period summary>svg { width:14px; height:14px; margin-left:7px; }
 .bb-transaction-period summary::-webkit-details-marker { display:none; }
-.bb-transaction-period>div { position:absolute; z-index:10; top:100%; left:0; width:240px; max-width:100%; padding:14px; border:1px solid hsl(var(--border)); border-radius:14px; background:hsl(var(--card)); box-shadow:0 8px 24px hsl(var(--foreground) / .08); }
+.bb-transaction-period>div { position:absolute; z-index:10; top:100%; left:0; width:240px; max-width:100%; padding:14px; border:1px solid hsl(var(--border)); border-radius:14px; background:hsl(var(--card)); }
 .bb-transaction-period>div button { width:100%; margin-top:10px; }
 .bb-recorded-day-chip { display:flex; align-items:center; gap:8px; min-height:44px; max-width:100%; padding:8px 12px; margin-top:12px; color:hsl(var(--primary)); background:hsl(var(--primary) / .08); border:1px solid hsl(var(--border)); border-radius:24px; }
 .bb-recorded-day-chip svg { width:14px; height:14px; }
