@@ -84,8 +84,14 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.match(rendered(), /Coffee/); assert.equal(work.pending, false)
   const beforeDetail = requests.length
   await expand('Coffee'); assert.equal(requests.length, beforeDetail + 1); assert.equal(latest().url, '/app/reconciliation/1')
-  await respond(detail(rows[0])); assert.ok(button('Confirm match'))
-  assert.equal(requests.length, beforeDetail + 1, 'Showing a candidate never automatically confirms it')
+  const firstDetail = latest()
+  await run(() => listeners.get('focus').forEach(fn => fn())); const focusRefresh = latest()
+  await respond(detail(rows[0]), 200, firstDetail)
+  assert.match(rendered(), /Finding sheet entries/)
+  assert.equal(button('Confirm match'), undefined, 'The first revealed editor never has inactive controls while the list is refreshing')
+  await respond(snapshot(), 200, focusRefresh)
+  assert.ok(button('Confirm match')); assert.equal(button('Confirm match').props.disabled, false)
+  assert.equal(requests.length, beforeDetail + 2, 'The unchanged list keeps a completed detail and never automatically confirms it')
   // A rejected metadata match must refresh its obsolete review, not trap the
   // whole screen behind the same uncertainty guard as a lost financial write.
   await click('Confirm match')
@@ -216,10 +222,25 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await expand('Coffee')
   const conflictedDetail = latest()
   await respond({ error: 'This transaction changed. Check again.' }, 409, conflictedDetail)
-  assert.equal(latest().url, '/app/reconciliation'); assert.equal(latest().options.method, 'GET', 'A stale detail reloads the owner list instead of retrying an obsolete ID forever')
-  const afterConflict = requests.length
+  assert.equal(latest().url, '/app/reconciliation'); assert.equal(latest().options.method, 'GET', 'A stale detail reloads the owner list')
   await respond(snapshot())
-  assert.equal(requests.length, afterConflict, 'Recovery waits for an explicit row expansion, preventing a list/detail retry loop')
+  assert.equal(latest().url, '/app/reconciliation/1', 'The selected row retries once without collapsing')
+  const afterConflict = requests.length
+  await respond({ error: 'This transaction changed again.' }, 409)
+  assert.equal(requests.length, afterConflict, 'A second conflict never creates a retry loop')
+  assert.ok(button('Retry review'))
+  await click('Retry review'); await respond(detail(rows[0])); assert.ok(button('Confirm match'))
+  await expand('Coffee')
+  const raw = { ...rows[6], bankId: 107 }
+  await run(() => controller.load()); await respond(snapshot(rows.map(row => row.id === raw.id ? raw : row)))
+  await expand('New posted'); await respond({ error: 'The row was prepared.' }, 404)
+  const materialized = { ...raw, id: 7 }
+  await respond(snapshot(rows.map(row => row.id === raw.id ? materialized : row)))
+  assert.equal(latest().url, '/app/reconciliation/7')
+  await respond(detail(materialized)); assert.ok(button('Confirm match'), 'The same bank row stays selected when it gets a review ID')
+  await expand('New posted')
+  await run(() => controller.load()); await respond(snapshot())
+  await run(() => listeners.get('bookiebot:reimbursements-changed').forEach(fn => fn()))
   await expand('Coffee')
   // A previous detail request cannot replace a newly expanded row.
   const oldDetail = latest(); await expand('Restaurant'); const newDetail = latest()

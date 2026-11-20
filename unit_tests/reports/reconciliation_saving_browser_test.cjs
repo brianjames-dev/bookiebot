@@ -224,6 +224,10 @@ async function verifyShortQueueRefresh(browser) {
   try {
     await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
     await page.locator('.bb-reconcile-row-toggle').waitFor()
+    const heading = () => page.locator('.bb-report-header').boundingBox()
+    const reconcileTitle = await heading()
+    const reviewGroup = await page.locator('.bb-reconcile-group').boundingBox()
+    assert(reviewGroup.y - reconcileTitle.y - reconcileTitle.height < 10, 'Reconcile content starts directly below the shared title header')
     await page.waitForFunction(() => document.querySelector('.bb-pull-refresh-button')?.disabled === false)
     const initial = await brand.boundingBox()
     await touch('touchstart', 130)
@@ -276,6 +280,53 @@ async function verifyShortQueueRefresh(browser) {
     const compact = page.locator('.bb-pull-refresh-space')
     await compact.waitFor({ state: 'attached' })
     assert.equal(await page.locator('.bb-settings-masthead-title > .bb-page-refresh-button').count(), 0)
+    await page.getByRole('button', { name: 'Savings', exact: true }).click()
+    const summary = page.locator('.sa-summary .sg-eyebrow')
+    await summary.waitFor()
+    const savingsTitle = await heading(), savingsBody = await summary.boundingBox()
+    assert(savingsBody.y - savingsTitle.y - savingsTitle.height < 10, 'Savings summary starts directly below the shared title header')
+    assert.deepEqual(errors, [])
+    assert.deepEqual(unexpected, [])
+  } finally { await page.close() }
+}
+
+async function verifyMatchPriority(browser, width, height) {
+  const split = { ...match, item: 'Fixture utility', amountCents: 13000, amountMismatch: true,
+    confirmable: false, confidence: .6, split: 'equal' }
+  const { page, errors, unexpected } = await fixture(browser, width, height, true, false, false, 0, {
+    async request(route) {
+      const path = new URL(route.request().url()).pathname
+      if (path === '/app/reconciliation') await route.fulfill({ json: snapshot(row) })
+      else if (path === '/app/reconciliation/1') await route.fulfill({ json: { item: { ...row, suggestions: [split],
+        logging: { allowed: true, kind: 'expense', categories: ['shopping'], paymentMethods: ['Fixture card'], reason: '' },
+      } } })
+      else return false
+      assert.equal(route.request().method(), 'GET')
+      return true
+    },
+  })
+  try {
+    await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
+    await page.getByRole('button', { name: /^Fixture store/ }).click()
+    await page.getByText('Potential matches (1)', { exact: true }).waitFor()
+    assert.equal(await page.getByText('Choose an entry', { exact: true }).count(), 0)
+    const choose = page.getByRole('button', { name: 'Choose budget entry', exact: true })
+    const add = page.getByRole('button', { name: 'Add expense', exact: true })
+    assert.match(await choose.getAttribute('class'), /bb-reconcile-primary/)
+    assert.match(await add.getAttribute('class'), /bb-reconcile-outline/)
+    await choose.click()
+    await page.getByRole('button', { name: /Fixture utility.*50\/50 split/ }).click()
+    await page.getByRole('button', { name: 'Review amount change', exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Ignore transaction', exact: true }).click()
+    const ignore = page.getByRole('button', { name: 'Ignore transaction', exact: true })
+    const back = page.getByRole('button', { name: 'Back', exact: true })
+    await back.waitFor()
+    for (const control of [ignore, back]) {
+      assert.equal(await control.evaluate(el => getComputedStyle(el).borderTopWidth), '1px')
+      assert((await control.boundingBox()).height >= 44)
+    }
+    await back.click()
+    await page.getByText('Amounts match', { exact: true }).waitFor({ state: 'hidden' })
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])
   } finally { await page.close() }
@@ -337,6 +388,7 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     try {
       for (const [width, height, dark] of [[382, 852, false], [867, 669, true]]) {
         await verify(browser, width, height, dark)
+        await verifyMatchPriority(browser, width, height)
         console.log('PASS in-button Reconcile spinner', engine.name(), width, height)
       }
       await verifyWorkspace(browser)

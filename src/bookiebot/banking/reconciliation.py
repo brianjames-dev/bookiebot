@@ -94,6 +94,7 @@ class ScheduledPullCandidate:
     source_ref: str
     account: str = ""
     amount_recorded: bool = False
+    bill_source_label: str = ""
 
     @property
     def occurrence_ref(self) -> str:
@@ -302,6 +303,12 @@ def match_scheduled_pull(
 def _schedule_represents_action(pull: ScheduledPullCandidate, candidate: dict) -> bool:
     if candidate["type"] not in {"expense", "payment"}:
         return False
+    if pull.source_type == "bill" and candidate.get("shared_bill"):
+        # The monthly cell can be net of repayments (or hold the legacy share).
+        # Only the canonical payer action can claim this named occurrence.
+        source = _normalize_schedule_text(pull.bill_source_label or pull.name)
+        return bool(source and source == candidate["shared_bill"]
+                    and candidate["date"].strftime("%Y-%m") == pull.pull_date.strftime("%Y-%m"))
     if round(candidate["amount"] * 100) != round(pull.amount * 100):
         return False
     same_period = (
@@ -370,6 +377,7 @@ def find_scheduled_pull_candidates(
     scheduled_pulls: Iterable[ScheduledPullCandidate],
     *,
     action_log: Iterable[LoggedAction] = (),
+    excluded_sheet_refs: set[str] | None = None,
     window_days: int = 7,
     limit: int = 5,
 ) -> list[ActionLogCandidate]:
@@ -381,6 +389,8 @@ def find_scheduled_pull_candidates(
 
     candidates: list[ActionLogCandidate] = []
     for pull in distinct_scheduled_pulls(scheduled_pulls, action_log):
+        if excluded_sheet_refs and pull.occurrence_ref in excluded_sheet_refs:
+            continue
         day_delta = _transaction_day_delta(transaction, pull.pull_date)
         if day_delta > window_days:
             continue
@@ -427,6 +437,7 @@ def find_action_log_candidates(
     *,
     classification: ReconciliationClassification | None = None,
     excluded_action_ids: set[str] | None = None,
+    scheduled_pulls: Iterable[ScheduledPullCandidate] = (),
     window_days: int = 7,
     limit: int = 5,
 ) -> list[ActionLogCandidate]:
@@ -436,6 +447,7 @@ def find_action_log_candidates(
 
     excluded = excluded_action_ids or set()
     compatible = _compatible_action_types(transaction, classification)
+    scheduled_pulls = tuple(scheduled_pulls)
     candidates: list[ActionLogCandidate] = []
     for logged in action_log:
         if logged.id in excluded:
@@ -444,13 +456,23 @@ def find_action_log_candidates(
         if candidate is None or candidate["type"] not in compatible:
             continue
         day_delta = _transaction_day_delta(transaction, candidate["date"])
+        linked_bill = False
+        if candidate.get("shared_bill"):
+            bill_pulls = [pull for pull in scheduled_pulls if _schedule_represents_action(pull, candidate)
+                          and _scheduled_name_score(transaction, pull.name) >= 0.5]
+            if len({pull.occurrence_ref for pull in bill_pulls}) == 1:
+                # Review an invoice recorded early using its withdrawal timing.
+                # Keep the original action date and anchor for confirmation.
+                pull_delta = min(_transaction_day_delta(transaction, pull.pull_date) for pull in bill_pulls)
+                linked_bill = pull_delta <= window_days
+                day_delta = min(day_delta, pull_delta)
         if day_delta > window_days:
             continue
 
         name_score = _name_score(transaction, candidate["text"])
         amount_delta = abs(candidate["amount"] - abs(transaction.amount))
         amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
-        if amount_delta > amount_tolerance:
+        if amount_delta > amount_tolerance and not linked_bill:
             continue
 
         amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
@@ -459,12 +481,12 @@ def find_action_log_candidates(
         if candidate["type"] == "income" and name_score <= 0 and amount_delta > 0.01:
             continue
         candidates.append(
-            _action_log_candidate(
+            replace(_action_log_candidate(
                 logged,
                 candidate,
                 confidence=min(score, 0.98),
                 notes=f"amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",
-            )
+            ), sheet_ref=action_sheet_ref(logged, scheduled_pulls))
         )
 
     return sorted(candidates, key=lambda item: (-item.confidence, item.date), reverse=False)[: max(1, limit)]
@@ -697,7 +719,10 @@ def _action_candidate(logged: LoggedAction) -> dict | None:
         amount = _money_value(action.new_values[fields.index('amount')])
     else:
         amount = _action_amount(action_type, action.new_values, action.description)
-    action_date = _action_date(action.new_values, logged.created_at)
+    shared_bill = (action_type == "payment" and action.metadata.get("canonical_reimbursement") == "true"
+                   and action.metadata.get("reimbursement_source_action_id") == logged.id)
+    action_date = _parse_date(action.metadata.get("reconciliation_expense_date", "")) if shared_bill else None
+    action_date = action_date or _action_date(action.new_values, logged.created_at)
     if amount is None or action_date is None or amount <= 0:
         return None
 
@@ -712,6 +737,7 @@ def _action_candidate(logged: LoggedAction) -> dict | None:
         "amount": amount,
         "date": action_date,
         "text": " ".join(str(part) for part in text_parts if part),
+        "shared_bill": _normalize_schedule_text(action.metadata.get("category", "")) if shared_bill else "",
     }
 
 

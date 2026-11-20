@@ -112,7 +112,7 @@ def _row(transaction: BankTransaction, item: ReconciliationItem | None) -> dict[
         account += f" · {transaction.account_mask}"
     recovering = bool(item and item.status == "import_requested")
     return {
-        "id": item.id if item else -transaction.id, "stateVersion": _version(transaction, item),
+        "id": item.id if item else -transaction.id, "bankId": transaction.id, "stateVersion": _version(transaction, item),
         "version": _version(transaction, item), "status": status,
         "date": transaction.date or transaction.authorized_date or "",
         "merchant": transaction.merchant_name or transaction.name,
@@ -202,26 +202,32 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
                 limit=12, action_log=actions, include_groups=False)
         else:
             pulls = _scheduled_pulls_for_transactions([transaction], actor_key=actor)
-            excluded = service.store.matched_action_log_ids(owner) | claimed_schedule_action_ids(
-                pulls, actions, service.store.matched_sheet_refs(owner),
-            )
+            claimed = service.store.matched_sheet_refs(owner)
+            excluded = service.store.matched_action_log_ids(owner) | claimed_schedule_action_ids(pulls, actions, claimed)
             candidates = find_action_log_candidates(
                 transaction, actions,
-                excluded_action_ids=excluded, limit=8,
+                excluded_action_ids=excluded, scheduled_pulls=pulls, limit=8,
             )
             candidates += find_scheduled_pull_candidates(
-                transaction, pulls, limit=4, action_log=actions,
+                transaction, pulls, limit=4, action_log=actions, excluded_sheet_refs=claimed,
             )
     row["suggestions"] = [_suggestion(candidate, transaction) for candidate in candidates]
     if candidates:
         from bookiebot.banking.shared_amounts import shared_amount_review
         from bookiebot.reimbursements.store import ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError
         by_id = {logged.id: logged for logged in actions}
-        for suggestion in row["suggestions"]:
-            if item is None and suggestion['amountMismatch']:
-                continue  # Shared amount review starts after the chosen action prepares its stable identity.
+        for candidate, suggestion in zip(candidates, row["suggestions"]):
             logged = by_id.get(suggestion["id"])
             if logged is None:
+                continue
+            metadata = logged.action.metadata
+            if metadata.get("canonical_lifecycle") == "active" and metadata.get("split_method"):
+                suggestion["split"] = metadata["split_method"]
+            if item is None and suggestion['amountMismatch']:
+                continue  # Shared amount review starts after the chosen action prepares its stable identity.
+            if (suggestion.get("split") and candidate.action_type == "payment" and suggestion['amountMismatch']
+                    and candidate.date.strftime('%Y-%m') != now_pacific().strftime('%Y-%m')):
+                suggestion['sharedAmount'] = {'blocked': 'Review this past bill’s amount in Transactions.'}
                 continue
             try:
                 plan = shared_amount_review(owner, logged, round(abs(transaction.amount) * 100), item.id if item else review_id)
