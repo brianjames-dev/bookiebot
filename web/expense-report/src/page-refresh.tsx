@@ -1,4 +1,5 @@
-import { createContext, useContext, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { createContext, useContext, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { RefreshCw } from "lucide-react"
 import type { AppScreen } from "./app-navigation"
 
 type RefreshHandler = { refresh: () => Promise<unknown>; disabled?: boolean }
@@ -42,4 +43,15 @@ export function usePageRefresh(screen: AppScreen | null, handler: RefreshHandler
   }, [registry, id, screen])
   useLayoutEffect(() => { registry?.changed() }, [registry, handler.disabled])
   return Boolean(registry)
+}
+
+export function PageRefreshButton({ screen, label, blocked = false }: { screen: AppScreen; label: string; blocked?: boolean }) {
+  const registry = usePageRefreshRegistry()!
+  useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot)
+  const [refreshing, setRefreshing] = useState(false)
+  return <button type="button" className="sr-refresh bb-page-refresh-button" aria-label={label} title={label}
+    disabled={blocked || refreshing || !registry.available(screen)} aria-busy={refreshing}
+    onClick={async () => { setRefreshing(true); try { await registry.refresh(screen) } finally { setRefreshing(false) } }}>
+    <RefreshCw className={refreshing ? "sr-refresh-spinning" : undefined} aria-hidden="true" />
+  </button>
 }

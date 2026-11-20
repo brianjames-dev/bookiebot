@@ -4,7 +4,7 @@ html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-space[data-phase="pulling"], .bb-pull-refresh-space[data-phase="armed"] { transition: none; }
 /* The temporary gap owns this motion. Scroll anchoring must not counter its
    shrinking height with a second stream of viewport corrections. */
-.bb-app-shell:has(> .bb-pull-refresh-space[data-released="true"]) { overflow-anchor: none; }
+.bb-app-shell:has(> .bb-pull-refresh-space:is([data-released="true"],[data-live-gap="true"])) { overflow-anchor: none; }
 .bb-pull-refresh-space[data-phase="settling"] { transition: height 360ms cubic-bezier(.4, 0, .2, 1); }
 .bb-pull-refresh[data-phase="settling"] { transition: transform 360ms cubic-bezier(.4, 0, .2, 1), opacity 260ms; }
 /* Loading/results stay in the document above the masthead and scroll with it.
@@ -38,6 +38,16 @@ html.bb-pull-refresh-enabled { overscroll-behavior-y: contain; }
 .bb-pull-refresh-button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-pull-refresh:has(:focus-visible) { opacity: 1; transform: translate(-50%, 0); }
 .bb-pull-refresh[data-blocked="true"] { visibility: hidden; }
+/* Short queues cannot rely on native overscroll to move the masthead. The
+   live spacer owns that displacement and leaves the arrow above the wordmark. */
+html.bb-pull-refresh-enabled:has(.bb-page[data-screen=reconcile]),
+.bb-page[data-screen=reconcile]:not([data-duo-landscape]) { overscroll-behavior-y:none; }
+.bb-page[data-screen=reconcile] > .bb-pull-refresh-space > .bb-pull-refresh { top:env(safe-area-inset-top, 0px); }
+.bb-page[data-screen=reconcile] .bb-pull-refresh[data-visible=true] { transform:translate(-50%,calc(var(--bb-pull-distance) - 64px)); }
+@media (hover:none), (pointer:coarse) {
+  .bb-page[data-screen=reconcile] .bb-pull-refresh[data-phase=idle]:not(:has(:focus-visible)) { opacity:0; pointer-events:none; }
+  .bb-page[data-screen=reconcile] .bb-pull-refresh[data-phase=idle]:not(:has(:focus-visible)) button { pointer-events:none; }
+}
 .bb-page[data-bills-open=true]>.bb-pull-refresh-space>.bb-pull-refresh { top:86px }
 .bb-page[data-bills-open=true] .bb-pull-refresh[data-phase=idle] { opacity:0 }
 .bb-page[data-bills-open=true] .bb-pull-refresh[data-phase=idle] .bb-pull-refresh-button { pointer-events:none }

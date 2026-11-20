@@ -1,5 +1,15 @@
 # Agent Status
 
+## Reconcile refresh and match clarity (2026-11-20)
+
+Closed DUO displaces the short Reconcile queue as the refresh gesture progresses, keeping the indicator above the wordmark. Open DUO unmounts the pull surface app-wide and uses the existing refresh controls plus buttons for Overview, Transactions and root Settings. Reconcile uses the same Updated line as other tabs, with a short status while checking or recovering. A refresh after an uncertain write still only reads its saved outcome.
+
+The Reconcile pane centers its loading ring under the sticky close button. Choosing another match and adding an expense or income are direct actions below the comparison. The chooser shows each amount and a selected checkmark, and the comparison marks amount differences with the warning triangle.
+
+Local verification passed 3,558 tests with 915 optional PostgreSQL cases skipped, Python and frontend types, and the build. Chromium and WebKit passed short-queue pull/recovery, every open-tab refresh control, chooser and save visuals, and four interrupted-refresh fold cases. The older broad pull suite stops at the same startup-spinner assertion on the baseline and the new bundle.
+
+Review follow-up restores the mouse-accessible compact refresh control and routes the open-DUO shared-payment refresh directly to the receipt loader. The receipt's recovery text follows the active pose.
+
 ## Reconcile editor polish and recurring date review (2026-11-20)
 
 The signed-in November Bills view showed Recology’s recurring day as 18 and its recorded date as November 20, matching the Calendar. Provide an explicit current-charge date choice in the recurring review. It commits with the schedule in one batch and leaves amounts, repayment history and source identity intact. The existing current-month date editor still corrects an occurrence without changing the schedule. Combined reviewed amount/split changes verify the original transaction and the exact date change again before using its refreshed version.
@@ -577,6 +587,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of refresh and match clarity. Pull down in a short closed-DUO Reconcile queue and verify the arrow clears the portrait, then unfold and repeat the gesture to check that only the refresh button runs a check. Open a row with alternatives and confirm the chooser, warning icon and Add expense action. After a failed check, read the short status under the portrait and refresh once to verify the saved outcome.
 
 Native acceptance of the Reconcile follow-up and recurring bill date choice. Swipe the status pills in closed DUO and compare matching entries from the ellipsis menu. In open DUO watch the close button position while loading, then open Add expense and verify one heading and a right-side scroll track. To move a legitimate existing bill, review the recurring day with Applies from set to this month and choose Also move this month’s charge, or use Edit payment date from This month’s bill. Check Calendar and Transactions and confirm the original split and repayment details.
 

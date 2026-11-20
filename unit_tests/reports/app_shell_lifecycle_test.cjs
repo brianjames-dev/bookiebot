@@ -341,9 +341,9 @@ async function main() {
   assert.doesNotMatch(visibleReviewText(), /Nothing needs review/)
   assert.ok(tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.disabled)
   await run(() => bankReadRequest.reject(Error('Offline')))
-  assert.equal(screen(tree), 'reconcile'); assert.ok(button(tree, 'Try again')); assert.equal(tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.disabled,false,'Pull refresh can retry failed connection discovery')
+  assert.equal(screen(tree), 'reconcile'); assert.equal(tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.disabled,false,'Pull refresh can retry failed connection discovery')
   assert.equal(optionalNav.props['data-tab-count'], 5)
-  bankReadRequest = deferred(); await tap(tree, 'Try again')
+  bankReadRequest = deferred(); await run(() => tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.onClick())
   assert.match(visibleReviewText(), /Loading bank transactions/)
   await run(() => bankReadRequest.resolve(response({ enabled: true, checkedAt: null, items: [] })))
   bankReadRequest = null

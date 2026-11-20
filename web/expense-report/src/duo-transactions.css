@@ -8,7 +8,6 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-shell-masthead {
   grid-column:1; grid-row:1; width:100%; height:var(--bb-duo-masthead); min-height:0; margin:0; padding-inline:var(--bb-duo-inset);
  }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-pull-refresh-space { grid-column:1; grid-row:1; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] > .bb-report-header {
   grid-column:1; grid-row:2; align-self:start; z-index:4;
   height:var(--bb-duo-heading); min-height:0; width:calc(var(--bb-duo-fold) - 2 * var(--bb-duo-inset));
