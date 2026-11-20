@@ -110,15 +110,15 @@ def connect(client, actor=BRIAN, owner="brian"):
     client.http.session.cookie_jar.update_cookies({"bb_phone_local": result[0]})
 
 
-def seed(client, owner="brian", pending=False, reviewed=True, status="needs_review", amount=12.34, age=0):
+def seed(client, owner="brian", pending=False, reviewed=True, status="needs_review", amount=12.34, age=0, merchant="Starbucks", bank_date=None):
     item = client.store.upsert_item(owner_key=owner, provider="plaid", item_id=f"item-{owner}",
                                     access_token="private-bank-token", institution_name="Example bank")
     client.store.upsert_accounts([BankAccount(item.id, f"account-{owner}", owner, "Checking", "1234",
                                               "depository", "checking", None, 100, 100)])
     client.store.upsert_transactions([{
         "transaction_id": f"transaction-{owner}", "account_id": f"account-{owner}",
-        "date": (now_pacific().date() - timedelta(days=age)).isoformat(),
-        "name": f"Starbucks {owner}", "merchant_name": "Starbucks", "amount": amount, "pending": pending,
+        "date": (bank_date or now_pacific().date() - timedelta(days=age)).isoformat(),
+        "name": f"{merchant} {owner}", "merchant_name": merchant, "amount": amount, "pending": pending,
     }], owner)
     transaction = client.store.recent_transactions(owner)[0]
     if reviewed:
@@ -691,6 +691,91 @@ async def test_amount_update_rejects_stale_sheet_preview(client, monkeypatch):
         'operation': 'update_match', 'id': item.id, 'version': row['version'], 'suggestionId': 'coffee',
     })
     assert response.status == 409
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('accounting,bank_amount,reviewed', [
+    ('cash_v1', 122.76, False), ('cash_v1', 122.76, True),
+    ('cash_v1', 176.25, True), ('legacy_net', 122.76, True), ('legacy_net', 176.25, True),
+])
+async def test_shared_bill_uses_full_charge_and_retains_source_and_repayments(client, monkeypatch, accounting, bank_amount, reviewed):
+    from bookiebot.banking.reconciliation import ScheduledPullCandidate
+    from bookiebot.reimbursements import projection, service
+    from bookiebot.reimbursements.store import ReimbursementStore
+    from bookiebot.sheets.undo import _allocation_action
+    from unit_tests.reimbursements.test_store import payload, payment
+
+    today = now_pacific().replace(day=24)
+    monkeypatch.setattr(review, 'now_pacific', lambda: today)
+    withdrawal = today.date().replace(day=22)
+    entered = withdrawal.replace(day=1)
+    stored = seed(client, reviewed=reviewed, merchant='Recology Sonoma', amount=bank_amount, bank_date=withdrawal)
+    ledger = ReimbursementStore(client.access)
+    ledger.initialize()
+    value = ledger.register_allocation(payload(sourceActionId='recology', item='Recology', category='Recology',
+        expenseDate=entered.isoformat(), sourceWorksheet='income', sourceYear=entered.year,
+        sourceSheetTitle=entered.strftime('%B'), sourceRow=20, sourceColumnMap={'amount': 3},
+        grossCents=12276, payerShareCents=6138, partnerShareCents=6138, method='equal', accounting=accounting))
+    ledger.mark_projected(value['id'], value['version'])
+    if accounting == 'cash_v1':
+        ledger.command('brian', {**payment(value, 4320), 'date': entered.isoformat()})
+        value = ledger.get_allocation(value['id'])
+        ledger.mark_projected(value['id'], value['version'])
+    logged_bill = LoggedAction(id='recology', user_key=BRIAN, created_at=entered.isoformat(),
+        action=UndoAction(worksheet='income', kind='clear_cells', row=20, columns=[3], previous_values=[''],
+                          new_values=['79.56' if accounting == 'cash_v1' else '61.38'],
+                          metadata={'type': 'payment', 'category': 'Recology'}, description='Logged Recology'))
+    canonical = _allocation_action(logged_bill, value, for_reconciliation=True)
+    assert canonical is not None and canonical.action.new_values == ['122.76']
+    client.actions[:] = [canonical]
+    monkeypatch.setenv('BOOKIEBOT_REIMBURSEMENTS_ENABLED', 'true')
+    monkeypatch.setattr(service, 'build_reimbursement_store', lambda: ledger)
+    monkeypatch.setattr(banking, '_read_current_logged_actions', lambda _actor: client.actions)
+    pull = ScheduledPullCandidate('bill', 'Recology', float(logged_bill.action.new_values[0]), withdrawal,
+                                  'bill:recology', amount_recorded=True)
+    for module in (banking, review):
+        monkeypatch.setattr(module, '_scheduled_pulls_for_transactions', lambda *args, **kwargs: [pull])
+    def project(*args, **kwargs):
+        current = ledger.get_allocation(value['id'])
+        ledger.mark_projected(current['id'], current['version'])
+        return True
+    monkeypatch.setattr(projection, 'sync_pending', project)
+    connect(client)
+
+    review_id = stored.id if reviewed else -stored.id
+    row = await details(client, review_id)
+    assert row['bankId'] == (stored.bank_transaction_id if reviewed else stored.id)
+    assert len(row['suggestions']) == 1
+    candidate = row['suggestions'][0]
+    assert candidate['id'] == 'recology' and candidate['amountCents'] == 12276 and candidate['split'] == 'equal'
+    request = dict(id=review_id, version=row['version'], suggestionId='recology')
+    before = ledger.snapshot('brian')
+    result = await client.http.post('/app/reconciliation', headers=HEADERS, json={**request, 'operation': 'confirm'})
+    if bank_amount == 122.76:
+        assert result.status == 200, await result.text()
+        assert ledger.snapshot('brian') == before
+    else:
+        assert result.status == 409 and ledger.snapshot('brian') == before
+        plan = candidate['sharedAmount']
+        if accounting == 'legacy_net':
+            assert 'read-only' in plan['blocked']
+            return
+        assert plan['previousGrossCents'] == 12276 and plan['grossCents'] == 17625 and plan['receivedCents'] == 4320
+        result = await client.http.post('/app/reconciliation', headers=HEADERS,
+            json={**request, 'operation': 'update_match', 'sharedAmountToken': plan['token']})
+        assert result.status == 200, await result.text()
+        revised = ledger.get_allocation(value['id'])
+        assert revised['grossCents'] == 17625 and revised['settledCents'] == 4320 and revised['method'] == 'equal'
+        assert ledger.snapshot('brian')['events'] == before['events']
+    saved = client.store.review_reconciliation_items('brian', start_date=entered.isoformat())[0]
+    assert saved.matched_action_log_id == 'recology'
+    assert pull.occurrence_ref in saved.matched_sheet_ref.split(' + ')
+    client.store.upsert_transactions([{
+        'transaction_id': 'second-recology', 'account_id': 'account-brian', 'date': withdrawal.isoformat(),
+        'name': 'Recology Sonoma', 'amount': bank_amount, 'pending': False,
+    }], 'brian')
+    duplicate = next(item for item in (await list_rows(client))['items'] if item['id'] != saved.id)
+    assert not (await details(client, duplicate['id']))['suggestions']
 
 
 @pytest.mark.asyncio

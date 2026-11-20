@@ -958,8 +958,10 @@ def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_recon
                 "canonical_reimbursement": "true", "canonical_version": str(value["version"]),
                 "canonical_lifecycle": value.get("lifecycle", "active"),
                 "reimbursement_source_action_id": value["sourceActionId"]}
-    # Historical net allocations remain read-only and retain their saved display.
-    if value["accounting"] != "cash_v1":
+    source_payment = for_reconciliation and value["sourceWorksheet"] == "income" and logged.id == value["sourceActionId"]
+    # Historical net allocations retain their saved display. Only the original
+    # payer's bill can expose the ledger's gross amount to bank matching.
+    if value["accounting"] != "cash_v1" and not source_payment:
         return replace(logged, action=replace(action, metadata=metadata))
     fields = value.get("sourceColumnMap", {})
     if value["sourceWorksheet"] == "expense" and fields:
@@ -975,6 +977,8 @@ def _allocation_action(logged: LoggedAction, value: dict[str, Any], *, for_recon
                   item=value["item"], location=value["location"])
     active_split = value.get("lifecycle", "active") == "active"
     source_type = "expense" if value["sourceWorksheet"] == "expense" else "payment"
+    if source_payment:
+        metadata["reconciliation_expense_date"] = value["expenseDate"]
     metadata.update(category=value["category"], person=value["payerPerson"], source_type=source_type,
                     split_method=value["method"], gross_amount=values["amount"],
                     canonical_settled_cents=str(value["settledCents"]),

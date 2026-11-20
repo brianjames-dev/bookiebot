@@ -297,8 +297,9 @@
 .sw-root .si-top-editor .sg-editor{margin-left:0}
 .sw-root .sg-editor .si-bank-icon{width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px}
 /* Closed: the page is the sole scrolling owner; title/actions are ordinary flow. */
-.bb-page.bb-app-shell[data-screen=savings]:not([data-duo-landscape=true])>.bb-report-header{position:relative;top:auto;}
-.bb-page.bb-app-shell[data-screen=savings]:not([data-duo-landscape=true]) .bb-shell-savings{display:block;padding-top:10px;}
+.bb-page.bb-app-shell[data-screen=savings]:not([data-duo-landscape=true])>.bb-report-header{position:relative;top:auto;padding-bottom:4px;}
+.bb-page.bb-app-shell[data-screen=savings]:not([data-duo-landscape=true]) .bb-shell-savings{display:block;padding-top:0;}
+.sw-root:not([data-wide=true]) .sa-summary .sg-hero{padding-top:0;}
 /* Open: title stays in the fixed shell while only the left pane scrolls. */
 .bb-page.bb-app-shell[data-screen=savings][data-duo-landscape=true]{overflow:clip;}
 .bb-page.bb-app-shell[data-screen=savings][data-duo-landscape=true]>.bb-report-header{position:absolute;top:var(--bb-duo-masthead);left:var(--bb-duo-inset);margin:0;width:calc(var(--bb-duo-fold) - 2 * var(--bb-duo-inset));z-index:10;}

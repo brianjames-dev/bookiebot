@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-20 — Match split bills against the full payer charge
+
+A canonical payer action and its uniquely identified bill occurrence reserve both references. Match the ledger's original gross even when the personal sheet carries a net value. Use the named occurrence to bridge early entry and withdrawal only within the existing date window. Exact matches change review metadata alone. A current cash-accounting mismatch requires the existing bound amount review and keeps confirmed repayments. Historical net amounts stay read-only. Never use the partner's reimbursement as evidence of the payer's bank withdrawal.
+
+Keep the bank transaction selected when its review ID changes. A stale detail can refresh the list and retry once without writing. Wait for the initial editor's controls to be ready and prioritize matching over creating a new budget entry.
+
 ## 2026-11-20 — Use pose-specific refresh controls and one Reconcile status line
 
 Unmount the pull gesture in open DUO landscape and reuse each page's registered refresh handlers through buttons. The compact Reconcile queue positions its header with the pull gap even when the viewport cannot bounce. Review keeps its status under the portrait and uses the same control to read saved outcomes before allowing any new write. Alternative matching and budget-entry creation start directly below the comparison and retain their existing explicit confirmations.

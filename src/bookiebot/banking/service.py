@@ -395,11 +395,14 @@ def _scheduled_pulls_for_transactions(
                     source_ref=bill.source_range or f"bill:{bill.bill_key}",
                     account=bill.account,
                     amount_recorded=recorded,
+                    bill_source_label=bill.source_label,
                 )
             )
             expected = next_bill_pull_date(bill, expected + timedelta(days=1))
         for transaction_date in unique_transaction_dates:
             if transaction_date in seen_pull_dates:
+                continue
+            if not bill.active or (bill.plan_id and not bill.effective_from <= transaction_date.strftime("%Y-%m") < bill.effective_until):
                 continue
             date_transactions = transactions_by_date.get(transaction_date, [])
             name_matches = any(_bill_name_matches_transaction(bill.display_name, transaction) for transaction in date_transactions)
@@ -415,6 +418,7 @@ def _scheduled_pulls_for_transactions(
                     source_ref=bill.source_range or f"bill:{bill.bill_key}",
                     account=bill.account,
                     amount_recorded=recorded,
+                    bill_source_label=bill.source_label,
                 )
             )
     return candidates
@@ -882,6 +886,7 @@ class BankingService:
             item.transaction,
             pulls,
             action_log=action_log,
+            excluded_sheet_refs=claimed_refs,
             window_days=14 if fallback else 7,
             limit=limit,
         )
@@ -903,6 +908,7 @@ class BankingService:
                 excluded_action_ids=excluded,
                 window_days=7,
                 limit=limit,
+                scheduled_pulls=pulls,
             )
             candidates = sorted([*action_candidates, *schedule_candidates], key=lambda candidate: (-candidate.confidence, not candidate.amount_recorded))[: max(1, limit)]
             groups = find_action_log_candidate_groups(

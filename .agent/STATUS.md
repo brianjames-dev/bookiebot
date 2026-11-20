@@ -1,5 +1,15 @@
 # Agent Status
 
+## Reconcile editor readiness and split bills (2026-11-20)
+
+Close the compact title gaps in Savings and Reconcile. Render active editors after their first detail and queue refresh are ready. Keep a selected transaction through one read-only recovery by bank ID. Retry explicitly if that second detail fails. Match actions lead, Add expense is secondary when candidates exist, and review confirmation controls use button surfaces.
+
+Match recorded split bills by the payer's canonical gross, including an early invoice entry and a net personal sheet cell. Suppress the equivalent schedule candidate, reserve the source and occurrence together, and use the current shared amount review for a real difference. Historical net bills allow exact matching only. No live financial writes.
+
+Local verification passed 3,563 tests with 915 optional PostgreSQL skips. Python types, frontend types, the production build, and Chromium/WebKit tests passed. Focused regressions cover finite detail retry, retention when a bank row receives its review ID, ready first render, expired-preview refresh, match priority, both button styles, preserved repayments, and duplicate-claim prevention.
+
+Manual DUO check. In closed DUO compare the spacing under Savings and Reconcile with Reimbursements. Open a Needs review row during refresh and verify the first visible editor is actionable. In both poses open a row with possible matches, then try Choose budget entry and back out of Ignore. For Recology, compare its full original charge with the bank amount and verify existing shares/repayments in Shared. Use Confirm match only for the right existing charge. If there is a real difference, inspect the revised shares and prior received amount before any decision.
+
 ## Reconcile refresh and match clarity (2026-11-20)
 
 Closed DUO displaces the short Reconcile queue as the refresh gesture progresses, keeping the indicator above the wordmark. Open DUO unmounts the pull surface app-wide and uses the existing refresh controls plus buttons for Overview, Transactions and root Settings. Reconcile uses the same Updated line as other tabs, with a short status while checking or recovering. A refresh after an uncertain write still only reads its saved outcome.
