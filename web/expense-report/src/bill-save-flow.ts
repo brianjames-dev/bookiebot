@@ -62,6 +62,14 @@ export async function runBillFlow(flow:BillSaveFlow,request:Request,persist:(flo
    if(flow.current){
     if(!result.currentChange||stable(result.currentChange)!==stable(flow.current))failed('The recurring rule is saved, but the current-charge details need a fresh review.')
     flow.current=result.currentChange
+    if(flow.configuration?.applyCurrentPaymentDate){
+     const next=await charge()
+     const {date:before,version:_oldVersion,...original}=flow.expected!
+     const {date:after,version:_newVersion,...updated}=next
+     if(before!==result.currentPaymentDate?.previousDate||after!==result.currentPaymentDate?.date||stable(updated)!==stable(original))
+      failed('The recurring rule is saved, but this charge needs a fresh review before changing its amount or split.')
+     flow.expected=next
+    }
    }
    if(flow.historyCommands){
     const scope=(commands:Command[])=>commands.map(({requestId,rootRequestId,...command})=>command)

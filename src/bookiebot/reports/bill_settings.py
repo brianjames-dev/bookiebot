@@ -10,7 +10,7 @@ import re
 from typing import Any, cast
 
 from bookiebot.reports.app_access import PostgresAppAccessStore, build_app_access_store
-from bookiebot.reports.bill_payment_date import date_batch, prepare_date
+from bookiebot.reports.bill_payment_date import configuration_date, date_batch, prepare_date
 from bookiebot.sheets import undo
 from bookiebot.sheets.recurring import BILL_TAB, SUBSCRIPTION_TAB, SETTINGS_LOG_TAB, BillConflict, BillValidation, BillPlan, fingerprint, month_key, money_cents, selected
 from bookiebot.sheets.recurring_changes import prepare_change
@@ -178,11 +178,18 @@ def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | Non
     explicit_current = "applyCurrentCharge" in body
     if explicit_current and type(body["applyCurrentCharge"]) is not bool:
         raise BillValidation("Choose whether to update the recorded charge.")
-    change = prepare_change(source.settings, {k:v for k,v in body.items() if k != "applyCurrentCharge"}, today=today)
+    apply_date = body.get("applyCurrentPaymentDate", False)
+    if type(apply_date) is not bool:
+        raise BillValidation("Choose whether to move the recorded charge.")
+    change = prepare_change(source.settings, {k:v for k,v in body.items() if k not in {"applyCurrentCharge", "applyCurrentPaymentDate"}}, today=today)
     from bookiebot.reimbursements.service import enabled
     if change.after.split_method != "none" and not enabled():
         raise BillValidation("Shared splits are unavailable. Try again when Shared is connected.")
-    configuration_batch(source, change, "review-preview", fingerprint(body), "{}", today=today)
+    current_date = configuration_date(source, change) if explicit_current or apply_date else None
+    if apply_date and current_date is None:
+        raise BillValidation("This month's charge no longer needs that date change. Review it again.")
+    payment_date = current_date["date"] if current_date and apply_date else None
+    configuration_batch(source, change, "review-preview", fingerprint(body), "{}", today=today, current_payment_date=payment_date)
     result = change.public()
     if explicit_current:
         from bookiebot.reports.bill_current_review import configuration_target
@@ -193,6 +200,11 @@ def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | Non
         result["applyCurrentCharge"] = body["applyCurrentCharge"]
         result["reviewVersion"] = fingerprint([change.review_version, body["applyCurrentCharge"],
                                                current if body["applyCurrentCharge"] else None])
+    if current_date:
+        result["currentPaymentDate"] = current_date
+        result["applyCurrentPaymentDate"] = apply_date
+        if apply_date:
+            result["reviewVersion"] = fingerprint([result["reviewVersion"], current_date])
     return result
 
 
@@ -524,11 +536,15 @@ class BillCommands:
                         batch.send()
                         batch_committed = True
                     else:
-                        change = prepare_change(source.settings, {k:v for k,v in body.items() if k != "applyCurrentCharge"}, today=now_pacific().date())
+                        change = prepare_change(source.settings, {k:v for k,v in body.items() if k not in {"applyCurrentCharge", "applyCurrentPaymentDate"}}, today=now_pacific().date())
                         result = {"state": "done", "success": True, "detail": f"Bill {'stopped' if change.operation == 'delete' else 'saved'} from {change.after.effective_from}."}
                         if body.get("applyCurrentCharge") and checked_review.get("currentChange"):
                             result["currentChange"] = checked_review["currentChange"]
-                        batch = configuration_batch(source, change, request_id, digest, json.dumps(result), today=now_pacific().date())
+                        payment_date = checked_review["currentPaymentDate"]["date"] if checked_review.get("applyCurrentPaymentDate") else None
+                        if payment_date:
+                            result["currentPaymentDate"] = checked_review["currentPaymentDate"]
+                        batch = configuration_batch(source, change, request_id, digest, json.dumps(result),
+                            today=now_pacific().date(), current_payment_date=payment_date)
                         started = True
                         batch.send()
                         batch_committed = True
@@ -550,7 +566,7 @@ class BillCommands:
             for key in list(_CACHE):
                 if key[0] == actor:
                     _CACHE.pop(key)
-        if result.get('success') and body.get('operation') in {'end','end-year','restore-end','restore-end-year','payment-date'}:
+        if result.get('success') and (body.get('applyCurrentPaymentDate') or body.get('operation') in {'end','end-year','restore-end','restore-end-year','payment-date'}):
             from bookiebot.banking.service import clear_schedule_source_cache
             clear_schedule_source_cache(actor)
         return result

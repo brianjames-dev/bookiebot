@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — Include the occurrence date in recurring review on request
+
+A recurring payment day edit starting this month can separately opt into moving the eligible recorded physical charge. Bind the original date and charge version into the accepted review and write the override, rule and receipt atomically. An already-correct rule can still be used to align this month’s charge. A combined amount/split review continues only if the new transaction is the same reviewed source with the exact saved date change.
+
 ## 2026-11-20 — Correct a recorded bill’s withdrawal date at the occurrence
 
 Bills offers a separate current-month review for the payer to correct the date of a physical recorded charge. Persist only the date override on the existing plan/month charge identity. A legacy charge without a record receives metadata tied to its existing worksheet row. Reuse the atomic Sheets receipt and owner lock. The recurring rule, sheet cash, allocation and repayment evidence keep their original identities and values. Calendar and Transactions consume the same effective withdrawal date.

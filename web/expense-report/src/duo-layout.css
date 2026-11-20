@@ -235,9 +235,13 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-reconcile[data-wide=true] .bb-reconcile-chevron { transform:rotate(-90deg); }
 .bb-reconcile-right {
   min-width:0; min-height:0; margin:0 16px calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
-  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+  padding-right:8px; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
   scrollbar-width:thin; scrollbar-color:hsl(var(--border)) transparent;
 }
+.bb-reconcile-inspector-tools { position:sticky; top:0; z-index:5; height:0; pointer-events:none; }
+.bb-reconcile-inspector-tools > button { position:relative; top:3px; pointer-events:auto; }
+.bb-reconcile-right .bb-reconcile-detail-heading { padding-right:43px; }
+.bb-reconcile-right .bb-reconcile-row-details > .bb-report-loading { min-height:44px; padding-right:43px; }
 .bb-reconcile-pane { position:relative; isolation:isolate; }
 .bb-reconcile-pane > [data-review-layer=old] { position:absolute; inset:0 0 auto; pointer-events:none; }
 .bb-reconcile-pane > [data-review-layer=current] { position:relative; }

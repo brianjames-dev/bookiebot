@@ -51,8 +51,9 @@ async function verify(browser, width, height, dark) {
 }
 
 async function verifyWorkspace(browser) {
-  let release
+  let release, releaseFirst
   const held = new Promise(resolve => { release = resolve })
+  const heldFirst = new Promise(resolve => { releaseFirst = resolve })
   const items = Array.from({ length: 22 }, (_, i) => ({ ...row, id: i + 1, merchant: `Fixture charge ${i + 1}` }))
   const { page, errors, unexpected } = await fixture(browser, 867, 669, true, false, false, 0, {
     async request(route) {
@@ -64,8 +65,13 @@ async function verifyWorkspace(browser) {
       }
       if (!path.startsWith('/app/reconciliation/')) return false
       const id = Number(path.split('/').at(-1))
+      if (id === 1) await heldFirst
       if (id === 2) await held
-      await route.fulfill({ json: { item: { ...items[id - 1], suggestions: id === 1 ? [match] : [] } } })
+      await route.fulfill({ json: { item: {
+        ...items[id - 1],
+        suggestions: id === 1 ? [match, { ...match, id: 'alternative', item: 'Backup jacket' }] : [],
+        logging: { allowed: true, kind: 'expense', categories: ['shopping'], paymentMethods: ['Fixture card'], reason: '' },
+      } } })
       return true
     },
   })
@@ -89,13 +95,43 @@ async function verifyWorkspace(browser) {
     const second = queue.filter({ has: page.getByText('Fixture charge 2', { exact: true }) })
     await first.click()
     const pane = page.getByRole('complementary', { name: 'Transaction review' })
+    await pane.getByText('Finding sheet entries…').waitFor({ state: 'attached' })
+    const close = pane.getByRole('button', { name: 'Close review' })
+    const loadingAnchor = await close.boundingBox()
+    const paneBox = await pane.boundingBox()
+    assert(loadingAnchor && Math.abs(loadingAnchor.y - paneBox.y - 3) < 1)
+    releaseFirst()
     await pane.getByText('Rain jacket').waitFor()
+    assert.deepEqual(await close.boundingBox(), loadingAnchor, 'Close stays at the same position while the review loads')
     await page.waitForFunction(() => document.querySelector('.bb-reconcile-pane').getAnimations({ subtree:true }).length === 0)
     const ignore = pane.getByRole('button', { name: 'Ignore transaction' })
     assert.equal(await ignore.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
+    const options = pane.locator('summary[aria-label="Review options"]')
+    await options.click()
+    const menu = pane.locator('.bb-reconcile-menu-content')
+    assert.deepEqual(await menu.locator('button').allTextContents(), ['Choose budget entry', 'Add expense'])
+    assert.equal(await menu.getByText('Backup jacket').count(), 0)
+    await menu.getByRole('button', { name: 'Choose budget entry' }).click()
+    await pane.getByRole('heading', { name: 'Choose budget entry', exact: true }).waitFor()
+    await pane.getByRole('button', { name: /Backup jacket/ }).click()
+    await pane.getByRole('heading', { name: 'Review match' }).waitFor()
+    await options.click()
+    await menu.getByRole('button', { name: 'Add expense', exact: true }).click()
+    await pane.getByRole('heading', { name: 'Add expense', exact: true }).waitFor()
+    assert.equal(await pane.getByRole('heading', { name: /Add / }).count(), 1)
+    const form = pane.locator('form.bb-reconcile-log')
+    assert.equal(await form.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
+    const [overflowX, overflowY, delta] = await pane.evaluate(el => [
+      getComputedStyle(el).overflowX, getComputedStyle(el).overflowY, el.scrollWidth - el.clientWidth,
+    ])
+    assert.equal(overflowX, 'hidden')
+    assert.equal(overflowY, 'auto')
+    assert(delta <= 1, 'No scroll track below the pane')
+    await form.getByRole('button', { name: 'Cancel new entry' }).click()
+    await pane.getByRole('heading', { name: 'Review match' }).waitFor()
     await second.click()
     assert.equal(await pane.getAttribute('aria-busy'), 'true')
-    assert(await pane.getByText('Rain jacket').isVisible(), 'Keep the first editor visible while the second loads')
+    assert(await pane.getByText('Backup jacket').filter({ visible: true }).first().isVisible(), 'Keep the first editor visible while the second loads')
     release()
     await page.waitForFunction(() => {
       const old = document.querySelector('[data-review-layer=old]')
@@ -119,10 +155,26 @@ async function verifyWorkspace(browser) {
         opening?.dataset.open === 'true' && opening.getAnimations().length > 0
     })
     assert.equal(await page.locator('.bb-reconcile-right').count(), 0)
+    await page.setViewportSize({ width: 320, height: 678 })
+    const strip = page.locator('.bb-reconcile-filters')
+    const heading = page.getByRole('heading', { name: 'Reconcile', exact: true })
+    const stripBox = await strip.boundingBox(), headingBox = await heading.boundingBox()
+    assert(stripBox.x >= headingBox.x + headingBox.width)
+    assert(Math.abs(stripBox.y + stripBox.height / 2 - headingBox.y - headingBox.height / 2) < 2)
+    assert(await strip.evaluate(el => el.scrollWidth > el.clientWidth), 'More statuses extend past the clipped edge')
+    await page.mouse.move(stripBox.x + stripBox.width - 10, stripBox.y + stripBox.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(stripBox.x + 10, stripBox.y + stripBox.height / 2, { steps: 8 })
+    await page.mouse.up()
+    await page.waitForFunction(() => document.querySelector('.bb-reconcile-filters').scrollLeft > 15)
+    const checked = strip.getByRole('button', { name: /Checked/ })
+    await checked.click()
+    assert.equal(await checked.getAttribute('aria-pressed'), 'true')
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])
   } finally {
     release()
+    releaseFirst()
     await page.close()
   }
 }

@@ -51,9 +51,14 @@ def test_configuration_review_is_read_only_and_confirm_is_exactly_once(saved):
     assert saved.commands.saved(H, body["requestId"]) is None
 
 
-@pytest.mark.parametrize("name,pull_months,tracked", [("PG&E", (), False), ("Recology", (2, 5, 8, 11), True)])
-def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash(saved, monkeypatch, name, pull_months, tracked):
+@pytest.mark.parametrize("name,pull_months,tracked,via_schedule", [
+    ("PG&E", (), False, False),
+    ("Recology", (2, 5, 8, 11), True, False),
+    ("Recology", (2, 5, 8, 11), True, True),
+])
+def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash(saved, monkeypatch, name, pull_months, tracked, via_schedule):
     from bookiebot.reports import expense_breakdown as report, transactions
+    from bookiebot.reports.reimbursement_overview import cash_calendar, normalize_cash
     from bookiebot.reimbursements import service
     from bookiebot.sheets.recurring_rows import runtime_tables
 
@@ -78,7 +83,8 @@ def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash
                   "item": name, "location": "", "payerPerson": "Brian", "accounting": "cash_v1", "method": "equal",
                   "grossCents": 6023, "payerShareCents": 3012, "partnerShareCents": 3011,
                   "settledCents": 3011, "outstandingCents": 0}
-    event = {"id": "repayment-1", "allocationId": allocation["id"], "status": "confirmed", "date": "2026-11-01", "amountCents": 3011}
+    event = {"id": "repayment-1", "allocationId": allocation["id"], "kind": "cash", "status": "confirmed",
+             "date": "2026-11-01", "amountCents": 3011}
     ledger = {"allocations": [allocation], "events": [event]}
     original_ledger = deepcopy(ledger)
     store = SimpleNamespace(snapshot=lambda *args, **kwargs: ledger)
@@ -98,9 +104,12 @@ def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash
         assert len(rows) == 1
         schedules, _, _ = runtime_tables("brian", transport.rows[BILL_TAB], [], [], transport.rows.get(CHARGES_TAB, []))
         period = report.BudgetMonth(2026, 11)
-        payments = report._payment_items(transport.rows["November"], schedules, period, as_of=TODAY)
-        events = report._bill_calendar_events(payments, [], schedules, period, 13, transport.rows["November"], set())
-        assert len(events) == 1 and events[0].amount == 60.23
+        cash = normalize_cash(owner="brian", period=month, as_of=TODAY, ledger=ledger, shared=[],
+                              personal=transport.rows["November"], schedules=schedules, forecasts=())
+        payments = report._payment_items(cash.personal, schedules, period, as_of=TODAY)
+        cash.basis(payments)
+        events = cash_calendar(report._bill_calendar_events(payments, [], schedules, period, 13, cash.personal, set()), cash)
+        assert len(events) == 1 and events[0].amount == 30.12
         return rows[0], events[0].day
 
     original, original_day = dates()
@@ -113,15 +122,34 @@ def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash
         bills.review(B, {**body, "paymentDate": "2026-12-01"})
     reviewed = bills.review(B, body)
     assert (reviewed["previousDate"], reviewed["date"]) == ("2026-11-12", "2026-11-09")
+    if via_schedule:
+        from unit_tests.sheets.test_recurring import form
+        snapshot = bills.read_workbook(B, TODAY)
+        body = {"operation": "update", "id": bill.id, "version": bill.version, "settingsVersion": snapshot.settings.version,
+                "applyCurrentCharge": False, "bill": form(name=name, type="variable", amount="", pullDay=9,
+                    cadence="quarterly", pullMonths=list(pull_months), splitMethod="equal",
+                    category="bills_utilities", effectiveFrom=month)}
+        recurring_only = bills.review(B, body)
+        assert recurring_only["applyCurrentPaymentDate"] is False
+        assert recurring_only["currentChange"] is None
+        body["applyCurrentPaymentDate"] = True
+        reviewed = bills.review(B, body)
+        assert reviewed["reviewVersion"] != recurring_only["reviewVersion"]
+        assert reviewed["currentPaymentDate"] == {"month": month, "previousDate": "2026-11-12",
+                                                  "date": "2026-11-09", "chargeVersion": current["version"]}
+        assert reviewed["applyCurrentPaymentDate"] is True
     assert not transport.sent
-    unchanged = {t: deepcopy((transport.rows[t], transport.formulas[t])) for t in transport.rows if t != CHARGES_TAB}
+    changed_tables = {CHARGES_TAB, SETTINGS_LOG_TAB, *([BILL_TAB] if via_schedule else [])}
+    unchanged = {t: deepcopy((transport.rows[t], transport.formulas[t]))
+                 for t in transport.rows if t not in changed_tables and (not via_schedule or t == "November")}
     body.update(requestId="recorded-date-request-01", reviewVersion=reviewed["reviewVersion"])
     result = saved.commands.command(B, body)
     assert result["success"], result
     assert saved.commands.command(B, body) == result
     assert len(transport.sent) == 1
-    assert {r["updateCells"]["start"]["sheetId"] for r in transport.sent[0]["requests"] if "updateCells" in r} == {
-        transport.properties[t]["sheetId"] for t in (CHARGES_TAB, SETTINGS_LOG_TAB)}
+    written_tables = {r["updateCells"]["start"]["sheetId"] for r in transport.sent[0]["requests"] if "updateCells" in r}
+    assert {transport.properties[t]["sheetId"] for t in changed_tables} <= written_tables
+    assert via_schedule or written_tables == {transport.properties[t]["sheetId"] for t in changed_tables}
     assert all((transport.rows[t], transport.formulas[t]) == value for t, value in unchanged.items())
     moved, day = dates()
     assert (moved["date"], day) == ("2026-11-09", 9)
@@ -130,8 +158,14 @@ def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash
     assert ledger == original_ledger
     updated, = decode_charges(transport.rows[CHARGES_TAB])
     assert updated.payment_date == "2026-11-09"
-    if tracked:
+    if tracked and not via_schedule:
         assert updated == replace(charge, payment_date="2026-11-09")
+    if via_schedule:
+        assert updated.charge_date == charge.charge_date
+        assert updated.initial_amount_cents == charge.initial_amount_cents
+        assert updated.anchor == charge.anchor
+        assert result["currentPaymentDate"] == reviewed["currentPaymentDate"]
+        return
     with pytest.raises(BillConflict, match="bill charge changed"):
         bills.review(B, {**body, "paymentDate": "2026-11-08"})
 

@@ -186,6 +186,9 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   // retaining the selected alternative rather than switching back to the primary.
   await run(() => controller.load()); await respond(snapshot())
   await expand('New posted'); await respond(detail(rows[6], [suggestion({ amountCents: 1800, amountMismatch: true, confirmable: false }), suggestion({ id: 'expense-b', item: 'Alternative dinner', amountCents: 1700, amountMismatch: true, confirmable: false })]))
+  assert.doesNotMatch(rendered(), /Alternative dinner/, 'Candidate records belong to the separate chooser')
+  await click('Choose budget entry')
+  assert.match(rendered(), /Choose budget entry.*Alternative dinner/)
   await click('Alternative dinner$17.00Logged expense · Sep 9Sheet $17.00 → Bank $15.99 · Choose this entry')
   await click('Review amount change')
   assert.deepEqual(body(), { operation: 'prepare', id: -7, version: 'detail-version--7', reviewIntent: 'amount', suggestionId: 'expense-b' })
