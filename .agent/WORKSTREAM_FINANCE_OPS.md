@@ -858,6 +858,8 @@ Status: Complete in code and automated verification as of 2026-08-11; production
 
 ## Bank Reconciliation - Implementation Slices
 
+2026-11-20: Implemented the approved review queue, the Transactions scroll lane and inline animation, and the retained right-side details transition. Bank and budget details keep the existing explicit confirmation and stale-state checks. Grouping uses loaded previews without fetching every row. Also added the date-only correction for physical utility occurrences, preserving original budget and reimbursement records while updating Calendar and Transactions.
+
 ### Slice 1 - Inbox Freshness And Stale Handling
 
 - Add owner-level default freshness policy, likely `BOOKIEBOT_RECONCILIATION_MAX_AGE_DAYS`.

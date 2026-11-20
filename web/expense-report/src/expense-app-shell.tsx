@@ -68,6 +68,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const configurationOpen=billsOpen||transfersOpen
   const settingsTitle=transfersOpen?"Transfers":billsOpen?"Bills":widgetGuideOpen?"Widget setup":"Settings"
   const [savingsHeaderActions,setSavingsHeaderActions]=useState<HTMLDivElement|null>(null)
+  const [reconcileHeaderActions,setReconcileHeaderActions]=useState<HTMLDivElement|null>(null)
   const [billAmountRequest,setBillAmountRequest]=useState<BillAmountRequest|null>(null)
   const consumeBillAmount=useCallback(()=>setBillAmountRequest(null),[])
   const [askOpen, setAskOpen] = useState(false)
@@ -226,7 +227,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const reportVisible = screen === "overview"
   const transactionsUpdatedAt = transactionsUpdated?.owner === owner ? transactionsUpdated.time : null
   const pageUpdatedAt = screen === "savings" ? savingsUpdated?.owner===owner?savingsUpdated.time:null : screen === "shared" ? sharedUpdated?.owner === owner ? sharedUpdated.time : null : transactionsUpdatedAt
-  const brandStatus = screen === "transactions" || screen === "shared" || screen === "savings" ? <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
+  const brandStatus = screen === "reconcile" ? (reconciliation.snapshot?.checkedAt
+    ? <AppUpdatedTime updatedAt={Date.parse(reconciliation.snapshot.checkedAt)} /> : <span>Bank review</span>) : screen === "transactions" || screen === "shared" || screen === "savings" ? <div className="bb-app-status" role="status" aria-live="polite" aria-atomic="true">
     {pageUpdatedAt === null ? <span>Not updated yet</span> : <AppUpdatedTime updatedAt={pageUpdatedAt} />}
   </div> : controls
   const fallback = report && <SharedReimbursementsCard hideTitle items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
@@ -249,7 +251,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
           if(configurationOpen){widgetGuideRef.current=false;setBillsOpen(false);setTransfersOpen(false)}
           else if(widgetGuideOpen)selectScreen('settings')
           else selectScreen(lastMain)
-        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions" && screen !== "shared" && screen !== "savings"}
+        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1></div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions" && screen !== "shared" && screen !== "savings" && screen !== "reconcile"}
           onChat={() => setAskOpen(true)} chatRef={askTriggerRef} chatOpen={askOpen && monthlyReady} chatDisabled={!report || !monthlyReady} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)} avatarUrl={avatarUrl} showPortrait={screen === 'settings'}
@@ -264,7 +266,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       <ReportHeader month={screen==='overview'||screen==='transactions'?monthControl:screen==='shared'?'Reimbursements':screenTitles[screen]} projected={preferences.mode === "projected"}
         onToggle={() => preferences.setMode(preferences.mode === "projected" ? "current" : "projected")}
         disabled={!report} hidden={screen==='settings'} showViewControl={reportVisible}
-        controls={<><div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} /><div className="sr-header-actions" ref={setSharedHeaderActions} hidden={screen !== "shared"}/><div className="sw-header-actions" ref={setSavingsHeaderActions} hidden={screen !== "savings"}/></>} />
+        controls={<><div className="bb-transactions-title-actions" ref={setTransactionsHeaderActions} hidden={screen !== "transactions"} /><div className="sr-header-actions" ref={setSharedHeaderActions} hidden={screen !== "shared"}/><div className="sw-header-actions" ref={setSavingsHeaderActions} hidden={screen !== "savings"}/><div className="bb-reconcile-title-actions" ref={setReconcileHeaderActions} hidden={screen !== "reconcile"}/></>} />
       <div className="bb-shell-report" hidden={!reportVisible || !monthlyReady}>
         {report && <ExpenseReportApp key={reportIdentity} report={report} externalHeader
           appComparison={comparison} appSession={{ signOut, signingOut }} />}
@@ -282,7 +284,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <SavingsWorkspace key={report.ownerName} report={report} ready={monthlyReady} active={screen==='savings'} headerActions={savingsHeaderActions} onUpdated={onSavingsUpdated} onTransfers={()=>{selectScreen('settings');setTransfersOpen(true)}}/>}
       </main>
       <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>
-        {report && <ReconciliationScreen controller={reconciliation} embeddedHeader />}
+        {report && <ReconciliationScreen controller={reconciliation} embeddedHeader wide={duo.landscape && screen==="reconcile"} headerActions={reconcileHeaderActions} aliases={report.calendarLogoAliases}/>}
       </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen || configurationOpen}>
         {report && <>

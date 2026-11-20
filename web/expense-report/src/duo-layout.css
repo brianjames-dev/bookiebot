@@ -212,3 +212,32 @@ body:has(.bb-app-shell[data-duo-overview="true"]) { overscroll-behavior: none; }
 .bb-app-shell[data-duo-enabled="true"] .bb-metric-label { min-height: 44px; align-items: flex-end; line-height: 20px; }
 .bb-app-shell[data-duo-enabled="true"] .bb-metric-explain { min-height: 44px; align-items: flex-end; padding-bottom: 0; line-height: 20px; }
 .bb-app-shell[data-duo-enabled="true"] .bb-metric-value { margin-top: 0; }
+
+/* Reconcile uses Transactions' physical left scroll lane and right pane. */
+.bb-page[data-duo-landscape=true][data-screen=reconcile] {
+  display:grid; grid-template-rows:var(--bb-duo-masthead) minmax(0,1fr);
+  height:100dvh; min-height:0; overflow:clip; padding:0 var(--bb-duo-overlay) 16px 0;
+}
+.bb-page[data-duo-landscape=true][data-screen=reconcile] > :is(.bb-shell-masthead,.bb-pull-refresh-space) { grid-column:1; grid-row:1; }
+.bb-page[data-duo-landscape=true][data-screen=reconcile] > .bb-report-header { grid-column:1; grid-row:2; align-self:start; z-index:4; }
+.bb-page[data-duo-landscape=true][data-screen=reconcile] > .bb-shell-reconcile {
+  grid-area:2/1; width:100%; max-width:none; min-width:0; min-height:0; margin:0; padding:0;
+  grid-template-rows:minmax(0,1fr);
+}
+.bb-reconcile[data-wide=true] {
+  display:grid; grid-template-rows:minmax(0,1fr);
+  grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);
+}
+.bb-reconcile[data-wide=true] .bb-reconcile-left {
+  margin-top:var(--bb-duo-heading);
+}
+.bb-reconcile[data-wide=true] .bb-reconcile-row[data-open=true] .bb-reconcile-row-toggle { background:hsl(var(--primary) / .08); }
+.bb-reconcile[data-wide=true] .bb-reconcile-chevron { transform:rotate(-90deg); }
+.bb-reconcile-right {
+  min-width:0; min-height:0; margin:0 16px calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
+  overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain;
+  scrollbar-width:thin; scrollbar-color:hsl(var(--border)) transparent;
+}
+.bb-reconcile-pane { position:relative; isolation:isolate; }
+.bb-reconcile-pane > [data-review-layer=old] { position:absolute; inset:0 0 auto; pointer-events:none; }
+.bb-reconcile-pane > [data-review-layer=current] { position:relative; }

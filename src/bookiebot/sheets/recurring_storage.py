@@ -107,8 +107,10 @@ class WorkbookSnapshot:
         value = cell(self.rows[title], row or 0, column)
         due = self.settled_dates.get((month, bill_label_key(label))) or plan.due_date(month)
         when = due.isoformat() if due else None
-        if charge and charge.plan_snapshot:
-            when = charge.payment_date or charge.charge_date
+        if charge and charge.payment_date:
+            when = charge.payment_date
+        elif charge and charge.plan_snapshot:
+            when = charge.charge_date
         elif charge and plan.kind != "variable":
             when = charge.charge_date
         recorded = bool(charge and charge.recorded) or (plan.id, month) in self.recorded_plans
@@ -122,10 +124,15 @@ class WorkbookSnapshot:
             gross = plan.amount_cents
         elif len(related) == 1 and related[0]['payerOwner'] == self.owner:
             gross = related[0].get('grossCents')
+        payer = self.responsible_owner(plan, month) == self.owner
+        as_of = self.as_of or now_pacific().date()
+        can_date = (month == self.settings.period and plan.active and payer and plan.id not in self.delegated_payers and row is not None
+                    and (recorded or amount > 0 and (not cell(self.formulas[title], row, column).startswith("=")
+                         or when is not None and when <= as_of.isoformat())))
         return {"available": True, "month": month, "row": row, "amountColumn": column,
                 "amountCents": amount, "billAmountCents": gross, "date": when,
-                "status": "paid" if known and when and when <= (self.as_of or now_pacific().date()).isoformat() else "confirmed" if known else "unconfirmed",
-                "paymentPolicy": "autopay", "canConfirmAmount": self.responsible_owner(plan, month) == self.owner,
+                "status": "paid" if known and when and when <= as_of.isoformat() else "confirmed" if known else "unconfirmed",
+                "paymentPolicy": "autopay", "canConfirmAmount": payer, "canEditPaymentDate": can_date,
                 "splitPending": bool(charge and charge.recorded and charge.payer_owner == self.owner and plan.split_method != "none" and not related),
                 "recorded": recorded, "sourceLabel": label,
                 "virtual": charge.virtual if charge else not plan.monthly_source,

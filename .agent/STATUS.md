@@ -1,5 +1,11 @@
 # Agent Status
 
+## Reconcile review queue and recorded bill payment dates (2026-11-20)
+
+Implement the approved review queue with swipeable status pills, merchant icons and side-by-side Bank charge and Budget entry cards. Closed DUO uses the Transactions inline expansion and editor slides. Open DUO keeps the list independently scrollable with the exact Transactions scrollbar rule and gives the right pane a retained crossfade between ready details. The red Ignore icon opens a separate confirmation. Suggestions still load on demand. The queue picks up verified groups at the next filter or refresh so an arriving preview cannot move an open row.
+
+Bills now offers **Edit payment date** on an eligible recorded current-month charge. The reviewed correction updates only its existing occurrence metadata and leaves the recurring schedule, cash cells, split ledger and repayment events intact. Fixture coverage exercises legacy monthly PG&E and tracked quarterly Recology, verifies one moved Calendar event and one Transactions row, and checks stale/repeated saves. Local Python suite: 3,557 passed and 914 optional PostgreSQL cases skipped. Python and frontend types and the built assets pass. Chromium and WebKit verify scrollbar parity, retained row switching, parallel inline motion and saving spinners. Release checks belong to the task PR.
+
 ## Flat options menus (2026-11-20)
 
 Remove the external shadow from the Savings and Reimbursements options menu and the Transactions month picker. The picker keeps a visible border after removing Konsta's glass shadow. Six Chromium/WebKit cases cover the three menus across closed/open DUO and light/dark themes. The focused month-picker, Savings workspace and Reconcile UI contracts, frontend types, and production build pass. On a phone, open the Transactions title picker and the ellipsis menus in Savings and Reimbursements to check their borders and surfaces. The combined Reconcile layout is a separate review draft.
@@ -563,6 +569,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of Reconcile and bill dates. Swipe the status pills and switch between two rows in open DUO while scrolling the left list. Fold and repeat the switch to check parallel inline expansion and collapse. Use a legitimate date correction in Settings → Bills → This month’s bill → Edit payment date → Review → Confirm. Verify the same charge on the corrected day in Calendar and Transactions, and check its existing split and Shared repayment.
 
 First: native acceptance of the Savings editor visibility repair in both DUO modes. Switch goals while editing, cancel End goal after Review and open/back out of the institution picker. Only the current screen should be visible after each slide. The signed-in Current/Projected and lifetime payroll checks are complete. On the next payday, use the actual withholding on the existing paycheck row. See docs/SAVINGS.md.
 

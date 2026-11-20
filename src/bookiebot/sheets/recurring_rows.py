@@ -232,7 +232,7 @@ def runtime_tables(owner: str, bill_rows: list[list[str]], subscription_schedule
                     remaining.append(replace(part, effective_from=end))
             portions = remaining
             recorded = occurrence_plan(charge, view)
-            day = (date.fromisoformat(charge.payment_date or charge.charge_date).day if charge.plan_snapshot
+            day = (date.fromisoformat(charge.payment_date or charge.charge_date).day if charge.plan_snapshot or charge.payment_date
                    else plan.pull_day if plan.kind == "variable" else date.fromisoformat(charge.charge_date).day)
             occurrence = replace(recorded, source_tab=SUBSCRIPTION_TAB if charge.virtual else BILL_TAB,
                 source_range=view.source_range, monthly_source=not charge.virtual,

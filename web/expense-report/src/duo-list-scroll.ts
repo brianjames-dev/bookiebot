@@ -4,6 +4,7 @@ const lists:Record<string,{container:string;rows:string}>={
  transactions:{container:'.bb-recorded-results',rows:'.bb-daily-day-group'},
  shared:{container:'.sr-list',rows:'.sr-row-group'},
  savings:{container:'.sw-root .sg-left',rows:'.sg-goal-item,.ss-parent-item'},
+ reconcile:{container:'.bb-reconcile-left',rows:'.bb-reconcile-row'},
 }
 type View={anchor:HTMLElement|null;offset:number;y:number;wide:boolean}
 

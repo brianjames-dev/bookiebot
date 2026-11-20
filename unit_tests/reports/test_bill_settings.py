@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime
 from types import SimpleNamespace
@@ -7,7 +8,8 @@ import pytest
 
 from bookiebot.reports import bill_settings as bills
 from bookiebot.sheets import recurring_storage as storage
-from bookiebot.sheets.recurring import BillConflict, BILL_TAB, SUBSCRIPTION_TAB
+from bookiebot.sheets.recurring import BillConflict, BillValidation, BILL_TAB, SETTINGS_LOG_TAB, SUBSCRIPTION_TAB
+from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, encode_charges, source_anchor
 from bookiebot.sheets.recurring_rows import encode
 from unit_tests.sheets.test_recurring_storage import fixture, TODAY, B, update
 from unit_tests.sheets.test_recurring import plan
@@ -47,6 +49,91 @@ def test_configuration_review_is_read_only_and_confirm_is_exactly_once(saved):
     with pytest.raises(BillConflict, match="different bill details"):
         saved.commands.command(B, {**body, "operation": "delete"})
     assert saved.commands.saved(H, body["requestId"]) is None
+
+
+@pytest.mark.parametrize("name,pull_months,tracked", [("PG&E", (), False), ("Recology", (2, 5, 8, 11), True)])
+def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash(saved, monkeypatch, name, pull_months, tracked):
+    from bookiebot.reports import expense_breakdown as report, transactions
+    from bookiebot.reimbursements import service
+    from bookiebot.sheets.recurring_rows import runtime_tables
+
+    month = "2026-11"
+    bill = replace(saved.loan, name=name, source_label=name, kind="variable", source_tab=BILL_TAB,
+                   category="bills_utilities", amount_cents=None, split_method="equal",
+                   cadence="quarterly" if pull_months else "monthly", pull_months=pull_months)
+    client, _ = fixture([bill])
+    transport = client.http_client
+    for data in (transport.rows, transport.formulas):
+        data["November"][0][2] = "60.23"
+    charge = BillCharge(bill.id, month, "2026-11-01", name, bill.category, transport.properties["November"]["sheetId"],
+                        1, 3, source_anchor(bill.id, month), 6023, True, payer_owner="brian", payment_date="2026-11-12")
+    if tracked:
+        transport.properties[CHARGES_TAB] = {"title": CHARGES_TAB, "sheetId": 50, "gridProperties": {"rowCount": 1000, "columnCount": 32}}
+        for data in (transport.rows, transport.formulas):
+            data[CHARGES_TAB] = encode_charges([charge], [])
+    allocation = {"id": "allocation-1", "version": 3, "projectedVersion": 3, "payerOwner": "brian", "partnerOwner": "hannah",
+                  "sourceYear": 2026, "sourceWorksheet": "income", "sourceSheetTitle": "November", "sourceActionId": "bill-source",
+                  "sourceRow": 1, "sourceColumnMap": {"amount": 3}, "sourceValues": {"item": name, "date": "2026-11-01"},
+                  "expenseDate": "2026-11-01", "billPlanId": bill.id, "category": name,
+                  "item": name, "location": "", "payerPerson": "Brian", "accounting": "cash_v1", "method": "equal",
+                  "grossCents": 6023, "payerShareCents": 3012, "partnerShareCents": 3011,
+                  "settledCents": 3011, "outstandingCents": 0}
+    event = {"id": "repayment-1", "allocationId": allocation["id"], "status": "confirmed", "date": "2026-11-01", "amountCents": 3011}
+    ledger = {"allocations": [allocation], "events": [event]}
+    original_ledger = deepcopy(ledger)
+    store = SimpleNamespace(snapshot=lambda *args, **kwargs: ledger)
+    monkeypatch.setattr(service, "enabled", lambda: True)
+    monkeypatch.setattr(service, "build_reimbursement_store", lambda: store)
+    monkeypatch.setattr(bills, "read_workbook", lambda actor, today: storage.read_workbook(actor, today, client=client))
+    monkeypatch.setattr(transactions, "now_pacific", lambda: datetime(2026, 11, 13, 12))
+    monkeypatch.setattr(transactions, "get_gspread_client", lambda: client)
+    monkeypatch.setattr(transactions, "get_shared_expenses_spreadsheet_id", lambda year: "shared")
+    monkeypatch.setattr(transactions, "get_budget_spreadsheet_id_for_user", lambda actor, year: "personal")
+    monkeypatch.setattr(transactions, "receipt_addresses", lambda *args: {})
+    monkeypatch.setattr(transactions, "read_workbook_tabs",
+                        lambda _, book, titles: {"November": []} if book == "shared" else {t: transport.rows[t] for t in titles if t in transport.rows})
+
+    def dates():
+        rows = transactions.load_transactions(B, month, fresh=True)
+        assert len(rows) == 1
+        schedules, _, _ = runtime_tables("brian", transport.rows[BILL_TAB], [], [], transport.rows.get(CHARGES_TAB, []))
+        period = report.BudgetMonth(2026, 11)
+        payments = report._payment_items(transport.rows["November"], schedules, period, as_of=TODAY)
+        events = report._bill_calendar_events(payments, [], schedules, period, 13, transport.rows["November"], set())
+        assert len(events) == 1 and events[0].amount == 60.23
+        return rows[0], events[0].day
+
+    original, original_day = dates()
+    assert (original["date"], original_day) == ("2026-11-12", 12)
+    current = bills.read_workbook(B, TODAY).charge(bill, month)
+    assert current["canEditPaymentDate"]
+    body = {"operation": "payment-date", "id": bill.id, "month": month, "paymentDate": "2026-11-09",
+            "chargeVersion": current["version"]}
+    with pytest.raises(BillValidation, match="within this month"):
+        bills.review(B, {**body, "paymentDate": "2026-12-01"})
+    reviewed = bills.review(B, body)
+    assert (reviewed["previousDate"], reviewed["date"]) == ("2026-11-12", "2026-11-09")
+    assert not transport.sent
+    unchanged = {t: deepcopy((transport.rows[t], transport.formulas[t])) for t in transport.rows if t != CHARGES_TAB}
+    body.update(requestId="recorded-date-request-01", reviewVersion=reviewed["reviewVersion"])
+    result = saved.commands.command(B, body)
+    assert result["success"], result
+    assert saved.commands.command(B, body) == result
+    assert len(transport.sent) == 1
+    assert {r["updateCells"]["start"]["sheetId"] for r in transport.sent[0]["requests"] if "updateCells" in r} == {
+        transport.properties[t]["sheetId"] for t in (CHARGES_TAB, SETTINGS_LOG_TAB)}
+    assert all((transport.rows[t], transport.formulas[t]) == value for t, value in unchanged.items())
+    moved, day = dates()
+    assert (moved["date"], day) == ("2026-11-09", 9)
+    for field in ("id", "amountCents", "displayAmountCents", "split", "repayment"):
+        assert moved[field] == original[field]
+    assert ledger == original_ledger
+    updated, = decode_charges(transport.rows[CHARGES_TAB])
+    assert updated.payment_date == "2026-11-09"
+    if tracked:
+        assert updated == replace(charge, payment_date="2026-11-09")
+    with pytest.raises(BillConflict, match="bill charge changed"):
+        bills.review(B, {**body, "paymentDate": "2026-11-08"})
 
 
 def test_current_charge_inspection_exposes_only_the_canonical_public_row(saved, monkeypatch):
