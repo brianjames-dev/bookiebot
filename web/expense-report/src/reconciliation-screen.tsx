@@ -1,7 +1,7 @@
 import { ReportLoading, SavingButton } from "./report-loading"
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { Check, ChevronDown, Ellipsis, EyeOff, RefreshCw, X } from "lucide-react"
+import { Check, ChevronDown, Ellipsis, EyeOff, ListChecks, Plus, RefreshCw, X } from "lucide-react"
 import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import { ReimbursementLedger } from "./reimbursement-ledger"
@@ -10,6 +10,19 @@ import { EditorExpansion, EditorScenes } from "./transaction-editor-workspace"
 import "./reconciliation-screen.css"
 
 type ReviewStatus = "needs_review" | "pending" | "checked" | "ignored"
+
+function updatePillEdges(strip: HTMLDivElement) {
+  strip.dataset.earlier = String(strip.scrollLeft > 1)
+  strip.dataset.more = String(strip.scrollWidth - strip.clientWidth - strip.scrollLeft > 1)
+}
+
+function revealPill(strip: HTMLDivElement, button: HTMLElement | null) {
+  if (!button || !strip.clientWidth) return
+  const bounds = strip.getBoundingClientRect(), target = button.getBoundingClientRect()
+  if (target.left < bounds.left) strip.scrollLeft += target.left - bounds.left - 9
+  if (target.right > bounds.right - 13) strip.scrollLeft += target.right - bounds.right + 13
+  updatePillEdges(strip)
+}
 interface ReceiptLink { allocationId: string; partner: string; bankAmountCents: number; outstandingCents: number }
 interface SharedAmountPlan {
   token: string; allocationId: string; allocationVersion: number; reviewId: number; method: "income" | "equal" | "fronted" | "custom"
@@ -267,16 +280,36 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
     disabled: busy || Boolean(receiptTarget),
   })
   const pillStrip = useRef<HTMLDivElement>(null)
+  const pillDrag = useRef<{ x: number; left: number; moved: boolean } | null>(null)
   useLayoutEffect(() => {
     const strip = pillStrip.current
-    if (!strip?.clientWidth) return
-    const pill = strip.querySelector<HTMLButtonElement>('[aria-pressed=true]')
-    if (!pill) return
-    const bounds = strip.getBoundingClientRect(), target = pill.getBoundingClientRect()
-    if (target.left < bounds.left) strip.scrollLeft += target.left - bounds.left
-    if (target.right > bounds.right) strip.scrollLeft += target.right - bounds.right
+    if (!strip) return
+    revealPill(strip, strip.querySelector('[aria-pressed=true]'))
+    updatePillEdges(strip)
+    const observer = new ResizeObserver(() => updatePillEdges(strip))
+    observer.observe(strip)
+    return () => observer.disconnect()
   }, [filter, wide, headerActions, snapshot?.enabled])
-  const filters = snapshot?.enabled && <div ref={pillStrip} className="bb-reconcile-filters" role="group" aria-label="Transaction status">
+  const filters = snapshot?.enabled && <div ref={pillStrip} className="bb-reconcile-filters" role="group" aria-label="Transaction status"
+    onScroll={event => updatePillEdges(event.currentTarget)}
+    onFocus={event => { if (event.target.matches(":focus-visible")) revealPill(event.currentTarget, event.target) }}
+    onPointerDown={event => {
+      pillDrag.current = event.pointerType === "mouse" && event.button === 0
+        ? { x: event.clientX, left: event.currentTarget.scrollLeft, moved: false } : null
+    }}
+    onPointerMove={event => {
+      const drag = pillDrag.current, strip = event.currentTarget
+      if (!drag || !event.buttons || strip.scrollWidth <= strip.clientWidth) return
+      const delta = event.clientX - drag.x
+      if (!drag.moved && Math.abs(delta) < 5) return
+      if (!drag.moved) strip.setPointerCapture(event.pointerId)
+      drag.moved = true
+      strip.scrollLeft = drag.left - delta
+    }}
+    onClickCapture={event => {
+      if (event.detail && pillDrag.current?.moved) { event.preventDefault(); event.stopPropagation() }
+      pillDrag.current = null
+    }}>
     {(Object.keys(filterLabels) as Filter[]).map(value => <button type="button" key={value} disabled={reviewing} aria-pressed={filter === value} onClick={() => { setFilter(value); setOpenId(null) }}>
       <span>{filterLabels[value]}<small>{rows.filter(item => value === "checked" ? ["checked", "ignored"].includes(item.status) : item.status === value).length}</small></span></button>)}
   </div>
@@ -285,7 +318,7 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
     disabled={!snapshot?.enabled || busy || Boolean(receiptTarget)} onClick={() => void load(needsRefresh ? undefined : { operation: "check" })}>
     <RefreshCw className={busy&&!pendingReview?"sr-refresh-spinning":undefined} size={17} aria-hidden="true" />{!wide && (busy ? "Checking…" : needsRefresh ? "Check status" : "Check")}</button>
   const toolbar = <>{filters}{check}</>
-  const reviewContent = (item: ReconciliationItem, active: boolean, close?: () => void) => {
+  const reviewContent = (item: ReconciliationItem, active: boolean) => {
     const detail = details[item.id], pending = pendingReview?.id === item.id ? pendingReview : null
     const failure = active && detailFailedId === item.id ? detailError : ""
     const loading = active && !failure && !detail
@@ -300,11 +333,10 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
         {detail.scheduleRecovery && <SavingButton type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={disabled} saving={pending?.operation === "recover_schedule"}
           onClick={() => void load({ operation: "recover_schedule", id: detail.id, version: detail.stateVersion ?? detail.version })}>Verify saved payment change</SavingButton>}
         {detail.readOnly && <p className="bb-reconcile-muted">{detail.scheduleRecovery ? "A sheet change may have finished. Verify the saved amounts without writing them again." : "Finish this transaction in BookieBot before checking again."}</p>}
-        <ReviewChoices key={detail.version} item={detail} active={active} close={close} aliases={aliases} initialReview={snapshot?.preparedReview?.id === detail.id ? snapshot.preparedReview : undefined} disabled={disabled} pending={pending} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
+        <ReviewChoices key={detail.version} item={detail} active={active} aliases={aliases} initialReview={snapshot?.preparedReview?.id === detail.id ? snapshot.preparedReview : undefined} disabled={disabled} pending={pending} onCommand={command => void load(command)} onRejectAccess={rejectAccess} onRefresh={() => { setDetails({}); setDetailRetry(value => value + 1) }} />
         {!detail.readOnly && ["checked", "ignored"].includes(detail.status) && <SavingButton type="button" className="bb-reconcile-action bb-reconcile-secondary" disabled={disabled}
           saving={pending?.operation === "reopen"} onClick={() => void load({operation:"reopen",id:detail.id,version:detail.stateVersion??detail.version})}>Reopen review</SavingButton>}
       </>}
-      {!detail && close && <button className="bb-reconcile-dismiss" type="button" aria-label="Close review" onClick={close}><X size={16} aria-hidden="true"/></button>}
     </div>
   }
   const groups = new Map<string, ReconciliationItem[]>()
@@ -345,13 +377,14 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
     <div className="bb-reconcile-list">{list}</div>
     </div>
     {wide && <RightReview item={openRow} ready={!openRow || Boolean(details[openRow.id]) || detailFailedId===openRow.id}
-      render={(item,active)=>reviewContent(item,active,()=>{if(!reviewing)setOpenId(null)})}/>}
+      render={reviewContent} close={() => setOpenId(null)} locked={reviewing}/>}
   </section>
 }
 const recommendedFor = (item: ReconciliationItem) => item.suggestions.find((_, index) => index === 0 && (item.suggestions[0].confidence ?? 1) >= .72)
 
-function RightReview({ item, ready, render }: {
+function RightReview({ item, ready, render, close, locked }: {
   item?: ReconciliationItem; ready: boolean; render: (item: ReconciliationItem, active: boolean) => ReactNode
+  close: () => void; locked: boolean
 }) {
   const [shown, setShown] = useState<ReconciliationItem>()
   const [previous, setPrevious] = useState<ReconciliationItem>()
@@ -388,6 +421,9 @@ function RightReview({ item, ready, render }: {
   }, [shown?.id])
   const pending = Boolean(item && item.id !== shown?.id)
   return <aside className="bb-reconcile-right" aria-label="Transaction review" aria-busy={pending || undefined}>
+    {item && <div className="bb-reconcile-inspector-tools">
+      <button className="bb-reconcile-dismiss" type="button" disabled={locked} aria-label="Close review" onClick={close}><X size={16} aria-hidden="true"/></button>
+    </div>}
     <div ref={pane} className="bb-reconcile-pane">
       {previous && <div key={previous.id} data-review-layer="old" inert aria-hidden="true">{render(previous,false)}</div>}
       {shown ? <div key={shown.id} data-review-layer="current" inert={pending} aria-hidden={pending || undefined}>{render(shown,!pending && shown.id===item?.id)}</div>
@@ -416,7 +452,7 @@ function ReconcileIcon({title,category="",aliases}: {title:string;category?:stri
   return <TransactionIcon entry={{item:title,location:title,category,amount:0,date:"",person:""}} aliases={aliases}/>
 }
 
-function ReviewChoices({ item, initialReview, disabled, pending, active, close, aliases, onCommand, onRefresh, onRejectAccess }: { item: ReconciliationItem; initialReview?: PreparedReview; disabled: boolean; pending: ReviewCommand | null; active:boolean; close?:()=>void; aliases?:Record<string,string>; onCommand: (command: Command) => void; onRefresh: () => void; onRejectAccess: (message: string) => void }) {
+function ReviewChoices({ item, initialReview, disabled, pending, active, aliases, onCommand, onRefresh, onRejectAccess }: { item: ReconciliationItem; initialReview?: PreparedReview; disabled: boolean; pending: ReviewCommand | null; active:boolean; aliases?:Record<string,string>; onCommand: (command: Command) => void; onRefresh: () => void; onRejectAccess: (message: string) => void }) {
   const recommended = recommendedFor(item)
   const initialSelection = initialReview?.suggestionId
     ? item.suggestions.find(s => s.id === initialReview.suggestionId)?.id ?? "" : recommended?.id ?? ""
@@ -424,11 +460,12 @@ function ReviewChoices({ item, initialReview, disabled, pending, active, close, 
   const [reviewAmount, setReviewAmount] = useState(initialReview?.intent === "amount" && Boolean(initialSelection))
   const [logging, setLogging] = useState<"" | "edit" | "review">(initialReview?.intent === "log" ? "edit" : "")
   const [ignoring, setIgnoring] = useState(false)
+  const [choosing, setChoosing] = useState(false)
   const menu = useRef<HTMLDetailsElement>(null)
   const [fields, setFields] = useState<Record<string, string>>((): Record<string, string> => item.amountCents < 0
     ? { source: item.merchant, label: "" }
     : { category: "", item: item.merchant, location: item.merchant, person: item.logging?.paymentMethods.length === 1 ? item.logging.paymentMethods[0] : "" })
-  const discardDraft = useCallback(() => { setLogging(""); setReviewAmount(false); setIgnoring(false) }, [])
+  const discardDraft = useCallback(() => { setLogging(""); setReviewAmount(false); setIgnoring(false); setChoosing(false) }, [])
   useAppWorkStatus({ label: "Bank entry review", dirty: active && Boolean(logging || reviewAmount || ignoring), onDiscard: discardDraft })
   useEffect(() => {
     const dismiss = (event: Event) => {
@@ -448,33 +485,35 @@ function ReviewChoices({ item, initialReview, disabled, pending, active, close, 
     else if (intent === "amount") setReviewAmount(true)
     else { setLogging("edit"); setReviewAmount(false) }
   }
-  const choose = (suggestion: Suggestion) => { setSelectedId(suggestion.id); setReviewAmount(false); setLogging(""); if(menu.current)menu.current.open=false }
-  const card = (suggestion: Suggestion) => <div key={suggestion.id} className="bb-reconcile-suggestion" data-selected={selectedId === suggestion.id}>
-    {suggestion.id === recommended?.id && <p className="bb-reconcile-eyebrow">Suggested match</p>}
-    <button type="button" className="bb-reconcile-choice" aria-pressed={selectedId === suggestion.id} disabled={disabled} onClick={() => choose(suggestion)}>
+  const card = (suggestion: Suggestion) => <button type="button" key={suggestion.id} className="bb-reconcile-choice" aria-pressed={selectedId === suggestion.id} disabled={disabled} onClick={() => { setSelectedId(suggestion.id); setChoosing(false) }}>
       <span className="bb-reconcile-suggestion-title"><strong>{suggestion.item}</strong><span>{money(suggestion.amountCents)}</span></span>
       <span className="bb-reconcile-muted">{suggestion.kind === "schedule" ? suggestion.recorded ? "Scheduled payment" : "Scheduled · not recorded in sheet" : item.amountCents < 0 ? "Logged income" : suggestion.category === "Payment" ? "Logged bill payment · full amount" : "Logged expense"} · {dateLabel(suggestion.date)}</span>
       <span className="bb-reconcile-muted">{suggestion.amountCents === Math.abs(item.amountCents) ? "Amount matches bank" : `Sheet ${money(suggestion.amountCents)} → Bank ${money(item.amountCents)}`}{selectedId === suggestion.id ? " · Selected" : " · Choose this entry"}</span>
-    </button>
-  </div>
-  const others = item.suggestions.filter(entry => entry.id !== selectedId)
+  </button>
   const send = (operation: "confirm" | "update_match") => onCommand({ operation, id: item.id, version: item.version, suggestionId: selectedId,
     ...(operation === "update_match" && shared && !("blocked" in shared) ? { sharedAmountToken: shared.token } : {}) })
   const readyToLog = item.amountCents < 0 ? Boolean(fields.source.trim()) : Boolean(fields.category && fields.item.trim() && fields.person)
-  const detail = !logging && !reviewAmount && !ignoring
-  const entryAction = <SavingButton type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={disabled} saving={pending?.operation === "prepare" && pending.reviewIntent === "log"} onClick={() => {if(menu.current)menu.current.open=false;startReview("log")}}>{`Add ${item.amountCents < 0 ? "income" : "expense"} to budget sheet`}</SavingButton>
-  const heading = ignoring ? "Ignore transaction" : logging === "review" ? "Review new sheet entry" : logging ? "Add budget entry" : reviewAmount ? "Review change" : item.status==="pending"?"Pending charge":["checked","ignored"].includes(item.status)?"Checked transaction":"Review match"
-  return <EditorScenes scene={ignoring?"ignore":logging==="review"?"entry-review":logging?"entry":reviewAmount?"amount":"match"}>
+  const detail = !logging && !reviewAmount && !ignoring && !choosing
+  const entryTitle = item.amountCents < 0 ? "Add income" : "Add expense"
+  const entryAction = <SavingButton type="button" className="bb-reconcile-action bb-reconcile-outline" disabled={disabled} saving={pending?.operation === "prepare" && pending.reviewIntent === "log"} onClick={() => {if(menu.current)menu.current.open=false;startReview("log")}}>{entryTitle} to budget sheet</SavingButton>
+  const canChoose = Boolean(item.suggestions.length && (!selected || item.suggestions.length > 1))
+  const heading = ignoring ? "Ignore transaction" : choosing ? "Choose budget entry" : logging === "review" ? "Review new sheet entry" : logging ? entryTitle : reviewAmount ? "Review change" : item.status==="pending"?"Pending charge":["checked","ignored"].includes(item.status)?"Checked transaction":"Review match"
+  return <EditorScenes scene={ignoring?"ignore":choosing?"choices":logging==="review"?"entry-review":logging?"entry":reviewAmount?"amount":"match"}>
     <div className="bb-reconcile-choices">
     <header className="bb-reconcile-detail-heading"><h2>{heading}</h2><div className="bb-reconcile-tools">
       {editable && detail && <button type="button" className="bb-reconcile-ignore" disabled={disabled} aria-label="Ignore transaction" onClick={()=>setIgnoring(true)}><EyeOff size={18} aria-hidden="true"/></button>}
-      {detail && (others.length>0 || Boolean(selected && editable && item.logging?.allowed)) && <details className="bb-reconcile-menu" ref={menu}>
+      {detail && (canChoose || Boolean(selected && editable && item.logging?.allowed)) && <details className="bb-reconcile-menu" ref={menu}>
         <summary aria-label="Review options"><Ellipsis size={17} aria-hidden="true"/></summary><div className="bb-reconcile-menu-content">
-          {others.map(card)}{selected && editable && item.logging?.allowed && entryAction}
+          {canChoose && <button type="button" disabled={disabled} onClick={() => { if(menu.current)menu.current.open=false;setChoosing(true) }}><ListChecks size={16} aria-hidden="true"/>Choose budget entry</button>}
+          {selected && editable && item.logging?.allowed && <SavingButton type="button" disabled={disabled} saving={pending?.operation === "prepare" && pending.reviewIntent === "log"}
+            onClick={() => { if(menu.current)menu.current.open=false; startReview("log") }}><Plus size={16} aria-hidden="true"/>{entryTitle}</SavingButton>}
         </div></details>}
-      {close && <button type="button" className="bb-reconcile-dismiss" disabled={Boolean(pending)} aria-label="Close review" onClick={close}><X size={16} aria-hidden="true"/></button>}
     </div></header>
-    {ignoring ? <><MatchComparison item={item} selected={selected} aliases={aliases}/>
+    {choosing ? <>
+      <p className="bb-reconcile-muted">{money(item.amountCents)} · {item.merchant} · {dateLabel(item.date)}</p>
+      <div className="bb-reconcile-candidates">{item.suggestions.map(card)}</div>
+      <div className="bb-reconcile-form-actions"><button type="button" className="bb-reconcile-action" onClick={() => setChoosing(false)}>Back</button></div>
+    </> : ignoring ? <><MatchComparison item={item} selected={selected} aliases={aliases}/>
       <div className="bb-reconcile-form-actions"><button type="button" className="bb-reconcile-action" disabled={disabled} onClick={()=>setIgnoring(false)}>Back</button>
         <SavingButton type="button" className="bb-reconcile-action bb-reconcile-danger" disabled={disabled} saving={pending?.operation==="ignore"}
           onClick={()=>onCommand({operation:"ignore",id:item.id,version:item.stateVersion??item.version})}>Ignore transaction</SavingButton></div></> : <>
@@ -501,7 +540,6 @@ function ReviewChoices({ item, initialReview, disabled, pending, active, close, 
       : <form className="bb-reconcile-log" onSubmit={event => { event.preventDefault(); if (disabled || !readyToLog) return
         if (logging === "edit") setLogging("review")
         else onCommand({ operation: "log", id: item.id, version: item.stateVersion ?? item.version, fields }) }}>
-        <h3>{logging === "review" ? "Review new sheet entry" : `Add ${item.amountCents < 0 ? "income" : "expense"}`}</h3>
         <p className="bb-reconcile-muted">{money(item.amountCents)} · {dateLabel(item.date)} · {item.amountCents < 0 ? "Income" : "Expense"} sheet</p>
         {logging === "edit" ? Object.entries(fields).map(([field, value]) => <label key={field}>
           {({ category: "Category", item: "Item", location: "Location (optional)", person: "Payment method", source: "Income source", label: "Note (optional)" } as Record<string, string>)[field]}

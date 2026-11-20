@@ -1,5 +1,13 @@
 # Agent Status
 
+## Reconcile editor polish and recurring date review (2026-11-20)
+
+The signed-in November Bills view showed Recology’s recurring day as 18 and its recorded date as November 20, matching the Calendar. Provide an explicit current-charge date choice in the recurring review. It commits with the schedule in one batch and leaves amounts, repayment history and source identity intact. The existing current-month date editor still corrects an occurrence without changing the schedule. Combined reviewed amount/split changes verify the original transaction and the exact date change again before using its refreshed version.
+
+Use a single horizontal pill lane beside the closed DUO title. Reconcile options now open the separate budget-entry chooser and the flat entry form, following the approved draft. The open DUO close button stays at its top-right anchor while loading and through editor changes. Scroll stays on the right edge of the pane.
+
+Local verification passed 3,558 Python tests with 915 optional PostgreSQL cases skipped, Python and frontend types, and the bundle build. Chromium and WebKit passed the compact carousel, stable close position, separate chooser, form layout and reviewed date selection. Calendar and Transactions fixtures retain the same canonical amounts, split and receipts through the date correction.
+
 ## Reconcile review queue and recorded bill payment dates (2026-11-20)
 
 Implement the approved review queue with swipeable status pills, merchant icons and side-by-side Bank charge and Budget entry cards. Closed DUO uses the Transactions inline expansion and editor slides. Open DUO keeps the list independently scrollable with the exact Transactions scrollbar rule and gives the right pane a retained crossfade between ready details. The red Ignore icon opens a separate confirmation. Suggestions still load on demand. The queue picks up verified groups at the next filter or refresh so an arriving preview cannot move an open row.
@@ -569,6 +577,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of the Reconcile follow-up and recurring bill date choice. Swipe the status pills in closed DUO and compare matching entries from the ellipsis menu. In open DUO watch the close button position while loading, then open Add expense and verify one heading and a right-side scroll track. To move a legitimate existing bill, review the recurring day with Applies from set to this month and choose Also move this month’s charge, or use Edit payment date from This month’s bill. Check Calendar and Transactions and confirm the original split and repayment details.
 
 Native acceptance of Reconcile and bill dates. Swipe the status pills and switch between two rows in open DUO while scrolling the left list. Fold and repeat the switch to check parallel inline expansion and collapse. Use a legitimate date correction in Settings → Bills → This month’s bill → Edit payment date → Review → Confirm. Verify the same charge on the corrected day in Calendar and Transactions, and check its existing split and Shared repayment.
 

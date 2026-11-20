@@ -35,6 +35,30 @@ function server(change=current){
 }
 (async()=>{
  let count=0;
+ for(const unexpected of [false,true]){
+  const state=server(),request=state.request;
+  const dated={...configuration,applyCurrentPaymentDate:true};
+  const flow=billFlow(dated,current);
+  const paymentDate={previousDate:source.date,date:'2026-11-04'};
+  state.request=async(url,body)=>{
+   const result=await request(url,body);
+   if(url==='/app/bills'&&body?.applyCurrentPaymentDate){
+    state.row={...state.row,date:paymentDate.date,version:'date-v2',...(unexpected?{title:'Changed elsewhere'}:{})};
+    result.currentPaymentDate=paymentDate;
+   }
+   return result;
+  };
+  if(unexpected){
+   await assert.rejects(runBillFlow(flow,state.request,()=>{}),/fresh review before changing its amount/);
+   assert.equal(state.writes.length,1);
+  }else{
+   await runBillFlow(flow,state.request,()=>{});
+   assert.equal(flow.stage,'done');
+   assert.equal(state.row.date,paymentDate.date);
+   assert.equal(state.writes[1].body.version,'date-v2');
+  }
+  count++;
+ }
  {
   const state=server(),flow=billFlow(configuration,current),snapshots=[];
   await runBillFlow(flow,state.request,s=>snapshots.push(clone(s)));

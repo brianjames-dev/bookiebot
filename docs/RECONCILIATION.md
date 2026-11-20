@@ -8,6 +8,8 @@ BookieBot checks bank transactions against expenses you already logged. It does 
 
 Swipe the status pills beside the title to switch queues. Open a row to compare its bank activity and budget entry side by side. On open DUO, the list scrolls independently and the review stays in the right pane. On closed DUO, the review opens under the row. The red crossed-eye icon opens the Ignore confirmation for eligible transactions.
 
+When there are other possible matches, open the ellipsis menu and choose **Choose budget entry** to compare them in the editor. **Add expense** and **Add income** open the entry form. In open DUO the close button stays in the top-right corner while the entry loads and while the form scrolls.
+
 1. Open **Reconcile**. The initial list reads saved bank data without querying Sheets or starting a bank sync.
 2. Tap **Check** to sync your bank and compare recent transactions with existing logs and schedules. The timestamp describes the bank data; the bank may still report a delayed or pending charge.
 3. Open a **Needs review** row to see suggestions. An exact recorded amount offers **Confirm match** directly. **Review amount change**, **Review payment change** and **Add expense/income to budget sheet** open their respective review or form without a preliminary Review match step. If the posted transaction has no saved review yet, the chosen action prepares its metadata internally from saved bank data. Expansion stays read-only; preparation does not sync the bank, write an expense or record a repayment. Only your explicit confirmation saves a match or financial change.

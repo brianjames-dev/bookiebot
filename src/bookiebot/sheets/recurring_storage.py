@@ -378,7 +378,7 @@ def _preserved_occurrences(snapshot: WorkbookSnapshot, change: BillChange, today
 
 
 def configuration_batch(snapshot: WorkbookSnapshot, change: BillChange, request_id: str, request_fingerprint: str,
-                        result_json: str, *, today: date) -> SheetBatch:
+                        result_json: str, *, today: date, current_payment_date: str | None = None) -> SheetBatch:
     plans = change.rows(request_id)
     tab = change.after.source_tab
     original = snapshot.formulas.get(tab, [])
@@ -386,6 +386,11 @@ def configuration_batch(snapshot: WorkbookSnapshot, change: BillChange, request_
     batch = SheetBatch(snapshot)
     batch.table(tab, encoded)
     charges = _preserved_occurrences(snapshot, change, today)
+    if current_payment_date:
+        existing = next((c for c in charges if c.plan_id == change.after.id and c.month == snapshot.settings.period), None)
+        if existing is None or existing.virtual:
+            raise BillConflict("This bill charge’s original source needs review.")
+        charges[charges.index(existing)] = replace(existing, payment_date=current_payment_date)
     if charges != decode_charges(snapshot.rows.get(CHARGES_TAB, [])):
         batch.table(CHARGES_TAB, encode_charges(charges, snapshot.rows.get(CHARGES_TAB, [])))
     tables = {t: encoded if t == tab else snapshot.rows.get(t, []) for t in (BILL_TAB, SUBSCRIPTION_TAB)}

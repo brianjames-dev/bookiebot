@@ -7,8 +7,25 @@ from typing import Any
 
 from bookiebot.sheets.recurring import BillConflict, BillValidation, SETTINGS_LOG_TAB, fingerprint, selected
 from bookiebot.sheets.recurring_charges import CHARGES_TAB, BillCharge, decode_charges, encode_charges, source_anchor
+from bookiebot.sheets.recurring_changes import BillChange
 from bookiebot.sheets.recurring_storage import LOG_HEADERS, SheetBatch, WorkbookSnapshot
 from bookiebot.sheets.routing import now_pacific
+
+
+def configuration_date(source: WorkbookSnapshot, change: BillChange) -> dict[str, Any] | None:
+    """Offer the existing charge as a separate, explicitly reviewed change."""
+    period = source.settings.period
+    if change.operation != "update" or change.after.effective_from != period:
+        return None
+    due = change.after.due_date(period)
+    prior = next((p for p in selected(list(source.settings.plans), period) if p.id == change.after.id), None)
+    if not due or prior is None:
+        return None
+    current = source.charge(prior, period)
+    proposed = due.isoformat()
+    if not current.get("canEditPaymentDate") or current.get("date") == proposed:
+        return None
+    return {"month": period, "previousDate": current.get("date"), "date": proposed, "chargeVersion": current["version"]}
 
 
 def prepare_date(source: WorkbookSnapshot, body: dict[str, Any], today: date):

@@ -44,7 +44,7 @@ Choose a bill to open **Bill amount** directly in its existing Bills editor. **R
 
 ## Recurring configuration
 
-To correct this month’s withdrawal, open the bill and choose **This month’s bill** → **Edit payment date**. Review the old and new dates and confirm. Calendar and Transactions use the corrected date for that occurrence. The recurring payment day, original amount, split and recorded repayments stay the same. Future-dated corrections appear in Transactions on the corrected day.
+When editing the recurring **Payment day** with **Applies from** set to this month, choose **Also move [month]’s charge** in Review to move the existing charge in Calendar and Transactions. Review shows the old and new dates. If the recurring rule is already correct, use **This month’s bill** → **Edit payment date** to move only this month’s charge. Both paths preserve the original amount, split and recorded repayments unless you separately opt into an amount or split edit. Future-dated corrections appear in Transactions on the corrected day.
 
 Set the recurring amount, payment day, frequency and account. **Applies from** defaults to the current month, or the saved upcoming version's month when opening that version. Choose the current month or a later month; the saved recurring rule starts in that exact month and continues until changed again. Selecting November shows **Applies from: November 2026 onward** in the existing review row and saves November, even when a November charge is already recorded. Back, switching rows and folding retain that selection and prepared review. There are no separate selected/recurring start labels.
 

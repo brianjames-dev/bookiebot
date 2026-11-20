@@ -12,7 +12,6 @@
 .bb-reconcile-row-toggle strong { display: block; font-size: 15px; font-weight: 600; }
 .bb-reconcile-row-toggle small { display: block; font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 4px; }
 .bb-reconcile-matched { display: flex; gap: 6px; align-items: center; font-size: 13px; color: hsl(var(--primary)); }
-.bb-reconcile-suggestion { background: hsl(var(--background)); border-radius: 10px; padding: 12px; margin: 8px 0; }
 .bb-reconcile-suggestion-title { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: 14px; }
 .bb-reconcile-suggestion-title strong { min-width: 0; overflow-wrap: anywhere; }
 .bb-reconcile-suggestion-title > span { flex-shrink: 0; font-variant-numeric: tabular-nums; }
@@ -32,13 +31,10 @@
 @media (prefers-reduced-motion: reduce) { .bb-reconcile-chevron { transition-duration: 0ms; } }
 .bb-reconcile-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 11px 16px; border-radius: 10px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-weight: 600; margin: 8px 0; }
 .bb-reconcile-outline { width: 100%; border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
-.bb-reconcile-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: hsl(var(--primary)); margin: 0 0 8px; }
-.bb-reconcile-suggestion { border: 1px solid transparent; }
-.bb-reconcile-suggestion[data-selected="true"] { border-color: hsl(var(--primary) / .55); }
 .bb-reconcile-choice { display: block; width: 100%; min-height: 44px; padding: 0; text-align: left; border: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; }
 .bb-reconcile-choice > .bb-reconcile-muted { display: block; margin: 6px 0 0; font-size: 12px; }
-.bb-reconcile-confirm, .bb-reconcile-log { border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
-.bb-reconcile-log h3 { margin: 0; font-size: 16px; }
+.bb-reconcile-confirm { border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
+.bb-reconcile-log { min-width:0; margin:0; font-size:13px; line-height:1.5; }
 .bb-reconcile-log label { display: grid; gap: 5px; margin: 12px 0; color: hsl(var(--muted-foreground)); }
 .bb-reconcile-log input, .bb-reconcile-log select, .bb-reconcile-confirm select { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); color: hsl(var(--foreground)); padding: 9px; font: inherit; font-size: 16px; }
 .bb-reconcile-log dl > div { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 8px; margin: 6px 0; }
@@ -63,11 +59,14 @@
 .bb-reconcile-share-review dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 .bb-reconcile-title-actions:not([hidden]) { display:flex; align-items:center; flex:1; min-width:0; gap:8px; }
-.bb-page[data-screen="reconcile"] .bb-report-header { justify-content:flex-start; gap:10px; }
+.bb-page[data-screen="reconcile"] .bb-report-header { display:flex; justify-content:flex-start; gap:10px; }
 .bb-page[data-screen="reconcile"] .bb-report-context { flex:none; }
 .bb-reconcile-heading:empty { display:none; }
-.bb-reconcile-filters { display:flex; flex:1; align-items:center; gap:4px; min-width:0; overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; padding-inline:2px; }
+.bb-reconcile-filters { display:flex; flex:1; align-items:center; gap:4px; min-width:0; overflow-x:auto; overflow-y:hidden; overscroll-behavior-x:contain; scrollbar-width:none; padding-inline:2px; user-select:none; }
 .bb-reconcile-filters::-webkit-scrollbar { display:none; }
+.bb-reconcile-filters[data-more=true] { mask-image:linear-gradient(to right,#000 calc(100% - 13px),transparent); }
+.bb-reconcile-filters[data-earlier=true] { mask-image:linear-gradient(to right,transparent,#000 9px); }
+.bb-reconcile-filters[data-earlier=true][data-more=true] { mask-image:linear-gradient(to right,transparent,#000 9px,#000 calc(100% - 13px),transparent); }
 .bb-reconcile-filters button { display:grid; place-items:center; flex:none; min-height:44px; padding:0; border:0; background:transparent; color:hsl(var(--muted-foreground)); font:inherit; font-size:12px; white-space:nowrap; }
 .bb-reconcile-filters button > span { display:flex; gap:4px; align-items:center; min-height:28px; padding:0 8px; border:1px solid hsl(var(--border)); border-radius:18px; }
 .bb-reconcile-filters button small { font-size:11px; font-variant-numeric:tabular-nums; }
@@ -97,9 +96,12 @@
 .bb-reconcile-menu { position:relative; }
 .bb-reconcile-menu summary { list-style:none; }
 .bb-reconcile-menu summary::-webkit-details-marker { display:none; }
-.bb-reconcile-menu-content { position:absolute; z-index:4; top:calc(100% + 4px); right:0; width:min(220px,61vw); max-height:180px; overflow:auto; padding:7px; background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:12px; }
-.bb-reconcile-tools .bb-reconcile-menu-content button { display:block; width:100%; height:auto; padding:6px; color:hsl(var(--primary)); border:0; border-radius:8px; text-align:left; }
+.bb-reconcile-menu-content { position:absolute; z-index:4; top:calc(100% + 4px); right:0; width:max-content; max-width:61vw; padding:4px; background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:12px; }
+.bb-reconcile-tools .bb-reconcile-menu-content button { display:flex; justify-content:flex-start; align-items:center; gap:7px; width:100%; height:auto; min-height:44px; padding:5px 8px; color:hsl(var(--foreground)); background:transparent; border:0; border-radius:8px; text-align:left; font-size:13px; }
 .bb-reconcile-tools .bb-reconcile-ignore { border:0; border-radius:8px; background:transparent; color:hsl(var(--destructive)); }
+.bb-reconcile-candidates .bb-reconcile-choice { padding:8px; border-bottom:1px solid hsl(var(--border)); }
+.bb-reconcile-candidates .bb-reconcile-choice[aria-pressed=true] { background:hsl(var(--primary) / .08); }
+.bb-reconcile-candidates .bb-reconcile-muted { display:block; margin:3px 0 0; }
 .bb-reconcile-dismiss { margin-inline-start:auto; }
 .bb-reconcile .bi-editor-scenes > .bi-step-viewport > .bi-step-pane { background:hsl(var(--background)); }
 .bb-reconcile-inline .bi-editor-scenes > .bi-step-viewport > .bi-step-pane { background:hsl(var(--card)); }
