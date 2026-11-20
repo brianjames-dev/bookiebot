@@ -10,6 +10,8 @@ Manual check. Open an exact match and compare the Add and Confirm button baselin
 
 Local full suite passed 3,565 tests with 915 optional PostgreSQL skips. The final targeted bank/review suite passed 179 tests. Python/frontend types, the production build, and the Chromium and WebKit checks pass. The signed-in baseline confirmed the $97.96 City of Santa Rosa row lacked a Water candidate before the release.
 
+Review follow-up aligns Discord schedule confirmation with its wider exact-match suggestions. A 12-day subscription candidate now passes through the same fresh confirmation and source claim.
+
 ## Reconcile editor readiness and split bills (2026-11-20)
 
 Close the compact title gaps in Savings and Reconcile. Render active editors after their first detail and queue refresh are ready. Keep a selected transaction through one read-only recovery by bank ID. Retry explicitly if that second detail fails. Match actions lead, Add expense is secondary when candidates exist, and review confirmation controls use button surfaces.

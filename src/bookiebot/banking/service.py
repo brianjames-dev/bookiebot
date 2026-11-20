@@ -1120,9 +1120,9 @@ class BankingService:
         clear_schedule_source_cache(actor_key)
         candidates = find_scheduled_pull_candidates(
             item.transaction,
-            _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key),
+            _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key, window_days=REVIEW_EXACT_WINDOW_DAYS),
             action_log=read_active_logged_actions(actor_key),
-            window_days=14,
+            window_days=REVIEW_EXACT_WINDOW_DAYS,
             limit=25,
         )
         candidate = next((candidate for candidate in candidates if candidate.sheet_ref == schedule_ref), None)

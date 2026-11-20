@@ -1349,22 +1349,18 @@ def test_reconciliation_match_candidates_includes_schedule_matches(monkeypatch, 
     assert candidates[0].sheet_ref == "Subscriptions!B10:D10#pull=2026-05-17"
 
 
-def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, tmp_path):
+@pytest.mark.parametrize(('name', 'pull'), [
+    ('PG&E WEB ONLINE', ScheduledPullCandidate('bill', 'PG&E', 132.36, date(2026, 5, 17),
+        '_BookieBot Bill Schedule!A3:I3', amount_recorded=True)),
+    ('Unclear charge', ScheduledPullCandidate('subscription', 'Annual service', 132.36, date(2026, 5, 5),
+        'Subscriptions!B10:D10')),
+])
+def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, tmp_path, name, pull):
     monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor: [])
-    monkeypatch.setattr(
-        banking_service,
-        "_scheduled_pulls_for_transactions",
-        lambda _transactions, actor_key, **_options: [
-            ScheduledPullCandidate(
-                source_type="bill",
-                amount_recorded=True,
-                name="PG&E",
-                amount=132.36,
-                pull_date=date(2026, 5, 17),
-                source_ref="_BookieBot Bill Schedule!A3:I3",
-            )
-        ],
-    )
+    def scheduled_pulls(transactions, *, actor_key, window_days=7):
+        transaction_day = date.fromisoformat(transactions[0].date)
+        return [pull] if abs((transaction_day - pull.pull_date).days) <= window_days else []
+    monkeypatch.setattr(banking_service, '_scheduled_pulls_for_transactions', scheduled_pulls)
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     service = BankingService(
         config=BankingConfig(
@@ -1385,14 +1381,16 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
             )
         ),
     )
-    service.seed_unmatched_debug_transaction("brian", name="PG&E WEB ONLINE", amount=132.36, date="2026-05-17")
+    service.seed_unmatched_debug_transaction("brian", name=name, amount=132.36, date="2026-05-17")
     item = service.reconciliation_preview("brian", force=True).items[0]
+    _, suggestions, _ = service.reconciliation_match_candidates('brian', item.id, actor_key='676638528590970917')
+    assert [candidate.sheet_ref for candidate in suggestions] == [pull.occurrence_ref]
 
     confirmed, candidate, status = service.confirm_reconciliation_schedule_match(
         "brian",
         item.id,
         actor_key="676638528590970917",
-        schedule_ref="_BookieBot Bill Schedule!A3:I3#pull=2026-05",
+        schedule_ref=pull.occurrence_ref,
     )
 
     assert status == "matched"
@@ -1400,7 +1398,7 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id is None
-    assert confirmed.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3#pull=2026-05"
+    assert confirmed.matched_sheet_ref == pull.occurrence_ref
 
 
 def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
