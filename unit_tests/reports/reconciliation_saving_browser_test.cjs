@@ -1,6 +1,7 @@
 // Delay a fixture match to inspect the actual button and spinner geometry.
 const assert = require('node:assert/strict')
 const { fixture, engines } = require('./duo_layout_browser_test.cjs')
+const { base: savingsFixture } = require('./savings_workspace_browser_test.cjs')
 
 const row = { id: 1, version: 'fixture-v1', status: 'needs_review', date: '2026-10-20', merchant: 'Fixture store',
   amountCents: 16631, currency: 'USD', accountLabel: 'Fixture card', suggestions: [] }
@@ -60,7 +61,7 @@ async function verifyWorkspace(browser) {
       const path = new URL(route.request().url()).pathname
       if (path === '/app/reconciliation') {
         assert.equal(route.request().method(), 'GET', 'Opening an editor must not change a bank transaction')
-        await route.fulfill({ json: { enabled: true, checkedAt: null, items } })
+        await route.fulfill({ json: { enabled: true, checkedAt: '2026-10-20T20:00:00Z', items } })
         return true
       }
       if (!path.startsWith('/app/reconciliation/')) return false
@@ -69,7 +70,7 @@ async function verifyWorkspace(browser) {
       if (id === 2) await held
       await route.fulfill({ json: { item: {
         ...items[id - 1],
-        suggestions: id === 1 ? [match, { ...match, id: 'alternative', item: 'Backup jacket' }] : [],
+        suggestions: id === 1 ? [match, { ...match, id: 'alternative', item: 'Backup jacket', amountCents: 17000, amountMismatch: true }] : [],
         logging: { allowed: true, kind: 'expense', categories: ['shopping'], paymentMethods: ['Fixture card'], reason: '' },
       } } })
       return true
@@ -88,6 +89,9 @@ async function verifyWorkspace(browser) {
     const queue = page.locator('.bb-reconcile-row-toggle')
     await queue.first().waitFor()
     const left = page.locator('.bb-reconcile-left')
+    assert.equal(await page.locator('.bb-pull-refresh-space').count(), 0)
+    assert.equal(await page.evaluate(() => document.documentElement.classList.contains('bb-pull-refresh-enabled')), false)
+    assert.match(await page.locator('.bb-brand-status .bb-app-status time').innerText(), /^Updated /)
     assert.deepEqual(await scrollStyle('.bb-reconcile-left'), transactionsStyle)
     const [scrollHeight, clientHeight] = await left.evaluate(el => [el.scrollHeight, el.clientHeight])
     assert(scrollHeight > clientHeight, `The list owns vertical scroll (${scrollHeight}px in a ${clientHeight}px viewport)`)
@@ -100,23 +104,29 @@ async function verifyWorkspace(browser) {
     const loadingAnchor = await close.boundingBox()
     const paneBox = await pane.boundingBox()
     assert(loadingAnchor && Math.abs(loadingAnchor.y - paneBox.y - 3) < 1)
+    const loader = await pane.locator('.bb-report-loading-spinner').boundingBox()
+    assert(loader && loader.y > paneBox.y + 60, 'The spinner is centered in the review area below the heading')
+    assert(Math.abs(loader.x + loader.width / 2 - paneBox.x - paneBox.width / 2) <= 6)
     releaseFirst()
     await pane.getByText('Rain jacket').waitFor()
     assert.deepEqual(await close.boundingBox(), loadingAnchor, 'Close stays at the same position while the review loads')
     await page.waitForFunction(() => document.querySelector('.bb-reconcile-pane').getAnimations({ subtree:true }).length === 0)
     const ignore = pane.getByRole('button', { name: 'Ignore transaction' })
     assert.equal(await ignore.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
-    const options = pane.locator('summary[aria-label="Review options"]')
-    await options.click()
-    const menu = pane.locator('.bb-reconcile-menu-content')
-    assert.deepEqual(await menu.locator('button').allTextContents(), ['Choose budget entry', 'Add expense'])
-    assert.equal(await menu.getByText('Backup jacket').count(), 0)
-    await menu.getByRole('button', { name: 'Choose budget entry' }).click()
+    const direct = pane.locator('.bb-reconcile-entry-actions')
+    const comparison = await pane.locator('.bb-reconcile-comparison').boundingBox()
+    assert((await direct.boundingBox()).y > comparison.y + comparison.height)
+    assert.equal(await pane.locator('summary[aria-label="Review options"]').count(), 0)
+    await direct.getByRole('button', { name: 'Choose budget entry' }).click()
     await pane.getByRole('heading', { name: 'Choose budget entry', exact: true }).waitFor()
+    const marked = pane.locator('.bb-reconcile-choice[aria-pressed=true] svg.lucide-circle-check')
+    assert.equal(await marked.count(), 1)
     await pane.getByRole('button', { name: /Backup jacket/ }).click()
     await pane.getByRole('heading', { name: 'Review match' }).waitFor()
-    await options.click()
-    await menu.getByRole('button', { name: 'Add expense', exact: true }).click()
+    assert.equal(await pane.locator('.bb-reconcile-match-result svg.lucide-triangle-alert').count(), 1)
+    const add = direct.getByRole('button', { name: 'Add expense', exact: true })
+    assert.equal(await add.locator('.bb-saving-label').evaluate(el => getComputedStyle(el).columnGap), '8px')
+    await add.click()
     await pane.getByRole('heading', { name: 'Add expense', exact: true }).waitFor()
     assert.equal(await pane.getByRole('heading', { name: /Add / }).count(), 1)
     const form = pane.locator('form.bb-reconcile-log')
@@ -179,6 +189,98 @@ async function verifyWorkspace(browser) {
   }
 }
 
+async function verifyShortQueueRefresh(browser) {
+  let writes = 0, reads = 0
+  const { page, errors, unexpected } = await fixture(browser, 382, 852, true, false, false, 0, {
+    async request(route) {
+      const request = route.request()
+      const path = new URL(request.url()).pathname
+      if (path === '/app/savings') {
+        assert.equal(request.method(), 'GET')
+        await route.fulfill({ json: savingsFixture() })
+        return true
+      }
+      if (path !== '/app/reconciliation') return false
+      if (request.method() === 'POST') {
+        writes++
+        assert.equal(request.postDataJSON().operation, 'check')
+        await route.fulfill({ status: 503, json: { error: 'Temporary bank response' } })
+      } else {
+        reads++
+        await route.fulfill({ json: { enabled: true, checkedAt: '2026-10-20T20:00:00Z', items: [row] } })
+      }
+      return true
+    },
+  })
+  const touch = (type, y) => page.evaluate(([type, y]) => {
+    const target = document.querySelector('.bb-reconcile-row-toggle')
+    const point = { identifier: 91, target, clientX: 125, clientY: y }
+    const event = new Event(type, { bubbles: true, cancelable: true })
+    Object.defineProperties(event, { touches: { value: type === 'touchend' ? [] : [point] }, changedTouches: { value: [point] } })
+    target.dispatchEvent(event)
+  }, [type, y])
+  const brand = page.locator('.bb-report-brand')
+  const phase = expected => page.waitForFunction(expected => document.querySelector('.bb-pull-refresh-space')?.dataset.phase === expected, expected)
+  try {
+    await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
+    await page.locator('.bb-reconcile-row-toggle').waitFor()
+    await page.waitForFunction(() => document.querySelector('.bb-pull-refresh-button')?.disabled === false)
+    const initial = await brand.boundingBox()
+    await touch('touchstart', 130)
+    await touch('touchmove', 300)
+    await phase('pulling')
+    assert((await brand.boundingBox()).y - initial.y > 30)
+    await touch('touchmove', 430)
+    await phase('armed')
+    const disc = await page.locator('.bb-pull-disc').boundingBox()
+    assert(disc.y + disc.height <= (await brand.boundingBox()).y, 'Pull arrow never overlaps the wordmark in a short queue')
+    await touch('touchend', 430)
+    await phase('error')
+    assert.match(await brand.locator('.bb-app-status').innerText(), /^Check saved status/)
+    assert.equal(await page.locator('.bb-shell-reconcile').getByRole('button', { name: /try again|check status/i }).count(), 0)
+
+    const before = reads
+    await touch('touchstart', 170)
+    await touch('touchmove', 470)
+    await phase('armed')
+    await touch('touchend', 470)
+    await phase('done')
+    assert.equal(reads, before + 1)
+    assert.equal(writes, 1, 'The recovery pull only reads saved status')
+    await phase('idle')
+    assert.equal((await brand.boundingBox()).y, initial.y)
+    assert.match(await brand.locator('.bb-app-status time').innerText(), /^Updated /)
+
+    await page.setViewportSize({ width: 867, height: 669 })
+    const refresh = page.getByRole('button', { name: 'Check bank transactions', exact: true })
+    await refresh.waitFor()
+    await touch('touchstart', 130)
+    await touch('touchmove', 430)
+    await touch('touchend', 430)
+    assert.equal(await page.locator('.bb-pull-refresh-space').count(), 0)
+    await refresh.click()
+    await page.getByRole('button', { name: 'Check status', exact: true }).waitFor()
+    assert.equal(writes, 2, 'Only the open layout arrow starts the next check')
+    for (const [tab, label] of [
+      ['Overview', 'Refresh Overview'],
+      ['Transactions', 'Refresh Transactions'],
+      ['Shared', 'Refresh reimbursements'],
+      ['Savings', 'Refresh savings'],
+      ['Settings', 'Refresh Settings'],
+    ]) {
+      await page.getByRole('button', { name: tab, exact: true }).click()
+      await page.getByRole('button', { name: label, exact: true }).waitFor()
+      assert.equal(await page.locator('.bb-pull-refresh-space').count(), 0, `${tab} only uses a refresh button in open DUO`)
+    }
+    await page.setViewportSize({ width: 382, height: 852 })
+    const compact = page.locator('.bb-pull-refresh-space')
+    await compact.waitFor({ state: 'attached' })
+    assert.equal(await page.locator('.bb-settings-masthead-title > .bb-page-refresh-button').count(), 0)
+    assert.deepEqual(errors, [])
+    assert.deepEqual(unexpected, [])
+  } finally { await page.close() }
+}
+
 ;(async () => {
   for (const engine of engines) {
     const browser = await engine.launch({ headless: true })
@@ -189,6 +291,8 @@ async function verifyWorkspace(browser) {
       }
       await verifyWorkspace(browser)
       console.log('PASS Reconcile scrollbar, selection transition and inline expansion', engine.name())
+      await verifyShortQueueRefresh(browser)
+      console.log('PASS Reconcile short-queue pull, header status and open refresh', engine.name())
     } finally { await browser.close() }
   }
 })().catch(error => { console.error(error); process.exitCode = 1 })

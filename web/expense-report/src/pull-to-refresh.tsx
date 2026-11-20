@@ -60,7 +60,7 @@ export function PullToRefresh({ screen, blocked = false, label, canvasKey }: { s
     running.current = true; refreshScreen.current = selected; window.clearTimeout(timer.current)
     // Snapshot the bounce once for the icon's CSS handoff. Never feed later
     // scroll positions back into layout while the browser releases its spring.
-    gesture.current = null; pulled.current = 0; setReleaseOverscroll(Math.max(0, -readPageScroll().y)); setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
+    gesture.current = null; pulled.current = 0; setReleaseOverscroll(selected === "reconcile" ? 0 : Math.max(0, -readPageScroll().y)); setDistance(PULL_REFRESH_HOLD); setPhase("refreshing"); setMessage("")
     const success = await registry.refresh(selected)
     running.current = false
     if (!mounted.current) return
@@ -171,9 +171,10 @@ export function PullToRefresh({ screen, blocked = false, label, canvasKey }: { s
   // Native rubber banding owns the page while the finger is down. After release,
   // animate once toward a stable loading gap; scroll frames must not resize it.
   const tracking = phase === "pulling" || phase === "armed"
-  const offset = visible && !tracking ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0
+  const movesPage = screen === "reconcile"
+  const offset = visible && (!tracking || movesPage) ? Math.min(distance, PULL_REFRESH_THRESHOLD) : 0
   const ratio = Math.min(1, distance / PULL_REFRESH_THRESHOLD), progress = Math.min(ratio < 1 ? 99 : 100, Math.round(ratio * 100))
-  return <div className="bb-pull-refresh-space" data-phase={phase} data-released={offset > 0 || phase === "settling"} style={{ height: offset }}
+  return <div className="bb-pull-refresh-space" data-phase={phase} data-live-gap={movesPage && tracking} data-released={!tracking && (offset > 0 || phase === "settling")} style={{ height: offset }}
     onTransitionEnd={event => {
       if (phase !== "settling" || event.target !== event.currentTarget || event.propertyName !== "height") return
       // A new finger may already be down; finishing the previous animation

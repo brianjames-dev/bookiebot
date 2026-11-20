@@ -858,6 +858,8 @@ Status: Complete in code and automated verification as of 2026-08-11; production
 
 ## Bank Reconciliation - Implementation Slices
 
+2026-11-20 refresh and match clarity: Both DUO layouts use the standard masthead status. Closed queues create room for the pull indicator during the gesture, and open queues refresh with the icon. Related matching and budget entry actions sit below the comparison. Existing saved-state recovery, reconnect and explicit financial confirmation paths remain in force.
+
 2026-11-20 follow-up: Keep the compact status carousel on the title row, provide a full-frame chooser through the options menu, flatten the add-entry form and retain the top-right close button during loading. The recurring bill review now offers an explicit date-only change for the current recorded occurrence, with no repayment replay.
 
 2026-11-20: Implemented the approved review queue, the Transactions scroll lane and inline animation, and the retained right-side details transition. Bank and budget details keep the existing explicit confirmation and stale-state checks. Grouping uses loaded previews without fetching every row. Also added the date-only correction for physical utility occurrences, preserving original budget and reimbursement records while updating Calendar and Transactions.

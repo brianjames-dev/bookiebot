@@ -18,8 +18,8 @@ const transactions={items:Array.from({length:24},(_,i)=>({id:'row-'+i,actionId:'
   await page.evaluate(()=>{window.dispatchEvent(new Event('pagehide'));Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'))});
   await page.setViewportSize({width:951,height:669});await page.waitForTimeout(100);
   await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}))});await page.waitForTimeout(400);
-  assert.equal(await page.locator('.bb-pull-refresh-space').evaluate(el=>el.getBoundingClientRect().height),0,'No stale loading gap is carried into the open canvas');
-  release();await page.waitForTimeout(500);assert.equal(await page.locator('.bb-pull-refresh-space').getAttribute('data-phase'),'idle','The late response does not revive the old pull presentation');assert.equal(await page.locator('.bb-shell-masthead').evaluate(el=>el.getBoundingClientRect().top),0);
+  assert.equal(await page.locator('.bb-pull-refresh-space').count(),0,'Open DUO removes the pull surface and its listeners');
+  release();await page.waitForTimeout(500);assert.equal(await page.locator('.bb-pull-refresh-space').count(),0,'The late response cannot revive compact pull feedback');assert.equal(await page.locator('.bb-shell-masthead').evaluate(el=>el.getBoundingClientRect().top),0);
   assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);count++;console.log('PASS pending refresh, app exit and background fold',engine.name(),tab);
  }finally{release?.();await page.close()}
  }}finally{await browser.close()}}console.log(count+' native interrupted-refresh cases passed')})().catch(error=>{console.error(error);process.exitCode=1});

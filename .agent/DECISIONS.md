@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — Use pose-specific refresh controls and one Reconcile status line
+
+Unmount the pull gesture in open DUO landscape and reuse each page's registered refresh handlers through buttons. The compact Reconcile queue positions its header with the pull gap even when the viewport cannot bounce. Review keeps its status under the portrait and uses the same control to read saved outcomes before allowing any new write. Alternative matching and budget-entry creation start directly below the comparison and retain their existing explicit confirmations.
+
 ## 2026-11-20 — Include the occurrence date in recurring review on request
 
 A recurring payment day edit starting this month can separately opt into moving the eligible recorded physical charge. Bind the original date and charge version into the accepted review and write the override, rule and receipt atomically. An already-correct rule can still be used to align this month’s charge. A combined amount/split review continues only if the new transaction is the same reviewed source with the exact saved date change.
