@@ -103,6 +103,9 @@ class ScheduledPullCandidate:
         return f"{self.source_ref}#pull={pull_key}"
 
 
+REVIEW_EXACT_WINDOW_DAYS = 14
+
+
 @dataclass(frozen=True)
 class ReconciliationDecision:
     classification: ReconciliationClassification
@@ -392,18 +395,24 @@ def find_scheduled_pull_candidates(
         if excluded_sheet_refs and pull.occurrence_ref in excluded_sheet_refs:
             continue
         day_delta = _transaction_day_delta(transaction, pull.pull_date)
-        if day_delta > window_days:
+        recorded = pull.source_type == "subscription" or pull.amount_recorded
+        bank_amount = abs(transaction.amount)
+        candidate_amount = pull.amount if pull.amount > 0 else bank_amount
+        amount_delta = abs(candidate_amount - bank_amount)
+        close_amount = _near_review_amount(bank_amount, amount_delta)
+        bill_label = (pull.bill_source_label or pull.name) if pull.source_type == "bill" and recorded and close_amount else ""
+        name_score = _review_name_score(transaction, pull.name, bill_label=bill_label)
+        amount_tolerance = _review_amount_tolerance(bank_amount, name_score, recorded=recorded)
+        exact = pull.amount > 0 and round(pull.amount * 100) == round(bank_amount * 100)
+        allowed_days = max(window_days, REVIEW_EXACT_WINDOW_DAYS) if recorded and exact else window_days
+        if day_delta > allowed_days:
             continue
-        name_score = _scheduled_name_score(transaction, pull.name)
-        candidate_amount = pull.amount if pull.amount > 0 else abs(transaction.amount)
-        amount_delta = abs(candidate_amount - abs(transaction.amount))
-        amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
         if amount_delta > amount_tolerance and name_score < 0.5:
             continue
         exact_or_wildcard_amount = pull.amount <= 0 or amount_delta <= 0.01
         if pull.amount <= 0 and name_score < 0.5:
             continue
-        if name_score <= 0 and not exact_or_wildcard_amount and day_delta > 3:
+        if name_score < .5 and not exact_or_wildcard_amount and day_delta > 3 and not (recorded and close_amount):
             continue
         amount_score = max(0.0, 1 - (amount_delta / amount_tolerance))
         date_score = max(0.0, 1 - (day_delta / max(window_days, 1)))
@@ -418,9 +427,9 @@ def find_scheduled_pull_candidates(
                 date=pull.pull_date,
                 amount=candidate_amount,
                 label=f"{pull.name} ({pull.source_type})",
-                confidence=min(score, 0.98),
+                confidence=min(score, 0.71 if name_score < .5 else 0.98),
                 notes=f"{pull.source_type} schedule{' (not logged)' if pull.source_type == 'bill' and not pull.amount_recorded else ''}, amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",
-                amount_recorded=pull.source_type == "subscription" or pull.amount_recorded,
+                amount_recorded=recorded,
             )
         )
 
@@ -455,23 +464,34 @@ def find_action_log_candidates(
         candidate = _action_candidate(logged)
         if candidate is None or candidate["type"] not in compatible:
             continue
+        bank_amount = abs(transaction.amount)
+        amount_delta = abs(candidate["amount"] - bank_amount)
+        close_amount = _near_review_amount(bank_amount, amount_delta)
+        exact = round(candidate["amount"] * 100) == round(bank_amount * 100)
+        allowed_days = max(window_days, REVIEW_EXACT_WINDOW_DAYS) if exact and transaction.amount > 0 else window_days
         day_delta = _transaction_day_delta(transaction, candidate["date"])
+        name_score = _review_name_score(transaction, candidate["text"], bill_label=candidate["payment_label"] if close_amount else "")
         linked_bill = False
-        if candidate.get("shared_bill"):
-            bill_pulls = [pull for pull in scheduled_pulls if _schedule_represents_action(pull, candidate)
-                          and _scheduled_name_score(transaction, pull.name) >= 0.5]
+        if candidate["type"] == "payment":
+            bill_pulls = [pull for pull in scheduled_pulls if pull.source_type == "bill" and _schedule_represents_action(pull, candidate)]
             if len({pull.occurrence_ref for pull in bill_pulls}) == 1:
-                # Review an invoice recorded early using its withdrawal timing.
-                # Keep the original action date and anchor for confirmation.
-                pull_delta = min(_transaction_day_delta(transaction, pull.pull_date) for pull in bill_pulls)
-                linked_bill = pull_delta <= window_days
-                day_delta = min(day_delta, pull_delta)
-        if day_delta > window_days:
+                pull_name = max(_review_name_score(transaction, pull.name, bill_label=(pull.bill_source_label or pull.name) if close_amount else "")
+                                for pull in bill_pulls)
+                if pull_name >= .5 or close_amount:
+                    # An invoice may be logged weeks before the withdrawal.
+                    # Score the real schedule date and retain the original claim.
+                    pull_delta = min(_transaction_day_delta(transaction, pull.pull_date) for pull in bill_pulls)
+                    linked_bill = bool(candidate["shared_bill"] and pull_name >= .5 and pull_delta <= window_days)
+                    day_delta = min(day_delta, pull_delta)
+                    name_score = max(name_score, pull_name)
+            if exact and name_score >= .8 and candidate["date"].strftime("%Y-%m") == transaction_date.strftime("%Y-%m"):
+                # A strongly identified bill entered early can still be chosen
+                # in its own month if no usable withdrawal date was configured.
+                allowed_days = max(allowed_days, 30)
+        if day_delta > allowed_days:
             continue
 
-        name_score = _name_score(transaction, candidate["text"])
-        amount_delta = abs(candidate["amount"] - abs(transaction.amount))
-        amount_tolerance = _candidate_amount_tolerance(abs(transaction.amount), name_score)
+        amount_tolerance = _review_amount_tolerance(bank_amount, name_score, recorded=transaction.amount > 0)
         if amount_delta > amount_tolerance and not linked_bill:
             continue
 
@@ -484,7 +504,7 @@ def find_action_log_candidates(
             replace(_action_log_candidate(
                 logged,
                 candidate,
-                confidence=min(score, 0.98),
+                confidence=min(score, 0.71 if name_score < .5 else 0.98),
                 notes=f"amount Δ ${amount_delta:.2f}, date Δ {day_delta}d",
             ), sheet_ref=action_sheet_ref(logged, scheduled_pulls))
         )
@@ -737,6 +757,7 @@ def _action_candidate(logged: LoggedAction) -> dict | None:
         "amount": amount,
         "date": action_date,
         "text": " ".join(str(part) for part in text_parts if part),
+        "payment_label": _normalize_schedule_text(action.metadata.get("category", "")) if action_type == "payment" else "",
         "shared_bill": _normalize_schedule_text(action.metadata.get("category", "")) if shared_bill else "",
     }
 
@@ -844,6 +865,24 @@ def _name_score(transaction: BankTransaction, action_text: str) -> float:
 
 def _scheduled_name_score(transaction: BankTransaction, schedule_name: str) -> float:
     return _name_score(transaction, schedule_name)
+
+
+def _review_name_score(transaction: BankTransaction, name: str, *, bill_label: str = "") -> float:
+    # The city's generic payment descriptor also covers other services. Use
+    # this only as evidence in manual Water review, never for automatic matching.
+    if (_normalize_schedule_text(bill_label) in {"water", "water bill", "santa rosa water", "city of santa rosa water"}
+            and re.search(r"\bcity of santa rosa\b", _normalize_schedule_text(_normalized_transaction_text(transaction)))):
+        return 0.9
+    return _name_score(transaction, name)
+
+
+def _near_review_amount(bank_amount: float, difference: float) -> bool:
+    return difference <= max(2.0, min(10.0, bank_amount * .075))
+
+
+def _review_amount_tolerance(bank_amount: float, name_score: float, *, recorded: bool) -> float:
+    tolerance = _candidate_amount_tolerance(bank_amount, name_score)
+    return max(tolerance, min(10.0, bank_amount * .075)) if recorded else tolerance
 
 
 def _normalize_schedule_text(value: str) -> str:

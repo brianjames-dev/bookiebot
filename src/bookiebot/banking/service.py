@@ -31,6 +31,7 @@ from bookiebot.banking.plaid_client import PlaidClient, requires_bank_reconnect
 from bookiebot.banking.reconciliation import (
     ActionLogCandidate,
     ActionLogCandidateGroup,
+    REVIEW_EXACT_WINDOW_DAYS,
     ScheduledPullCandidate,
     _candidate_amount_tolerance,
     _scheduled_name_score,
@@ -877,7 +878,7 @@ class BankingService:
         if action_log is None:
             action_log = read_active_logged_actions(actor_key)
         excluded = self.store.matched_action_log_ids(owner_key)
-        pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key)
+        pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key, window_days=REVIEW_EXACT_WINDOW_DAYS)
         claimed_refs = self.store.matched_sheet_refs(owner_key) - {
             part.strip() for part in (item.matched_sheet_ref or "").split(" + ") if part.strip()
         }
@@ -1170,7 +1171,7 @@ class BankingService:
         claimed_refs = self.store.matched_sheet_refs(owner_key) - {
             part.strip() for part in (item.matched_sheet_ref or "").split(" + ") if part.strip()
         }
-        pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key)
+        pulls = _scheduled_pulls_for_transactions([item.transaction], actor_key=actor_key, window_days=REVIEW_EXACT_WINDOW_DAYS)
         if action_id in claimed_schedule_action_ids(
             pulls,
             action_by_id.values(), claimed_refs,

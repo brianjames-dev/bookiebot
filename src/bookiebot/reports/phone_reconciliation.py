@@ -22,7 +22,8 @@ from bookiebot.banking.schedule_changes import (
 )
 from bookiebot.core.bank_link import bank_reconnect_url
 from bookiebot.banking.reconciliation import (
-    ActionLogCandidate, claimed_schedule_action_ids, expense_match_references, find_action_log_candidates, find_scheduled_pull_candidates,
+    ActionLogCandidate, REVIEW_EXACT_WINDOW_DAYS, claimed_schedule_action_ids, expense_match_references,
+    find_action_log_candidates, find_scheduled_pull_candidates,
 )
 from bookiebot.banking.service import (
     BankingService, _reconciliation_max_age_days, _scheduled_pulls_for_transactions,
@@ -201,7 +202,7 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
             _, candidates, _ = service.reconciliation_match_candidates(owner, item.id, actor_key=actor,
                 limit=12, action_log=actions, include_groups=False)
         else:
-            pulls = _scheduled_pulls_for_transactions([transaction], actor_key=actor)
+            pulls = _scheduled_pulls_for_transactions([transaction], actor_key=actor, window_days=REVIEW_EXACT_WINDOW_DAYS)
             claimed = service.store.matched_sheet_refs(owner)
             excluded = service.store.matched_action_log_ids(owner) | claimed_schedule_action_ids(pulls, actions, claimed)
             candidates = find_action_log_candidates(

@@ -1,5 +1,15 @@
 # Agent Status
 
+## Reconcile inline share and broader match suggestions (2026-11-20)
+
+Keep Add expense and Confirm match on one row. Make the Budget entry card open the chooser, use the bank source alone in Ignore, and slide from the matched row to its payment summary in either DUO layout. The selected payment's editor survives a fold, and Back returns to the same checked row. Payments still require their existing separate confirmation.
+
+Manual matching recognizes City of Santa Rosa as a Water hint and checks the original payer charge around withdrawal. Check exact amounts against up to 14 days of recorded sources, allow a clearly identified exact bill within its original month if timing is missing, and consider small differences within the ordinary window. Weak-name matches require choosing the entry and received payments or prior claims are preserved. Automated matching is unchanged.
+
+Manual check. Open an exact match and compare the Add and Confirm button baselines. Open a candidate via the Budget entry card, then back out of Ignore and verify it only shows the bank charge. In Checked, view a settled share, fold, and tap Back. The same row stays selected. In Needs review, compare City of Santa Rosa against the full recorded Water charge before confirming a legitimate match.
+
+Local full suite passed 3,565 tests with 915 optional PostgreSQL skips. The final targeted bank/review suite passed 179 tests. Python/frontend types, the production build, and the Chromium and WebKit checks pass. The signed-in baseline confirmed the $97.96 City of Santa Rosa row lacked a Water candidate before the release.
+
 ## Reconcile editor readiness and split bills (2026-11-20)
 
 Close the compact title gaps in Savings and Reconcile. Render active editors after their first detail and queue refresh are ready. Keep a selected transaction through one read-only recovery by bank ID. Retry explicitly if that second detail fails. Match actions lead, Add expense is secondary when candidates exist, and review confirmation controls use button surfaces.

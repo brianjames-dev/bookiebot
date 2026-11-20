@@ -16,7 +16,9 @@ async function verify(browser, width, height, dark) {
     async request(route) {
       const request = route.request()
       const path = new URL(request.url()).pathname
-      if (path === '/app/reconciliation/1') await route.fulfill({ json: { item: { ...row, suggestions: [match] } } })
+      if (path === '/app/reconciliation/1') await route.fulfill({ json: { item: { ...row, suggestions: [match],
+        logging: { allowed: true, kind: 'expense', categories: ['shopping'], paymentMethods: ['Fixture card'], reason: '' },
+      } } })
       else if (path !== '/app/reconciliation') return false
       else if (request.method() === 'POST') {
         posts++
@@ -31,6 +33,10 @@ async function verify(browser, width, height, dark) {
     await page.getByRole('button', { name: 'Reconcile', exact: true }).click()
     await page.getByRole('button', { name: /^Fixture store/ }).click()
     const confirm = page.getByRole('button', { name: 'Confirm match', exact: true })
+    const add = page.getByRole('button', { name: 'Add expense', exact: true })
+    await confirm.waitFor()
+    const [confirmBox, addBox] = await Promise.all([confirm.boundingBox(), add.boundingBox()])
+    assert(Math.abs(confirmBox.y - addBox.y) < 1 && confirmBox.x > addBox.x, 'Add and Confirm use the same footer row')
     await confirm.click()
     const spinner = confirm.locator('.bb-report-loading-spinner')
     await spinner.waitFor({ state: 'visible' })
@@ -117,7 +123,7 @@ async function verifyWorkspace(browser) {
     const comparison = await pane.locator('.bb-reconcile-comparison').boundingBox()
     assert((await direct.boundingBox()).y > comparison.y + comparison.height)
     assert.equal(await pane.locator('summary[aria-label="Review options"]').count(), 0)
-    await direct.getByRole('button', { name: 'Choose budget entry' }).click()
+    await pane.locator('button[data-budget]').click()
     await pane.getByRole('heading', { name: 'Choose budget entry', exact: true }).waitFor()
     const marked = pane.locator('.bb-reconcile-choice[aria-pressed=true] svg.lucide-circle-check')
     assert.equal(await marked.count(), 1)
@@ -312,7 +318,8 @@ async function verifyMatchPriority(browser, width, height) {
     assert.equal(await page.getByText('Choose an entry', { exact: true }).count(), 0)
     const choose = page.getByRole('button', { name: 'Choose budget entry', exact: true })
     const add = page.getByRole('button', { name: 'Add expense', exact: true })
-    assert.match(await choose.getAttribute('class'), /bb-reconcile-primary/)
+    assert.notEqual(await choose.getAttribute('data-budget'), null)
+    assert.equal(await choose.locator('svg.lucide-chevron-right').count(), 1)
     assert.match(await add.getAttribute('class'), /bb-reconcile-outline/)
     await choose.click()
     await page.getByRole('button', { name: /Fixture utility.*50\/50 split/ }).click()
@@ -321,6 +328,10 @@ async function verifyMatchPriority(browser, width, height) {
     const ignore = page.getByRole('button', { name: 'Ignore transaction', exact: true })
     const back = page.getByRole('button', { name: 'Back', exact: true })
     await back.waitFor()
+    const ignoreScene = page.locator('[data-editor-scene=ignore]')
+    assert.equal(await ignoreScene.locator('.bb-reconcile-comparison').count(), 0)
+    assert.equal(await ignoreScene.locator('.bb-reconcile-choice-source .bb-transaction-icon').count(), 1)
+    assert.match(await ignoreScene.locator('.bb-reconcile-choice-source').innerText(), /Fixture store.*\$166\.31/s)
     for (const control of [ignore, back]) {
       assert.equal(await control.evaluate(el => getComputedStyle(el).borderTopWidth), '1px')
       assert((await control.boundingBox()).height >= 44)
@@ -336,8 +347,12 @@ async function verifyDesktopAndReceiptRefresh(browser) {
   let checks = 0, receiptReads = 0, readingReceipt = false
   const desktop = { newPage: options => browser.newPage({ ...options, hasTouch: false, isMobile: false }) }
   const checked = { ...row, status: 'checked', receipt: {
-    allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 8000,
+    allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 0,
   } }
+  const allocation = { id: 'fixture-shared-bill', payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian',
+    item: 'Fixture store', expenseDate: '2026-10-20', grossCents: row.amountCents, payerShareCents: 8631,
+    partnerShareCents: 8000, settledCents: 8000, outstandingCents: 0, accounting: 'cash_v1', method: 'equal',
+    version: 1, projectedVersion: 1, status: 'settled' }
   const { page, errors, unexpected } = await fixture(desktop, 720, 850, true, false, false, 0, {
     async request(route) {
       const request = route.request(), path = new URL(request.url()).pathname
@@ -351,7 +366,7 @@ async function verifyDesktopAndReceiptRefresh(browser) {
       else if (path === '/app/reimbursements') {
         assert.equal(request.method(), 'GET')
         if (readingReceipt && ++receiptReads === 1) await route.fulfill({ status: 503, json: { error: 'Receipt temporarily unavailable' } })
-        else await route.fulfill({ json: { enabled: true, ownerKey: 'brian', currency: 'USD', allocations: [], events: [], resets: [], resetState: 'fixture' } })
+        else await route.fulfill({ json: { enabled: true, ownerKey: 'brian', currency: 'USD', allocations: [allocation], events: [], resets: [], resetState: 'fixture' } })
       } else return false
       return true
     },
@@ -365,16 +380,28 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     const toolbar = page.locator('.bb-reconcile-title-actions')
     await toolbar.getByRole('button', { name: /Checked/ }).click()
     await page.locator('.bb-reconcile-row-toggle').click()
-    const openReceipt = page.getByRole('button', { name: 'Mark Hannah’s share received' })
+    const openReceipt = page.getByRole('button', { name: 'View Hannah’s share' })
     await openReceipt.waitFor()
     readingReceipt = true
     await openReceipt.click()
     const receipt = page.getByRole('region', { name: 'Receive shared payment' })
     await receipt.getByText('Receipt temporarily unavailable').waitFor()
+    assert.equal(await page.locator('.bb-reconcile-right [data-editor-scene=receipt] .bb-reconcile-receipt').count(), 1)
+    assert.equal(await page.locator('.bb-reconcile-left .bb-reconcile-receipt').count(), 0)
     assert.equal(await receipt.getByText(/Pull down/).count(), 0)
     const refresh = toolbar.getByRole('button', { name: 'Refresh payment', exact: true })
     await refresh.click()
-    await receipt.getByText('This shared payment changed.', { exact: false }).waitFor()
+    await receipt.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).waitFor()
+    assert.equal(await receipt.getByText(/The bank match is saved separately/).count(), 0)
+    await page.setViewportSize({ width: 382, height: 852 })
+    const inline = page.locator('.bb-reconcile-row[data-open=true] [data-editor-scene=receipt] .bb-reconcile-receipt')
+    await inline.waitFor()
+    assert.equal(await inline.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).count(), 1)
+    const back = inline.getByRole('button', { name: 'Back to reconciliation' })
+    assert.equal(await back.evaluate(el => getComputedStyle(el).borderTopWidth), '1px')
+    await back.click()
+    await page.getByRole('heading', { name: 'Checked transaction', exact: true }).waitFor()
+    assert.equal(await page.locator('.bb-reconcile-row[data-open=true]').count(), 1)
     assert.equal(receiptReads, 2)
     assert.equal(checks, 1, 'Receipt refresh only reads the receipt')
     assert.deepEqual(errors, [])

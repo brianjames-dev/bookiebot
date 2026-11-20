@@ -45,8 +45,8 @@
 .bb-reconcile-future { display: flex; align-items: center; gap: 9px; min-height: 44px; margin: 12px 0; }
 .bb-reconcile-future input { width: 18px; height: 18px; accent-color: hsl(var(--primary)); flex-shrink: 0; }
 .bb-reconcile-split { display: grid; gap: 7px; margin: 12px 0; }
-.bb-reconcile-receipt { border: 1px solid hsl(var(--border)); border-radius: 14px; padding: 16px; margin: 16px 0; scroll-margin-top: 24px; }
-.bb-reconcile-receipt h2 { margin: 0 0 8px; font-size: 17px; }
+.bb-reconcile-receipt { padding:10px 0 0; }
+.bb-reconcile-receipt h2 { margin:0 0 12px; font-size:17px; font-weight:500; letter-spacing:-.025em; }
 .bb-reconcile-receipt-amounts { margin: 16px 0; font-size: 13px; }
 .bb-reconcile-receipt-amounts > div { display: flex; justify-content: space-between; gap: 16px; margin: 8px 0; }
 .bb-reconcile-receipt-amounts dd { margin: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -83,7 +83,7 @@
 .bb-reconcile-row-amount { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .bb-reconcile-chevron { color:hsl(var(--muted-foreground)); transition:transform var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-reconcile-row[data-open="true"] .bb-reconcile-chevron { transform:rotate(180deg); }
-.bb-reconcile-row .bb-transaction-icon,.bb-reconcile-compare-source .bb-transaction-icon { position:relative; flex:none; width:28px; height:28px; }
+.bb-reconcile-row .bb-transaction-icon,.bb-reconcile-compare-source .bb-transaction-icon,.bb-reconcile-choice-source .bb-transaction-icon { position:relative; flex:none; width:28px; height:28px; }
 .bb-reconcile-inline { position:relative; padding:0 0 8px 26px; }
 .bb-reconcile-inline .bb-reconcile-row-details { padding:10px; border-radius:14px; background:hsl(var(--card)); }
 .bb-reconcile-row-details { position:relative; min-width:0; }
@@ -93,8 +93,11 @@
 .bb-reconcile-dismiss { display:grid; place-items:center; width:38px; height:38px; padding:0; border:1px solid hsl(var(--border)); border-radius:50%; background:hsl(var(--card)); color:hsl(var(--foreground)); }
 .bb-reconcile-tools .bb-reconcile-ignore { border:0; border-radius:8px; background:transparent; color:hsl(var(--destructive)); }
 .bb-reconcile-ignore { display:grid; place-items:center; width:38px; height:38px; padding:0; }
-.bb-reconcile-entry-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 0; }
-.bb-reconcile-entry-actions .bb-reconcile-action { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:auto; margin:0; padding:7px 10px; font-size:13px; }
+.bb-reconcile-entry-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:6px; margin:12px 0 0; }
+.bb-reconcile-entry-actions:empty,.bb-reconcile-decision:empty { display:none; }
+.bb-reconcile-entry-actions > .bb-reconcile-action,.bb-reconcile-decision > .bb-reconcile-action { display:inline-flex; align-items:center; justify-content:center; gap:8px; width:auto; margin:0; padding:7px 9px; font-size:13px; }
+.bb-reconcile-entry-actions:has(> .bb-reconcile-action) > .bb-reconcile-decision { margin-inline-start:auto; }
+.bb-reconcile-decision:has(> .bb-reconcile-confirm) { width:100%; }
 .bb-reconcile-entry-actions .bb-saving-label { display:inline-flex; align-items:center; gap:8px; }
 .bb-reconcile-choice-source,.bb-reconcile-candidates .bb-reconcile-choice {
   display:grid; grid-template-columns:minmax(0,1fr) auto 18px;
@@ -111,11 +114,14 @@
 .bb-reconcile .bi-editor-scenes > .bi-step-viewport > .bi-step-pane { background:hsl(var(--background)); }
 .bb-reconcile-inline .bi-editor-scenes > .bi-step-viewport > .bi-step-pane { background:hsl(var(--card)); }
 .bb-reconcile-comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.bb-reconcile-comparison > div { min-width:0; padding:10px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
-.bb-reconcile-comparison > [data-budget][data-matched=true] { background:hsl(var(--primary) / .08); border-color:hsl(var(--primary) / .3); }
+.bb-reconcile-comparison > :is(div,button) { min-width:0; padding:10px; border:1px solid hsl(var(--border)); border-radius:12px; background:hsl(var(--card)); }
+.bb-reconcile-comparison > button[data-budget] { display:flex; flex-direction:column; align-items:stretch; text-align:left; color:inherit; font:inherit; }
+.bb-reconcile-comparison > button[data-budget] .bb-reconcile-budget-title { display:flex; gap:4px; justify-content:space-between; align-items:center; }
+.bb-reconcile-budget-title svg { flex:none; color:hsl(var(--primary)); }
+.bb-reconcile-comparison > [data-budget][data-matched=true],.bb-reconcile-comparison > button[data-budget] { background:hsl(var(--primary) / .08); border-color:hsl(var(--primary) / .42); }
 .bb-reconcile-comparison small { display:block; font-size:11px; color:hsl(var(--muted-foreground)); overflow-wrap:anywhere; }
 .bb-reconcile-budget-placeholder { display:block; margin-top:8px; font-size:13px; line-height:1.35; color:hsl(var(--muted-foreground)); }
-.bb-reconcile-comparison > div > strong { display:block; margin:3px 0 7px; font-size:clamp(16px,2.6vw,24px); font-weight:500; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
+.bb-reconcile-comparison > :is(div,button) > strong { display:block; margin:3px 0 7px; font-size:clamp(16px,2.6vw,24px); font-weight:500; letter-spacing:-.035em; font-variant-numeric:tabular-nums; }
 .bb-reconcile-compare-source { display:flex; align-items:center; gap:6px; min-width:0; font-size:12px; line-height:1.35; overflow-wrap:anywhere; }
 .bb-reconcile-compare-source .bb-transaction-icon { width:22px; height:22px; }
 .bb-reconcile-match-result { display:flex; align-items:center; gap:5px; margin:8px 0; font-size:12px; color:hsl(var(--primary)); }
@@ -126,7 +132,7 @@
 @media (max-width:360px) {
   .bb-reconcile-inline { padding-inline-start:14px; }
   .bb-reconcile-comparison { gap:5px; }
-  .bb-reconcile-comparison > div { padding:7px; }
+  .bb-reconcile-comparison > :is(div,button) { padding:7px; }
   .bb-reconcile-inline .bb-reconcile-compare-source { display:block; }
 }
 @media (prefers-reduced-motion:reduce) {

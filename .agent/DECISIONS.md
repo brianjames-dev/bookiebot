@@ -1,5 +1,11 @@
 # Agent Decisions
 
+## 2026-11-20 — Broaden manual candidate evidence and keep receipts in the same editor
+
+The city descriptor is a manual Water hint. Recorded exact amounts can be suggested within 14 days. Nearby recorded amounts may appear with weaker text evidence, but weak-name candidates remain below the automatic UI selection threshold. Existing automatic decisions, source reservations, fresh confirmation, category direction, and separate payment confirmation remain in place.
+
+Use the Budget entry comparison card to select existing candidates and put the secondary Add action on the match footer. Route the checked share summary through the shared editor slide. Move one mounted receipt host across layouts so folding preserves its review and its refresh registration follows the active editor.
+
 ## 2026-11-20 — Match split bills against the full payer charge
 
 A canonical payer action and its uniquely identified bill occurrence reserve both references. Match the ledger's original gross even when the personal sheet carries a net value. Use the named occurrence to bridge early entry and withdrawal only within the existing date window. Exact matches change review metadata alone. A current cash-accounting mismatch requires the existing bound amount review and keeps confirmed repayments. Historical net amounts stay read-only. Never use the partner's reimbursement as evidence of the payer's bank withdrawal.
