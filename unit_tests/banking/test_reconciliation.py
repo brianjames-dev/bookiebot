@@ -549,6 +549,46 @@ def test_find_scheduled_pull_candidates_includes_exact_amount_with_vague_bank_na
     assert candidates[0].amount == 117.36
 
 
+def test_manual_review_ranks_water_above_coincidental_exact_amount_without_auto_matching():
+    transaction = replace(_transaction("City of Santa Rosa", 97.96), date="2026-05-18")
+    source = LoggedAction(id="water-source", user_key="brian", created_at="2026-05-01T12:00:00",
+        action=UndoAction(worksheet="income", kind="clear_cells", row=20, columns=[3], previous_values=[""],
+            new_values=["97.96"], description="Water $97.96", metadata={"type": "payment", "category": "water",
+                "canonical_reimbursement": "true", "reimbursement_source_action_id": "water-source",
+                "reconciliation_expense_date": "2026-05-01"}))
+    water = ScheduledPullCandidate("bill", "Water", 63.41, date(2026, 5, 19), "bill:water", amount_recorded=True)
+    coincidental = ScheduledPullCandidate("subscription", "Unrelated subscription", 97.96, date(2026, 5, 18), "subscription:other")
+    actions = find_action_log_candidates(transaction, [source], scheduled_pulls=[water, coincidental])
+    schedules = find_scheduled_pull_candidates(transaction, [water, coincidental], action_log=[source])
+    assert len(actions) == len(schedules) == 1
+    assert actions[0].amount == 97.96 and actions[0].confidence > 0.90
+    assert actions[0].sheet_ref.endswith(water.occurrence_ref)
+    unscheduled = find_action_log_candidates(transaction, [source])
+    assert [candidate.action_id for candidate in unscheduled] == [source.id]
+    assert unscheduled[0].confidence < .72
+    assert not find_action_log_candidates(replace(transaction, amount=300.0), [source], scheduled_pulls=[water])
+    assert schedules[0].sheet_ref == coincidental.occurrence_ref and schedules[0].confidence < .72
+    automatic = reconcile_transaction(transaction, [source], [water, coincidental])
+    assert automatic.status == "needs_review" and not automatic.matched_sheet_ref
+
+
+def test_manual_review_finds_more_recorded_expenses_and_pulls_by_amount():
+    transaction = _transaction("Unclear descriptor", 100)
+    action = LoggedAction(id="expense", user_key="brian", created_at="2026-05-06T12:00:00",
+        action=UndoAction(worksheet="expense", kind="clear_cells", row=20, columns=[14,15,16,17,18],
+            previous_values=[""]*5, new_values=["5/6/2026", "Groceries", "100.00", "Market", "Brian"],
+            description="Logged groceries", metadata={"type": "expense", "category": "food"}))
+    far_exact = ScheduledPullCandidate("subscription", "Cloud editor", 100, date(2026, 5, 5), "subscription:cloud")
+    near = ScheduledPullCandidate("bill", "Maintenance", 107, date(2026, 5, 13), "bill:maintenance", amount_recorded=True)
+    estimate = replace(near, name="Estimate", source_ref="bill:estimate", amount_recorded=False)
+    assert [item.action_id for item in find_action_log_candidates(transaction, [action])] == ["expense"]
+    assert not find_action_log_candidates(transaction, [action], excluded_action_ids={"expense"})
+    candidates = find_scheduled_pull_candidates(transaction, [far_exact, near, estimate])
+    assert {item.sheet_ref for item in candidates} == {far_exact.occurrence_ref, near.occurrence_ref}
+    assert all(item.confidence < .72 for item in candidates)
+    assert not find_scheduled_pull_candidates(transaction, [far_exact, near], excluded_sheet_refs={far_exact.occurrence_ref, near.occurrence_ref})
+
+
 def test_find_scheduled_pull_candidates_includes_bill_without_entered_amount_by_date():
     candidates = find_scheduled_pull_candidates(
         _transaction("Recology Sonoma", 145.36),
@@ -1266,7 +1306,7 @@ def test_reconciliation_match_candidates_includes_schedule_matches(monkeypatch, 
     monkeypatch.setattr(
         banking_service,
         "_scheduled_pulls_for_transactions",
-        lambda _transactions, actor_key: [
+        lambda _transactions, actor_key, **_options: [
             ScheduledPullCandidate(
                 source_type="subscription",
                 name="Railway",
@@ -1309,22 +1349,18 @@ def test_reconciliation_match_candidates_includes_schedule_matches(monkeypatch, 
     assert candidates[0].sheet_ref == "Subscriptions!B10:D10#pull=2026-05-17"
 
 
-def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, tmp_path):
+@pytest.mark.parametrize(('name', 'pull'), [
+    ('PG&E WEB ONLINE', ScheduledPullCandidate('bill', 'PG&E', 132.36, date(2026, 5, 17),
+        '_BookieBot Bill Schedule!A3:I3', amount_recorded=True)),
+    ('Unclear charge', ScheduledPullCandidate('subscription', 'Annual service', 132.36, date(2026, 5, 5),
+        'Subscriptions!B10:D10')),
+])
+def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, tmp_path, name, pull):
     monkeypatch.setattr(banking_service, "read_active_logged_actions", lambda _actor: [])
-    monkeypatch.setattr(
-        banking_service,
-        "_scheduled_pulls_for_transactions",
-        lambda _transactions, actor_key: [
-            ScheduledPullCandidate(
-                source_type="bill",
-                amount_recorded=True,
-                name="PG&E",
-                amount=132.36,
-                pull_date=date(2026, 5, 17),
-                source_ref="_BookieBot Bill Schedule!A3:I3",
-            )
-        ],
-    )
+    def scheduled_pulls(transactions, *, actor_key, window_days=7):
+        transaction_day = date.fromisoformat(transactions[0].date)
+        return [pull] if abs((transaction_day - pull.pull_date).days) <= window_days else []
+    monkeypatch.setattr(banking_service, '_scheduled_pulls_for_transactions', scheduled_pulls)
     store = BankStore(tmp_path / "banking.sqlite3", TokenCipher("test-secret-key"))
     service = BankingService(
         config=BankingConfig(
@@ -1345,14 +1381,16 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
             )
         ),
     )
-    service.seed_unmatched_debug_transaction("brian", name="PG&E WEB ONLINE", amount=132.36, date="2026-05-17")
+    service.seed_unmatched_debug_transaction("brian", name=name, amount=132.36, date="2026-05-17")
     item = service.reconciliation_preview("brian", force=True).items[0]
+    _, suggestions, _ = service.reconciliation_match_candidates('brian', item.id, actor_key='676638528590970917')
+    assert [candidate.sheet_ref for candidate in suggestions] == [pull.occurrence_ref]
 
     confirmed, candidate, status = service.confirm_reconciliation_schedule_match(
         "brian",
         item.id,
         actor_key="676638528590970917",
-        schedule_ref="_BookieBot Bill Schedule!A3:I3#pull=2026-05",
+        schedule_ref=pull.occurrence_ref,
     )
 
     assert status == "matched"
@@ -1360,7 +1398,7 @@ def test_confirm_reconciliation_schedule_match_marks_schedule_row(monkeypatch, t
     assert confirmed is not None
     assert confirmed.status == "confirmed"
     assert confirmed.matched_action_log_id is None
-    assert confirmed.matched_sheet_ref == "_BookieBot Bill Schedule!A3:I3#pull=2026-05"
+    assert confirmed.matched_sheet_ref == pull.occurrence_ref
 
 
 def test_scheduled_pulls_falls_back_to_visible_subscriptions(monkeypatch):
