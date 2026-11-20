@@ -217,7 +217,7 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
   const [details, setDetails] = useState<Record<number, ReconciliationItem>>({})
   const [detailFailure, setDetailFailure] = useState<{ id: number; version: string; message: string } | null>(null)
   const [detailRevision, setDetailRevision] = useState(0)
-  const [receiptTarget, setReceiptTarget] = useState<{ row: ReconciliationItem; scope: ReceiptLink & { review: boolean }; open: boolean; visit: number } | null>(null)
+  const [receiptTarget, setReceiptTarget] = useState<{ row: ReconciliationItem; scope: ReceiptLink; open: boolean; visit: number } | null>(null)
   const [receiptMutationLocked, setReceiptMutationLocked] = useState(false)
   const [receiptContainer] = useState(() => typeof document !== "undefined" && document.createElement ? document.createElement("div") : null)
   const receiptOpen = Boolean(receiptTarget?.open)
@@ -242,8 +242,8 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
   const rejectReceiptAccess = useCallback((message: string) => { setReceiptTarget(null); setDetails({}); rejectAccess(message) }, [rejectAccess])
   const closeReceipt = () => setReceiptTarget(previous => previous && { ...previous, open: false })
   const receiptVisit = useRef(0)
-  const openReceipt = (row: ReconciliationItem, receipt: ReceiptLink, review: boolean) => {
-    setReceiptTarget({ row, scope: { ...receipt, review }, open: true, visit: ++receiptVisit.current })
+  const openReceipt = (row: ReconciliationItem, receipt: ReceiptLink) => {
+    setReceiptTarget({ row, scope: receipt, open: true, visit: ++receiptVisit.current })
   }
   useEffect(() => {
     const refresh = () => { setDetails({}); setDetailRevision(value => value + 1) }
@@ -395,8 +395,8 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
             saving={pending?.operation === "reopen"} onClick={() => void load({operation:"reopen",id:detail.id,version:detail.stateVersion??detail.version})}>
             <RotateCcw size={15} aria-hidden="true"/>Reopen review</SavingButton>}
           {detail.receipt && <button type="button" className="bi-primary" disabled={disabled}
-            onClick={() => openReceipt(detail, detail.receipt!, detail.receipt!.outstandingCents > 0)}>
-            <Users size={16} aria-hidden="true"/>{detail.receipt.outstandingCents > 0 ? "Mark" : "View"} {detail.receipt.partner}’s share{detail.receipt.outstandingCents > 0 ? " received" : ""}</button>}
+            onClick={() => openReceipt(detail, detail.receipt!)}>
+            <Users size={16} aria-hidden="true"/>View {detail.receipt.partner}’s share</button>}
           {detail.scheduleRecovery && <SavingButton type="button" className="bi-primary" disabled={disabled} saving={pending?.operation === "recover_schedule"}
             onClick={() => void load({ operation: "recover_schedule", id: detail.id, version: detail.stateVersion ?? detail.version })}>Verify saved payment change</SavingButton>}
         </div></footer>
@@ -429,8 +429,8 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
         const followup = snapshot.receiptFollowup!
         const row = rows.find(item => item.id === followup.id)
         if (!row) return
-        setFilter("checked"); selectRow(row); openReceipt(row, followup.receipt, true)
-      }}>Review {snapshot.receiptFollowup.receipt.partner}’s share</button></div>}
+        setFilter("checked"); selectRow(row); openReceipt(row, followup.receipt)
+      }}>View {snapshot.receiptFollowup.receipt.partner}’s share</button></div>}
     {!snapshot && !error && <ReportLoading label="Loading bank transactions…"/>}
     {snapshot?.connections?.some(connection => connection.needsReconnect) && <div className="bb-reconcile-recovery-actions">
       {snapshot.connections.filter(connection => connection.needsReconnect).map(connection => <a key={connection.id}

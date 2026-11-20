@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — View a matched share before recording payment
+
+Both phone Reconcile entry points open the read-only share summary. Requesting to record money received is a separate action in that summary and uses the reviewed allocation version. Unmatched bank charges have no receipt shortcut.
+
 ## 2026-11-20 — Coalesce recurring preview sources and separate receipt viewing from saving
 
 Read an actor’s managed bill and subscription tabs, visible subscription fallback and current month in one read-only workbook batch. Serialize cold loads per actor, cache successful results for the existing preview lifetime and invalidate on the existing write and confirmation paths. Keep the managed-empty subscription marker authoritative and fail closed for an incomplete response.

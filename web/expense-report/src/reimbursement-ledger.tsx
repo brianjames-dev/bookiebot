@@ -181,7 +181,7 @@ function validate(snapshot: LedgerResponse) {
   return snapshot
 }
 
-export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number; review?: boolean }
+export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number }
 export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matchedReceiptActive = true, onClose, onRejectAccess, onReceiptMutationLock, balanceFirst = false, aliases, onUpdated, headerActions }: {
   fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; matchedReceiptActive?: boolean; onClose?: () => void; onRejectAccess?: (message: string) => void
   balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void; headerActions?: HTMLElement | null
@@ -336,17 +336,20 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
     void execute()
   }
   const undo = () => { if(!feedback.command||!snapshot||pending.current||executing.current||signedOut)return; const command=feedback.command;setImmediate(inverseDisplay(snapshot,command));setUndoVersion(value=>value+1);feedback.dismiss(); run(command,()=>{}) }
-  if (matchedReceipt) return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt bi-product" aria-label="Receive shared payment"><div className="bi-editor">
-    {legacy && !uncertain && fallback}
-    {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
-      {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
-        : pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
-    {!snapshot && !error && !legacy && <ReportLoading label="Loading the matched shared payment…"/>}
-    {snapshot && <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} active={matchedReceiptActive} disabled={busy || uncertain || refreshing}
-      run={run} refresh={() => void load()} aliases={aliases} />}
-    <footer className="bi-editor-footer bb-reconcile-native-actions"><button type="button" className="bi-cancel" disabled={busy || uncertain} onClick={onClose}>
-      <ArrowLeft aria-hidden="true"/>Back to reconciliation</button></footer>
-  </div></section></ReimbursementSavingContext.Provider>
+  if (matchedReceipt) {
+    const back = <button type="button" className="bi-cancel" disabled={busy || uncertain} onClick={onClose}>
+      <ArrowLeft aria-hidden="true"/>Back to reconciliation</button>
+    return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt bi-product" aria-label="Receive shared payment"><div className="bi-editor">
+      {legacy && !uncertain && fallback}
+      {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
+        {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
+          : pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
+      {!snapshot && !error && !legacy && <ReportLoading label="Loading the matched shared payment…"/>}
+      {snapshot ? <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} active={matchedReceiptActive} disabled={busy || uncertain || refreshing}
+        run={run} refresh={() => void load()} aliases={aliases} back={back} />
+        : <footer className="bi-editor-footer bb-reconcile-native-actions">{back}</footer>}
+    </div></section></ReimbursementSavingContext.Provider>
+  }
   if (legacy && !uncertain) return <>{fallback}</>
   return <ReimbursementSavingContext.Provider value={savingOperation}><Card className={`bb-report-section bb-reimbursement-section bb-canonical-reimbursements${balanceFirst ? " bb-balance-first-card" : ""}`}>
     {!balanceFirst && <CardHeader><CardTitle>Shared Reimbursements</CardTitle></CardHeader>}
@@ -363,17 +366,18 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
   </Card></ReimbursementSavingContext.Provider>
 }
 
-function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refresh, aliases }: {
-  snapshot: LedgerSnapshot; scope: MatchedReceiptScope; active: boolean; disabled: boolean; run: Run; refresh: () => void; aliases?: Record<string, string>
+function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refresh, aliases, back }: {
+  snapshot: LedgerSnapshot; scope: MatchedReceiptScope; active: boolean; disabled: boolean; run: Run; refresh: () => void; aliases?: Record<string, string>; back: ReactNode
 }) {
   const pageRefresh = Boolean(usePageRefreshRegistry())
   const wide = useAppNavigation()?.duoLandscape
   const item = snapshot.allocations.find(item => item.id === scope.allocationId && item.payerOwner === snapshot.ownerKey
     && writable(item) && item.grossCents === scope.bankAmountCents)
-  const [editing, setEditing] = useState(Boolean(scope.review))
-  const [reviewVersion, setReviewVersion] = useState(scope.review ? item?.version : undefined)
-  useAppWorkStatus({ label: "Matched payment review", dirty: active && editing, onDiscard: () => setEditing(false) })
-  if (!item) return <p role="status">This shared payment changed. Review its current details in Shared.</p>
+  const [reviewVersion, setReviewVersion] = useState<number>()
+  const editing = reviewVersion !== undefined
+  useAppWorkStatus({ label: "Matched payment review", dirty: active && editing, onDiscard: () => setReviewVersion(undefined) })
+  if (!item) return <><p role="status">This shared payment changed. Review its current details in Shared.</p>
+    <footer className="bi-editor-footer bb-reconcile-native-actions">{back}</footer></>
   const events = snapshot.events.filter(event => event.allocationId === item.id)
   const incoming = events.filter(event => event.status === "pending")
   const offset = events.filter(event => event.kind === "offset" && event.status === "confirmed").reduce((sum, event) => sum + event.amountCents, 0)
@@ -400,9 +404,12 @@ function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refres
     {Boolean(item.clearedCents) && <p className="bb-ledger-note">Undo the balance reset in Shared before recording a receipt.</p>}
     {incoming.map(event => <IncomingPayment key={event.id} event={event} allocation={item} disabled={disabled || pendingSheet || Boolean(item.clearedCents)} run={run} />)}
     {stale && <p role="status">This payment changed. Go back and reopen it before confirming.</p>}
-    {item.outstandingCents > 0 && !editing && <button type="button" className="bi-primary" disabled={blocked} onClick={() => { setReviewVersion(item.version); setEditing(true) }}>Mark {partner}’s share received</button>}
     {editing && item.outstandingCents > 0 && !pendingSheet && !item.clearedCents && !incoming.length
-      && <PaymentEditor allocation={item} isPayer native disabled={blocked || stale} run={run} close={() => setEditing(false)} />}
+      && <PaymentEditor allocation={item} isPayer native disabled={blocked || stale} run={run} close={() => setReviewVersion(undefined)} />}
+    <footer className="bi-editor-footer bb-reconcile-native-actions">{back}
+      {item.outstandingCents > 0 && !editing && <button type="button" className="bi-primary" disabled={blocked}
+        onClick={() => setReviewVersion(item.version)}>Mark {partner}’s share received</button>}
+    </footer>
   </>
 }
 
