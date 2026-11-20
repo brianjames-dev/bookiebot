@@ -50,6 +50,7 @@ interface Snapshot { enabled: boolean; checkedAt: string | null; items: Reconcil
 type Command = { operation: "check" } | { operation: "prepare" | "confirm" | "update_match" | "update_schedule" | "recover_schedule" | "log" | "ignore" | "reopen"; id: number; version: string; suggestionId?: string; fields?: Record<string, string>; scheduleVersion?: string; updateFuture?: boolean; splitMethod?: string; sharedAmountToken?: string; reviewIntent?: "amount" | "log" }
 type ReviewCommand = Exclude<Command, { operation: "check" }>
 const endpoint = "/app/reconciliation"
+const detailStillFresh = (item: ReconciliationItem) => Date.now() - (item.loadedAt ?? 0) < 30_000
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
 const isAmount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value)
@@ -224,7 +225,7 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
     setDetailFailure(null)
     if (item) setDetails(previous => {
       const saved = previous[item.id]
-      if (!saved || (saved.stateVersion && Date.now() - (saved.loadedAt ?? 0) < 30_000)) return previous
+      if (!saved || (saved.stateVersion && detailStillFresh(saved))) return previous
       const next = { ...previous }; delete next[item.id]; return next
     })
     setSelection(item ? { id: item.id, bankId: item.bankId } : null)
@@ -264,13 +265,16 @@ export function ReconciliationScreen({ controller, embeddedHeader=false, wide=fa
   }, [preparedId])
   // Keep source previews for unchanged bank/review versions for up to 30 seconds.
   // Every financial confirmation still validates fresh server-side evidence.
-  useEffect(() => { setDetails(previous => Object.fromEntries(Object.entries(previous).filter(([id, detail]) => {
-    const row = rows.find(entry => entry.id === Number(id))
-    return row && (!row.stateVersion || row.stateVersion === detail.stateVersion)
-  }))) }, [revision])
+  useEffect(() => {
+    setDetails(previous => Object.fromEntries(Object.entries(previous).filter(([id, detail]) => {
+      const row = rows.find(entry => entry.id === Number(id))
+      return row && (!row.stateVersion || row.stateVersion === detail.stateVersion) && detailStillFresh(detail)
+    })))
+    if (openDetail && !detailStillFresh(openDetail)) setDetailRevision(value => value + 1)
+  }, [revision])
   useEffect(() => {
     if (openId === null || !openVersion || !snapshot?.enabled) return
-    if (openDetail && Date.now() - (openDetail.loadedAt ?? 0) < 30_000) return
+    if (openDetail && detailStillFresh(openDetail)) return
     if (openDetail) setDetails(previous => { const next = { ...previous }; delete next[openId]; return next })
     const controller = new AbortController(); let active = true
     void request(`${endpoint}/${openId}`, controller).then(value => {

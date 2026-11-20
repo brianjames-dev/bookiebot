@@ -6,7 +6,7 @@ Close the compact title gaps in Savings and Reconcile. Render active editors aft
 
 Match recorded split bills by the payer's canonical gross, including an early invoice entry and a net personal sheet cell. Suppress the equivalent schedule candidate, reserve the source and occurrence together, and use the current shared amount review for a real difference. Historical net bills allow exact matching only. No live financial writes.
 
-Local verification passed 3,563 tests with 915 optional PostgreSQL skips. Python types, frontend types, the production build, and Chromium/WebKit tests passed. Focused regressions cover finite detail retry, retention when a bank row receives its review ID, ready first render, match priority, both button styles, preserved repayments, and duplicate-claim prevention.
+Local verification passed 3,563 tests with 915 optional PostgreSQL skips. Python types, frontend types, the production build, and Chromium/WebKit tests passed. Focused regressions cover finite detail retry, retention when a bank row receives its review ID, ready first render, expired-preview refresh, match priority, both button styles, preserved repayments, and duplicate-claim prevention.
 
 Manual DUO check. In closed DUO compare the spacing under Savings and Reconcile with Reimbursements. Open a Needs review row during refresh and verify the first visible editor is actionable. In both poses open a row with possible matches, then try Choose budget entry and back out of Ignore. For Recology, compare its full original charge with the bank amount and verify existing shares/repayments in Shared. Use Confirm match only for the right existing charge. If there is a real difference, inspect the revised shares and prior received amount before any decision.
 

@@ -4,6 +4,8 @@ const React = req('react'), Renderer = req('react-test-renderer'), ts = req('typ
 global.IS_REACT_ACT_ENVIRONMENT = true
 const requests = [], timers = new Map(), listeners = new Map()
 let serial = 0, work, controller, tree, owner = 'Brian'
+let clockOffset = 0
+class TestDate extends Date { static now() { return Date.now() + clockOffset } }
 const statuses = new Map()
 const updateWork = () => { const entries = [...statuses.values()]; work = { pending: entries.some(entry => entry.pending), uncertain: entries.some(entry => entry.uncertain), dirty: entries.some(entry => entry.dirty) } }
 const events = []
@@ -18,7 +20,7 @@ function load(file) {
   if (cache.has(file)) return cache.get(file)
   const exports = {}; cache.set(file, exports)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText
-  vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set, crypto: { randomUUID: () => `receipt-${++serial}-request` },
+  vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date: TestDate, Set, crypto: { randomUUID: () => `receipt-${++serial}-request` },
     Event: class { constructor(type) { this.type = type } }, CustomEvent: class { constructor(type) { this.type = type } }, window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
     require: name => name.endsWith('.css') ? {} : name === './daily-transactions' ? { TransactionIcon: () => null }
@@ -92,6 +94,12 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await respond(snapshot(), 200, focusRefresh)
   assert.ok(button('Confirm match')); assert.equal(button('Confirm match').props.disabled, false)
   assert.equal(requests.length, beforeDetail + 2, 'The unchanged list keeps a completed detail and never automatically confirms it')
+  clockOffset += 31_000
+  await run(() => listeners.get('focus').forEach(fn => fn()))
+  await respond(snapshot())
+  assert.equal(latest().url, '/app/reconciliation/1', 'A focus refresh revalidates an expired detail even when the bank state is identical')
+  assert.equal(button('Confirm match'), undefined)
+  await respond(detail(rows[0])); assert.equal(button('Confirm match').props.disabled, false)
   // A rejected metadata match must refresh its obsolete review, not trap the
   // whole screen behind the same uncertainty guard as a lost financial write.
   await click('Confirm match')
