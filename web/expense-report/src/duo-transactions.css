@@ -41,13 +41,18 @@
   grid-column:1; grid-row:4; margin:0 35px 8px; min-height:44px; justify-self:start;
  }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-results {
-  display:block; grid-column:1; grid-row:5; margin:0 27px 0 35px; padding-right:8px; min-height:0;
+  display:block; grid-column:1; grid-row:5;
+ }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-results,
+ .bb-reconcile[data-wide=true] .bb-reconcile-left {
+  margin-right:27px; margin-left:35px; padding-right:8px; min-height:0;
   position:relative; isolation:isolate;
   overflow-x:hidden; overflow-y:auto; overscroll-behavior:none;
   scrollbar-width:thin; scrollbar-color:hsl(var(--border)) transparent;
  }
  /* Keep promoted rows/icons within their own paint stack, away from the native scrollbar. */
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transaction-list { padding-top:0; position:relative; isolation:isolate; z-index:0; }
+ .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-transaction-list,
+ .bb-reconcile[data-wide=true] .bb-reconcile-list { padding-top:0; position:relative; isolation:isolate; z-index:0; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-graph-toggle { display:none; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-summary-controls { max-width:55%; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-recorded-summary-controls .bb-category-mix-filter { max-width:100%; }

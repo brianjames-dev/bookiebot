@@ -21,7 +21,11 @@ function load(file) {
   vm.runInNewContext(code, { exports, AbortController, Error, Intl, Date, Set, crypto: { randomUUID: () => `receipt-${++serial}-request` },
     Event: class { constructor(type) { this.type = type } }, CustomEvent: class { constructor(type) { this.type = type } }, window: win, document: { visibilityState: 'visible', addEventListener: win.addEventListener, removeEventListener: win.removeEventListener },
     fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject })),
-    require: name => name.endsWith('.css') ? {} : name === './app-work-guard' ? {
+    require: name => name.endsWith('.css') ? {} : name === './daily-transactions' ? { TransactionIcon: () => null }
+      : name === './transaction-editor-workspace' ? {
+        EditorExpansion: ({ open, children }) => open ? children : null,
+        EditorScenes: ({ children }) => children,
+      } : name === './app-work-guard' ? {
       useAppWorkStatus(value) {
         const id = React.useId()
         statuses.set(id, value); updateWork()
@@ -168,8 +172,8 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await expand('Paycheck'); await respond(detail(rows[5]))
   assert.match(rendered(), /\+\$15\.99/); assert.ok(button('Confirm match'), 'Exact income compares absolute bank cents, while displaying money-in direction')
   await expand('New posted'); await respond(detail(rows[6], [])); assert.ok(button('Ignore transaction'))
-  assert.match(button('Ignore transaction').props.className, /bb-reconcile-danger/)
-  assert.match(rendered(), /No close match found in your budget sheet/)
+  assert.match(button('Ignore transaction').props.className, /bb-reconcile-ignore/)
+  assert.match(rendered(), /No matching entry/)
   assert.equal(button('Review transaction'), undefined); assert.equal(button('Check for matches'), undefined)
   await expand('New posted'); await expand('New posted'); const rawExact = detail(rows[6]); rawExact.item.version = 'raw-exact-version'; await respond(rawExact)
   assert.ok(button('Confirm match')); assert.equal(button('Review match'), undefined)
@@ -200,6 +204,8 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await click('Cancel new entry')
   await click('Check'); assert.deepEqual(body(), { operation: 'check' }); assert.ok([...timers.values()].some(timer => timer.ms === 60000))
   await respond(snapshot()); await expand('Coffee'); await respond(detail(rows[0]))
+  const beforeIgnore = requests.length
+  await click('Ignore transaction'); assert.equal(requests.length, beforeIgnore)
   await click('Ignore transaction'); assert.deepEqual(body(), { operation: 'ignore', id: 1, version: 'detail-version-1' })
   await respond({ error: 'This transaction changed. Check again.' }, 409)
   assert.equal(latest().options.method, 'GET'); await respond(snapshot())

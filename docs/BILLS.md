@@ -44,6 +44,8 @@ Choose a bill to open **Bill amount** directly in its existing Bills editor. **R
 
 ## Recurring configuration
 
+To correct this month’s withdrawal, open the bill and choose **This month’s bill** → **Edit payment date**. Review the old and new dates and confirm. Calendar and Transactions use the corrected date for that occurrence. The recurring payment day, original amount, split and recorded repayments stay the same. Future-dated corrections appear in Transactions on the corrected day.
+
 Set the recurring amount, payment day, frequency and account. **Applies from** defaults to the current month, or the saved upcoming version's month when opening that version. Choose the current month or a later month; the saved recurring rule starts in that exact month and continues until changed again. Selecting November shows **Applies from: November 2026 onward** in the existing review row and saves November, even when a November charge is already recorded. Back, switching rows and folding retain that selection and prepared review. There are no separate selected/recurring start labels.
 
 An eligible unrecorded fixed charge uses the new November amount and appears in November Transactions once its saved payment day arrives. A recurring split starts with that selected month's eligible charges, including an elapsed payment day. Recorded occurrences retain their original amount, category, payment date and split separately from the recurring rule, including fully repaid zero cash expense. They remain one actual transaction rather than being recreated. A managed legacy monthly bill can retain a valid payment date and actual transaction even when its old configuration has no expected price. Variable estimates still never become actual transactions.

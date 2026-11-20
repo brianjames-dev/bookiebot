@@ -10,6 +10,7 @@ import re
 from typing import Any, cast
 
 from bookiebot.reports.app_access import PostgresAppAccessStore, build_app_access_store
+from bookiebot.reports.bill_payment_date import date_batch, prepare_date
 from bookiebot.sheets import undo
 from bookiebot.sheets.recurring import BILL_TAB, SUBSCRIPTION_TAB, SETTINGS_LOG_TAB, BillConflict, BillValidation, BillPlan, fingerprint, month_key, money_cents, selected
 from bookiebot.sheets.recurring_changes import prepare_change
@@ -166,6 +167,8 @@ def review(actor: str, body: dict[str, Any], *, snapshot: WorkbookSnapshot | Non
     if body.get("operation") == "current":
         from bookiebot.reports.bill_current_review import review_current
         return review_current(actor, source, body)
+    if body.get("operation") == "payment-date":
+        return prepare_date(source, body, today)[0]
     if body.get("operation") == "rollover":
         return _carry_review(source, body, today)["review"]
     if body.get("operation") == "project":
@@ -339,6 +342,8 @@ class BillCommands:
             elif command.get("operation") in {"end-year", "restore-end-year"}:
                 from bookiebot.reports.bill_cancellation import command_source
                 snapshot = command_source(actor, command, now_pacific().date())
+            elif command.get("operation") == "payment-date":
+                snapshot = read_workbook(actor, date.fromisoformat(month_key(command["month"]) + "-01"))
             else:
                 snapshot = read_workbook(actor, now_pacific().date())
             rows = snapshot.rows.get("_BookieBot Bill Settings Log", [])
@@ -462,10 +467,19 @@ class BillCommands:
                     if body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
                         from bookiebot.reports.savings_transfers import review as transfer_review
                         transfer = transfer_review(actor, body, source)
-                    checked_review = transfer['review'] if transfer else carry["review"] if carry else projection["review"] if projection else review(actor, body, snapshot=source)
+                    if body.get("operation") == "payment-date":
+                        checked_review, date_rows = prepare_date(source, body, now_pacific().date())
+                    else:
+                        date_rows = None
+                        checked_review = transfer['review'] if transfer else carry["review"] if carry else projection["review"] if projection else review(actor, body, snapshot=source)
                     if checked_review["reviewVersion"] != body.get("reviewVersion"):
                         raise BillConflict("The bill review changed. Review it again before saving.")
-                    if body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
+                    if date_rows is not None:
+                        batch, result = date_batch(source, date_rows, request_id, digest)
+                        started = True
+                        batch.send()
+                        batch_committed = True
+                    elif body.get('operation') in {'transfer-create', 'transfer-update', 'transfer-stop'}:
                         from bookiebot.reports.savings_transfers import configuration_batch as transfer_batch
                         assert transfer is not None
                         batch, result = transfer_batch(source, transfer, request_id, digest)
@@ -536,7 +550,7 @@ class BillCommands:
             for key in list(_CACHE):
                 if key[0] == actor:
                     _CACHE.pop(key)
-        if result.get('success') and body.get('operation') in {'end','end-year','restore-end','restore-end-year'}:
+        if result.get('success') and body.get('operation') in {'end','end-year','restore-end','restore-end-year','payment-date'}:
             from bookiebot.banking.service import clear_schedule_source_cache
             clear_schedule_source_cache(actor)
         return result

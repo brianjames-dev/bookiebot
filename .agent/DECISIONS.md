@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — Correct a recorded bill’s withdrawal date at the occurrence
+
+Bills offers a separate current-month review for the payer to correct the date of a physical recorded charge. Persist only the date override on the existing plan/month charge identity. A legacy charge without a record receives metadata tied to its existing worksheet row. Reuse the atomic Sheets receipt and owner lock. The recurring rule, sheet cash, allocation and repayment evidence keep their original identities and values. Calendar and Transactions consume the same effective withdrawal date.
+
 ## 2026-11-19 — Estimate ESPP on an eligible entered paycheck
 
 Derive an estimate for blank withholding on an eligible paycheck in the current Pacific month. Scale by the latest earlier confirmed deduction-to-net-deposit ratio for the same payroll source and enrollment rate. The scheduled-paycheck matcher removes the fulfilled forecast. Apply the estimate only in Projected and show it separately in Savings and the Saved explanation. The existing withholding cell confirms the actual and supersedes estimation, including an explicit zero. Estimates never write to payroll or enter confirmed Current and lifetime Invested totals.
