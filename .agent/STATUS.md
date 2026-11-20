@@ -1,5 +1,9 @@
 # Agent Status
 
+## Unfolded DUO rotation and save feedback (2026-11-20)
+
+Arm the guarded native viewport-fit recovery when the open display returns from portrait to landscape, including late reduced-height reports. Preserve scroll positions, open editors and the settled navigation placement. Reconcile shows the shared saving ring inside the matched action button, and Bills, Transfers and Transactions use it on their confirmation buttons. Test with the Home Screen app unfolded: note the bottom of the list and dock in landscape, rotate fully to portrait, then back to landscape without folding or backgrounding. Repeat once with a Transactions editor open. In Reconcile, use the next intended confirmation to check that the spinner stays in the tapped button until it finishes. The automated rotation fixtures model the native viewport dimensions and no live financial changes are needed for these checks. CI and deployment evidence belong to the task PR.
+
 ## Estimate ESPP when a paycheck is logged (2026-11-19)
 
 An eligible current-month paycheck with a blank withholding field now gets a preview proportional to its entered net deposit. Use the latest earlier confirmed same-source, same-rate payroll ratio, rounded to cents. Apply only in Projected; show the dated estimate separately in Savings and the Saved details. The posted paycheck takes over from the scheduled forecast, and a real withholding entry including zero takes over from the estimate. Preserve confirmed Current and lifetime totals. Focused payroll and display checks cover rounding, changed deposit, invalid and future entries, source/rate changes, and estimate replacement. Manual acceptance is the payroll step in docs/SAVINGS.md. Final checks and deployment evidence belong to the task PR.

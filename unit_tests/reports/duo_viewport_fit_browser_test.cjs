@@ -18,7 +18,7 @@ async function geometry(page){return page.evaluate(()=>{
    await page.exposeFunction('__nativeFitRestored',async()=>{if(armed){armed=false;await page.setViewportSize({width:867,height:669});recovered=true}});
    await page.addInitScript(()=>{
     Object.defineProperty(navigator,'standalone',{configurable:true,value:true});
-    Object.defineProperty(window,'outerWidth',{get:()=>951});Object.defineProperty(window,'outerHeight',{get:()=>669});
+    Object.defineProperty(window,'outerWidth',{get:()=>window.__openPortrait?669:951});Object.defineProperty(window,'outerHeight',{get:()=>window.__openPortrait?951:669});
     // The user's Screen API stayed on the closed display. It is diagnostic
     // evidence only, and must not become the app's canvas height/width.
     Object.defineProperty(window,'screen',{value:{width:457,height:678,availWidth:457,availHeight:678,orientation:{type:'landscape-secondary',angle:270}}});
@@ -56,6 +56,22 @@ async function geometry(page){return page.evaluate(()=>{
   // A subsequent healthy return must neither flash nor reparse the viewport.
   await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'));Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'visible'});document.dispatchEvent(new Event('visibilitychange'))});await wait(page);
   assert.equal(await page.evaluate(()=>window.__fitChanges.length),2);
-  await page.screenshot({path:out+'/'+engine.name()+'-'+tab+'.png'});assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);cases++;console.log('PASS native-fit dimensions, committed reset, retained draft and healthy return',engine.name(),tab);
+  // Rotate without a visibility/focus change. The native host briefly reports
+  // a healthy viewport followed by the same reduced height with the rail out.
+  await page.evaluate(()=>{window.__openPortrait=true;window.dispatchEvent(new Event('orientationchange'))});
+  await page.setViewportSize({width:669,height:867});
+  await page.locator('.bb-page:not([data-duo-landscape])').waitFor();await wait(page);
+  assert.equal(await page.evaluate(()=>window.__fitChanges.length),2);
+  await page.evaluate(()=>{window.__openPortrait=false;window.__fitSawPaint=false});
+  await page.setViewportSize({width:867,height:669});
+  await page.locator('.bb-page[data-duo-landscape="true"]').waitFor();
+  recovered=false;armed=true;await page.setViewportSize({width:867,height:587});
+  await page.waitForFunction(()=>window.__fitChanges.length===4);
+  for(let i=0;!recovered&&i<20;i++)await page.waitForTimeout(50);
+  assert(recovered);await wait(page);
+  assert.deepEqual(await geometry(page),before,'Rotation restores full height and dock geometry on '+tab);
+  if(tab==='Transactions')assert.equal(await page.getByRole('textbox',{name:'Amount',exact:true}).inputValue(),'94.00','Retain unsaved draft across rotation');
+  assert.equal(await page.evaluate(()=>window.__fitChanges.length),4);
+  await page.screenshot({path:out+'/'+engine.name()+'-'+tab+'.png'});assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);cases++;console.log('PASS native-fit recovery, app return, rotation and retained state',engine.name(),tab);
  }catch(error){await page.screenshot({path:out+'/failure-'+engine.name()+'-'+tab+'.png',fullPage:true});throw error}finally{await page.close()}
  }}finally{await browser.close()}}console.log(cases+' built-app native-fit contract cases passed')})().catch(error=>{console.error(error);process.exitCode=1});

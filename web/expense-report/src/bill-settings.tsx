@@ -20,7 +20,7 @@ import {usePageRefresh,usePageRefreshRegistry} from './page-refresh'
 import {BillPredictionInfo} from './bill-prediction-info'
 import type {BillPrediction} from './types'
 import {CategoryFilterControl} from './category-filter-control'
-import {ReportLoading} from './report-loading'
+import {ReportLoading,SavingButton} from './report-loading'
 import {readPageScroll,scrollPageTo} from './page-scroll'
 import type {BillAmountRequest} from './bill-checkin'
 import './bill-checkin.css'
@@ -273,7 +273,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   {shownReview.replacesScheduledChanges&&<p className="bi-footnote">Replaces later scheduled changes for this bill.</p>}
   {shownReview.operation==='amount'&&<p className="bi-footnote">Appears in Transactions on the saved autopay date. Early repayments stay in Shared.</p>}
   {shownReview.operation==='adopt'&&<p className="bi-footnote">Prepares this recorded charge for editing here. The purchase total stays unchanged.</p>}
-  <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}><ArrowLeft aria-hidden="true"/>Back</button><button type="button" className="bi-primary" disabled={locked||!review||!confirmReady} onClick={()=>void save()}>{busy?'Saving…':shownReview.operation==='delete'||shownReview.operation==='end'?'Stop bill':shownReview.operation==='restore-end'?'Restore bill':shownReview.operation==='amount'?'Confirm amount':'Confirm'}</button></footer>
+  <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}><ArrowLeft aria-hidden="true"/>Back</button><SavingButton type="button" className="bi-primary" disabled={locked||!review||!confirmReady} saving={busy&&Boolean(pending)} onClick={()=>void save()}>{shownReview.operation==='delete'||shownReview.operation==='end'?'Stop bill':shownReview.operation==='restore-end'?'Restore bill':shownReview.operation==='amount'?'Confirm amount':'Confirm'}</SavingButton></footer>
  </>
  return <div ref={root} className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
 

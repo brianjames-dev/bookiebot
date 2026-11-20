@@ -3,12 +3,12 @@ import type {LedgerSnapshot} from './reimbursement-ledger'
 import {reimbursementReceipt,reimbursementSyncPending,resolveReimbursementReceipt,type ReimbursementReceipt} from './reimbursement-undo'
 import type {UndoNotice} from './transaction-undo-popup'
 import {transactionMotion} from './transaction-inline-editor'
-import {ReportLoading} from './report-loading'
+import {SavingButton} from './report-loading'
 
 export const ReimbursementSavingContext=createContext<string|undefined>(undefined)
-export function ReimbursementSaveButton({operation,children,className='',...props}:ButtonHTMLAttributes<HTMLButtonElement>&{operation:string;children:ReactNode}){
+export function ReimbursementSaveButton({operation,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{operation:string;children:ReactNode}){
  const saving=useContext(ReimbursementSavingContext)===operation
- return <button {...props} className={className+' bb-saving-button'} aria-busy={saving||undefined} data-saving={saving||undefined} aria-label={props['aria-label']??(typeof children==='string'?children:undefined)}><span className="bb-saving-label">{children}</span>{saving&&<span className="bb-saving-indicator" aria-hidden="true"><ReportLoading compact label="Saving…"/></span>}</button>
+ return <SavingButton {...props} saving={saving}/>
 }
 type Phase='syncing'|'ready'|'changed'|'queued'|'undone-syncing'|'undone'|'failed'
 interface Feedback {notice:UndoNotice;receipt:ReimbursementReceipt|null;phase:Phase;dismissed:boolean;jobId?:string;detail?:string}

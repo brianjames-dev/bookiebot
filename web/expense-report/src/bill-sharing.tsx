@@ -1,3 +1,4 @@
+import {SavingButton} from './report-loading'
 import {useEffect,useRef,useState} from 'react'
 import {StepMotion} from './transaction-step-motion'
 import {transactionMotion} from './transaction-inline-editor'
@@ -110,7 +111,7 @@ export function BillSharingEditor({bill,ownerName,partnerName,onClose,onSaved,on
     <div><dt>Repeats</dt><dd>{review.bill.cadence}</dd></div><div><dt>Payment day</dt><dd>{review.bill.pullDay??'Not set'}</dd></div></dl>}
    <p className="bb-settings-note">Existing transactions, splits and received repayments stay unchanged.</p>
   </>}
-  <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setChange(null);setError('')}}>Back</button><button type="button" className="bi-primary" disabled={locked||!ready} onClick={()=>void confirm()}>Confirm</button></footer>
+  <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setChange(null);setError('')}}>Back</button><SavingButton type="button" className="bi-primary" disabled={locked||!ready} saving={busy&&Boolean(pending)} onClick={()=>void confirm()}>Confirm</SavingButton></footer>
  </div>
  return <div className="bb-bill-sharing" aria-busy={busy}>
   <StepMotion open mode="slide" duration={transactionMotion.duration} review={Boolean(review)} edit={summary} confirm={confirmView}/>

@@ -42,6 +42,14 @@ const visible = node => { for (let current = node; current; current = current.pa
 const rendered = () => text(tree.toJSON())
 const buttons = () => tree.root.findAllByType('button').filter(visible)
 const button = label => buttons().find(node => text(node) === label || node.props['aria-label'] === label)
+const assertBusyButton = label => {
+  const saving = button(label)
+  assert.equal(saving.props.disabled, true)
+  assert.equal(saving.props['aria-busy'], true)
+  const spinner = saving.findByProps({ className: 'bb-report-loading', 'data-compact': true })
+  assert.deepEqual(tree.root.findAllByProps({ className: 'bb-report-loading', 'data-compact': true }), [spinner],
+    'The initiating control contains the only compact spinner')
+}
 const click = async label => run(() => { const node = button(label); assert.ok(node, `Missing ${label}`); assert.ok(!node.props.disabled, `Disabled ${label}`); node.props.onClick() })
 const filter = async label => run(() => buttons().find(node => node.props['aria-pressed'] !== undefined && text(node).startsWith(label)).props.onClick())
 const expand = async merchant => run(() => tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'bb-reconcile-row-toggle' && text(node).startsWith(merchant)).props.onClick())
@@ -98,6 +106,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   await click('Confirm match')
   assert.deepEqual(body(), { operation: 'confirm', id: 1, version: 'detail-version-1', suggestionId: 'expense-a' })
   assert.equal(work.pending, true); assert.equal(latest().options.method, 'POST')
+  assertBusyButton('Confirm match')
   const lost = latest(); await reject(lost)
   assert.equal(work.uncertain, true); assert.ok(!button('Check status').props.disabled, 'Read-only status refresh remains available during uncertainty')
   assert.ok(button('Confirm match').props.disabled, 'Uncertain response cannot be blindly retried')
@@ -134,6 +143,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.match(rendered(), /Hannah’s share\$9\.00 → \$7\.99/); assert.match(rendered(), /Already received · kept\$6\.00/)
   assert.match(rendered(), /Hannah still owes\$1\.99/); assert.match(rendered(), /records no additional repayment/)
   await click('Update amount & match'); assert.equal(body().sharedAmountToken, sharedPlan.token)
+  assertBusyButton('Update amount & match')
   const rejectedPosts = requests.filter(r => r.options.method === 'POST').length
   await respond({ error: 'This shared expense or repayment changed. Review the revised shares again.', outcome: 'not_applied' }, 409)
   assert.equal(latest().options.method, 'GET', 'A guaranteed no-write rejection refreshes once without repeating a financial command')
@@ -270,6 +280,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.match(latest().url, /future=1/); assert.ok(button('Update scheduled payment & match').props.disabled)
   await respond({ change: { ...schedulePlan, fingerprint: 'f'.repeat(64), updateFuture: true, description: 'Update this payment and the future bill estimate.' } })
   await click('Update scheduled payment & match')
+  assertBusyButton('Update scheduled payment & match')
   assert.deepEqual(body(), { operation: 'update_schedule', id: 30, version: 'detail-version-30', suggestionId: 'schedule:bill:water', scheduleVersion: 'f'.repeat(64), updateFuture: true, splitMethod: 'income' })
   await respond(snapshot([{ ...scheduledRow, status: 'checked' }]))
   const recoveringSchedule = item(31, 'Cloud saved change', { version: 'recovery-base', stateVersion: 'recovery-base', readOnly: true, scheduleRecovery: true })
@@ -295,6 +306,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.equal(requests.length, beforeCached, 'Entering and reviewing a new entry never writes')
   await run(() => form().props.onSubmit({ preventDefault() {} }))
   assert.deepEqual(body(), { operation: 'log', id: 20, version: 'base-20', fields: { category: 'food', item: 'Donut shop', location: 'Donut shop', person: 'Brian (BofA)' } })
+  assertBusyButton('Add entry & match')
   await respond(snapshot([{ ...logRow, status: 'checked', version: 'checked-20', stateVersion: 'checked-20' }]))
   assert.ok(events.filter(event => event === 'bookiebot:transactions-changed').length >= 2)
   const sharedBill = item(40, 'Water paid', { amountCents: 12500, date: '2026-10-23' })
