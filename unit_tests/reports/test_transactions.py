@@ -36,7 +36,7 @@ def saved(tmp_path, monkeypatch, access):
                 action_id = undo.record_undo_action(H if person=="Hannah" else B,undo.UndoAction(worksheet="expense",kind="clear_cells",row=row,
                     columns=list(columns.values()),previous_values=[""]*len(columns),new_values=list(fields.values()),metadata={"type":"expense","category":"shopping"},description=fields["item"]))
                 action_ids[period,row] = action_id
-    def tabs(_gc,book,titles):
+    def tabs(_gc,book,titles,*,metadata_out=None):
         result={}
         for title in titles:
             for period,repo in repos.items():

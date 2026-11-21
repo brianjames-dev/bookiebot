@@ -27,7 +27,7 @@ def bill(access, monkeypatch, request):
     allocation = store.register_allocation(payload(
         payerOwner=owner, partnerOwner=partner, payerPerson="Brian (BofA)" if actor == B else "Hannah",
         category=category, item=category, location="", expenseDate="2026-11-01",
-        sourceWorksheet="income", sourceSheetTitle="November", sourceYear=2026, sourceRow=1,
+        sourceWorksheet="income", sourceSheetTitle="November", sourceYear=2026, sourceRow=1, sourceSpreadsheetId="personal",
         sourceColumnMap={"amount": 3, "item": 2}, sourceValues={"amount": "152.08", "item": category},
         grossCents=15208, payerShareCents=8000, partnerShareCents=7208))
     action = undo.UndoAction(worksheet="income", kind="restore_cells", row=1, columns=[3],
@@ -43,14 +43,69 @@ def bill(access, monkeypatch, request):
     monkeypatch.setattr(tx, "get_gspread_client", lambda: SimpleNamespace())
     monkeypatch.setattr(tx, "get_budget_spreadsheet_id_for_user", lambda *a: "personal")
     monkeypatch.setattr(tx, "get_shared_expenses_spreadsheet_id", lambda *a: "shared")
-    monkeypatch.setattr(tx, "read_workbook_tabs", lambda _client, book, titles:
-        {"November": personal, "_BookieBot Bill Schedule": [bills.BILL_SCHEDULE_HEADERS,
-            [category, category, "monthly", "1", "", category, "", "", "", "200"]]}
-        if book == "personal" else {"November": [], "_BookieBot Action Log - 2026-11": history})
+    metadata = {}
+    schedule = [bills.BILL_SCHEDULE_HEADERS, [category, category, "monthly", "1", "", category, "", "", "", "200"]]
+    def read(_client, book, titles, *, metadata_out=None):
+        if book == "personal":
+            if metadata_out is not None:
+                metadata_out.update(metadata)
+            return {"November": personal, "_BookieBot Bill Schedule": deepcopy(schedule)}
+        return {"November": [], "_BookieBot Action Log - 2026-11": history}
+    monkeypatch.setattr(tx, "read_workbook_tabs", read)
     tx._CACHE.clear()
     yield SimpleNamespace(store=store, allocation=allocation, actor=actor, owner=owner, partner=partner,
-        personal=personal, history=history, clock=clock)
+        personal=personal, history=history, clock=clock, metadata=metadata, schedule=schedule)
     tx._CACHE.clear()
+
+
+@pytest.mark.parametrize("bill", [(B, "Water", True)], indirect=True)
+@pytest.mark.parametrize("evidence", ["anchors", "legacy"])
+def test_shifted_split_bill_has_one_charge_and_keeps_the_neighbor(bill, evidence):
+    allocation = bill.allocation
+    bill.store.command(bill.owner, payment(allocation, 7208))
+    current = bill.store.get_allocation(allocation["id"])
+    bill.store.mark_projected(current["id"], current["version"])
+    bill.personal[:] = [["", "Recology", "80.00"], ["", "Water", "80.00"]]
+    bill.schedule[1][3] = "18"
+    bill.schedule.append(["recology", "Recology", "monthly", "18", "", "Recology"])
+    bill.clock[0] = datetime(2026, 11, 20, tzinfo=PACIFIC_TZ)
+
+    logged = json.loads(bill.history[1][5])
+    logged["row"] = 2
+    bill.history[1][5] = json.dumps(logged)
+    split = {**logged, "metadata": {**logged["metadata"], "type": "split", "source_type": "payment",
+                                    "source_action_id": allocation["sourceActionId"], "allocation_id": allocation["id"]}}
+    bill.history.append([allocation["splitActionId"], "2026-11-02T12:00:00-08:00", B, "active", "", json.dumps(split)])
+    if evidence == "anchors":
+        bill.metadata.update(sheets=[{"properties": {"sheetId": 1, "title": "November"}}], namedRanges=[
+            {"name": projection._name(kind, allocation["id"]), "range": {"sheetId": 1, "startRowIndex": 1,
+                "endRowIndex": 2, "startColumnIndex": start, "endColumnIndex": 3}}
+            for kind, start in [("source", 1), ("amount", 2)]])
+        # A second structural shift can move the named range before audit coordinates catch up.
+        logged["row"] = 1
+        bill.history[1][5] = json.dumps(logged)
+
+    before = deepcopy([bill.personal, bill.history, bill.store.snapshot(bill.owner)])
+    result = tx.listing(B, {"month": "2026-11", "view": "daily", "scope": "spending", "fresh": "1"})
+    rows = {row["category"]: row for row in result["items"] if row["date"] == "2026-11-18"}
+    assert result["total"] == 2
+    assert result["days"][0]["totalCents"] == 16000
+    water = rows["Water"]
+    assert water["actionId"] == allocation["splitActionId"]
+    assert (water["amountCents"], water["displayAmountCents"], water["repayment"]["settledCents"]) == (15208, 8000, 7208)
+    assert rows["Recology"]["id"] == "2026-11:sheet-payment-1"
+    assert [bill.personal, bill.history, bill.store.snapshot(bill.owner)] == before
+
+
+@pytest.mark.parametrize("bill", [(B, "Water", True)], indirect=True)
+def test_bill_source_locator_declines_ambiguous_legacy_rows_and_broken_anchors(bill):
+    allocation = bill.allocation
+    rows = [["", "Water", "152.08"], ["", "Water", "152.08"]]
+    assert projection.personal_bill_source_row(allocation, rows, {}, logged_row=1) is None
+    metadata = {"sheets": [{"properties": {"sheetId": 1, "title": "November"}}], "namedRanges": [
+        {"name": projection._name("source", allocation["id"]), "range": {"sheetId": 1, "startRowIndex": 0,
+            "endRowIndex": 1, "startColumnIndex": 1, "endColumnIndex": 3}}]}
+    assert projection.personal_bill_source_row(allocation, rows[:1], metadata, logged_row=1) is None
 
 
 def listing(bill, expected):
@@ -120,8 +175,8 @@ def test_variable_estimates_never_create_actual_transaction_rows(bill, monkeypat
                                   for logged in (True, False)], indirect=True)
 def test_fully_reimbursed_bill_waits_for_its_saved_autopay_day(bill, monkeypatch):
     read = tx.read_workbook_tabs
-    def later_schedule(client, book, titles):
-        result = read(client, book, titles)
+    def later_schedule(client, book, titles, **kwargs):
+        result = read(client, book, titles, **kwargs)
         if book == "personal":
             result["_BookieBot Bill Schedule"][1][3] = "22"
         return result
@@ -172,8 +227,8 @@ def test_recipient_recorded_bill_keeps_actual_partial_or_full_receipt_date(bill,
     bill.store.command(bill.owner, {**payment(bill.allocation, receipt), "date": "2026-11-02"})
     bill.personal[0][2] = f"{receipt / 100:.2f}"
     read = tx.read_workbook_tabs
-    def later_schedule(client, book, titles):
-        result = read(client, book, titles)
+    def later_schedule(client, book, titles, **kwargs):
+        result = read(client, book, titles, **kwargs)
         if book == "personal":
             result["_BookieBot Bill Schedule"][1][3] = "22"
         return result

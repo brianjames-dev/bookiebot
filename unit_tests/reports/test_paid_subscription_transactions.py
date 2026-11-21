@@ -41,7 +41,7 @@ def subscriptions(monkeypatch):
             expenses[2][column - 1] = values[field]
     schedule = [bills.BILL_SCHEDULE_HEADERS, ["rent", "Rent", "monthly", "1", "", "Rent", "", "", "", ""]]
     requests = []
-    def read(_client, book, titles):
+    def read(_client, book, titles, *, metadata_out=None):
         requests.append((book, list(titles)))
         return ({"November": personal, "February": personal, "October": personal,
             "Subscriptions": source, "_BookieBot Bill Schedule": schedule} if book == "personal" else

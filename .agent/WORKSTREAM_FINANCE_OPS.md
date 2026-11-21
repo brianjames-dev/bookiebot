@@ -1,3 +1,5 @@
+2026-11-20 Shifted split bill — resolve the payer's source range before deduplicating Transactions and keep neighboring bill rows independent. The November Water allocation's cached coordinate was repaired through the existing projected-version guard. Original bank match, workbook amounts, action lineage and cash events are preserved. Device steps are in STATUS.
+
 2026-11-20 Reconcile receipt feedback — show saved and reversed amounts immediately on Transactions and Reimbursements with one timed Undo toast through tab changes. The matched receipt uses the existing canonical writer, durable deferred projection and queued Undo. Move match status text and the unpaid-share pill above the comparison cards. Device steps are in STATUS.
 
 2026-11-20 Checked reimbursement entry — route checked split transactions and the just-matched shortcut through the same view-first summary. Place Back and the eligible receipt action in the summary footer. Device acceptance is in STATUS.

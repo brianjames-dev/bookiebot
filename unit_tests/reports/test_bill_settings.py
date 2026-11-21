@@ -97,7 +97,7 @@ def test_change_recorded_utility_date_moves_one_charge_preserving_split_and_cash
     monkeypatch.setattr(transactions, "get_budget_spreadsheet_id_for_user", lambda actor, year: "personal")
     monkeypatch.setattr(transactions, "receipt_addresses", lambda *args: {})
     monkeypatch.setattr(transactions, "read_workbook_tabs",
-                        lambda _, book, titles: {"November": []} if book == "shared" else {t: transport.rows[t] for t in titles if t in transport.rows})
+                        lambda _, book, titles, **kwargs: {"November": []} if book == "shared" else {t: transport.rows[t] for t in titles if t in transport.rows})
 
     def dates():
         rows = transactions.load_transactions(B, month, fresh=True)
