@@ -69,13 +69,15 @@ def snapshot(owner: str, *, retry_projection: bool = False) -> dict[str, Any]:
             "projectionPending": not synced or result["projectionPending"] or any(row["version"] != row["projectedVersion"] for row in result["allocations"])}
 
 
-def command(owner: str, body: dict[str, Any]) -> dict[str, Any]:
+def command(owner: str, body: dict[str, Any], *, defer_receipt_projection: bool = False) -> dict[str, Any]:
     store = build_reimbursement_store()
     result = store.command(owner, body)
     if body.get("operation") == "queue_undo":
         current = snapshot(owner)
         job = next((job for job in current["undoJobs"] if job["id"] == result["undoJob"]["id"]), result["undoJob"])
         return {**result, **current, "undoJob": job}
+    if defer_receipt_projection and body.get("operation") in ("receive", "confirm_payment"):
+        return {**result, **snapshot(owner)}
     if body.get("operation") == "receive_all":
         from bookiebot.reimbursements.batch_projection import sync_received
         synced = sync_received(store, {a["id"] for a in result["allocations"]})

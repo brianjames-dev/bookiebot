@@ -105,7 +105,12 @@ async def _reimbursements(request: web.Request) -> web.Response:
             body = json.loads(raw)
             if not isinstance(body, dict):
                 raise ReimbursementValidationError("Invalid settlement request.")
-            result = await asyncio.to_thread(service.command, session.owner_key, body)
+            if request.query.get("deferredReceipt") == "1" and body.get("operation") in ("receive", "confirm_payment"):
+                # Commit the canonical receipt first. The app's existing recovery
+                # consumes its durable pending projection after it displays the save.
+                result = await asyncio.to_thread(service.command, session.owner_key, body, defer_receipt_projection=True)
+            else:
+                result = await asyncio.to_thread(service.command, session.owner_key, body)
         else:
             result = await asyncio.to_thread(service.snapshot, session.owner_key,
                                             retry_projection=request.query.get("snapshot") != "1")

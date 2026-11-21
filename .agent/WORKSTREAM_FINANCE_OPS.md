@@ -1,3 +1,5 @@
+2026-11-20 Reconcile receipt feedback — show saved and reversed amounts immediately on Transactions and Reimbursements with one timed Undo toast through tab changes. The matched receipt uses the existing canonical writer, durable deferred projection and queued Undo. Move match status text and the unpaid-share pill above the comparison cards. Device steps are in STATUS.
+
 2026-11-20 Checked reimbursement entry — route checked split transactions and the just-matched shortcut through the same view-first summary. Place Back and the eligible receipt action in the summary footer. Device acceptance is in STATUS.
 
 2026-11-20 Reconcile row loading and checked shares — show a loader for the active selection while retaining the previous panel for the handoff. Batch recurring source reads by owner and preserve fresh confirmation and fail-closed evidence. Use the shared allocation visual and native actions in checked details. Inspecting a share allows immediate row changes and dismissal. Unresolved receipt writes keep their safe retry. Device acceptance is in STATUS.

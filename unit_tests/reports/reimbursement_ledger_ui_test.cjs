@@ -59,6 +59,7 @@ function load(file) {
   return exports
 }
 const { ReimbursementLedger, reimbursementAmountCents, ledgerTotals, defaultOffsetEntries, canReverseLedgerEvent } = load(path.join(frontend, "src/reimbursement-ledger.tsx"))
+const { clearAppResources } = load(path.join(frontend, "src/app-resource-state.ts"))
 const { balanceFirstScope, sharedExpenseDate, reimbursementTransaction } = load(path.join(frontend, "src/shared-balance-first.tsx"))
 const {reimbursementUndo,reimbursementReceipt,resolveReimbursementReceipt}=load(path.join(frontend,"src/reimbursement-undo.ts"))
 const undoResult={enabled:true,ownerKey:"brian",currency:"USD",allocations:[],resetState:"after-save",operationId:"receipt-op",events:[
@@ -222,6 +223,7 @@ async function expand(tree, name) {
   if (!target.props["aria-expanded"]) await tap(target)
 }
 function fixture({ get, post } = {}) {
+  clearAppResources()
   timers.clear(); dispatched.length = 0
   for (const scope of Object.values(listeners)) scope.clear()
   const state = { snapshot: clone(sample), calls: [] }

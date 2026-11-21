@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — Share receipt acknowledgements across the expense app
+
+The matched receipt request returns the saved canonical ledger before Sheets projection. The existing recovery path reads the durable pending projection and the Undo path may queue against the returned financial state. The owner-scoped app ledger shares accepted snapshots and presentation-only inverse state with both editors. Use the shell-level Reimbursements toast for the acknowledgement so the countdown survives switching screens. Superseded reads cannot roll back either a save or a local inverse.
+
 ## 2026-11-20 — View a matched share before recording payment
 
 Both phone Reconcile entry points open the read-only share summary. Requesting to record money received is a separate action in that summary and uses the reviewed allocation version. Unmatched bank charges have no receipt shortcut.

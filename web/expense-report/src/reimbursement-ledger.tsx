@@ -1,6 +1,7 @@
 import {ReportLoading} from "./report-loading"
 import { ratioShareCents } from "./split-ratio"
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
 import { AnimatedDisclosure, CollapsibleContent, SlidingSelection } from "./components/ui/motion"
 import { FittedAmount } from "./components/ui/fitted-amount"
@@ -15,7 +16,8 @@ import { transactionMotion } from "./transaction-inline-editor"
 import { ArrowLeft, CircleCheck, Clock3 } from "lucide-react"
 import { UndoPopup } from "./transaction-undo-popup"
 import { ReimbursementSavingContext, ReimbursementSaveButton, useReimbursementFeedback } from "./reimbursement-feedback"
-import {applyDisplayChange,inverseDisplay,pendingDisplay,reimbursementDisplay,validDisplayChange,type ReimbursementDisplayChange} from './reimbursement-display-state'
+import {clearReimbursementSnapshot,inverseDisplay,publishReimbursementSnapshot,reimbursementDisplay,reimbursementLedgerState,validDisplayChange,type ReimbursementDisplayChange} from './reimbursement-display-state'
+import {useAppResource} from "./app-resource-state"
 import { ReimbursementSplitEditor } from "./reimbursement-split-editor"
 import { RepaymentAllocation } from "./repayment-allocation"
 import { reimbursementMethod } from "./reimbursement-value-motion"
@@ -125,7 +127,7 @@ export function canReverseLedgerEvent(event: LedgerEvent, owner: string, allocat
 class LedgerRequestError extends Error {
   constructor(message: string, readonly status: number) { super(message) }
 }
-async function request<T>(body?: Command, signal?: AbortSignal, snapshotOnly = false): Promise<T> {
+async function request<T>(body?: Command, signal?: AbortSignal, snapshotOnly = false, deferredReceipt = false): Promise<T> {
   const controller = new AbortController()
   const abort = () => controller.abort()
   let rejectAbort: () => void = () => {}
@@ -135,7 +137,8 @@ async function request<T>(body?: Command, signal?: AbortSignal, snapshotOnly = f
   if (signal?.aborted) abort()
   const timer = window.setTimeout(abort, 20_000)
   try {
-    return await Promise.race([cancelled, fetch("/app/reimbursements" + (!body && snapshotOnly ? "?snapshot=1" : ""), {
+    const query = deferredReceipt ? "?deferredReceipt=1" : !body && snapshotOnly ? "?snapshot=1" : ""
+    return await Promise.race([cancelled, fetch("/app/reimbursements" + query, {
       method: body ? "POST" : "GET", credentials: "same-origin", mode: "same-origin", referrerPolicy: "same-origin",
       cache: "no-store", redirect: "error", signal: controller.signal,
       headers: body ? { "Content-Type": "application/json", "X-BookieBot-App": "1" } : undefined,
@@ -182,19 +185,30 @@ function validate(snapshot: LedgerResponse) {
 }
 
 export interface MatchedReceiptScope { allocationId: string; bankAmountCents: number }
-export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matchedReceiptActive = true, onClose, onRejectAccess, onReceiptMutationLock, balanceFirst = false, aliases, onUpdated, headerActions }: {
+export function ReimbursementLedger({ fallback, refreshKey, ownerName, matchedReceipt, matchedReceiptActive = true, onClose, onRejectAccess, onReceiptMutationLock, balanceFirst = false, aliases, onUpdated, headerActions, toastTarget }: {
   fallback: ReactNode; refreshKey?: string; matchedReceipt?: MatchedReceiptScope; matchedReceiptActive?: boolean; onClose?: () => void; onRejectAccess?: (message: string) => void
   balanceFirst?: boolean; aliases?: Record<string, string>; onUpdated?: (time: number | null) => void; headerActions?: HTMLElement | null
-  onReceiptMutationLock?: (locked: boolean) => void
+  ownerName?: string; toastTarget?: HTMLElement | null; onReceiptMutationLock?: (locked: boolean) => void
 }) {
-  const [snapshot, setSnapshot] = useState<LedgerSnapshot | null>(null)
-  const [immediate,setImmediate] = useState<ReimbursementDisplayChange|null>(null)
-  const displayed=useMemo(()=>snapshot?(immediate?applyDisplayChange(snapshot,immediate):pendingDisplay(snapshot)):null,[snapshot,immediate])
-  const ownerScope=useRef('')
-  useLayoutEffect(()=>{if(displayed){ownerScope.current=displayed.ownerKey;reimbursementDisplay.publish(displayed.ownerKey,displayed)}else if(ownerScope.current){reimbursementDisplay.clear(ownerScope.current);setImmediate(null)}},[displayed])
+  const [detectedOwner, setDetectedOwner] = useState("")
+  const owner = ownerName ?? detectedOwner
+  const ownerScope = useRef(owner)
+  ownerScope.current = owner
+  const ledger = useAppResource(reimbursementLedgerState, owner)
+  const snapshot = ledger?.snapshot ?? null
+  const displayed = useAppResource(reimbursementDisplay, owner)
+  const fastDisplay = balanceFirst || Boolean(matchedReceipt)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   useEffect(() => { onUpdated?.(updatedAt) }, [updatedAt, onUpdated])
-  const feedback = useReimbursementFeedback(snapshot)
+  const feedback = useReimbursementFeedback(matchedReceipt ? null : snapshot)
+  const shownAcknowledgement = useRef(ledger?.acknowledgement)
+  useLayoutEffect(() => {
+    const acknowledgement = ledger?.acknowledgement
+    if (matchedReceipt || !acknowledgement || shownAcknowledgement.current === acknowledgement) return
+    shownAcknowledgement.current = acknowledgement
+    feedback.acknowledge(acknowledgement.body, acknowledgement.result)
+    setUpdatedAt(Date.now())
+  }, [ledger?.acknowledgement, matchedReceipt])
   const [savingOperation,setSavingOperation] = useState<string>()
   const [undoVersion,setUndoVersion] = useState(0)
   const [legacy, setLegacy] = useState(false)
@@ -219,29 +233,40 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
   activeReceipt.current = matchedReceiptActive
   const performRead = useCallback(async (recover: boolean, quiet = false) => {
     const id = ++readId.current
+    const requestedOwner = ownerScope.current
+    const beforeRead = reimbursementLedgerState.read(requestedOwner)
     readController.current?.abort()
     const controller = new AbortController()
     readController.current = controller
     if(!quiet)setRefreshing(true)
     try {
-      const response = await request<LedgerResponse>(undefined, controller.signal, balanceFirst && !recover)
+      const response = await request<LedgerResponse>(undefined, controller.signal, fastDisplay && !recover)
       if (!mounted.current || id !== readId.current) return false
-      if (response.enabled === false) { setLegacy(true); setSnapshot(null); setUpdatedAt(null) }
-      else { setSnapshot(validate(response)); setLegacy(false); setUpdatedAt(Date.now()) }
+      const current = reimbursementLedgerState.read(requestedOwner)
+      // A read that started before a save or an immediate Undo cannot replace it.
+      if (requestedOwner && (current !== beforeRead || current?.immediate)) return true
+      if (response.enabled === false) { setLegacy(true); clearReimbursementSnapshot(requestedOwner); setUpdatedAt(null) }
+      else {
+        const next = validate(response)
+        if (requestedOwner && next.ownerKey !== requestedOwner.trim().toLowerCase()) return false
+        setDetectedOwner(next.ownerKey)
+        publishReimbursementSnapshot(next)
+        setLegacy(false); setUpdatedAt(Date.now())
+      }
       setSignedOut(false); setError("")
       return true
     } catch (failure) {
       if (!mounted.current || id !== readId.current || controller.signal.aborted) return false
       if (failure instanceof LedgerRequestError && [401, 403].includes(failure.status)) {
-        setSnapshot(null); setUpdatedAt(null); setLegacy(false); setSignedOut(failure.status === 401)
+        clearReimbursementSnapshot(ownerScope.current); setUpdatedAt(null); setLegacy(false); setSignedOut(failure.status === 401)
         if (matchedReceipt) onRejectAccess?.(failure.message)
       }
       setError(failure instanceof LedgerRequestError ? failure.message : "Couldn’t refresh reimbursements. Previously loaded balances may be out of date.")
       return false
     } finally { if (!quiet && mounted.current && id === readId.current) setRefreshing(false) }
-  }, [matchedReceipt, onRejectAccess, balanceFirst])
+  }, [matchedReceipt, onRejectAccess, fastDisplay])
   const load = useCallback((recover = true, quiet = false): Promise<boolean> => {
-    if (!balanceFirst) return performRead(true)
+    if (!fastDisplay) return performRead(true)
     // Retain the fast paint when explicit recovery arrives during its read.
     // Concurrent display reads share one result; recovery still runs afterward.
     if (readController.current?.signal.aborted) { readFlight.current = null; queuedRecovery.current = null }
@@ -262,7 +287,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
       .finally(() => { if (queuedRecovery.current === queued) queuedRecovery.current = null })
     queuedRecovery.current = queued
     return queued
-  }, [balanceFirst, performRead])
+  }, [fastDisplay, performRead])
   useEffect(() => {
     mounted.current = true
     const refresh = () => { if (activeReceipt.current && !pending.current && document.visibilityState === "visible") void load(false) }
@@ -284,7 +309,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
     void load()
   }, [balanceFirst, snapshot, busy, uncertain, refreshing, error, load])
   // Job polling is SQL-only, bounded, and never blocks reading the list or folding.
-  const queuedJob = (snapshot?.undoJobs?.filter(job=>job.status==='queued').map(job=>job.id).join('|') ?? '')+(snapshot?.projectionPending?'|'+snapshot.resetState:'')
+  const queuedJob = matchedReceipt ? "" : (snapshot?.undoJobs?.filter(job=>job.status==='queued').map(job=>job.id).join('|') ?? '')+(snapshot?.projectionPending?'|'+snapshot.resetState:'')
   useEffect(()=>{
     if(!queuedJob)return
     let stopped=false,timer:number|undefined,attempt=0
@@ -305,23 +330,25 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
     updateWork({ label: "Reimbursements", pending: true, uncertain })
     setBusy(true); setSavingOperation(String(change.body.operation)); setError("")
     try {
-      const result = validate(await request<LedgerResponse>(change.body, controller.signal))
+      const deferredReceipt = Boolean(matchedReceipt && ["receive", "confirm_payment"].includes(String(change.body.operation)))
+      const result = validate(await request<LedgerResponse>(change.body, controller.signal, false, deferredReceipt))
       if (!mounted.current) return
+      if (ownerScope.current && result.ownerKey !== ownerScope.current.trim().toLowerCase()) throw new Error("The reimbursement account changed.")
       pending.current = null; setUncertain(false); change.done(true)
-      setSnapshot(result); setLegacy(false); setUpdatedAt(Date.now())
-      setImmediate(null)
-      feedback.acknowledge(change.body, result)
+      publishReimbursementSnapshot(result, {body: change.body})
+      setLegacy(false); setUpdatedAt(Date.now())
       window.dispatchEvent(new CustomEvent("bookiebot:reimbursements-changed",{detail:{operation:change.body.operation}}))
       // The command already contains the complete authoritative snapshot. Do
       // not delay an immediately clickable Undo behind a duplicate display read.
-      if (!balanceFirst && change.body.operation !== "receive_all") await load(false)
+      if (!fastDisplay && change.body.operation !== "receive_all") await load(false)
     } catch (failure) {
       if (!mounted.current) return
       if (failure instanceof LedgerRequestError && failure.status < 500) {
-        setImmediate(null)
+        const current = reimbursementLedgerState.read(ownerScope.current)
+        if (current?.immediate) publishReimbursementSnapshot(current.snapshot)
         pending.current = null; setUncertain(false)
-        if ([401, 403].includes(failure.status)) { setSnapshot(null); setUpdatedAt(null); if(matchedReceipt)onRejectAccess?.(failure.message) }
-        if (failure.status === 401) { setSnapshot(null); setUpdatedAt(null); setSignedOut(true); change.done(false) }
+        if ([401, 403].includes(failure.status)) { clearReimbursementSnapshot(ownerScope.current); setUpdatedAt(null); if(matchedReceipt)onRejectAccess?.(failure.message) }
+        if (failure.status === 401) { setSignedOut(true); change.done(false) }
         if (failure.status === 409) { change.done(false); await load() }
         setError(failure.message)
       } else {
@@ -335,7 +362,13 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
     pending.current = { body: { ...body, requestId: crypto.randomUUID() }, done }
     void execute()
   }
-  const undo = () => { if(!feedback.command||!snapshot||pending.current||executing.current||signedOut)return; const command=feedback.command;setImmediate(inverseDisplay(snapshot,command));setUndoVersion(value=>value+1);feedback.dismiss(); run(command,()=>{}) }
+  const undo = () => {
+    if(!feedback.command||!snapshot||pending.current||executing.current||signedOut)return
+    const command=feedback.command, immediate=inverseDisplay(snapshot,command)
+    if(immediate) publishReimbursementSnapshot(snapshot, {immediate})
+    setUndoVersion(value=>value+1);feedback.dismiss(); run(command,()=>{})
+  }
+  const toast = feedback.notice && <div className="sr-native-toast bi-product"><UndoPopup key={feedback.notice.id} notice={feedback.notice} modal={feedback.modal} detail={feedback.detail} undoAvailable={Boolean(feedback.command)} onUndo={undo} onDismiss={feedback.dismiss} returnFocus={()=>[...document.querySelectorAll<HTMLButtonElement>('.sr-row-main[data-selected=true],.sr-editor .bi-primary,.sr-primary,.sr-options')].find(el=>!el.disabled&&!el.closest('[aria-hidden=true]')&&getComputedStyle(el).visibility!=='hidden'&&el.getClientRects().length>0)??null}/></div>
   if (matchedReceipt) {
     const back = <button type="button" className="bi-cancel" disabled={busy || uncertain} onClick={onClose}>
       <ArrowLeft aria-hidden="true"/>Back to reconciliation</button>
@@ -345,7 +378,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
         {uncertain ? <button type="button" disabled={busy || signedOut} onClick={() => void execute()}>Retry this record</button>
           : pageRefresh ? !wide && <p>Pull down from the top to refresh.</p> : <button type="button" disabled={busy || refreshing} onClick={() => void load()}>Refresh payment</button>}</div>}
       {!snapshot && !error && !legacy && <ReportLoading label="Loading the matched shared payment…"/>}
-      {snapshot ? <MatchedReceiptContents snapshot={snapshot} scope={matchedReceipt} active={matchedReceiptActive} disabled={busy || uncertain || refreshing}
+      {displayed ? <MatchedReceiptContents snapshot={displayed} scope={matchedReceipt} active={matchedReceiptActive} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending && displayed.displayAllocationIds?.includes(matchedReceipt.allocationId))}
         run={run} refresh={() => void load()} aliases={aliases} back={back} />
         : <footer className="bi-editor-footer bb-reconcile-native-actions">{back}</footer>}
     </div></section></ReimbursementSavingContext.Provider>
@@ -361,7 +394,7 @@ export function ReimbursementLedger({ fallback, refreshKey, matchedReceipt, matc
       {displayed && (balanceFirst ? <BalanceFirstReimbursements snapshot={displayed} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending)} selectDisabled={busy || uncertain} headerActions={headerActions} undoVersion={undoVersion} refreshing={refreshing} run={run} aliases={aliases} refresh={() => void load()} />
         : <LedgerContents snapshot={displayed} disabled={busy || uncertain || refreshing || Boolean(displayed.displayPending)} run={run}
           refresh={() => void load()} refreshing={refreshing} />)}
-      {feedback.notice&&<div className="sr-native-toast bi-product"><UndoPopup key={feedback.notice.id} notice={feedback.notice} modal={feedback.modal} detail={feedback.detail} undoAvailable={Boolean(feedback.command)} onUndo={undo} onDismiss={feedback.dismiss} returnFocus={()=>[...document.querySelectorAll<HTMLButtonElement>('.sr-row-main[data-selected=true],.sr-editor .bi-primary,.sr-primary,.sr-options')].find(el=>!el.disabled&&!el.closest('[aria-hidden=true]')&&getComputedStyle(el).visibility!=='hidden'&&el.getClientRects().length>0)??null}/></div>}
+      {toastTarget ? createPortal(toast,toastTarget) : toast}
     </CardContent>
   </Card></ReimbursementSavingContext.Provider>
 }
