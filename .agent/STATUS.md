@@ -1,5 +1,15 @@
 # Agent Status
 
+## Inset Groups Settings (2026-11-20)
+
+Settings has a grouped category directory in compact layouts. Back returns to that directory before leaving Settings. Open DUO defaults to Account and keeps the directory beside the active category. Resize the sidebar by dragging or pressing its arrow keys. Pointer drag clears focus and prevents text selection. The split uses the existing usable viewport and right system gutter.
+
+Bills and Transfers open their lists in the detail pane. Opening an editor gives the existing schedule workspace both panes so the list can still switch rows during editing. Closing the editor restores the sidebar and its width. Folding keeps the selected category and the editor draft. Existing settings, refresh routes, confirmations, read-only diagnostics and workspace data keep their current controllers.
+
+Local lifecycle, type checks, and the production build passed. Chromium and WebKit covered the category directory, resize without lingering focus, both gutter geometries, retained bill drafts, account actions, household membership, and diagnostic export. CI and deployment are tracked in the task PR.
+
+Manual check. Open Settings folded and enter Appearance, then tap Back and check that the row is focused. Unfold and open Settings to see Account on the right. Drag the divider in both directions and verify that no outline remains. Open Bills, select an existing bill, then fold and unfold with its editor open. Cancel without saving and check that the category directory returns with its prior width. Check Widgets → Setup & widgets → Back and About & updates → Copy display report.
+
 ## Receipt icon and folded account spacing (2026-11-20)
 
 The Reconcile receipt checkmark matches the 14px Back arrow. Folded Savings account editors reuse the inline inset so the guide line sits outside the raised panel throughout the account flow.
@@ -665,6 +675,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Review Settings categories and decide which controls need further refinement after native acceptance of Inset Groups.
 
 Native acceptance of the receipt icon size and guide spacing in folded Savings accounts.
 

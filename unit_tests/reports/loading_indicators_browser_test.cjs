@@ -64,11 +64,18 @@ async function spinner(page,scope,label,compact=false){
    const settings=await fixture(browser,width,height,dark,false,false,0,{initialHash:'#settings',config:{householdEnabled:true},request:settingsReads.request});
    try{
     const page=settings.page;await page.emulateMedia({reducedMotion:'no-preference'});const main=page.getByRole('main',{name:'Settings',exact:true});
+    const selectSettings=async name=>{
+     if(width<800&&!await page.getByRole('navigation',{name:'Settings categories'}).isVisible())await press(page,page.locator('.bb-settings-masthead-title button'));
+     await press(page,page.getByRole('button',{name,exact:true}));
+    };
+    await selectSettings('Widgets');
     let pending=await spinner(page,main,'Loading widgets…');await page.screenshot({path:path.join(output,name+'-widgets.png')});releaseWidgets();await pending.waitFor({state:'detached'});
+    await selectSettings('Notifications');
     pending=await spinner(page,main,'Loading notification settings…',true);releaseNotifications();await pending.waitFor({state:'detached'});
+    await selectSettings('Household');
     pending=await spinner(page,main,'Loading household…');releaseHousehold();await pending.waitFor({state:'detached'});
-    let release=settingsReads.hold('/app/transfers');await press(page,main.getByRole('button',{name:'Manage savings transfers',exact:true}));const transfers=page.getByRole('main',{name:'Transfers',exact:true});pending=await spinner(page,transfers,'Loading transfers…');release();await pending.waitFor({state:'detached'});
-    await press(page,page.locator('.bb-settings-masthead-title button'));release=settingsReads.hold('/app/widgets/script');await press(page,main.getByRole('button',{name:'Setup & widgets',exact:true}));const guide=page.getByRole('main',{name:'Widget setup',exact:true});pending=await spinner(page,guide,'Loading script…',true);assert(await guide.getByRole('button',{name:'Loading script…',exact:true}).isDisabled());release();await pending.waitFor({state:'detached'});await guide.getByRole('button',{name:'Copy script',exact:true}).waitFor();
+    let release=settingsReads.hold('/app/transfers');await selectSettings('Transfers');const transfers=page.getByRole('main',{name:'Transfers',exact:true});pending=await spinner(page,transfers,'Loading transfers…');release();await pending.waitFor({state:'detached'});
+    await selectSettings('Widgets');release=settingsReads.hold('/app/widgets/script');await press(page,main.getByRole('button',{name:'Setup & widgets',exact:true}));const guide=page.getByRole('main',{name:'Widget setup',exact:true});pending=await spinner(page,guide,'Loading script…',true);assert(await guide.getByRole('button',{name:'Loading script…',exact:true}).isDisabled());release();await pending.waitFor({state:'detached'});await guide.getByRole('button',{name:'Copy script',exact:true}).waitFor();
     assert.deepEqual(settings.errors,[]);assert.deepEqual(settings.unexpected,[]);cases++;console.log('PASS Settings widgets/notifications/household/transfers/script spinners',name);
    }catch(error){await settings.page.screenshot({path:path.join(output,name+'-settings-failure.png')});throw error}finally{settingsReads.releaseAll();await settings.page.close()}
   }}finally{await browser.close()}

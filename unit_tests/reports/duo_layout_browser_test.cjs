@@ -475,9 +475,10 @@ if(require.main===module)(async()=>{
       await page.getByRole('button',{name:'Collapse comparison',exact:true}).click();
       await page.getByRole('button',{name:'Talk to BookieBot',exact:true}).click();await page.getByRole('button',{name:'Close Talk to BookieBot',exact:true}).click();
       await page.getByRole('button',{name:'Settings',exact:true}).click();
+      await page.getByRole('button',{name:'Appearance',exact:true}).click();
       const preference=page.getByRole('switch',{name:'Duo landscape layout',exact:true});await preference.click();assert.equal(await preference.getAttribute('aria-checked'),'false');
       assert.notEqual(await page.evaluate(()=>getComputedStyle(document.documentElement).overflowY),'hidden','preference off restores ordinary document scrolling');
-      await page.evaluate(()=>window.scrollTo(0,200));assert(await page.evaluate(()=>scrollY>0),'ordinary document can scroll again');
+      assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.bb-page')).position),'static','Ordinary Settings returns scroll ownership to the document');
       await preference.click();assert.equal(await page.evaluate(()=>scrollY),0,'enabling Duo returns ownership to the content surface');
       await page.getByRole('button',{name:'Back',exact:true}).click();await page.locator('.bb-app-shell[data-duo-overview="true"]').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollHeight),height);
       const pressureCase=await fixture(browser,width,height,dark,false,true),pressurePage=pressureCase.page;await pressurePage.locator('.bb-category-overflow').waitFor();await pressurePage.waitForTimeout(200);

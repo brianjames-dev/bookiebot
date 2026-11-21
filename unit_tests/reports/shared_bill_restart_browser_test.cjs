@@ -27,7 +27,7 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
     await page.route('**/app/account/changes',route=>route.fulfill({json:{revision:phase==='active'?1:0}}));
     await page.route('**/app/account',route=>route.fulfill({json:{id:'fixture-'+owner,name:owner,googleEnabled:false,google:{connected:false,email:null}}}));
     await page.evaluate(owner=>localStorage.setItem('bookiebot:duo-layout:'+owner.toLowerCase(),'true'),owner);await page.reload();await page.locator('.bb-metrics-grid').waitFor();
-    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
     await page.locator('.bb-bills-row').first().waitFor();await page.getByRole('combobox',{name:'Bill type',exact:true}).selectOption('ended');
     assert.equal(await page.locator('.bb-bills-row').count(),1);assert.equal(await page.locator('.bb-bills-row').getAttribute('data-bill-id'),data.ids[actor]);
    }

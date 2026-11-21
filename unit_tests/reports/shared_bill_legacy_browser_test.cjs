@@ -19,7 +19,7 @@ async function settle(page){await page.waitForFunction(()=>![...document.querySe
     return route.fulfill({json:{month:'2026-11',today:'2026-11-16',ownerName:'Brian',partnerName:'Hannah',settingsVersion:'legacy-view',splitsEnabled:true,bills}});
    }});
    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));
-   await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+   await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
    await page.locator('.bb-bills-row').first().waitFor();assert.equal(await page.locator('.bb-bills-row').count(),4);
    assert(!await page.locator('.bb-bills-list').getByText('Finish setup',{exact:true}).count());
    for(const [name,total,share,,status] of facts){

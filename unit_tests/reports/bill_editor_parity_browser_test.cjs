@@ -60,7 +60,7 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      await press(page.getByRole('button',{name:(width>=800?'Edit':'Update')+' Target',exact:true}));await settle(page);
      const native=await styles(page.getByRole('region',{name:'Edit transaction',exact:true}),'Item');
      await press(page.getByRole('region',{name:'Edit transaction',exact:true}).getByRole('button',{name:'Cancel',exact:true}));await settle(page);
-     await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+     await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
      const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').first().waitFor();
      await press(panel.locator('.bb-bills-row').first());await settle(page);
      assert.equal(await host(page).locator('.bi-editor-scenes').count(),1,'Bills uses the retained native editor workspace');

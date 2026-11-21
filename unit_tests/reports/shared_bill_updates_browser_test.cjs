@@ -30,7 +30,7 @@ async function settle(page){await page.waitForFunction(()=>![...document.querySe
    await page.screenshot({path:path.join(output,`${engine.name()}-${width}-${dark?'dark':'light'}.png`),fullPage:true});
    const close=details.getByRole('button',{name:'Close',exact:true});await close.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));await page.waitForTimeout(100);
    await tap(page,close);await settle(page);
-   await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+   await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
    const water=page.locator('.bb-bills-row').filter({has:page.locator('.bb-bills-row-text strong',{hasText:/^Water$/})});
    await water.evaluate(el=>el.scrollIntoView({block:'center',behavior:'instant'}));await page.waitForTimeout(100);await tap(page,water);await settle(page);
    const editor=page.locator('.bb-bills-editor[data-open=true]');await editor.getByRole('heading',{name:'Shared bill',exact:true}).waitFor();

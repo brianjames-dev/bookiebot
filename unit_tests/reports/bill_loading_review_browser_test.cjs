@@ -23,14 +23,14 @@ async function press(page,button){await button.evaluate(el=>el.scrollIntoView({b
    }});
    try{
     await page.emulateMedia({reducedMotion:'no-preference'});
-    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
     const main=page.getByRole('main',{name:'Bills',exact:true}),spinner=main.locator('.bb-report-loading-spinner');await spinner.waitFor();
     assert(await page.locator('.bb-settings-masthead-title button').isEnabled(),'Reading Bills must not grey or lock the Back/title capsule');
     assert.equal(await page.locator('.bb-settings-masthead-title .bb-glass-control').evaluate(el=>getComputedStyle(el).opacity),'1');
     assert.equal(await spinner.evaluate(el=>getComputedStyle(el).animationName),'bb-pull-spin','Bills uses the same actual Overview spinner');
     await page.screenshot({path:path.join(output,`${engine.name()}-${width}-loading.png`)});release();
     await main.locator('.bb-bills-row').waitFor();assert.equal(await spinner.count(),0);
-    await tap(page,page.locator('.bb-settings-masthead-title button'));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+    await tap(page,page.locator('.bb-settings-masthead-title button'));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
     assert.equal(reads,1,'The mounted list reopens immediately without reading Sheets again');
     await press(page,main.locator('.bb-bills-row'));
     let editor=main.locator('.bb-bills-editor[data-open=true]');assert((await editor.innerText()).includes('$152.08'));

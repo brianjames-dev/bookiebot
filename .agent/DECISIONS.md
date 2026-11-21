@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 · Grouped Settings navigation
+
+Use one category directory for compact drill-in and open-DUO detail navigation. Account is the default open detail. Sidebar width is adjustable within the usable viewport. Keep one instance of each controller so folding and switching panels cannot spawn duplicate editors or discard retained widget setup state. Bills and Transfers use the full schedule editor workspace when a row is open so selecting another schedule remains possible. Return to the category list when the editor closes. Category navigation continues to use the existing save and recovery guards.
+
 ## 2026-11-20 — Keep checked budget details tied to the saved reconciliation claim
 
 Resolve checked details on demand through the existing owner-scoped match report and reuse the phone's action cache. Display the saved schedule occurrence and confirmed amount even if its recurring price changes. A missing source leaves the original match checked and displays that its details are unavailable. This read does not participate in confirmation or modify the saved claim.
