@@ -13,13 +13,12 @@
 .bb-notification-option input:checked::after { transform: translateX(17px); background: hsl(var(--primary-foreground)); }
 .bb-notification-option input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-notification-option input:disabled { opacity: .5; }
-.bb-notification-settings .bb-notification-error { color: hsl(var(--destructive)); }
+.bb-notification-settings .bb-notification-error { color: hsl(var(--destructive)); overflow-wrap: anywhere; }
 .bb-notifications-embedded .bb-notification-settings { padding-top: 0; max-width: none; }
 .bb-notifications-embedded .bb-notification-embedded-state { display: flex; align-items: center; gap: 12px; margin-top: 0; }
-.bb-notification-embedded-state strong { margin-left: auto; font-size: .8rem; font-weight: 500; color: hsl(var(--foreground)); }
 .bb-notifications-embedded .bb-notification-option { min-width: 0; }
 .bb-notifications-embedded .bb-notification-option > span { min-width: 0; }
-.bb-notifications-embedded .bb-notification-option select { max-width: 120px; flex: 0 0 auto; }
+.bb-notifications-embedded .bb-notification-option select { max-width: min(168px, 62%); flex: 0 0 auto; }
 @media (prefers-reduced-motion: reduce) { .bb-notification-option input, .bb-notification-option input::after { transition: none; } }
 .bb-notification-days { min-width: 0; padding: 10px 0 16px; margin: 8px 0 0; border: 0; border-bottom: 1px solid hsl(var(--border) / .65); }
 .bb-notification-days legend { padding: 0; }
