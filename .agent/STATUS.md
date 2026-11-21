@@ -6,7 +6,7 @@ Settings keeps its glass controls over the content, with the page-wide header fi
 
 Phone notification choices save individually. Selecting the first weekday or enabling Payment reminders can prompt for iOS permission. Weekly Summary accepts multiple weekdays, and Payment Reminders supports the due date or one or two days before. Existing Monday and next-day settings retain their schedule. Clearing all types stops delivery while preserving the phone's other notification preferences.
 
-The full local suite passed 3,573 tests with 918 optional PostgreSQL skips. Python and frontend types, the production build, and Chromium and WebKit checks of Settings routing, refresh scoping, the sidebar, inline editor continuity and notification controls passed. The task PR tracks CI and deployment.
+The full local suite passed 3,573 tests with 918 optional PostgreSQL skips. Python and frontend types and the production build passed. Chromium and WebKit passed Settings routing, refresh scoping, sidebar resizing, inline Bills and Transfers, and notification controls at widths down to 320px. PR #226 tracks CI and deployment.
 
 Manual check. Open Bills and Transfers in both DUO poses, refresh using the control for that pose, and fold with an editor open. In Notifications, choose two weekdays and a payment reminder lead time, reopen Settings to verify they persisted, then clear the types if delivery is unwanted. Check that the other Settings pages have no refresh control.
 

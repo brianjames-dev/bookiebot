@@ -120,8 +120,7 @@ async function check(engine, { width, rail, dark, household }) {
     assert.equal(await button("Enable on this phone").count(), 0)
     await page.setViewportSize({ width: 320, height: 740 })
     await page.locator('.bb-page:not([data-duo-landscape])').waitFor()
-    const notifications = content("Notifications")
-    assert(await notifications.evaluate(main => main.scrollWidth <= main.clientWidth + 1),
+    assert(await detail.evaluate(pane => pane.scrollWidth <= pane.clientWidth + 1),
       "Notification preferences and registration errors fit a narrow screen")
     const timing = page.getByLabel("Payment reminder timing")
     assert((await timing.boundingBox()).width >= 136, "The selected reminder timing stays readable")
