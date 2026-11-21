@@ -118,9 +118,9 @@
 
 .bi-product .sp-split-options { position:absolute; right:0; top:0; z-index:3; }
 .sp-flow-heading { position:relative; padding-right:36px; }
-.sp-split-options summary { display:grid; place-items:center; min-width:44px; min-height:44px; list-style:none; cursor:pointer; }
+.sp-split-options summary { list-style:none; }
 .sp-split-options summary::-webkit-details-marker { display:none; }
-.sp-split-options[open] { background:var(--bi-panel-surface); border-radius:10px; }
+.sp-split-options-panel { position:absolute; top:calc(100% + 4px); right:0; width:max-content; }
 .bi-product .sp-detail .sp-management { margin:0; padding:0; background:transparent; }
 .bi-product .sp-detail .bi-expansion { display:block; opacity:1; }
 .bi-product .sp-detail .bi-expansion::before { display:none; }

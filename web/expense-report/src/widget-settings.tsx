@@ -2,6 +2,7 @@ import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { ReportMenu } from "./components/ui/report-menu"
+import { Trash2 } from "lucide-react"
 import { useAppWorkStatus } from "./app-work-guard"
 import "./widget-settings.css"
 
@@ -176,11 +177,11 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, active = t
               {connection.status === "pending" ? "Awaiting setup" : connection.lastUsedAt ? "Connected" : "Paired · Run in Scriptable"}
             </span>
           </div>
-          <select aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
+          <select className="bb-option-select" aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
           <ReportMenu label={`${connection.label} options`} disabled={busy || needsRefresh} closeOnSelect>
             <strong className="bb-widget-menu-label">{connection.label}</strong>
             <p className="bb-widget-menu-note">{connection.status === "pending" ? `Setup expires ${dateLabel(connection.expiresAt)}` : connection.lastUsedAt ? `Last checked ${dateLabel(connection.lastUsedAt)}` : "Run BookieBot in Scriptable to check the first preview."}</p>
-            <button className="bb-report-menu-action" type="button" disabled={busy || needsRefresh} onClick={() => setConfirmRevoke(connection.id)}>Remove</button>
+            <button className="bb-report-menu-action bb-option-destructive" type="button" disabled={busy || needsRefresh} onClick={() => setConfirmRevoke(connection.id)}><Trash2 aria-hidden="true" />Remove</button>
           </ReportMenu>
         </div>
         <CollapsibleContent open={confirmRevoke === connection.id}><div className="bb-widget-revoke"><p>Remove access for {connection.label}? You’ll need to pair it again.</p><div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" disabled={busy || needsRefresh} onClick={() => void run({ operation: "revoke", id: connection.id })}>Remove widget access</button><button className="bb-settings-action" type="button" disabled={busy} onClick={() => setConfirmRevoke(null)}>Keep widget</button></div></div></CollapsibleContent>
@@ -194,7 +195,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, active = t
     <CollapsibleContent open={formOpen} id={`${id}-form`}>
       <form className="bb-widget-form" onSubmit={event => { event.preventDefault(); if (canCreate && label.trim()) void run({ operation: "pair", label: label.trim(), mode }) }}>
         <label>Widget name<input autoComplete="off" maxLength={60} value={label} disabled={busy} onChange={event => setLabel(event.target.value)} /></label>
-        <label>Budget view<select aria-label="New widget budget view" value={mode} disabled={busy} onChange={event => setMode(event.target.value as WidgetMode)}><option value="current">Current</option><option value="projected">Projected</option></select></label>
+        <label>Budget view<select className="bb-option-select" aria-label="New widget budget view" value={mode} disabled={busy} onChange={event => setMode(event.target.value as WidgetMode)}><option value="current">Current</option><option value="projected">Projected</option></select></label>
         <div className="bb-widget-actions"><button className="bb-toolbar-button" type="submit" disabled={!canCreate || !label.trim()}>Create setup code</button><button className="bb-settings-action" type="button" disabled={busy} onClick={discard}>Cancel</button></div>
       </form>
     </CollapsibleContent>

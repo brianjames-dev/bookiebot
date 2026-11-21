@@ -6,9 +6,11 @@ Settings keeps its glass controls over the content, with the page-wide header fi
 
 Phone notification choices save individually. Selecting the first weekday or enabling Payment reminders can prompt for iOS permission. Weekly Summary accepts multiple weekdays, and Payment Reminders supports the due date or one or two days before. Existing Monday and next-day settings retain their schedule. Clearing all types stops delivery while preserving the phone's other notification preferences.
 
+Widgets, report options, Savings, Reimbursements, and Transaction split options share the app's rounded card surface and action styles. Notifications and Widgets also share the same styled select controls while keeping native pickers.
+
 The full local suite passed 3,573 tests with 918 optional PostgreSQL skips. Python and frontend types and the production build passed. Chromium and WebKit passed Settings routing, refresh scoping, sidebar resizing, inline Bills and Transfers, and notification controls at widths down to 320px. PR #226 tracks CI and deployment.
 
-Manual check. In open DUO, scroll the category sidebar under the glass Back control and check that the sidebar reaches the top. Open Bills and Transfers in both DUO poses, refresh using the control for that pose, and fold with an editor open. In Notifications, choose two weekdays and a payment reminder lead time, reopen Settings to verify they persisted, then clear the types if delivery is unwanted. Check that the other Settings pages have no refresh control.
+Manual check. In open DUO, scroll the category sidebar under the glass Back control and check that the sidebar reaches the top. Open Bills and Transfers in both DUO poses, refresh using the control for that pose, and fold with an editor open. In Notifications, choose two weekdays and a payment reminder lead time, reopen Settings to verify they persisted, then clear the types if delivery is unwanted. Check that the other Settings pages have no refresh control. Compare the Widgets, Reimbursements, Savings, and Transaction split ellipsis menus without confirming any actions.
 
 ## Inset Groups Settings (2026-11-20)
 

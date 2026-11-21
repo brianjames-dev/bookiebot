@@ -200,13 +200,13 @@ export function PhoneNotifications({ embedded = false }: { embedded?: boolean } 
         </fieldset>
         {toggle("upcoming", "Payment reminders")}
         {preferences.upcoming && <label className="bb-notification-option"><span>Remind me</span>
-          <select aria-label="Payment reminder timing" value={preferences.reminderDaysBefore} disabled={!editable}
+          <select className="bb-option-select" aria-label="Payment reminder timing" value={preferences.reminderDaysBefore} disabled={!editable}
             onChange={event => void save({ ...preferences, reminderDaysBefore: Number(event.target.value) })}>
             <option value={0}>On due date</option><option value={1}>Day before</option><option value={2}>Two days before</option>
           </select>
         </label>}
         <label className="bb-notification-option"><span>Delivery time (Pacific)</span>
-          <select aria-label="Notification delivery time" value={preferences.hour} disabled={!editable || !configured}
+          <select className="bb-option-select" aria-label="Notification delivery time" value={preferences.hour} disabled={!editable || !configured}
             onChange={event => void save({ ...preferences, hour: Number(event.target.value) })}>
             {Array.from({ length: 15 }, (_, index) => index + 7).map(hour => <option key={hour} value={hour}>{hour % 12 || 12} {hour < 12 ? "AM" : "PM"}</option>)}
           </select>

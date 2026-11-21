@@ -1721,24 +1721,43 @@ button.bb-left-categories { cursor: pointer; }
 .bb-icon-button svg { width: 24px; height: 24px; }
 .bb-icon-button:hover { background: hsl(var(--foreground) / 0.06); }
 .bb-icon-button:disabled { cursor: default; opacity: 0.55; }
-.bb-icon-button:focus-visible,
-.bb-report-menu-action:focus-visible {
+.bb-icon-button:focus-visible {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 2px;
 }
 .bb-report-menu { position: relative; }
-.bb-report-menu-trigger svg { fill: currentColor; }
+:is(.bb-report-menu-trigger, .sr-options, .sp-split-options summary) {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 50%;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  cursor: pointer;
+}
+:is(.bb-report-menu-trigger, .sr-options, .sp-split-options summary) > svg { width: 18px; height: 18px; }
+:is(.bb-report-menu-trigger, .sr-options)[aria-expanded=true],
+.sp-split-options[open] summary {
+  border-color: hsl(var(--primary) / .4);
+  background: color-mix(in srgb, hsl(var(--card)), hsl(var(--primary)) 12%);
+  color: hsl(var(--primary));
+}
+:is(.bb-report-menu-panel, .sr-options-panel, .sp-split-options-panel) {
+  padding: 5px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
 .bb-report-menu-panel {
   position: absolute;
   z-index: 50;
   top: calc(100% + 4px);
   right: 0;
   width: 210px;
-  padding: 6px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--card));
-  box-shadow: 0 10px 30px hsl(0 0% 0% / 0.16);
   opacity: 0;
   visibility: hidden;
   transform: translateY(-5px);
@@ -1750,7 +1769,7 @@ button.bb-left-categories { cursor: pointer; }
   transform: translateY(0);
   transition-delay: 0s;
 }
-.bb-report-menu-action,
+.bb-report-menu-action, .sr-options-menu button,
 .bb-theme-toggle.bb-report-menu-action {
   display: flex;
   align-items: center;
@@ -1759,19 +1778,50 @@ button.bb-left-categories { cursor: pointer; }
   width: 100%;
   min-height: 44px;
   height: auto;
-  padding: 10px;
+  padding: 8px 10px;
   border: 0;
-  border-radius: 2px;
+  border-radius: 10px;
   color: hsl(var(--foreground));
   background: transparent;
   font: inherit;
   font-size: 14px;
+  text-align: start;
   cursor: pointer;
   transition: background-color var(--bb-motion-duration) var(--bb-motion-ease);
 }
-.bb-report-menu-action:hover { background: hsl(var(--foreground) / 0.06); }
-.bb-report-menu-action:disabled { cursor: default; opacity: 0.55; }
+:is(.bb-report-menu-action, .sr-options-menu button, .bb-report-menu-trigger, .sr-options, .sp-split-options summary):focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+}
+@media (hover:hover) {
+  :is(.bb-report-menu-action, .sr-options-menu button, .bb-report-menu-trigger, .sr-options, .sp-split-options summary):not(:disabled):hover {
+    background: color-mix(in srgb, hsl(var(--card)), hsl(var(--primary)) 10%);
+  }
+}
+:is(.bb-report-menu-action, .sr-options-menu button, .bb-report-menu-trigger, .sr-options):disabled { cursor: default; opacity: .55; }
+:is(.bb-report-menu-action, .sr-options-menu button) > svg { width: 17px; height: 17px; flex: none; }
+.bb-report-menu-action.bb-option-destructive { color: hsl(var(--destructive)); }
 .bb-theme-setting { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: 12px; }
+
+.bb-option-select {
+  appearance: none;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px 29px 8px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%) calc(100% - 15px) 50% / 5px 5px no-repeat,
+    linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%) calc(100% - 10px) 50% / 5px 5px no-repeat,
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  font: inherit;
+  font-size: 16px;
+  text-overflow: ellipsis;
+}
+.bb-option-select:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.bb-option-select:disabled { opacity: .55; }
 
 .bb-app-controls {
   display: grid;

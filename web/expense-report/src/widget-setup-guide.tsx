@@ -87,13 +87,13 @@ function WidgetCustomizer({ open }: { open: boolean }) {
   return <div className="bb-widget-guide-extra-body">
     <p>Choose a widget, then paste its parameter into <strong>Edit Widget → Parameter</strong>.</p>
     <div className="bb-widget-customize-fields">
-      <label>Widget type<select aria-label="Widget type" value={type} onChange={event => {
+      <label>Widget type<select className="bb-option-select" aria-label="Widget type" value={type} onChange={event => {
         if (widgetTypes.some(widget => widget.value === event.target.value)) setType(event.target.value as WidgetType)
       }}>{widgetTypes.map(widget => <option key={widget.value} value={widget.value}>{widget.label}</option>)}</select></label>
-      <label>Theme<select aria-label="Widget theme" value={theme} onChange={event => {
+      <label>Theme<select className="bb-option-select" aria-label="Widget theme" value={theme} onChange={event => {
         if (event.target.value === "editorial" || event.target.value === "two-tone") setTheme(event.target.value)
       }}><option value="editorial">Editorial</option><option value="two-tone">Two-tone</option></select></label>
-      {type === "savings" && <label className="bb-widget-goal-choice">Goal<select aria-label="Widget savings goal" value={goalId} disabled={goalsLoading} onChange={event => {
+      {type === "savings" && <label className="bb-widget-goal-choice">Goal<select className="bb-option-select" aria-label="Widget savings goal" value={goalId} disabled={goalsLoading} onChange={event => {
         if (!event.target.value || goals.some(goal => goal.id === event.target.value)) setGoalId(event.target.value)
       }}><option value="">First active goal</option>{goals.map(goal => <option key={goal.id} value={goal.id}>{goal.name}</option>)}</select></label>}
     </div>

@@ -32,12 +32,20 @@ async function check(engine, { width, rail, dark, household }) {
             goalId: "", fromAccount: "Checking", toAccount: "Savings", active: true, nextDate: "2026-12-01" }] } })
       },
       request: async route => {
-        if (new URL(route.request().url()).pathname === "/app/notifications") {
+        const { pathname } = new URL(route.request().url())
+        if (pathname === "/app/notifications") {
           await route.fulfill({ json: { enabled: true, publicKey: "B" + "A".repeat(86),
             preferences: { weekly: true, weeklyDays: [0, 4], upcoming: true, reminderDaysBefore: 2, showAmounts: false, hour: 10 } } })
           return true
         }
-        if (new URL(route.request().url()).pathname !== "/app/household") return false
+        if (pathname === "/app/widgets/settings") {
+          assert.equal(route.request().method(), "GET")
+          await route.fulfill({ json: { connections: [{ id: "widget", label: "Small Widget", mode: "projected", status: "active",
+            createdAt: "2026-11-20", expiresAt: "2026-12-20", lastUsedAt: "2026-11-21" }],
+          scriptUrl: "/app/widgets/script", setupInstructionsUrl: "/app/widgets/help" } })
+          return true
+        }
+        if (pathname !== "/app/household") return false
         assert.equal(route.request().method(), "GET")
         await route.fulfill({ json: { account: { id: "fixture", name: "Brian" }, provider: "sheets", household: null } })
         return true
@@ -48,6 +56,13 @@ async function check(engine, { width, rail, dark, household }) {
     const category = name => directory.getByRole("button", { name, exact: true })
     const detail = page.locator(".bb-settings-detail")
     const content = label => page.getByRole("main", { name: label, exact: true })
+    const presentation = (locator, properties) => locator.evaluate((element, properties) => {
+      const styles = getComputedStyle(element)
+      return properties.map(property => styles[property])
+    }, properties)
+    const selectStyle = ["appearance", "borderRadius", "backgroundImage", "minHeight"]
+    const menuStyle = ["backgroundColor", "borderColor", "borderRadius", "boxShadow", "padding"]
+    const actionStyle = ["color", "borderRadius", "minHeight", "fontSize"]
 
     await tap(page, button("Settings"))
     await directory.waitFor()
@@ -143,11 +158,21 @@ async function check(engine, { width, rail, dark, household }) {
       "Notification preferences and registration errors fit a narrow screen")
     const timing = page.getByLabel("Payment reminder timing")
     assert((await timing.boundingBox()).width >= 136, "The selected reminder timing stays readable")
+    const timingStyle = await presentation(timing, selectStyle)
     await page.setViewportSize({ width, height: 669 })
     await page.locator('.bb-page[data-duo-landscape="true"]').waitFor()
     await tap(page, category("Widgets"))
     await button("Pair a widget").waitFor()
     assert.equal(await button("Refresh widgets").count(), 0)
+    assert.deepEqual(await presentation(page.getByLabel("Budget view for Small Widget"), selectStyle), timingStyle)
+    const widgetMenuButton = button("Small Widget options")
+    await tap(page, widgetMenuButton)
+    const widgetMenu = page.locator('.bb-widget-settings .bb-report-menu-panel[data-open="true"]')
+    const widgetPanelStyle = await presentation(widgetMenu, menuStyle)
+    assert.equal(widgetPanelStyle[3], "none", "Options surfaces have no underglow")
+    const removeStyle = await presentation(widgetMenu.getByRole("button", { name: "Remove", exact: true }), actionStyle)
+    await widgetMenu.getByRole("button", { name: "Remove", exact: true }).press("Escape")
+    assert.equal(await widgetMenuButton.getAttribute("aria-expanded"), "false")
     await tap(page, category("Transfers"))
     const transfers = content("Transfers")
     await tap(page, transfers.locator(".bb-bills-row").first())
@@ -207,6 +232,11 @@ async function check(engine, { width, rail, dark, household }) {
     await directory.waitFor()
     await tap(page, button("Back"))
     await page.locator('.bb-page[data-screen="overview"]').waitFor()
+    await tap(page, button("Shared"))
+    await tap(page, button("Reimbursement options"))
+    const sharedMenu = page.getByRole("dialog", { name: "Options", exact: true })
+    assert.deepEqual(await presentation(sharedMenu, menuStyle), widgetPanelStyle)
+    assert.deepEqual(await presentation(sharedMenu.getByRole("button", { name: "Reset balances", exact: true }), actionStyle), removeStyle)
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])
     console.log("PASS grouped Settings, category routing, resize, gutter, fold and draft", engine.name(), width)

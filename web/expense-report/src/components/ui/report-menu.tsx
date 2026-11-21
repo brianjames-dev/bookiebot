@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
+import { Ellipsis } from "lucide-react"
 
 /** A small disclosure, with ordinary button/tab behavior and a retained exit. */
 export function ReportMenu({ children, label = "Report settings", disabled = false, closeOnSelect = false }: {
@@ -43,7 +44,7 @@ export function ReportMenu({ children, label = "Report settings", disabled = fal
     <div className="bb-report-menu" ref={root}>
       <button ref={trigger} className="bb-icon-button bb-report-menu-trigger" type="button"
         disabled={disabled} aria-label={label} aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+        <Ellipsis aria-hidden="true" />
       </button>
       <div id={id} ref={panel} className="bb-report-menu-panel" data-open={open} aria-hidden={!open}
         onClick={(event) => {

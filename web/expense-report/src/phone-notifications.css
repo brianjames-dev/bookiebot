@@ -6,7 +6,6 @@
 .bb-notification-settings { padding: 8px 0 24px; max-width: 560px; }
 .bb-notification-settings p { margin: 8px 0 16px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
 .bb-notification-option { display: flex; gap: 18px; align-items: center; justify-content: space-between; margin: 18px 0; }
-.bb-notification-option select { background: hsl(var(--background)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); border-radius: 5px; padding: 7px 10px; font: inherit; }
 .bb-notification-option input { appearance: none; position: relative; margin: 0; width: 42px; height: 25px; flex: 0 0 42px; border: 1px solid hsl(var(--border)); border-radius: 20px; background: hsl(var(--muted)); cursor: pointer; transition: background 220ms ease; }
 .bb-notification-option input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 17px; height: 17px; background: hsl(var(--muted-foreground)); border-radius: 50%; transition: transform 220ms ease, background 220ms ease; }
 .bb-notification-option input:checked { background: hsl(var(--primary)); }
@@ -18,7 +17,7 @@
 .bb-notifications-embedded .bb-notification-embedded-state { display: flex; align-items: center; gap: 12px; margin-top: 0; }
 .bb-notifications-embedded .bb-notification-option { min-width: 0; }
 .bb-notifications-embedded .bb-notification-option > span { min-width: 0; }
-.bb-notifications-embedded .bb-notification-option select { max-width: min(168px, 62%); flex: 0 0 auto; }
+.bb-notifications-embedded .bb-notification-option select { max-width: min(174px, 66%); flex: 0 0 auto; }
 @media (prefers-reduced-motion: reduce) { .bb-notification-option input, .bb-notification-option input::after { transition: none; } }
 .bb-notification-days { min-width: 0; padding: 10px 0 16px; margin: 8px 0 0; border: 0; border-bottom: 1px solid hsl(var(--border) / .65); }
 .bb-notification-days legend { padding: 0; }

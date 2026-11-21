@@ -1,5 +1,5 @@
 import {useLayoutEffect,useRef,useState} from 'react'
-import {ArrowLeft,ArrowRight,ChevronDown} from 'lucide-react'
+import {ArrowLeft,ArrowRight,ChevronDown,Ellipsis,Scissors} from 'lucide-react'
 import type {RecordedTransaction} from './transactions-screen'
 import type {TransactionChangeSummary,TransactionOperation} from './transaction-change-summary'
 import {StepMotion} from './transaction-step-motion'
@@ -50,7 +50,10 @@ export function InlineTransactionEditor(props:InlineEditorProps){
  const content=<section className={"bi-editor"+(operation==='split'?' sp-management':'')+(props.embedded?' bi-editor-embedded':'')} data-kind={row.kind} data-operation={operation} data-review={Boolean(review)} data-design="levels" role="region" aria-label="Edit transaction">
   <span className="bi-sr-only">{title}</span>
   <StepMotion review={Boolean(review)} open={open} mode="slide" duration={transactionMotion.duration} edit={<>
-   {operation==='split'&&<header className="sp-flow-heading"><h2>Edit split</h2><p className="sp-flow-context">{row.location||row.title} · {splitMoney(row.amountCents)}</p>{row.capabilities.cancel_split&&<details className="sp-split-options"><summary aria-label="Split options">•••</summary><button type="button" disabled={locked} onClick={current.onRemoveSplit}>Remove split</button></details>}</header>}
+   {operation==='split'&&<header className="sp-flow-heading"><h2>Edit split</h2><p className="sp-flow-context">{row.location||row.title} · {splitMoney(row.amountCents)}</p>{row.capabilities.cancel_split&&<details className="sp-split-options">
+    <summary aria-label="Split options"><Ellipsis aria-hidden="true"/></summary>
+    <div className="sp-split-options-panel"><button type="button" className="bb-report-menu-action bb-option-destructive" disabled={locked} onClick={current.onRemoveSplit}><Scissors aria-hidden="true"/>Remove split</button></div>
+   </details>}</header>}
    <form className="bi-fields" onSubmit={event=>{event.preventDefault();if(canReview&&!locked)current.onReview()}}>
    {editing&&transfer?<>
     <div className="bi-key-fields"><label>Amount<span className="bi-money-input"><span aria-hidden="true">$</span><input type="text" inputMode="decimal" aria-label="Amount" disabled={locked} value={draft.amount??''} onChange={event=>current.onField('amount',event.target.value)}/></span></label>{field('item','Name')}</div>
