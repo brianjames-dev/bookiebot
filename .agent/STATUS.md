@@ -1,5 +1,15 @@
 # Agent Status
 
+## Reconcile payment feedback across tabs (2026-11-20)
+
+Confirming a receipt from a matched share returns the canonical saved payment immediately and leaves its durable sheet projection to existing recovery. Transactions and Reimbursements use the same owner-scoped state. The shell keeps one timed reimbursement Undo toast available when switching tabs or folding. Applying Undo repaints both tabs while the request is pending. Stale display reads cannot replace a newer save or an in-flight inverse.
+
+Place reconciliation status icons and text above the comparison cards, with the same **Awaiting repayment** pill in a checked parent editor while its linked share has a balance.
+
+Verification passed 124 focused tests, 3,566 local tests with 915 optional PostgreSQL skips, Python and frontend type checks, and the bundle build. Chromium and WebKit verified both DUO layouts with sheet recovery and Undo responses held open. CI and release evidence are tracked in the task PR.
+
+Manual check. From a checked split with a balance due, inspect the status line and record a legitimate receipt. Use the toast to check the updated amount in Transactions and the updated balance in Reimbursements. For a receipt that should be reversed, tap Undo and check both tabs again. Repeat the display check in both DUO layouts.
+
 ## Reconcile opens the share summary first (2026-11-20)
 
 The Checked row and the shortcut after confirming a match both say **View [name]’s share**. A share with a balance due offers **Back to reconciliation** and **Mark [name]’s share received** in the summary footer. The Mark action opens the separate receipt form. Matching a bank transaction and recording a repayment remain separate confirmed actions.
@@ -627,6 +637,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of the shared Reconcile receipt and Undo feedback. See the first entry and docs/RECONCILIATION.md.
 
 Native acceptance of the checked share summary and repayment action in both DUO poses.
 

@@ -359,7 +359,7 @@ const snapshot = (items = rows, enabled = true) => ({ enabled, checkedAt: '2026-
   assert.equal(requests.length, matchRequestCount, 'Bank confirmation never sends a repayment request')
   assert.ok(button('View Hannah’s share'))
   await click('View Hannah’s share')
-  const shareRead = requests.slice(matchRequestCount).find(request => request.url === '/app/reimbursements')
+  const shareRead = requests.slice(matchRequestCount).find(request => request.url === '/app/reimbursements?snapshot=1')
   assert.equal(shareRead.options.method, 'GET')
   assert.equal(latest().url, '/app/reconciliation/40')
   const savedBill = { ...checkedBill, receipt: receiptLink }

@@ -2,6 +2,11 @@ import type {LedgerSnapshot,LedgerAllocation} from './reimbursement-ledger'
 import {createAppResource} from './app-resource-state'
 
 export const reimbursementDisplay=createAppResource<LedgerSnapshot>()
+export const reimbursementLedgerState=createAppResource<{
+ snapshot:LedgerSnapshot
+ immediate?:ReimbursementDisplayChange
+ acknowledgement?:{body:Record<string,unknown>;result:LedgerSnapshot}
+}>()
 export interface ReimbursementDisplayChange {
  allocations:(Pick<LedgerAllocation,'id'|'version'|'settledCents'|'outstandingCents'|'status'>&{clearedCents:number})[]
  eventIds:string[]
@@ -51,4 +56,20 @@ export function applyDisplayChange(snapshot:LedgerSnapshot,change:ReimbursementD
 }
 export function pendingDisplay(snapshot:LedgerSnapshot):LedgerSnapshot {
  return (snapshot.undoJobs??[]).reduce((view,job)=>job.status==='queued'&&job.display?applyDisplayChange(view,job.display):view,snapshot)
+}
+
+/** One accepted ledger and one presentation for all of this owner's tabs. */
+export function publishReimbursementSnapshot(snapshot:LedgerSnapshot, options:{
+ immediate?:ReimbursementDisplayChange
+ body?:Record<string,unknown>
+}={}) {
+ const {ownerKey}=snapshot
+ const acknowledgement=options.body?{body:options.body,result:snapshot}:reimbursementLedgerState.read(ownerKey)?.acknowledgement
+ reimbursementDisplay.publish(ownerKey,options.immediate?applyDisplayChange(snapshot,options.immediate):pendingDisplay(snapshot))
+ reimbursementLedgerState.publish(ownerKey,{snapshot,immediate:options.immediate,acknowledgement})
+}
+
+export function clearReimbursementSnapshot(owner:string) {
+ reimbursementLedgerState.clear(owner)
+ reimbursementDisplay.clear(owner)
 }

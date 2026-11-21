@@ -83,6 +83,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [savingsUpdated,setSavingsUpdated]=useState<{owner:string;time:number|null}|null>(null)
   const onSavingsUpdated=useCallback((time:number|null)=>setSavingsUpdated({owner,time}),[owner])
   const [sharedUpdated, setSharedUpdated] = useState<{ owner: string; time: number | null } | null>(null)
+  const [reimbursementToastTarget, setReimbursementToastTarget] = useState<HTMLDivElement | null>(null)
   const onSharedUpdated = useCallback((time: number | null) => setSharedUpdated({ owner, time }), [owner])
   const askTriggerRef = useRef<HTMLButtonElement>(null)
   const screenRef = useRef(screen)
@@ -282,13 +283,13 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <TransactionsScreen key={report.ownerName} active={screen === "transactions"} ownerName={report.ownerName} aliases={report.calendarLogoAliases} initialMonth={questionMonth??`${report.year}-${String(report.month).padStart(2,"0")}`} headerActions={transactionsHeaderActions} onUpdated={onTransactionsUpdated} />}
       </main>
       <main className="bb-shell-shared bb-main" aria-label="Shared" hidden={screen !== "shared"}>
-        {report && <ReimbursementLedger key={report.ownerName} balanceFirst headerActions={sharedHeaderActions} aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} onUpdated={onSharedUpdated} />}
+        {report && <ReimbursementLedger key={report.ownerName} ownerName={report.ownerName} balanceFirst toastTarget={reimbursementToastTarget} headerActions={sharedHeaderActions} aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} onUpdated={onSharedUpdated} />}
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
         {report && <SavingsWorkspace key={report.ownerName} report={report} ready={monthlyReady} active={screen==='savings'} headerActions={savingsHeaderActions} onUpdated={onSavingsUpdated} onTransfers={()=>{selectScreen('settings');setTransfersOpen(true)}}/>}
       </main>
       <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>
-        {report && <ReconciliationScreen controller={reconciliation} embeddedHeader wide={duo.landscape && screen==="reconcile"} headerActions={reconcileHeaderActions} statusTarget={reconcileStatusTarget} aliases={report.calendarLogoAliases}/>}
+        {report && <ReconciliationScreen key={report.ownerName} ownerName={report.ownerName} controller={reconciliation} embeddedHeader wide={duo.landscape && screen==="reconcile"} headerActions={reconcileHeaderActions} statusTarget={reconcileStatusTarget} aliases={report.calendarLogoAliases}/>}
       </main>
       <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen || configurationOpen}>
         {report && <>
@@ -327,6 +328,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       </NavigationViewport>
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
+      <div className="sr-toast-host" ref={setReimbursementToastTarget} />
       {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Transfers" hidden={screen!=="settings"||!transfersOpen}><SavingsTransfers key={report.ownerName} ownerName={report.ownerName} active={screen==="settings"&&transfersOpen}/></main>}
       <BillCheckin key={owner} owner={owner} enabled={Boolean(report)&&monthlyReady} blocked={askOpen||widgetGuideOpen||keyboardOpen||signingOut||reportBusy} onEnter={request=>{setBillAmountRequest(request);setWidgetGuideOpen(false);selectScreen('settings');setBillsOpen(true)}}/>
     </div>

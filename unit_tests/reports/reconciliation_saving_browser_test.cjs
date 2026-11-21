@@ -136,7 +136,7 @@ async function verifyWorkspace(browser) {
     await pane.getByRole('button', { name: /Backup jacket/ }).click()
     await pane.getByRole('heading', { name: 'Review match' }).waitFor()
     assert.equal(await pane.locator('.bb-reconcile-match-result svg.lucide-triangle-alert').count(), 1)
-    assert.equal(await pane.locator('.bb-reconcile-match-result + .bb-reconcile-comparison').count(), 1)
+    assert.equal(await pane.locator('.bb-reconcile-comparison-status:has(.bb-reconcile-match-result) + .bb-reconcile-comparison').count(), 1)
     const add = direct.getByRole('button', { name: 'Add expense', exact: true })
     assert.equal(await add.locator('.bb-saving-label').evaluate(el => getComputedStyle(el).columnGap), '8px')
     await add.click()
@@ -373,7 +373,7 @@ async function verifyMatchPriority(browser, width, height) {
 async function verifyDesktopAndReceiptRefresh(browser) {
   let checks = 0, receiptReads = 0, readingReceipt = false
   const desktop = { newPage: options => browser.newPage({ ...options, hasTouch: false, isMobile: false }) }
-  const checked = { ...row, status: 'checked', receipt: {
+  const checked = { ...row, status: 'checked', matchLabel: 'Matches logged entry', receipt: {
     allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 8000,
   } }
   const other = { ...checked, id: 2, merchant: 'Another checked charge', receipt: undefined }
@@ -412,6 +412,10 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     await checkedRow.click()
     const openReceipt = page.getByRole('button', { name: 'View Hannah’s share' })
     await openReceipt.waitFor()
+    const comparisonStatus = page.locator('.bb-reconcile-comparison-status:visible')
+    await comparisonStatus.getByText('Matches logged entry').waitFor()
+    await comparisonStatus.locator('.rp-status').getByText('Awaiting repayment').waitFor()
+    assert.equal(await page.locator('.bb-reconcile-comparison-status:visible + .bb-reconcile-comparison').count(), 1)
     assert.match(await openReceipt.getAttribute('class'), /bi-primary/)
     assert.equal(await page.getByRole('button', { name: 'Mark Hannah’s share received' }).count(), 0)
     readingReceipt = true
@@ -465,6 +469,110 @@ async function verifyDesktopAndReceiptRefresh(browser) {
   } finally { await page.close() }
 }
 
+async function verifyReceiptFeedback(browser, width, height) {
+  const id = 'shared-reconcile-purchase'
+  const checked = { ...row, status: 'checked', matchLabel: 'Matches logged entry',
+    receipt: { allocationId: id, partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 8000 } }
+  const allocation = { id, payerOwner: 'brian', partnerOwner: 'hannah', payerPerson: 'Brian',
+    item: 'Shared fixture purchase', location: '', category: 'shopping', expenseDate: '2026-10-20',
+    grossCents: 16631, payerShareCents: 8631, partnerShareCents: 8000, settledCents: 0, outstandingCents: 8000,
+    accounting: 'cash_v1', method: 'equal', version: 1, projectedVersion: 1, status: 'outstanding' }
+  const initial = { enabled: true, ownerKey: 'brian', currency: 'USD', allocations: [allocation], events: [], resetState: 'before-receipt' }
+  const event = { id: 'recorded-cash', operationId: 'reconcile-receipt', allocationId: id, kind: 'receive', actorOwner: 'brian',
+    payeeOwner: 'brian', debtorOwner: 'hannah', amountCents: 5000, date: allocation.expenseDate, status: 'confirmed' }
+  const saved = { ...initial, allocations: [{ ...allocation, version: 2, settledCents: 5000, outstandingCents: 3000 }],
+    events: [event], operationId: event.operationId, resetState: 'receipt-pending', undoState: 'receipt-guard', projectionPending: true }
+  const undoJob = { id: 'fixture-undo', actorOwner: 'brian', operation: 'reverse_operation',
+    status: 'completed', error: '', createdAt: '', updatedAt: '' }
+  const restored = { ...initial, allocations: [{ ...allocation, version: 3, projectedVersion: 3 }],
+    events: [{ ...event, status: 'reversed' }], resetState: 'receipt-undone', undoJob, undoJobs: [undoJob] }
+  let state = initial, releaseProjection, releaseUndo, undoStarted
+  const projection = new Promise(resolve => { releaseProjection = resolve })
+  const undoResponse = new Promise(resolve => { releaseUndo = resolve })
+  const undoRequested = new Promise(resolve => { undoStarted = resolve })
+  const writes = []
+  const staleRow = { id, actionId: id, version: 'v1', month: '2026-10', date: allocation.expenseDate, title: allocation.item,
+    location: '', person: 'Brian', kind: 'expense', category: 'shopping', categoryLabel: 'Shopping',
+    amountCents: 16631, canonicalAllocationId: id, canonicalAllocationVersion: 1,
+    split: 'equal', fields: {}, editableFields: [], capabilities: {}, reasons: {} }
+  const { page, errors, unexpected } = await fixture(browser, width, height, true, false, false, 0, {
+    async request(route) {
+      const request = route.request(), url = new URL(request.url())
+      if (url.pathname === '/app/reconciliation') await route.fulfill({ json: snapshot(checked) })
+      else if (url.pathname === '/app/reconciliation/1') await route.fulfill({ json: { item: checked } })
+      else if (url.pathname === '/app/transactions') await route.fulfill({ json: {
+        items: [staleRow], total: 1, nextOffset: null, categories: ['shopping'], persons: ['Brian'], month: '2026-10',
+      } })
+      else if (url.pathname === '/app/reimbursements') {
+        if (request.method() === 'POST') {
+          const body = request.postDataJSON()
+          writes.push(body.operation)
+          assert(body.requestId)
+          if (body.operation === 'receive') {
+            assert.equal(url.searchParams.get('deferredReceipt'), '1')
+            assert.equal(body.amountCents, 5000)
+            state = saved
+          } else {
+            assert.equal(body.operation, 'queue_undo')
+            assert.equal(body.operationId, event.operationId)
+            assert.equal(body.expectedUndoState, saved.undoState)
+            undoStarted()
+            await undoResponse
+            state = restored
+          }
+        } else if (state === saved && !url.search) {
+          // No Sheets recovery response can contribute to the immediate UI.
+          await projection
+        }
+        await route.fulfill({ json: state })
+      } else return false
+      return true
+    },
+  })
+  const nav = name => page.getByRole('button', { name, exact: true })
+  const toast = page.locator('.sr-native-toast .bi-undo-popup')
+  const purchases = page.locator('.bb-shell-transactions .bb-daily-transactions')
+  const reimbursement = page.locator('.sr-row-main').filter({ hasText: allocation.item })
+  try {
+    await nav('Transactions').click()
+    await purchases.getByText('$166.31', { exact: true }).waitFor()
+    await nav('Shared').click()
+    await reimbursement.getByText('$80.00', { exact: true }).waitFor()
+    await nav('Reconcile').click()
+    await page.getByRole('button', { name: /Checked/ }).click()
+    await page.getByRole('button', { name: /^Fixture store/ }).click()
+    await page.getByRole('button', { name: 'View Hannah’s share' }).click()
+    await page.getByRole('button', { name: 'Mark Hannah’s share received' }).click()
+    await page.getByLabel('Amount ($)').fill('50.00')
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await nav('Confirm received record').click()
+    await toast.getByText('$50.00 received', { exact: true }).waitFor()
+    assert.equal(await toast.locator('.bi-undo-time').count(), 1)
+    const deadline = await toast.getAttribute('data-expires-at')
+
+    await nav('Transactions').click()
+    await purchases.getByText('$116.31', { exact: true }).waitFor()
+    await nav('Shared').click()
+    await reimbursement.getByText('$30.00', { exact: true }).waitFor()
+    assert.equal(await toast.getAttribute('data-expires-at'), deadline)
+    await toast.getByRole('button', { name: 'Undo', exact: true }).click()
+    await undoRequested
+    await reimbursement.getByText('$80.00', { exact: true }).waitFor()
+    await nav('Transactions').click()
+    await purchases.getByText('$166.31', { exact: true }).waitFor()
+    releaseUndo()
+    releaseProjection()
+    await toast.getByText('Undone', { exact: true }).waitFor()
+    assert.deepEqual(writes, ['receive', 'queue_undo'])
+    assert.deepEqual(errors, [])
+    assert.deepEqual(unexpected, [])
+  } finally {
+    releaseUndo()
+    releaseProjection()
+    await page.close()
+  }
+}
+
 ;(async () => {
   for (const engine of engines) {
     const browser = await engine.launch({ headless: true })
@@ -473,6 +581,8 @@ async function verifyDesktopAndReceiptRefresh(browser) {
         await verify(browser, width, height, dark)
         await verifyMatchPriority(browser, width, height)
         console.log('PASS in-button Reconcile spinner', engine.name(), width, height)
+        await verifyReceiptFeedback(browser, width, height)
+        console.log('PASS Reconcile receipt and Undo across tabs', engine.name(), width, height)
       }
       await verifyWorkspace(browser)
       console.log('PASS Reconcile scrollbar, selection transition and inline expansion', engine.name())

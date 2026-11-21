@@ -589,7 +589,7 @@ function ExpenseReportBody({ report, appControls, appAvatarUrl, appSession, appM
           projected={projectionActive} categoryColors={categoryColors} onInspectDay={inspectDay} />}
         </ReportScreen>
 
-        {!navigation && (appSession ? <ReimbursementLedger refreshKey={report.generatedAt} fallback={
+        {!navigation && (appSession ? <ReimbursementLedger ownerName={report.ownerName} refreshKey={report.generatedAt} fallback={
           <SharedReimbursementsCard items={report.sharedReimbursements ?? []} openItems={report.openSharedReimbursements}
             receivedItems={report.receivedSharedReimbursements} coverage={report.reimbursementCoverage}
             monthLabel={report.monthLabel} year={report.year} month={report.month} />

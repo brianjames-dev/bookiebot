@@ -227,6 +227,25 @@ async def test_snapshot_flag_cannot_skip_command_projection_or_duplicate_receipt
 
 
 @pytest.mark.asyncio
+async def test_deferred_receipt_returns_authoritative_payment_before_sheet_recovery(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(projection, "sync_pending", lambda store: calls.append(store) or False)
+    connect(client)
+    client.store.mark_projected(client.allocation["id"], client.allocation["version"])
+    body = payment(client)
+    for _ in range(2):
+        response = await client.http.post("/app/reimbursements?deferredReceipt=1", json=body, headers=HEADERS)
+        assert response.status == 200
+        data = await response.json()
+        assert data["projectionPending"] and data["undoState"]
+        assert len(data["events"]) == 1
+        assert data["allocations"][0]["settledCents"] == body["amountCents"]
+    assert calls == []
+    assert (await client.http.get("/app/reimbursements")).status == 200
+    assert calls == [client.store]
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("operation,lifecycle", [("cancel", "void"), ("delete", "deleted")])
 async def test_fast_snapshot_reports_inactive_projection_backlog(client, monkeypatch, operation, lifecycle):
     connect(client)
