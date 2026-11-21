@@ -218,7 +218,11 @@ def test_invalid_keys_and_preferences_are_rejected():
     for value in (None, {}, {**valid, "keys": {"p256dh": "A" * 87, "auth": "A" * 22}}):
         with pytest.raises(ValueError):
             storage.validate_subscription(value)
-    for value in ({}, {**storage.DEFAULT_PREFERENCES, "hour": True}, {**storage.DEFAULT_PREFERENCES, "hour": 23}, {**storage.DEFAULT_PREFERENCES, "weekly": False}):
+    for value in (
+        {}, {**storage.DEFAULT_PREFERENCES, "hour": True}, {**storage.DEFAULT_PREFERENCES, "hour": 23},
+        *({**storage.DEFAULT_PREFERENCES, "weeklyDays": days} for days in ([], [True], [0, 0], [7], "Monday")),
+        *({**storage.DEFAULT_PREFERENCES, "reminderDaysBefore": lead} for lead in (True, -1, 3)),
+    ):
         with pytest.raises(ValueError):
             storage.validate_preferences(value)
 
@@ -302,6 +306,39 @@ async def test_opt_in_weekly_timing_dedup_and_owner_report_scope(phone):
     assert len(phone.builds) == 1 and len(phone.sends) == 1
     phone.store.access.revoke_session(token)
     assert await push.send_due_phone_notifications(phone.app, datetime(2026, 9, 14, 10)) == 0
+
+
+@pytest.mark.asyncio
+async def test_existing_monday_prefs_and_selected_days_with_all_off(phone):
+    legacy = {"weekly": True, "upcoming": False, "showAmounts": False, "hour": 10}
+    token, _, digest = opt_in(phone.store, preferences=legacy)
+    assert phone.store.settings(digest)["preferences"]["weeklyDays"] == [0]
+    route = "/app/notifications"
+    headers = cookie(token)
+    original_endpoint = phone.store.active(0)[0]["subscription"]
+    changes = {**legacy, "weeklyDays": [4, 2]}
+    saved = await phone.client.post(route, json={"preferences": changes}, headers=headers)
+    assert saved.status == 200
+    assert (await saved.json())["preferences"]["weeklyDays"] == [2, 4]
+    assert await push.send_due_phone_notifications(phone.app, datetime(2026, 9, 7, 10)) == 0
+    assert await push.send_due_phone_notifications(phone.app, datetime(2026, 9, 9, 10)) == 1
+    assert await push.send_due_phone_notifications(phone.app, datetime(2026, 9, 9, 10, 5)) == 0
+    assert await push.send_due_phone_notifications(phone.app, datetime(2026, 9, 11, 10)) == 1
+
+    off = await phone.client.post(route, json={"preferences": {**changes, "weekly": False, "weeklyDays": []}}, headers=headers)
+    assert off.status == 200
+    assert phone.store.active(0)[0]["subscription"] == original_endpoint
+    assert await push.send_due_phone_notifications(phone.app, datetime(2026, 9, 16, 10)) == 0
+    assert len(phone.builds) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("lead", "start", "wording"), [(0, datetime(2026, 10, 1, 10), "today"), (2, datetime(2026, 9, 29, 10), "in 2 days")])
+async def test_payment_reminder_timing_reads_the_target_month(phone, lead, start, wording):
+    opt_in(phone.store, preferences={**storage.DEFAULT_PREFERENCES, "weekly": False, "upcoming": True, "reminderDaysBefore": lead})
+    assert await push.send_due_phone_notifications(phone.app, start) == 1
+    assert phone.builds[0]["month"] == 10
+    assert wording in phone.sends[0][1]["body"]
 
 
 @pytest.mark.asyncio
@@ -412,7 +449,7 @@ async def test_deployed_origin_enable_retry_and_existing_endpoint_persist_across
     digest = storage.session_hash(token)
     retained_subscription = subscription("retained-browser-endpoint")
     initial_preferences = {**storage.DEFAULT_PREFERENCES, "upcoming": True, "hour": 16}
-    changed_preferences = {**initial_preferences, "weekly": False, "showAmounts": True, "hour": 19}
+    changed_preferences = {**initial_preferences, "weekly": False, "weeklyDays": [], "showAmounts": True, "hour": 19}
     def deployed_headers(session_token=token, request_origin=origin):
         # The loopback server stands in for an HTTPS reverse proxy. Exercise
         # the production cookie/origin path, not the local development cookie.

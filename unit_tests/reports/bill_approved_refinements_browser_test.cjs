@@ -25,7 +25,7 @@ async function shot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdir
    page.on('request',r=>{if(['/app/widgets/settings','/app/notifications'].includes(new URL(r.url()).pathname))otherReads.push(r.url())});
    const capsule=page.locator('.bb-settings-masthead-title .bb-glass-control');
    assert.equal(await capsule.count(),1);assert.equal(await capsule.locator('button').count(),1,'One surface and one button, no nested glass');
-   assert.equal(await capsule.locator('button').getAttribute('aria-label'),'Back');assert.equal((await capsule.innerText()).trim(),'Bills');
+   assert.equal(await capsule.locator('button').getAttribute('aria-label'),'Back');assert.equal((await capsule.innerText()).trim(),wide?'Settings':'Bills');
    const chrome=await capsule.evaluate(n=>{const c=getComputedStyle(n),button=n.querySelector('button'),r=n.getBoundingClientRect();return {height:r.height,radius:c.borderRadius,buttonRadius:getComputedStyle(button).borderRadius,background:c.backgroundColor}});
    assert.equal(chrome.height,44);assert.notEqual(chrome.background,'rgba(0, 0, 0, 0)');
    const add=main.getByRole('button',{name:'Add bill',exact:true});
@@ -40,19 +40,14 @@ async function shot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdir
    assert(Math.abs(splitStyle.width-splitStyle.parentWidth)<1,'Recurring split spans the form');assert.equal(splitStyle.height,46);assert.equal(splitStyle.topBorder,'0px');assert.equal(splitStyle.bottomBorder,'1px');
    const oldSlot=await active(page).getAttribute('data-bill-slot');
    await sample(page);await main.locator('.bb-bills-row').nth(1).evaluate(n=>n.click());const frames=await page.evaluate(()=>window.__billSamples);
+   const simultaneous=frames.filter(f=>f.slots.length===2&&f.slots.every(s=>s.height>2));
+   assert(simultaneous.length>2,'Both rows collapse and expand concurrently in either pose');
+   const heights=simultaneous.map(f=>f.slots.find(s=>s.id===oldSlot).height);
+   assert(Math.max(...heights)-Math.min(...heights)>20,'Previous editor visibly collapses while the next opens');
+   assert(simultaneous.every(f=>f.slots.every(s=>s.anchor==='true')),'Both editors retain their row anchors');
+   assert.equal(frames.at(-1).slots.length,1);
    if(wide){
-    const cross=frames.filter(f=>f.slots.length===2);
-    assert(cross.length>8,'Both bill surfaces remain mounted through the eased switch');
-    assert(cross.some(f=>f.time>200&&f.slots.every(s=>s.moving==='true')),'Both retained surfaces ease during the switch');
-    assert(cross.every(f=>f.slots.every(s=>s.opacity===1)),'Bill surfaces stay opaque without a fade');
-    assert(cross.some(f=>f.slots.some(s=>s.transform!=='none')),'Bill selection uses an opaque eased transform');
-    assert.equal(await main.locator('.bb-bill-editor-workspace').evaluate(n=>getComputedStyle(n).overflow),'hidden','Selection surfaces are clipped by one stable viewport');
-    const animations=cross.flatMap(f=>f.slots.flatMap(s=>s.animations));
-    assert(animations.length>0&&animations.every(a=>a.duration===440&&a.easing==='cubic-bezier(0.2, 0.8, 0.25, 1)'),'Selection uses the standard 440 ms easing');
-    assert.equal(frames.at(-1).slots.length,1,'Outgoing surfaces are removed after easing');
-    const geometry=await main.evaluate(n=>{const list=n.querySelector('.bb-bills-list'),rows=n.querySelector('.bb-bills-rows'),host=n.querySelector('[data-open=true]'),nav=document.querySelector('.bb-navigation-pane'),box=e=>e.getBoundingClientRect().toJSON(),s=getComputedStyle(rows);return {list:box(list),rows:box(rows),host:box(host),nav:box(nav),scrollWidth:s.scrollbarWidth,scrollColor:s.scrollbarColor,document:document.documentElement.scrollWidth,viewport:innerWidth}});
-    assert(Math.abs(geometry.rows.right-geometry.list.right-8)<1,'Scroll track uses Transactions’ outer 8px gutter');assert.equal(geometry.scrollWidth,'thin');assert.equal(geometry.document,geometry.viewport);
-    await main.locator('.bb-bills-rows').evaluate(n=>n.scrollTop=400);assert(await main.locator('.bb-bills-rows').evaluate(n=>n.scrollTop)>0);assert.equal(await active(page).evaluate(n=>n.getBoundingClientRect().y),geometry.host.y,'Only left rows scroll');await main.locator('.bb-bills-rows').evaluate(n=>n.scrollTop=0);
+    assert(await page.getByRole('navigation',{name:'Settings categories'}).isVisible());
     // Reverse before the prior surface exits, then fold mid-transition. Keep
     // the same mounted draft and remove only inactive outgoing surfaces.
     await main.locator('.bb-bills-row').first().evaluate(n=>n.click());await page.waitForTimeout(60);
@@ -64,10 +59,7 @@ async function shot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdir
     await page.setViewportSize({width,height});await page.waitForTimeout(520);assert.equal(await main.locator('[data-bill-slot]').count(),1);assert(await active(page).evaluate(n=>n===window.__rapidBill));
     const before=reads;await press(main.getByRole('button',{name:'Refresh bills',exact:true}));assert.equal(reads,before+1);await gesture(page);assert.equal(reads,before+1,'Open DUO cannot trigger a second pull refresh');
    }else{
-    const simultaneous=frames.filter(f=>f.slots.length===2&&f.slots.every(s=>s.height>2));assert(simultaneous.length>2,'Both rows collapse/expand concurrently');
-    const heights=simultaneous.map(f=>f.slots.find(s=>s.id===oldSlot).height);assert(Math.max(...heights)-Math.min(...heights)>20,'Previous editor visibly collapses while next opens');
-    assert(simultaneous.every(f=>f.slots.every(s=>s.anchor==='true')),'Each transitioning editor retains its own parent anchor');
-    assert.equal(frames.at(-1).slots.length,1);await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(120);
+    await page.locator('.bb-page').evaluate(el=>el.scrollTop=0);await page.waitForTimeout(120);
     const before=reads;await gesture(page,{distance:160});assert.equal(reads,before,'A short pull does not refresh');await gesture(page);assert.equal(reads,before+1,'Closed Bills uses the native pull module');
     const draft=await active(page).getByRole('textbox',{name:'Name',exact:true}).inputValue();assert.equal(draft,'A long quarterly bill name that must stay inside the editor','Refreshing retains the current draft');
    }

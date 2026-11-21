@@ -14,7 +14,7 @@ print(json.dumps(expense_breakdown_client_payload(build(income_rows(('9/1/2026',
 const css=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.css'),'utf8')
 const js=fs.readFileSync(path.join(root,'src/bookiebot/reports/assets/expense-report-app.js'),'utf8')
 const html=dark=>`<!doctype html><html data-theme="${dark?'dark':'light'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="bookiebot-expense-report-root"></div><script id="bookiebot-expense-app-config" type="application/json">${JSON.stringify({ownerName:'Brian',reportUrl:'/app/expenses/data',logoutUrl:'/app/logout'})}</script><script>localStorage.setItem('bookiebot-expense-report-theme','${dark?'dark':'light'}')</script><script type="module">${js}</script></body></html>`
-const screens={Overview:'/app/expenses/data',Transactions:'/app/transactions',Shared:'/app/reimbursements',Savings:'/app/goals',Reconcile:'/app/reconciliation',Settings:'/app/widgets/settings'}
+const screens={Overview:'/app/expenses/data',Transactions:'/app/transactions',Shared:'/app/reimbursements',Savings:'/app/goals',Reconcile:'/app/reconciliation'}
 async function gesture(page,end=380,{start=80,x=16,cancel=false,finish=true,selector='.bb-shell-masthead',drift=false,begin=true}={}) {
   await page.evaluate(({start,end,x,cancel,finish,selector,drift,begin})=>{
     const target=document.querySelector(selector)
@@ -219,14 +219,12 @@ async function waitReady(page,label) {
         }
         assert.equal(canceled.at(-1).phase,'idle');cases++
         for(const [label,path] of Object.entries(screens)) {
-          await (label==='Settings' ? page.getByRole('button',{name:label,exact:true}) : page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true})).click()
+          await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:label,exact:true}).click()
           await page.evaluate(()=>window.scrollTo(0,0));await waitReady(page,label)
           if(label==='Transactions') {await page.getByRole('searchbox',{name:'Search transactions'}).fill('coffee');await page.waitForTimeout(400);await waitReady(page,label)}
           if(label==='Savings') {await page.getByRole('button',{name:'＋ Goal',exact:true}).click();await page.getByLabel('Goal name',{exact:true}).fill('Keep this draft');await page.getByLabel('Goal name',{exact:true}).blur();await page.evaluate(()=>window.scrollTo(0,0))}
-          if(label==='Settings') {await page.getByLabel('Notification delivery time').selectOption('15');await page.evaluate(()=>window.scrollTo(0,0))}
           const before=requests.filter(r=>r.name===path).length
           const reportBefore=requests.filter(r=>r.name==='/app/expenses/data').length
-          const notificationsBefore=requests.filter(r=>r.name==='/app/notifications').length
           await gesture(page,150);await page.waitForTimeout(120)
           assert.equal(requests.filter(r=>r.name===path).length,before,'Short pull must not request data')
           await gesture(page,224);await page.waitForTimeout(120)
@@ -258,10 +256,6 @@ async function waitReady(page,label) {
           if(label==='Savings') {
             assert.equal(requests.filter(r=>r.name==='/app/expenses/data').length,reportBefore+1,'Savings also reloads investment report data exactly once')
             assert.equal(await page.getByLabel('Goal name',{exact:true}).inputValue(),'Keep this draft')
-          }
-          if(label==='Settings') {
-            assert.equal(requests.filter(r=>r.name==='/app/notifications').length,notificationsBefore+1,'Settings waits for notifications and widgets')
-            assert.equal(await page.getByLabel('Notification delivery time').inputValue(),'15','Refresh retains unsaved notification preferences')
           }
           if(label==='Reconcile')assert.equal(requests.filter(r=>r.name===path).at(-1).body?.operation,'check')
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)

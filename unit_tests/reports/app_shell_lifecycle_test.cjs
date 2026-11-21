@@ -249,7 +249,7 @@ async function main() {
   assert.equal(widgetFocuses, 1); assert.equal(widgetScrolls, 1); assert.equal(win.scrollY, 480)
   assert.equal(setupCode(), retainedCode); assert.equal(widgetWrites.length, 1, 'Returning to pairing never creates another grant')
   await tap(tree, 'Done')
-  assert.equal(widgetReads, widgetReadsBeforeGuide); assert.deepEqual(reads, financialReadsBeforeGuide)
+  assert.equal(widgetReads, widgetReadsBeforeGuide + 1, 'Reopening Widgets from another tab reloads it once'); assert.deepEqual(reads, financialReadsBeforeGuide)
   await tap(tree, 'Back'); await tap(tree, 'Notifications'); assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true); await tap(tree, 'Back')
   assert.equal(guard.dirty, true, 'Hidden forms and pairing codes stay registered with the work guard')
   for (const name of ['Overview', 'Transactions', 'Shared', 'Savings', 'Settings']) await tap(tree, name)
@@ -418,7 +418,7 @@ async function main() {
   assert.equal(tree.root.findByProps({className:'bb-masthead bb-shell-masthead'}),initialMasthead)
   assert.equal(tree.root.findByProps({className:'bb-page-header bb-report-header'}),initialHeader,'The real month/view header persists')
   assert.equal(tree.root.findByProps({ 'aria-label': 'Main navigation' }),initialNav,'The real navigation persists')
-  assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,0)
+  assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).filter(visible).length,0)
   const resource=load(src('reimbursement-display-state.ts')).reimbursementDisplay
   const previousResource=resource.read('Brian'),beforeRefreshes=session.refreshes
   await run(()=>{resource.publish('Brian',{...previousResource,projectionPending:true});win.dispatchEvent(new Event('bookiebot:reimbursements-changed'));win.dispatchEvent(new Event('bookiebot:transactions-changed'))})

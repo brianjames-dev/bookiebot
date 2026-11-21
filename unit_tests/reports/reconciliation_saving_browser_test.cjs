@@ -303,7 +303,6 @@ async function verifyShortQueueRefresh(browser) {
       ['Transactions', 'Refresh Transactions'],
       ['Shared', 'Refresh reimbursements'],
       ['Savings', 'Refresh savings'],
-      ['Settings', 'Refresh Settings'],
     ]) {
       await page.getByRole('button', { name: tab, exact: true }).click()
       await page.getByRole('button', { name: label, exact: true }).waitFor()

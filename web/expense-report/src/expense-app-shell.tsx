@@ -156,8 +156,8 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     if (settingsBlocked) return
     if (widgetGuideOpen) {
       closeWidgetGuide()
-    } else if (configurationOpen || (!duo.landscape && settingsSection)) {
-      if (!duo.landscape) settingsFocus.current = settingsSection
+    } else if (!duo.landscape && settingsSection) {
+      settingsFocus.current = settingsSection
       setSettingsSelection(null)
       window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
     } else {
@@ -293,13 +293,11 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
       data-bills-open={screen === "settings" && configurationOpen || undefined}
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
-      {!duo.landscape && <PullToRefresh screen={screen} canvasKey={detailTitle} label={configurationOpen?settingsTitle:undefined} blocked={refreshBlocked} />}
+      {!duo.landscape && (screen !== "settings" || configurationOpen) && <PullToRefresh screen={screen} canvasKey={detailTitle} label={configurationOpen?settingsTitle:undefined} blocked={refreshBlocked} />}
       <header className="bb-masthead bb-shell-masthead">
         {screen === "settings" ? <div className="bb-settings-masthead-title">
           <AppHeaderBack label={settingsTitle} disabled={settingsBlocked} onBack={backFromSettings} />
           <h1 className="bb-settings-screen-heading">{settingsTitle}</h1>
-          {duo.landscape && !configurationOpen && !widgetGuideOpen &&
-            <PageRefreshButton screen="settings" label="Refresh Settings" blocked={refreshBlocked} />}
         </div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions" && screen !== "shared" && screen !== "savings" && screen !== "reconcile"}
           onChat={() => setAskOpen(true)} chatRef={askTriggerRef} chatOpen={askOpen && monthlyReady} chatDisabled={!report || !monthlyReady} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
@@ -348,10 +346,10 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
             <AmountAppearanceSettings />
           </section>
           <div className="bb-settings-section bb-settings-notifications" hidden={settingsSection !== "notifications"}>
-            <PhoneNotifications embedded refreshActive={!configurationOpen && !widgetGuideOpen} />
+            <PhoneNotifications embedded />
           </div>
           <div className="bb-settings-section" hidden={settingsSection !== "widgets"}>
-            <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} refreshActive={!configurationOpen && !widgetGuideOpen} />
+            <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} active={screen === "settings" && settingsSection === "widgets"} />
           </div>
           <div hidden={settingsSection !== "account"}>
             <div className="bb-settings-profile"><SettingsInitial owner={owner} /><strong>{owner}</strong></div>

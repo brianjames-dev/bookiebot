@@ -12,8 +12,8 @@ async function settle(page){await page.waitForTimeout(680)}
 async function press(button){await button.scrollIntoViewIfNeeded();await button.press('Enter')}
 async function sample(page){await page.evaluate(()=>{
  const host=document.querySelector('.bb-bills-editor'),workspace=host.querySelector('.bi-editor-scenes');
- window.__billFrames=(async()=>{const frames=[],start=performance.now();while(performance.now()-start<620){await new Promise(requestAnimationFrame);const h=document.querySelector('.bb-bills-editor'),w=h.querySelector('.bi-editor-scenes'),motions=[...h.querySelectorAll('.bi-step-viewport[data-moving="true"]')].filter(v=>!v.closest('[inert]'));
-  frames.push({same:host===h&&workspace===w,open:h.querySelector('.bi-expansion')?.dataset.open,height:h.querySelector('.bi-expansion')?.getBoundingClientRect().height??0,order:getComputedStyle(h).order,wide:document.querySelector('.bb-bills').dataset.wide,pan:[...h.querySelectorAll('.bi-step-viewport')].map(v=>v.scrollLeft),moving:motions.length,slides:motions.flatMap(v=>[...v.children].flatMap(p=>p.getAnimations().filter(a=>a.effect.getKeyframes().some(k=>'transform'in k)).map(a=>({duration:a.effect.getTiming().duration,easing:a.effect.getTiming().easing})))),viewports:[...h.querySelectorAll('.bi-step-viewport')].filter(v=>!v.closest('[inert]')).map(v=>({height:v.getBoundingClientRect().height,content:v.querySelector(':scope>.bi-step-pane[aria-hidden="false"]')?.offsetHeight}))});
+ window.__billFrames=(async()=>{const frames=[],start=performance.now();while(performance.now()-start<620){await new Promise(requestAnimationFrame);const h=document.querySelector('.bb-bills-editor'),w=h?.querySelector('.bi-editor-scenes'),motions=[...(h?.querySelectorAll('.bi-step-viewport[data-moving="true"]')??[])].filter(v=>!v.closest('[inert]'));
+  frames.push({same:host===h&&workspace===w,open:h?.querySelector('.bi-expansion')?.dataset.open,height:h?.querySelector('.bi-expansion')?.getBoundingClientRect().height??0,order:h&&getComputedStyle(h).order,wide:document.querySelector('.bb-page').dataset.duoLandscape || 'false',pan:[...(h?.querySelectorAll('.bi-step-viewport')??[])].map(v=>v.scrollLeft),moving:motions.length,slides:motions.flatMap(v=>[...v.children].flatMap(p=>p.getAnimations().filter(a=>a.effect.getKeyframes().some(k=>'transform'in k)).map(a=>({duration:a.effect.getTiming().duration,easing:a.effect.getTiming().easing})))),viewports:[...(h?.querySelectorAll('.bi-step-viewport')??[])].filter(v=>!v.closest('[inert]')).map(v=>({height:v.getBoundingClientRect().height,content:v.querySelector(':scope>.bi-step-pane[aria-hidden="false"]')?.offsetHeight}))});
  }return frames})();
  })}
 const frames=page=>page.evaluate(()=>window.__billFrames);
@@ -28,7 +28,7 @@ function checkFrames(samples,reduced,label){
 }
 async function transition(page,button,reduced,label){await button.scrollIntoViewIfNeeded();await sample(page);await button.press('Enter');checkFrames(await frames(page),reduced,label)}
 async function fold(page,width){
- await sample(page);await page.setViewportSize({width,height:740});await page.waitForFunction(w=>document.querySelector('.bb-bills').dataset.wide===String(w>=800),width);
+ await sample(page);await page.setViewportSize({width,height:740});await page.waitForFunction(w=>(document.querySelector('.bb-page').dataset.duoLandscape || 'false')===String(w>=800),width);
  const samples=await frames(page),after=samples.filter(s=>s.wide===String(width>=800));
  assert(after.length&&after.every(s=>s.same&&s.open==='true'&&s.height>20),'Folding keeps the same open editor');
  assert(after.every(s=>s.pan.every(x=>Math.abs(x)<1)),'Folding does not pan the slide viewport');
@@ -69,9 +69,9 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      for(const key of ['backgroundColor','borderRadius'])assert.equal(actual.panel[key],native.panel[key],`Bills retains the native ${key} surface`);
      assert.equal(actual.panel.padding,'16px','The approved roomier Bills inset is shared by both poses');
      const guide=await host(page).locator('.bi-expansion').evaluate(el=>{const s=getComputedStyle(el,'::before');return {display:s.display,left:s.left}});
-     assert.equal(guide.display,width>=800?'none':'block');if(width<800)assert.equal(guide.left,'4px');
+     assert.equal(guide.display,'block');assert.equal(guide.left,'4px');
      await panel.getByRole('textbox',{name:'Name',exact:true}).fill('PG&E draft');
-     await panel.getByRole('spinbutton',{name:'Payment day',exact:true}).fill('23');
+     await panel.getByRole('textbox',{name:'Payment day',exact:true}).fill('23');
      await transition(page,panel.getByRole('button',{name:/^Recurring split/}),reduced,'Settings → recurring split');
      await panel.getByRole('textbox',{name:"Brian's share percentage",exact:true}).fill('12.345');
      await fold(page,width>=800?382:867);await fold(page,width);
@@ -86,7 +86,7 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      await transition(page,panel.getByRole('button',{name:'Back',exact:true}),reduced,'Monthly review → amount');
      assert.equal(await panel.getByRole('textbox',{name:'Bill amount',exact:true}).inputValue(),'98.43');
      await transition(page,panel.getByRole('button',{name:'Cancel',exact:true}),reduced,'Monthly amount → settings');
-     assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'PG&E draft');assert.equal(await panel.getByRole('spinbutton',{name:'Payment day',exact:true}).inputValue(),'23');
+     assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'PG&E draft');assert.equal(await panel.getByRole('textbox',{name:'Payment day',exact:true}).inputValue(),'23');
      await transition(page,panel.getByRole('button',{name:/^Recurring split/}),reduced,'Settings → saved split');
      assert.equal(await panel.getByRole('textbox',{name:"Brian's share percentage",exact:true}).inputValue(),'42.25');await transition(page,panel.getByRole('button',{name:'Use split',exact:true}),reduced,'Saved split → settings');
      await transition(page,panel.getByRole('button',{name:'Review',exact:true}),reduced,'Settings → review');

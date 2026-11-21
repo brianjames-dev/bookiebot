@@ -2,8 +2,6 @@ import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { ReportMenu } from "./components/ui/report-menu"
-import { RefreshCw } from "lucide-react"
-import { usePageRefresh } from "./page-refresh"
 import { useAppWorkStatus } from "./app-work-guard"
 import "./widget-settings.css"
 
@@ -11,7 +9,7 @@ type WidgetMode = "current" | "projected"
 interface Connection { id: string; label: string; mode: WidgetMode; status: "pending" | "active"; createdAt: string; expiresAt: string; lastUsedAt: string | null }
 interface Pairing { id: string; setupCode: string; expiresAt: string }
 interface Settings { connections: Connection[]; scriptUrl: string; setupInstructionsUrl: string }
-interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void; refreshActive?: boolean }
+interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void; active?: boolean }
 const endpoint = "/app/widgets/settings"
 const isDate = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value))
 const isMode = (value: unknown): value is WidgetMode => value === "current" || value === "projected"
@@ -73,7 +71,7 @@ export function WidgetSettings(props: WidgetSettingsProps) {
   return <WidgetSettingsContent key={props.ownerName} {...props} />
 }
 
-function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshActive = true }: WidgetSettingsProps) {
+function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, active = true }: WidgetSettingsProps) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -130,8 +128,8 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
       if (!active()) return
       if (body) setNeedsRefresh(true)
       setError(body?.operation === "pair"
-        ? "Couldn’t confirm pairing. Refresh widgets before trying again, then remove any unused pending pairing."
-        : caught instanceof Error ? caught.message : "Couldn’t load widgets. Refresh widgets to try again.")
+        ? "Couldn’t confirm pairing. Check widget status before trying again, then remove any unused pending pairing."
+        : caught instanceof Error ? caught.message : "Couldn’t load widgets. Try again.")
       return false
     } finally {
       window.clearTimeout(timer)
@@ -139,13 +137,11 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
     }
   }
 
-  const pageRefresh = usePageRefresh(refreshActive ? "settings" : null, { refresh: () => run(), disabled: busy || loading })
-
   useEffect(() => {
     mounted.current = true
-    void run()
     return () => { mounted.current = false; copyGeneration.current++; operation.current?.abort(); operation.current = null }
   }, [])
+  useEffect(() => { if (active) void run() }, [active])
 
   useEffect(() => {
     if (!pairing) return
@@ -169,7 +165,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
   }
   const canCreate = Boolean(settings && settings.connections.length < 5 && !busy && !needsRefresh && !pairing)
   return <section className="bb-settings-section bb-widget-settings" aria-labelledby={`${id}-title`}>
-    <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2>{!pageRefresh && <button className="bb-icon-button bb-widget-refresh" type="button" disabled={busy} aria-busy={busy} onClick={() => void run()} aria-label="Refresh widgets" title="Refresh widgets"><RefreshCw aria-hidden="true" /></button>}</div>
+    <h2 id={`${id}-title`} className="bb-widget-heading">Widgets</h2>
     {loading && <ReportLoading label="Loading widgets…"/>}
     {settings && <div className="bb-widget-connections">
       {settings.connections.length === 0 && <p className="bb-settings-note bb-widget-empty">No widgets paired yet.</p>}
@@ -212,6 +208,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
       </div>}
     </CollapsibleContent>
     {error && <p className="bb-widget-error" role="alert">{error}</p>}
+    {(needsRefresh || (!settings && error)) && <button type="button" className="bb-toolbar-button" disabled={busy} onClick={() => void run()}>Check widget status</button>}
     {message && <p className="bb-settings-note" role="status">{message}</p>}
   </section>
 }

@@ -13,8 +13,6 @@
 .bb-notification-option input:checked::after { transform: translateX(17px); background: hsl(var(--primary-foreground)); }
 .bb-notification-option input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
 .bb-notification-option input:disabled { opacity: .5; }
-.bb-notification-hint { font-size: .8rem; }
-.bb-notification-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
 .bb-notification-settings .bb-notification-error { color: hsl(var(--destructive)); }
 .bb-notifications-embedded .bb-notification-settings { padding-top: 0; max-width: none; }
 .bb-notifications-embedded .bb-notification-embedded-state { display: flex; align-items: center; gap: 12px; margin-top: 0; }
@@ -23,3 +21,16 @@
 .bb-notifications-embedded .bb-notification-option > span { min-width: 0; }
 .bb-notifications-embedded .bb-notification-option select { max-width: 120px; flex: 0 0 auto; }
 @media (prefers-reduced-motion: reduce) { .bb-notification-option input, .bb-notification-option input::after { transition: none; } }
+.bb-notification-days { min-width: 0; padding: 10px 0 16px; margin: 8px 0 0; border: 0; border-bottom: 1px solid hsl(var(--border) / .65); }
+.bb-notification-days legend { padding: 0; }
+.bb-notification-weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.bb-notification-weekdays button {
+  min-width: 0; min-height: 44px; padding: 0; border: 1px solid hsl(var(--border)); border-radius: 10px;
+  background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 13px; cursor: pointer;
+}
+.bb-notification-weekdays button[aria-pressed=true] {
+  border-color: hsl(var(--primary) / .42); background: hsl(var(--primary) / .15); color: hsl(var(--primary)); font-weight: 600;
+}
+.bb-notification-weekdays button:disabled { cursor: default; opacity: .6; }
+.bb-notification-weekdays button:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
+.bb-notification-embedded-state:has(> h2:only-child) { display: none; }

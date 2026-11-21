@@ -1,8 +1,7 @@
 .bb-widget-settings { min-width: 0; scroll-margin-top: calc(max(18px, env(safe-area-inset-top, 0px)) + 64px); }
 .bb-widget-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .bb-widget-settings .bb-widget-heading h2 { margin: 0; }
-.bb-widget-settings .bb-widget-refresh, .bb-widget-settings .bb-report-menu-trigger { width: 44px; height: 44px; padding: 12px; border: 0; background: transparent; }
-.bb-widget-settings .bb-widget-refresh svg { width: 18px; height: 18px; }
+.bb-widget-settings .bb-report-menu-trigger { width: 44px; height: 44px; padding: 12px; border: 0; background: transparent; }
 .bb-widget-settings > .bb-settings-note { margin-top: 6px; }
 .bb-widget-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
 .bb-widget-actions .bb-toolbar-button { white-space: normal; text-align: center; text-decoration: none; font-size: 14px; }

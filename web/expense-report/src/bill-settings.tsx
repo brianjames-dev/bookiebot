@@ -53,7 +53,7 @@ async function request(path:string,body?:unknown,signal?:AbortSignal){
 function newForm(snapshot:Snapshot,source?:Bill):Form{const bill=source?.nextChange??source;return {name:bill?.name??'',type:bill?.type??'subscription',amount:bill?.amountCents==null?'':(bill.amountCents/100).toFixed(2),cadence:bill?.cadence??'monthly',pullDay:String(bill?.pullDay??1),paymentDate:source?.charge.date??'',firstMonth:bill?.pullMonths[0]??Number(snapshot.month.slice(5)),category:bill?.type==='subscription'&&!['static_bills_subscriptions_needs','subscriptions_wants'].includes(bill.category)?'static_bills_subscriptions_needs':bill?.category??'static_bills_subscriptions_needs',account:bill?.account??'',effectiveFrom:source?.nextChange?.effectiveFrom??snapshot.month,stopFrom:source?.nextChange?.active===false?source.nextChange.effectiveFrom:source&&!source.active?source.effectiveFrom:recurringStartMonth(snapshot.month,source?.earliestEffectiveMonth),splitMethod:bill?.splitMethod??'none',payerBasisPoints:bill?.payerBasisPoints??snapshot.incomeBasisPoints}}
 
 export function BillSettings({active,ownerName,aliases,amountRequest,onAmountConsumed}:{active:boolean;ownerName:string;aliases?:Record<string,string>;amountRequest?:BillAmountRequest|null;onAmountConsumed?:()=>void}){
- const navigation=useAppNavigation(),wide=navigation?.duoLandscape===true
+ const showRefresh=useAppNavigation()?.duoLandscape===true
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null),[filter,setFilter]=useState('all'),[selected,setSelected]=useState<Bill|null>(null),[form,setForm]=useState<Form|null>(null)
  const [mode,setMode]=useState<Mode>('settings'),[amount,setAmount]=useState(''),[review,setReview]=useState<Review|null>(null),[reviewBody,setReviewBody]=useState<Command|null>(null)
  const [busy,setBusy]=useState(false),[refreshing,setRefreshing]=useState(false),[error,setError]=useState(''),[result,setResult]=useState<Result|null>(null),[pending,setPending]=useState<Command|null>(null),[valid,setValid]=useState(true)
@@ -132,16 +132,22 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
  // A compact creation review is shorter than its form. Keep its heading out
  // from under the fixed Settings capsule after the native slide settles.
  useEffect(()=>{
-  if(wide||review?.operation!=='create'||!root.current)return
+  if(review?.operation!=='create'||!root.current)return
   const timer=window.setTimeout(()=>{
    const heading=root.current?.querySelector<HTMLElement>('.bb-bills-editor[data-open=true] .bi-step-review[aria-hidden=false] h2')
    const capsule=document.querySelector<HTMLElement>('.bb-settings-masthead-title')
    if(!heading||!capsule)return
-   const delta=heading.getBoundingClientRect().top-capsule.getBoundingClientRect().bottom-12
-   if(delta<0)scrollPageTo({top:readPageScroll().y+delta,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'})
+   const pane = showRefresh ? root.current?.closest('.bb-settings-detail') : null
+   const top = pane?.getBoundingClientRect().top ?? capsule.getBoundingClientRect().bottom
+   const delta=heading.getBoundingClientRect().top-top-12
+   const behavior=matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'
+   if(delta<0){
+    if(pane)pane.scrollBy({top:delta,behavior})
+    else scrollPageTo({top:readPageScroll().y+delta,behavior})
+   }
   },transactionMotion.duration)
   return()=>window.clearTimeout(timer)
- },[review,wide])
+ },[review,showRefresh])
  const change=(patch:Partial<Form>)=>{setForm(previous=>previous?{...previous,...patch}:null);setReview(null);setReviewBody(null);setError('')}
  const prepare=async(operation=selected?'update':'create',{applyCurrentCharge=false,applyCurrentPaymentDate=false,removeMonths}:{applyCurrentCharge?:boolean;applyCurrentPaymentDate?:boolean;removeMonths?:string[]}={})=>{
   if(flight.current||pending||!form||!snapshot)return
@@ -245,21 +251,21 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
     {mode==='amount'?<><label>Bill amount<span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label="Bill amount" inputMode="decimal" required value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00"/></span></label><p className="bb-bills-month-status"><Clock3 aria-hidden="true"/>Autopay · {dueLabel}</p>{reminder}</>:mode==='monthly'?<><p className="bb-bills-month-amount">{money(selected?.charge.billAmountCents??selected?.charge.amountCents)}</p><p className="bb-bills-month-status">{selected?.charge.status==='paid'?<Check aria-hidden="true"/>:<Clock3 aria-hidden="true"/>}{selected?.charge.status==='paid'?'Paid':'Autopay'} · {dueLabel}</p><p className="bi-footnote">{selected?.charge.status==='paid'?'Included in Transactions.':'Amount confirmed. Appears in Transactions on the autopay date.'}</p>{selected?.charge.canEditPaymentDate&&<button type="button" className="bb-settings-action" disabled={locked} onClick={()=>{change({paymentDate:selected.charge.date??''});setMode('date')}}>Edit payment date</button>}{selected?.type==='variable'&&reminder}</>:<p className="bi-footnote">Review this {money(selected?.amountCents)} recorded charge here. Its purchase total is preserved.</p>}
    </>:<>
     {selected&&mode==='settings'&&selected.active&&selected.charge.available&&(selected.type==='variable'||selected.charge.canEditPaymentDate)&&selected.charge.canConfirmAmount!==false&&<div className="bb-bills-charge-actions">
-     <button type="button" className="bb-settings-action" aria-label={selected.charge.recorded||selected.charge.amountCents?'This month’s bill':'Enter monthly amount'} disabled={locked} onClick={()=>openMonthly(selected)}><span className="bb-bills-full-label">{selected.charge.recorded||selected.charge.amountCents?'This month’s bill':'Enter monthly amount'}</span><span className="bb-bills-short-label" aria-hidden="true">Monthly amount</span><ChevronRight aria-hidden="true"/></button>
+     <button type="button" className="bb-settings-action" aria-label={selected.charge.recorded||selected.charge.amountCents?'This month’s bill':'Enter monthly amount'} disabled={locked} onClick={()=>openMonthly(selected)}><span>{selected.charge.recorded||selected.charge.amountCents?'This month’s bill':'Enter monthly amount'}</span><ChevronRight aria-hidden="true"/></button>
     </div>}
     {mode==='stop'?<p className="bi-footnote">Choose when billing ended. Review individual charges before removing them.</p>:<>
      <label data-bill-field="name">Name<input className="bb-bills-input" required maxLength={100} value={form.name} onChange={e=>change({name:e.target.value})}/></label>
      <div className="bi-secondary-fields">
       <label data-bill-field="type">Type<span className="bi-select"><select aria-label="Type" value={form.type} onChange={e=>change({type:e.target.value as Form['type'],category:e.target.value==='subscription'&&!['static_bills_subscriptions_needs','subscriptions_wants'].includes(form.category)?'static_bills_subscriptions_needs':form.category,cadence:form.cadence})}><option value="subscription">Subscription</option><option value="variable">Variable bill</option><option value="fixed">Fixed bill</option></select><ChevronDown aria-hidden="true"/></span></label>
-      <label data-bill-field="amount"><span className="bb-bills-full-label">{form.type==='variable'?'Estimate (optional)':'Recurring amount'}</span><span className="bb-bills-short-label" aria-hidden="true">{form.type==='variable'?'Estimate':'Recurring amount'}</span><span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label={form.type==='variable'?'Estimate (optional)':'Recurring amount'} required={form.type!=='variable'} inputMode="decimal" placeholder="0.00" value={form.amount} onChange={e=>change({amount:e.target.value})}/></span></label>
+      <label data-bill-field="amount"><span>{form.type==='variable'?'Estimate (optional)':'Recurring amount'}</span><span className="bi-money-input"><span aria-hidden="true">$</span><input className="bb-bills-input" aria-label={form.type==='variable'?'Estimate (optional)':'Recurring amount'} required={form.type!=='variable'} inputMode="decimal" placeholder="0.00" value={form.amount} onChange={e=>change({amount:e.target.value})}/></span></label>
      </div>
      <div className="bi-secondary-fields">
       <label data-bill-field="cadence">Repeats<span className="bi-select"><select aria-label="Repeats" value={form.cadence} onChange={e=>change({cadence:e.target.value as Form['cadence']})}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select><ChevronDown aria-hidden="true"/></span></label>
       <label data-bill-field="day">Payment day<input className="bb-bills-input" type="text" inputMode="numeric" pattern="(?:[1-9]|[12][0-9]|3[01])" required value={form.pullDay} onChange={e=>{if(/^\d{0,2}$/.test(e.target.value))change({pullDay:e.target.value})}}/></label>
      </div>
-     {form.cadence!=='monthly'&&<label data-bill-field="billing-month"><span className="bb-bills-full-label">{form.cadence==='yearly'?'Billing month':'First billing month'}</span><span className="bb-bills-short-label" aria-hidden="true">{form.cadence==='yearly'?'Billing month':'First month'}</span><span className="bi-select"><select aria-label={form.cadence==='yearly'?'Billing month':'First billing month'} value={form.firstMonth} onChange={e=>change({firstMonth:Number(e.target.value)})}>{Array.from({length:12},(_,i)=><option value={i+1} key={i}>{new Date(2026,i,1).toLocaleDateString('en-US',{month:'long'})}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>}
+     {form.cadence!=='monthly'&&<label data-bill-field="billing-month"><span>{form.cadence==='yearly'?'Billing month':'First billing month'}</span><span className="bi-select"><select aria-label={form.cadence==='yearly'?'Billing month':'First billing month'} value={form.firstMonth} onChange={e=>change({firstMonth:Number(e.target.value)})}>{Array.from({length:12},(_,i)=><option value={i+1} key={i}>{new Date(2026,i,1).toLocaleDateString('en-US',{month:'long'})}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>}
      <div className="bi-secondary-fields">
-      <label data-bill-field="category"><span className="bb-bills-full-label">Budget category</span><span className="bb-bills-short-label" aria-hidden="true">Category</span><span className="bi-select"><select aria-label="Budget category" value={form.category} onChange={e=>change({category:e.target.value})}>{Object.entries(categoryLabels).filter(([key])=>form.type!=='subscription'||['static_bills_subscriptions_needs','subscriptions_wants'].includes(key)).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>
+      <label data-bill-field="category"><span>Budget category</span><span className="bi-select"><select aria-label="Budget category" value={form.category} onChange={e=>change({category:e.target.value})}>{Object.entries(categoryLabels).filter(([key])=>form.type!=='subscription'||['static_bills_subscriptions_needs','subscriptions_wants'].includes(key)).map(([key,label])=><option value={key} key={key}>{label}</option>)}</select><ChevronDown aria-hidden="true"/></span></label>
       <label data-bill-field="account">Account<input className="bb-bills-input" maxLength={80} value={form.account} placeholder="Optional" onChange={e=>change({account:e.target.value})}/></label>
      </div>
     </>}
@@ -284,12 +290,12 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   {shownReview.operation==='adopt'&&<p className="bi-footnote">Prepares this recorded charge for editing here. The purchase total stays unchanged.</p>}
   <footer className="bi-editor-footer"><button type="button" className="bi-cancel" disabled={locked} onClick={()=>{setReview(null);setReviewBody(null)}}><ArrowLeft aria-hidden="true"/>Back</button><SavingButton type="button" className="bi-primary" disabled={locked||!review||!confirmReady} saving={busy&&Boolean(pending)} onClick={()=>void save()}>{shownReview.operation==='delete'||shownReview.operation==='end'?'Stop bill':shownReview.operation==='restore-end'?'Restore bill':shownReview.operation==='amount'?'Confirm amount':'Confirm'}</SavingButton></footer>
  </>
- return <div ref={root} className="bb-bills bi-product" data-tone="sage" data-wide={wide} aria-busy={busy}>
+ return <div ref={root} className="bb-bills bi-product" data-tone="sage" aria-busy={busy}>
 
   <div className="bb-bills-notices">
   {sharingRecovery&&<BillSharingRecovery journal={sharingRecovery} ownerName={ownerName} onSaved={()=>{setSharingRecovery(null);void load()}} onBlock={setSharingBlocked}/>}
   {newRequested&&<p className="bb-bills-status" role="status">New bill will open after the current change is verified.</p>}
-  {error&&(!form||wide||Boolean(flow))&&<p className="bb-bills-error" role="alert">{error}</p>}
+  {error&&(!form||Boolean(flow))&&<p className="bb-bills-error" role="alert">{error}</p>}
   {result?.detail&&<p role="status" className="bb-bills-status">{result.detail}</p>}
   {flow&&!busy&&<div className="bb-bills-recovery">{flow.pending?<><button type="button" onClick={()=>void executeFlow(flow,true)}>Check saved status</button><button type="button" onClick={()=>void executeFlow(flow,true,true)}>Retry same confirmation</button></>:<>{!flow.failed&&<button type="button" onClick={()=>void executeFlow(flow)}>Resume saved change</button>}<button type="button" onClick={()=>{sessionStorage.removeItem(flowKey);flowRef.current=null;setFlow(null);reset();void load()}}>Close</button></>}</div>}
   {pending&&<div className="bb-bills-recovery"><p role="status">Check the saved status before making another change.</p><button className="bb-bills-primary" type="button" disabled={busy} onClick={()=>void checkSaved()}>Check saved status</button><button type="button" className="bb-settings-action" disabled={busy} onClick={()=>void checkSaved(true)}>Retry same confirmation</button></div>}
@@ -298,7 +304,7 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
   </div>
   {snapshot&&<div className="bb-bills-panes">
    <section className="bb-bills-list" aria-label="Your bills">
-    <div className="bb-bills-toolbar"><CategoryFilterControl filter={filter} onFilterChange={setFilter} filters={[{value:'all',label:'Active bills'},{value:'subscription',label:'Subscriptions'},{value:'variable',label:'Variable bills'},{value:'fixed',label:'Fixed bills'},{value:'ended',label:'Ended bills'}]} label="Bill type" dismissTrigger="bill-filter"/><button type="button" className="bb-bills-add" aria-busy={newRequested} onClick={addBill}><Plus aria-hidden="true"/>Add bill</button>{wide&&<button type="button" className="bb-bills-refresh" aria-label="Refresh bills" disabled={locked} onClick={()=>{setResult(null);void refreshRegistry?.refresh('settings')}}><RefreshCw aria-hidden="true" className={refreshing?'bb-bills-refresh-spinning':undefined}/></button>}</div>
+    <div className="bb-bills-toolbar"><CategoryFilterControl filter={filter} onFilterChange={setFilter} filters={[{value:'all',label:'Active bills'},{value:'subscription',label:'Subscriptions'},{value:'variable',label:'Variable bills'},{value:'fixed',label:'Fixed bills'},{value:'ended',label:'Ended bills'}]} label="Bill type" dismissTrigger="bill-filter"/><button type="button" className="bb-bills-add" aria-busy={newRequested} onClick={addBill}><Plus aria-hidden="true"/>Add bill</button>{showRefresh&&<button type="button" className="bb-bills-refresh" aria-label="Refresh bills" disabled={locked} onClick={()=>{setResult(null);void refreshRegistry?.refresh('settings')}}><RefreshCw aria-hidden="true" className={refreshing?'bb-bills-refresh-spinning':undefined}/></button>}</div>
     <div className="bb-bills-rows"><div className="bb-bills-row-stack">{visible.map((bill,index)=>{
      const configured=bill.nextChange??bill,{cents:value,prediction,known}=billListAmount(bill)
      return <div className="bb-bills-row-shell" style={{order:index*2+2}} key={bill.id}>
@@ -313,11 +319,11 @@ export function BillSettings({active,ownerName,aliases,amountRequest,onAmountCon
     })}
     {!visible.length&&<p className="bb-bills-empty">No bills here yet.</p>}</div></div>
    </section>
-   <BillEditorWorkspace billId={selected?.id??'new'} order={placement.current.order} isNew={placement.current.isNew} open={Boolean(form)} wide={wide} locked={busy||Boolean(pending)||Boolean(flow)} onAnchorsChange={ids=>setAnchors(previous=>previous.length===ids.length&&previous.every((id,index)=>id===ids[index])?previous:ids)} onClosed={releaseRows}>
+   <BillEditorWorkspace billId={selected?.id??'new'} order={placement.current.order} isNew={placement.current.isNew} open={Boolean(form)} locked={busy||Boolean(pending)||Boolean(flow)} onAnchorsChange={ids=>setAnchors(previous=>previous.length===ids.length&&previous.every((id,index)=>id===ids[index])?previous:ids)} onClosed={releaseRows}>
     <EditorScenes scene={`${selected?.id??draftId.current}:${mode}`} open={Boolean(form)}>
      <>{mode==='charge'&&currentIntent?<BillCurrentCharge intent={currentIntent} ownerName={ownerName} rowOrder={order.current??undefined} onDone={()=>{reset();void load()}}/>:<div className="bi-editor" data-design="levels" data-operation={mode==='stop'?'delete':'update'}>
       <StepMotion review={Boolean(review)} open={Boolean(form)} mode="slide" duration={transactionMotion.duration} edit={editView} confirm={reviewView}/>
-      {error&&!wide&&<p className="bs-error" role="alert">{error}</p>}
+      {error&&<p className="bs-error" role="alert">{error}</p>}
      </div>}</>
     </EditorScenes>
    </BillEditorWorkspace>
