@@ -101,7 +101,6 @@
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-action-pane[data-peek="true"] { background:transparent; pointer-events:none; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-action-pane[data-peek="true"] h2 { visibility:hidden; }
  .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bb-duo-action-pane[data-peek="true"] .bb-duo-pane-tools { pointer-events:auto; }
- .bb-app-shell[data-duo-landscape="true"][data-screen="transactions"] .bi-undo-overlay { left:calc(var(--bb-duo-fold) + 16px); right:calc(var(--bb-duo-overlay) + 16px); top:var(--bb-duo-masthead); bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px); padding:0; background:transparent; }
 }
 
 @media(min-width:600px) {

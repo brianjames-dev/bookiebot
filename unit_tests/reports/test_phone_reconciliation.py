@@ -1,5 +1,6 @@
 """Actual HTTP and SQLite review contracts; no live bank or sheet writes."""
 import asyncio
+from dataclasses import replace
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -293,7 +294,37 @@ async def test_exact_confirmation_is_metadata_only_and_repeat_is_safe(client):
     assert (await result.json())["items"][0]["status"] == "checked"
     saved = client.store.get_reconciliation_item("brian", item.id)
     assert saved.status == "confirmed" and saved.matched_action_log_id == "coffee"
+    checked = await details(client, item.id)
+    assert checked["suggestions"] == []
+    assert checked["matchedEntry"] == {"item": "Coffee at Starbucks", "date": row["suggestions"][0]["date"],
+                                       "amountCents": 1234, "category": "Logged entry"}
     assert (await client.http.post("/app/reconciliation", json=body, headers=HEADERS)).status == 409
+
+
+@pytest.mark.asyncio
+async def test_checked_entry_displays_the_claimed_schedule_with_off_cycle_hints_and_price_changes(client, monkeypatch):
+    from bookiebot.banking.reconciliation import ScheduledPullCandidate
+    item = seed(client, merchant="Water")
+    connect(client)
+    pull = ScheduledPullCandidate("bill", "Water", 12.34, now_pacific().date(), "bill:water", amount_recorded=True)
+    pulls = [pull]
+    monkeypatch.setattr(review, "_scheduled_pulls_for_transactions", lambda *args, **kwargs: pulls)
+    monkeypatch.setattr(banking, "_scheduled_pulls_for_transactions", lambda *args, **kwargs: pulls)
+    client.actions.clear()
+    before = await details(client, item.id)
+    result = await client.http.post("/app/reconciliation", headers=HEADERS, json={
+        "operation": "confirm", "id": item.id, "version": before["version"], "suggestionId": before["suggestions"][0]["id"],
+    })
+    assert result.status == 200, await result.text()
+    due_date = pull.pull_date + timedelta(days=1 if pull.pull_date.day == 1 else -1)
+    pulls[:] = [replace(pull, amount=150.00, pull_date=due_date), replace(pull, amount=150.00),
+                replace(pull, source_ref="bill:other", name="Other", amount=12.34)]
+    checked = await details(client, item.id)
+    assert checked["suggestions"] == []
+    assert checked["matchedEntry"]["item"] == "Water (bill)"
+    assert checked["matchedEntry"]["amountCents"] == 1234
+    assert checked["matchedEntry"]["date"] in {due_date.isoformat(), pull.pull_date.isoformat()}
+    assert checked["matchedEntry"]["category"] == "Scheduled payment"
 
 
 @pytest.mark.asyncio

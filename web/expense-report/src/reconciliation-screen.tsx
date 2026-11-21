@@ -35,14 +35,16 @@ interface SharedAmountPlan {
 }
 type SharedAmount = SharedAmountPlan | { blocked: string }
 const splitLabels = { income: "By income", equal: "50/50", fronted: "Fronted", custom: "Custom" } as const
-interface Suggestion {
-  id: string; item: string; date: string; amountCents: number; category: string
+interface BudgetEntry { item: string; date: string; amountCents: number; category: string }
+interface Suggestion extends BudgetEntry {
+  id: string
   amountMismatch: boolean; kind: "recorded" | "schedule"; confirmable: boolean; recorded?: boolean; confidence?: number
   sharedAmount?: SharedAmount; split?: keyof typeof splitLabels
 }
 export interface ReconciliationItem {
   id: number; bankId?: number; version: string; stateVersion?: string; loadedAt?: number; status: ReviewStatus; date: string; merchant: string
   amountCents: number; currency: "USD"; accountLabel: string; suggestions: Suggestion[]
+  matchedEntry?: BudgetEntry
   receipt?: ReceiptLink
   logging?: { allowed: boolean; kind: "expense" | "income"; categories: string[]; paymentMethods: string[]; reason: string }; matchedSuggestionId?: string | null; needsCheck?: boolean; readOnly?: boolean; scheduleRecovery?: boolean; matchLabel?: string | null
 }
@@ -56,6 +58,8 @@ const detailStillFresh = (item: ReconciliationItem) => Date.now() - (item.loaded
 const isText = (value: unknown, max = 300): value is string => typeof value === "string" && value.length <= max
 const isDate = (value: unknown): value is string => isText(value) && Number.isFinite(Date.parse(value))
 const isAmount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value)
+const validBudgetEntry = (value: BudgetEntry) => value && isText(value.item, 500)
+  && isDate(value.date) && isAmount(value.amountCents) && isText(value.category)
 const validSharedAmount = (value: SharedAmount) => value && ("blocked" in value ? isText(value.blocked, 500) && Boolean(value.blocked)
   : isText(value.token, 64) && /^[a-f0-9]{64}$/.test(value.token) && isText(value.allocationId, 200)
     && isAmount(value.allocationVersion) && value.allocationVersion > 0 && isAmount(value.reviewId) && value.reviewId > 0
@@ -83,9 +87,9 @@ function validItem(value: unknown): value is ReconciliationItem {
     && (item.receipt === undefined || (item.status === "checked" && validReceipt(item.receipt) && item.receipt.bankAmountCents === item.amountCents))
     && (item.readOnly === undefined || typeof item.readOnly === "boolean")
     && (item.matchLabel === undefined || item.matchLabel === null || isText(item.matchLabel))
+    && (item.matchedEntry === undefined || (item.status === "checked" && validBudgetEntry(item.matchedEntry)))
     && Array.isArray(item.suggestions) && item.suggestions.length <= 25 && item.suggestions.every(suggestion =>
-      suggestion && isText(suggestion.id) && suggestion.id && isText(suggestion.item, 500) && isDate(suggestion.date)
-      && isAmount(suggestion.amountCents) && isText(suggestion.category) && typeof suggestion.amountMismatch === "boolean"
+      validBudgetEntry(suggestion) && isText(suggestion.id) && suggestion.id && typeof suggestion.amountMismatch === "boolean"
       && ["recorded", "schedule"].includes(suggestion.kind) && typeof suggestion.confirmable === "boolean"
       && (suggestion.recorded === undefined || typeof suggestion.recorded === "boolean")
       && (suggestion.split === undefined || Object.prototype.hasOwnProperty.call(splitLabels, suggestion.split))
@@ -516,6 +520,9 @@ function RightReview({ item, ready, render, close, locked }: {
 
 function MatchComparison({item, selected, aliases, onChoose, disabled, awaitingRepayment}: {item: ReconciliationItem; selected?: Suggestion; aliases?: Record<string,string>; onChoose?: () => void; disabled: boolean; awaitingRepayment: boolean}) {
   const difference = selected && Math.abs(item.amountCents) - selected.amountCents
+  const entry = item.matchedEntry ?? selected
+  const entryType = selected?.kind === "schedule" ? selected.recorded ? "Scheduled payment" : "Scheduled · not recorded in sheet" : entry?.category
+  const hasSavedMatch = item.matchLabel === "Matches logged entry" || item.matchLabel === "Matches scheduled payment"
   const BudgetCard = onChoose ? "button" : "div"
   return <>
     <div className="bb-reconcile-comparison-status">
@@ -530,10 +537,10 @@ function MatchComparison({item, selected, aliases, onChoose, disabled, awaitingR
       <div><small>{item.amountCents<0?"Bank deposit":"Bank charge"}</small><strong>{money(item.amountCents)}</strong>
         <div className="bb-reconcile-compare-source"><ReconcileIcon title={item.merchant} aliases={aliases}/><span>{item.merchant}<small>{dateLabel(item.date)} · {item.accountLabel}</small></span></div>
       </div>
-      <BudgetCard data-budget data-matched={Boolean(selected)} {...(onChoose ? {type:"button", "aria-label":"Choose budget entry", disabled, onClick:onChoose} : {})}>
+      <BudgetCard data-budget data-matched={Boolean(entry)} {...(onChoose ? {type:"button", "aria-label":"Choose budget entry", disabled, onClick:onChoose} : {})}>
         <small className="bb-reconcile-budget-title">{item.status==="pending"&&selected?"Tentative entry":"Budget entry"}{onChoose && <ChevronRight size={15} aria-hidden="true" />}</small>
-        {selected ? <><strong>{money(selected.amountCents)}</strong><span className="bb-reconcile-compare-source"><ReconcileIcon title={selected.item} category={selected.category} aliases={aliases}/><span>{selected.item}<small>{dateLabel(selected.date)} · {selected.kind==="schedule" ? selected.recorded ? "Scheduled payment" : "Scheduled · not recorded in sheet" : selected.category}{selected.split && ` · ${splitLabels[selected.split]} split`}</small></span></span></>
-          : <span className="bb-reconcile-budget-placeholder">{item.status==="checked"?"Match recorded":item.status==="ignored"?"Ignored":item.suggestions.length?`Potential matches (${item.suggestions.length})`:"No matching entry"}</span>}
+        {entry ? <><strong>{money(entry.amountCents)}</strong><span className="bb-reconcile-compare-source"><ReconcileIcon title={entry.item} category={entry.category} aliases={aliases}/><span>{entry.item}<small>{dateLabel(entry.date)} · {entryType}{selected?.split && ` · ${splitLabels[selected.split]} split`}</small></span></span></>
+          : <span className="bb-reconcile-budget-placeholder">{item.status==="checked"?(hasSavedMatch?"Matched entry unavailable":"No linked budget entry"):item.status==="ignored"?"Ignored":item.suggestions.length?`Potential matches (${item.suggestions.length})`:"No matching entry"}</span>}
       </BudgetCard>
     </div>
   </>

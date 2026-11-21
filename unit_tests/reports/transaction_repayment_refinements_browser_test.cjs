@@ -28,6 +28,7 @@ async function drag(page,start,end){await page.mouse.move(start.x,start.y);await
      else{await group.locator('.bi-expansion[data-open="true"]').waitFor();assert.equal(await group.locator('.bi-expansion[data-open="true"]').count(),1);await page.setViewportSize({width:867,height:669});await page.locator('.bb-page.bb-app-shell[data-duo-landscape="true"]').waitFor();await info.waitFor();assert.equal(await page.locator('.bb-recorded-results .bb-recorded-detail').count(),0);}
      await page.getByRole('button',{name:'Close transaction options',exact:true}).click();await page.setViewportSize({width,height:669});await page.waitForFunction(w=>(document.querySelector('.bb-page.bb-app-shell').getAttribute('data-duo-landscape')==='true')===(w>=600),width);
      const cue=page.locator('.sp-cue'),shell=page.locator('.bi-selected-row[data-entry-id="2026-10:purchase"]>.bb-recorded-swipe');await cue.waitFor();
+     assert.equal(await cue.locator('.lucide-arrow-up-right').count(),1,'Owed uses the same diagonal icon as Shared');
      if(width<600){
       const p=await cue.boundingBox(),start={x:p.x+p.width/2,y:p.y+p.height/2};await drag(page,start,{x:start.x-175,y:start.y});assert.equal(await shell.getAttribute('data-revealed'),'true','A swipe starting on the pill reveals the tray');assert.equal(await cue.getAttribute('aria-expanded'),'false','A drag never activates the pill');
       const b=await shell.boundingBox(),visible=await shell.evaluate(el=>el.clientWidth+parseFloat(el.style.getPropertyValue('--bb-recorded-offset'))),y=b.y+b.height*.65;

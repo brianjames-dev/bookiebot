@@ -1,5 +1,5 @@
 import {Children,cloneElement,isValidElement,useEffect,useLayoutEffect,useRef,type ReactElement,type ReactNode} from 'react'
-import {ArrowUp,ArrowDown,Clock3} from 'lucide-react'
+import {Clock3} from 'lucide-react'
 import type {RecordedTransaction} from './transactions-screen'
 import {InlineTransactionEditor,transactionMotion,type InlineEditorProps} from './transaction-inline-editor'
 import {TransactionIcon} from './daily-transactions'
@@ -8,7 +8,7 @@ import {StepMotion} from './transaction-step-motion'
 import {ChangedMoney,ChangedText} from './transaction-value-motion'
 import {splitMoney} from './transaction-split-model'
 import {repaymentLabel} from './transaction-repayment-model'
-import {RepaymentAllocation} from './repayment-allocation'
+import {RepaymentAllocation,RepaymentDirectionIcon} from './repayment-allocation'
 import './transaction-repayment.css'
 
 /** Two native row tracks keep the pill below the price without moving metadata. */
@@ -23,7 +23,7 @@ export function repaymentRow(row:RecordedTransaction,node:ReactNode,open:boolean
  const label=`${incoming?details.partnerName+' owes you':'You owe '+details.payerName} ${splitMoney(details.outstandingCents)}. View repayment details`
  return cloneElement(node,{'data-has-pending-split':true} as any,...children.filter(child=>!used.includes(child)),
   <div className="sp-row-primary" key="primary">{names}{price}</div>,
-  <div className="sp-row-secondary" key="secondary">{meta}<button type="button" className="sp-cue" data-direction={incoming?'receive':'send'} data-split-entry={row.id} aria-label={label} aria-expanded={open} aria-controls={'repayment-'+row.id} disabled={locked} onClick={event=>{event.stopPropagation();onOpen()}}><span className="sp-pill">{incoming?<ArrowUp aria-hidden="true"/>:<ArrowDown aria-hidden="true"/>}<span><ChangedMoney value={splitMoney(details.outstandingCents)} motionKey={key+'remaining'}/> {incoming?'Owed':'Due'}</span></span></button></div>)
+  <div className="sp-row-secondary" key="secondary">{meta}<button type="button" className="sp-cue" data-direction={incoming?'receive':'send'} data-split-entry={row.id} aria-label={label} aria-expanded={open} aria-controls={'repayment-'+row.id} disabled={locked} onClick={event=>{event.stopPropagation();onOpen()}}><span className="sp-pill"><RepaymentDirectionIcon incoming={incoming}/><span><ChangedMoney value={splitMoney(details.outstandingCents)} motionKey={key+'remaining'}/> {incoming?'Owed':'Due'}</span></span></button></div>)
 }
 
 /** Both row Split and repayment Edit split render this same nested native editor. */

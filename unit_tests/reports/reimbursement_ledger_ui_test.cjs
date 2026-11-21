@@ -924,16 +924,16 @@ async function matchedReceiptContracts() {
   assert.equal(writes(state).length, 0)
   assert.ok(text(tree.root).includes("Full bank payment"))
   assert.ok(!text(tree.root).includes("The bank match is saved separately"))
-  assert.match(button(tree.root, "Back to reconciliation").props.className, /bi-cancel/)
+  assert.match(button(tree.root, "Back").props.className, /bi-cancel/)
   assert.ok(text(tree.root).includes("Cash received"))
   assert.equal(tree.root.findAllByProps({ "aria-label": "Purchase allocation" }).length, 1)
   assert.equal(button(tree.root, "Mark all received"), undefined)
   assert.equal(button(tree.root, "Reset balances"), undefined)
-  await tap(button(tree.root, "Mark Hannah’s share received"))
+  await tap(button(tree.root, "Mark as received"))
   assert.equal(writes(state).length, 0, "Opening the separate confirmation never records a receipt")
   await fill(tree, "Amount", "12.34")
   await tap(button(tree.root, "Cancel")); assert.equal(writes(state).length, 0)
-  await tap(button(tree.root, "Mark Hannah’s share received")); await fill(tree, "Amount", "12.34")
+  await tap(button(tree.root, "Mark as received")); await fill(tree, "Amount", "12.34")
   await submit(tree)
   assert.equal(writes(state).length, 1)
   assert.equal(writes(state)[0].body.operation, "receive")
@@ -941,7 +941,7 @@ async function matchedReceiptContracts() {
   assert.equal(writes(state)[0].body.amountCents, 1234)
   assert.equal(writes(state)[0].body.version, 3)
   assert.ok(text(tree.root).includes("sheet update pending"))
-  assert.ok(button(tree.root, "Mark Hannah’s share received").props.disabled)
+  assert.ok(button(tree.root, "Mark as received").props.disabled)
   assert.ok(dispatched.includes("bookiebot:reimbursements-changed"))
   await unmount(tree)
 
@@ -953,7 +953,7 @@ async function matchedReceiptContracts() {
     if (guard === "settled") state.snapshot.allocations[0].settledCents = 10000, state.snapshot.allocations[0].outstandingCents = 0
     if (guard === "pending") state.snapshot.events.push(receipt({ id: "sent", status: "pending", kind: "report_payment" }))
     tree = await mount({ matchedReceipt })
-    const mark = button(tree.root, "Mark Hannah’s share received")
+    const mark = button(tree.root, "Mark as received")
     assert.ok(!mark || mark.props.disabled, `${guard} cannot create an unreviewed receipt`)
     if (guard === "pending") {
       await tap(button(tree.root, "Review")); assert.equal(writes(state).length, 0)
@@ -965,7 +965,7 @@ async function matchedReceiptContracts() {
   }
 
   state = fixture(); tree = await mount({ matchedReceipt })
-  await tap(button(tree.root, "Mark Hannah’s share received")); await fill(tree, "Amount", "12.34")
+  await tap(button(tree.root, "Mark as received")); await fill(tree, "Amount", "12.34")
   state.snapshot.allocations[0].version++
   state.snapshot.allocations[0].projectedVersion++
   state.snapshot.allocations[0].settledCents += 100
@@ -982,12 +982,12 @@ async function matchedReceiptContracts() {
   state = fixture({ post: () => { if (++attempts === 1) throw Error("Saved response lost"); return response(clone(state.snapshot)) } })
   tree = await mount({ matchedReceipt, onReceiptMutationLock: locked => { receiptLocked = locked } })
   assert.equal(receiptLocked, false, "Viewing a share leaves the Reconcile list and close control available")
-  await tap(button(tree.root, "Mark Hannah’s share received")); await submit(tree)
+  await tap(button(tree.root, "Mark as received")); await submit(tree)
   assert.equal(receiptLocked, true, "An uncertain write keeps the Reconcile list and close control locked")
-  assert.ok(button(tree.root, "Back to reconciliation").props.disabled, "An uncertain receipt stays mounted for its safe retry")
+  assert.ok(button(tree.root, "Back").props.disabled, "An uncertain receipt stays mounted for its safe retry")
   await tap(button(tree.root, "Retry this record"))
   assert.deepEqual(writes(state)[0].body, writes(state)[1].body)
-  assert.ok(!button(tree.root, "Back to reconciliation").props.disabled)
+  assert.ok(!button(tree.root, "Back").props.disabled)
   assert.equal(receiptLocked, false)
   await unmount(tree)
 

@@ -1,5 +1,17 @@
 # Agent Status
 
+## Reconcile, Savings and repayment presentation (2026-11-20)
+
+Checked Reconcile details resolve the saved budget entry through the existing match report. The comparison card shows the entry name, date, and amount, with the repayment pill below match status. The split-share summary uses Back and Mark as received on one row. The latter opens the existing receipt confirmation.
+
+Closed Savings editors use the shared raised surface with smaller edit and delete icons and 44px controls. Undo toasts use the center of the usable viewport in both poses. Transactions and Reimbursements use the same diagonal repayment arrows.
+
+Local verification passed 99 focused tests, 3,570 full-suite tests (918 optional PostgreSQL skips), Python and frontend types, and the production bundle build. Chromium and WebKit checked the two comparison cards, stacked status, inline receipt actions, closed editor surfaces, centered Undo, and repayment arrows. CI and release verification are tracked in the task PR.
+
+Review follow-up reuses scheduled candidate deduplication for the same saved bill occurrence when both due-date and off-cycle hints exist. The API regression checks that they still resolve to the confirmed amount after a recurring price changes.
+
+Manual check. Open a checked bank match and compare both cards. Open a share with a balance and inspect both footer actions without confirming a payment. In Savings, open a goal and account while folded, then unfold and check the same editors. The next legitimate save should show Undo centered above the navigation. Compare the Due and Owed arrows in Transactions and Shared.
+
 ## Shifted split bill in Transactions (2026-11-20)
 
 Transactions now resolves the original payer's split bill against its verified workbook named ranges before merging ledger and workbook rows. For an unanchored legacy row, require the owner's recorded payment action and a single exact bill and cash match. Preserve unrelated payments with the same amount.
@@ -645,6 +657,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of the matched budget card, compact editor treatments, and centered Undo in both DUO poses. See the presentation entry above.
 
 Native acceptance of the November 18 Water row, daily total, and original bank match. See the shifted split bill entry above.
 

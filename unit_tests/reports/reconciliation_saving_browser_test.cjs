@@ -373,7 +373,7 @@ async function verifyMatchPriority(browser, width, height) {
 async function verifyDesktopAndReceiptRefresh(browser) {
   let checks = 0, receiptReads = 0, readingReceipt = false
   const desktop = { newPage: options => browser.newPage({ ...options, hasTouch: false, isMobile: false }) }
-  const checked = { ...row, status: 'checked', matchLabel: 'Matches logged entry', receipt: {
+  const checked = { ...row, status: 'checked', matchLabel: 'Matches logged entry', matchedEntry: match, receipt: {
     allocationId: 'fixture-shared-bill', partner: 'Hannah', bankAmountCents: row.amountCents, outstandingCents: 8000,
   } }
   const other = { ...checked, id: 2, merchant: 'Another checked charge', receipt: undefined }
@@ -415,9 +415,15 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     const comparisonStatus = page.locator('.bb-reconcile-comparison-status:visible')
     await comparisonStatus.getByText('Matches logged entry').waitFor()
     await comparisonStatus.locator('.rp-status').getByText('Awaiting repayment').waitFor()
+    const matchStatus = await comparisonStatus.getByText('Matches logged entry').boundingBox()
+    const awaiting = await comparisonStatus.locator('.rp-status').boundingBox()
+    assert(awaiting.y >= matchStatus.y + matchStatus.height && Math.abs(awaiting.x - matchStatus.x) < 1)
     assert.equal(await page.locator('.bb-reconcile-comparison-status:visible + .bb-reconcile-comparison').count(), 1)
+    const matchedBudget = page.locator('.bb-reconcile-comparison:visible [data-budget]')
+    assert.match(await matchedBudget.innerText(), /Rain jacket/)
+    assert.equal(await matchedBudget.getByText('$166.31', { exact: true }).count(), 1)
     assert.match(await openReceipt.getAttribute('class'), /bi-primary/)
-    assert.equal(await page.getByRole('button', { name: 'Mark Hannah’s share received' }).count(), 0)
+    assert.equal(await page.getByRole('button', { name: 'Mark as received' }).count(), 0)
     readingReceipt = true
     await openReceipt.click()
     const receipt = page.getByRole('region', { name: 'Receive shared payment' })
@@ -429,8 +435,15 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     await refresh.click()
     await receipt.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).waitFor()
     const receiptActions = receipt.locator('footer')
-    await receiptActions.getByRole('button', { name: 'Back to reconciliation' }).waitFor()
-    await receiptActions.getByRole('button', { name: 'Mark Hannah’s share received' }).waitFor()
+    async function checkReceiptButtons(actions) {
+      const back = actions.getByRole('button', { name: 'Back', exact: true })
+      const mark = actions.getByRole('button', { name: 'Mark as received', exact: true })
+      await mark.waitFor()
+      const [left, right] = await Promise.all([back.boundingBox(), mark.boundingBox()])
+      assert(left.x < right.x && Math.abs(left.y - right.y) < 1, 'Back and Mark as received share one row')
+      assert.equal(await mark.locator('.lucide-check').count(), 1)
+    }
+    await checkReceiptButtons(receiptActions)
     assert.equal(await receipt.getByRole('button', { name: 'Confirm received record' }).count(), 0)
     assert.equal(await receipt.getByText(/The bank match is saved separately/).count(), 0)
     assert.equal(await receipt.getByRole('img', { name: /Brian.*Hannah/ }).count(), 1)
@@ -448,10 +461,11 @@ async function verifyDesktopAndReceiptRefresh(browser) {
     const inline = page.locator('.bb-reconcile-row[data-open=true] [data-editor-scene=receipt] .bb-reconcile-receipt')
     await inline.waitFor()
     await inline.getByRole('heading', { name: 'Hannah’s share · Fixture store' }).waitFor()
-    const back = inline.getByRole('button', { name: 'Back to reconciliation' })
+    await checkReceiptButtons(inline.locator('footer'))
+    const back = inline.getByRole('button', { name: 'Back' })
     assert.match(await back.getAttribute('class'), /bi-cancel/)
     assert.equal(await back.evaluate(el => getComputedStyle(el).borderTopWidth), '0px')
-    const markReceived = inline.locator('footer').getByRole('button', { name: 'Mark Hannah’s share received' })
+    const markReceived = inline.locator('footer').getByRole('button', { name: 'Mark as received' })
     await markReceived.click()
     await inline.getByRole('button', { name: 'Confirm received record' }).waitFor()
     await inline.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -542,11 +556,16 @@ async function verifyReceiptFeedback(browser, width, height) {
     await page.getByRole('button', { name: /Checked/ }).click()
     await page.getByRole('button', { name: /^Fixture store/ }).click()
     await page.getByRole('button', { name: 'View Hannah’s share' }).click()
-    await page.getByRole('button', { name: 'Mark Hannah’s share received' }).click()
+    await page.getByRole('button', { name: 'Mark as received' }).click()
     await page.getByLabel('Amount ($)').fill('50.00')
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     await nav('Confirm received record').click()
     await toast.getByText('$50.00 received', { exact: true }).waitFor()
+    assert(await toast.evaluate(el => {
+      const shell = el.closest('.bb-app-shell'), box = el.getBoundingClientRect()
+      const gutter = parseFloat(getComputedStyle(shell).getPropertyValue('--bb-duo-overlay')) || 0
+      return Math.abs(box.left + box.width / 2 - (window.innerWidth - gutter) / 2) < 1
+    }), 'The shared Undo toast is centered in the app viewport')
     assert.equal(await toast.locator('.bi-undo-time').count(), 1)
     const deadline = await toast.getAttribute('data-expires-at')
 

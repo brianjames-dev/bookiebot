@@ -1,3 +1,5 @@
+2026-11-20 Cross-tab presentation pass — include the saved budget source on checked Reconcile details, stack repayment status and keep the split-share actions inline. Share the toast viewport and repayment arrows with Transactions and Reimbursements. Match the folded Savings surface to native row editors. Manual checks are in STATUS.
+
 2026-11-20 Shifted split bill — resolve the payer's source range before deduplicating Transactions and keep neighboring bill rows independent. The November Water allocation's cached coordinate was repaired through the existing projected-version guard. Original bank match, workbook amounts, action lineage and cash events are preserved. Device steps are in STATUS.
 
 2026-11-20 Reconcile receipt feedback — show saved and reversed amounts immediately on Transactions and Reimbursements with one timed Undo toast through tab changes. The matched receipt uses the existing canonical writer, durable deferred projection and queued Undo. Move match status text and the unpaid-share pill above the comparison cards. Device steps are in STATUS.

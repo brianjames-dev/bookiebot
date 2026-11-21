@@ -13,7 +13,7 @@ import "./reimbursement-ledger.css"
 import { BalanceFirstReimbursements, reimbursementTransaction } from "./shared-balance-first"
 import { StepMotion } from "./transaction-step-motion"
 import { transactionMotion } from "./transaction-inline-editor"
-import { ArrowLeft, CircleCheck, Clock3 } from "lucide-react"
+import { ArrowLeft, Check, CircleCheck, Clock3 } from "lucide-react"
 import { UndoPopup } from "./transaction-undo-popup"
 import { ReimbursementSavingContext, ReimbursementSaveButton, useReimbursementFeedback } from "./reimbursement-feedback"
 import {clearReimbursementSnapshot,inverseDisplay,publishReimbursementSnapshot,reimbursementDisplay,reimbursementLedgerState,validDisplayChange,type ReimbursementDisplayChange} from './reimbursement-display-state'
@@ -371,7 +371,7 @@ export function ReimbursementLedger({ fallback, refreshKey, ownerName, matchedRe
   const toast = feedback.notice && <div className="sr-native-toast bi-product"><UndoPopup key={feedback.notice.id} notice={feedback.notice} modal={feedback.modal} detail={feedback.detail} undoAvailable={Boolean(feedback.command)} onUndo={undo} onDismiss={feedback.dismiss} returnFocus={()=>[...document.querySelectorAll<HTMLButtonElement>('.sr-row-main[data-selected=true],.sr-editor .bi-primary,.sr-primary,.sr-options')].find(el=>!el.disabled&&!el.closest('[aria-hidden=true]')&&getComputedStyle(el).visibility!=='hidden'&&el.getClientRects().length>0)??null}/></div>
   if (matchedReceipt) {
     const back = <button type="button" className="bi-cancel" disabled={busy || uncertain} onClick={onClose}>
-      <ArrowLeft aria-hidden="true"/>Back to reconciliation</button>
+      <ArrowLeft aria-hidden="true"/>Back</button>
     return <ReimbursementSavingContext.Provider value={savingOperation}><section className="bb-canonical-reimbursements bb-reconcile-receipt bi-product" aria-label="Receive shared payment"><div className="bi-editor">
       {legacy && !uncertain && fallback}
       {error && <div className="bb-ledger-message" role="alert"><p>{error}</p>
@@ -441,7 +441,7 @@ function MatchedReceiptContents({ snapshot, scope, active, disabled, run, refres
       && <PaymentEditor allocation={item} isPayer native disabled={blocked || stale} run={run} close={() => setReviewVersion(undefined)} />}
     <footer className="bi-editor-footer bb-reconcile-native-actions">{back}
       {item.outstandingCents > 0 && !editing && <button type="button" className="bi-primary" disabled={blocked}
-        onClick={() => setReviewVersion(item.version)}>Mark {partner}’s share received</button>}
+        onClick={() => setReviewVersion(item.version)}><Check aria-hidden="true"/>Mark as received</button>}
     </footer>
   </>
 }

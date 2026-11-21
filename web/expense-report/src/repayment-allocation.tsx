@@ -1,5 +1,11 @@
 import type { ReactNode } from "react"
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react"
 import { splitMoney } from "./transaction-split-model"
+
+export function RepaymentDirectionIcon({ incoming }: { incoming: boolean }) {
+  const Icon = incoming ? ArrowUpRight : ArrowDownLeft
+  return <Icon aria-hidden="true"/>
+}
 
 /** The same allocation bar, initials and shares in Transactions and Shared. */
 export function RepaymentAllocation({ payerName, partnerName, payerCents, partnerCents, incoming, method, locked = false, renderAmount = splitMoney }: {
