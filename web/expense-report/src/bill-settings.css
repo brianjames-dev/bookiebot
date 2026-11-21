@@ -115,9 +115,6 @@
 .bb-bills[data-wide=false] .bb-bills-editor:has(.bi-expansion-clip:not(:empty))::after { content:"";position:absolute;inset:auto 0 0;height:1px;z-index:3;background:hsl(var(--border));pointer-events:none }
 
 /* Transactions' fold/strip equation and scroll track; only left rows scroll. */
-.bb-page.bb-app-shell[data-duo-bills=true] { display:grid;grid-template-rows:80px minmax(0,1fr);padding:0 var(--bb-duo-overlay) 0 0;overflow:clip }
-.bb-app-shell[data-duo-bills=true]>.bb-shell-masthead { grid-row:1;grid-column:1 / -1;width:100%;height:80px;min-height:80px;margin:0;padding-inline:var(--bb-duo-inset) }
-.bb-app-shell[data-duo-bills=true]>.bb-shell-bills { grid-row:2;width:100%;min-height:0;max-width:none;margin:0;padding:0;gap:0;overflow:clip;display:block }
 .bb-bills[data-wide=true] { display:grid;grid-template-columns:minmax(0,calc((100% + var(--bb-duo-right-rail))/2)) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:4px 0;height:100%;min-height:0;overflow:hidden }
 .bb-bills[data-wide=true] .bb-bills-panes { display:contents }
 .bb-bills-notices { display:contents }

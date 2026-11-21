@@ -32,7 +32,7 @@ for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===proce
    if(lose){lose=false;return route.abort('failed')}return reply(result);
   }});
   await tap(page,page.getByRole('button',{name:'Settings',exact:true}));
-  await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+  await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
   const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').waitFor();
   await tap(page,panel.locator('.bb-bills-row').first());
   await tap(page,panel.getByRole('button',{name:'Enter monthly amount',exact:true}));

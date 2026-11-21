@@ -18,6 +18,7 @@ const out='/private/tmp/bookiebot-display-report';fs.mkdirSync(out,{recursive:tr
   assert(await page.evaluate(()=>window.__diagnosticCanvas===document.querySelector('.bb-page')),'No document replacement');
   await tap(page,page.getByRole('button',{name:'Settings',exact:true}));
   await page.locator('.bb-page').evaluate(el=>el.style.removeProperty('top'));
+  await tap(page,page.getByRole('button',{name:'About & updates',exact:true}));
   const copy=page.getByRole('button',{name:'Copy display report',exact:true});await copy.scrollIntoViewIfNeeded();await copy.tap();
   await page.getByRole('status').filter({hasText:'Display report copied.'}).waitFor();
   const raw=await page.evaluate(()=>window.__copiedReports.at(-1)),data=JSON.parse(raw);fs.writeFileSync(out+'/'+engine.name()+'-'+width+'-report.json',JSON.stringify(data,null,2));

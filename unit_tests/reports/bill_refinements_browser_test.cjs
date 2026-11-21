@@ -6,7 +6,7 @@ async function tap(page,button){await button.scrollIntoViewIfNeeded();await nati
 const settle=page=>page.waitForTimeout(680);
 async function geometry(page){return page.evaluate(()=>{
  const rect=selector=>{const el=document.querySelector(selector),r=el?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null};
- return {brand:rect('.bb-report-brand'),word:rect('.bb-wordmark'),avatar:rect('.bb-app-avatar'),header:rect('.bb-page>.bb-report-header'),title:rect('.bb-report-header:not([hidden]) h1'),settings:rect('main[aria-label="Settings"]>.bb-settings-heading h1'),main:rect('main[aria-label="Settings"]'),section:rect('main[aria-label="Settings"]>.bb-settings-section')};
+ return {brand:rect('.bb-report-brand'),word:rect('.bb-wordmark'),avatar:rect('.bb-app-avatar'),header:rect('.bb-page>.bb-report-header'),title:rect('.bb-report-header:not([hidden]) h1'),directory:rect('.bb-settings-index'),group:rect('.bb-settings-index-group')};
 })}
 ;(async()=>{let cases=0;for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){
  const browser=await engine.launch();try{for(const dark of [false,true])for(const width of [320,382,867].filter(w=>!process.env.ONLY_WIDTH||w===Number(process.env.ONLY_WIDTH))){
@@ -17,12 +17,12 @@ async function geometry(page){return page.evaluate(()=>{
   commands.push(body);return route.fulfill({json:{state:'done',success:true,detail:'Bill saved.'}});
  }});
  await settle(page);const overview=await geometry(page);
- await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await page.locator('main[aria-label="Settings"]:visible').waitFor();await settle(page);
+ await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await page.locator('.bb-settings-index').waitFor();await settle(page);
  const settings=await geometry(page);assert.equal(await page.locator('.bb-report-brand:visible').count(),0);assert.equal(await page.locator('.bb-settings-masthead-title h1').innerText(),'Settings');
- assert(Math.abs(settings.main.x-overview.title.x)<1,'Settings content starts at the Overview inset');
+ assert(Math.abs(settings.directory.x-overview.title.x)<1,'Settings content starts at the Overview inset');
  assert(await page.getByRole('button',{name:'Back',exact:true}).isVisible(),'Settings exposes its contextual glass Back');
- assert(settings.section.x>=settings.main.x-.5,'Cards do not bleed outside the content inset');
- await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').first().waitFor();
+ assert(settings.group.x>=settings.directory.x-.5,'Cards do not bleed outside the content inset');
+ await tap(page,page.getByRole('button',{name:'Bills',exact:true}));const panel=page.locator('main[aria-label="Bills"]');await panel.locator('.bb-bills-row').first().waitFor();
  const pge=panel.locator('.bb-bills-row').filter({hasText:'PG&E'}),icloud=panel.locator('.bb-bills-row').filter({hasText:'iCloud Storage'});
  assert.equal(await pge.locator('.bb-transaction-icon').getAttribute('data-merchant'),'pge','Reuse the actual company logo resolver');
  assert.notEqual(await icloud.locator('.bb-transaction-icon').getAttribute('data-merchant'),'fallback');

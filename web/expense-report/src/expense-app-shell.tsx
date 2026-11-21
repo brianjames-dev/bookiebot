@@ -18,6 +18,7 @@ import { PhoneNotifications } from "./phone-notifications"
 import { WidgetSettings } from "./widget-settings"
 import { BillSettings } from "./bill-settings"
 import { ReportLoading } from "./report-loading"
+import { SettingsDetailHeading, SettingsDirectory, SettingsInitial, settingsSections, type SettingsSection } from "./settings-directory"
 import { SavingsTransfers } from "./savings-transfers"
 import { BillCheckin, type BillAmountRequest } from "./bill-checkin"
 import { WidgetSetupGuide } from "./widget-setup-guide"
@@ -63,10 +64,13 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const [screen, setScreen] = useState<AppScreen>(() => navigation.getSnapshot().screen)
   const [lastMain, setLastMain] = useState<MainScreen>("overview")
   const [widgetGuideOpen, setWidgetGuideOpen] = useState(false)
-  const [billsOpen, setBillsOpen] = useState(false)
-  const [transfersOpen,setTransfersOpen]=useState(false)
-  const configurationOpen=billsOpen||transfersOpen
-  const settingsTitle=transfersOpen?"Transfers":billsOpen?"Bills":widgetGuideOpen?"Widget setup":"Settings"
+  const [settingsSelection, setSettingsSelection] = useState<SettingsSection | null>(null)
+  const settingsSection = settingsSelection ?? (duo.landscape ? "account" : null)
+  const billsOpen = settingsSection === "bills"
+  const transfersOpen = settingsSection === "transfers"
+  const configurationOpen = billsOpen || transfersOpen
+  const detailTitle = widgetGuideOpen ? "Widget setup" : settingsSection ? settingsSections[settingsSection].title : "Settings"
+  const settingsTitle = duo.landscape ? "Settings" : detailTitle
   const [savingsHeaderActions,setSavingsHeaderActions]=useState<HTMLDivElement|null>(null)
   const [reconcileHeaderActions,setReconcileHeaderActions]=useState<HTMLDivElement|null>(null)
   const [reconcileStatusTarget,setReconcileStatusTarget]=useState<HTMLDivElement|null>(null)
@@ -88,7 +92,9 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const askTriggerRef = useRef<HTMLButtonElement>(null)
   const screenRef = useRef(screen)
   const displayedScreen = useRef(screen)
-  const widgetGuideRef = useRef(false)
+  const settingsDirectoryY = useRef(0)
+  const settingsFocus = useRef<SettingsSection | "detail" | null>(null)
+  const widgetGuideReturn = useRef<{ y: number; wide: boolean } | null>(null)
   const widgetFocusRequested = useRef(false)
   const positions = useRef<Partial<Record<AppScreen, number>>>({})
   const sourceId = useRef(0)
@@ -101,42 +107,62 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   const selectScreen = useCallback((next: AppScreen) => {
     if (!ready) return
     if (next === "reconcile" && !visibleRef.current) return
-    if (next === screenRef.current) {
-      if (next === "settings" && widgetGuideRef.current) {
-        widgetGuideRef.current = false
-        startTransition(() => {
-          setWidgetGuideOpen(false)
-          setBillsOpen(false);setTransfersOpen(false)
-          window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
-        })
-      }
-      return
-    }
-    // The guide is a temporary Settings view; its scroll must not replace the
-    // form/code position that Back, the gear and later tab visits restore.
-    if (!widgetGuideRef.current) positions.current[displayedScreen.current] = readPageScroll().y
-    widgetGuideRef.current = false
+    if (next === screenRef.current) return
+    positions.current[displayedScreen.current] = readPageScroll().y
+    if (next === "settings") settingsDirectoryY.current = 0
+    widgetGuideReturn.current = null
     widgetFocusRequested.current = false
+    settingsFocus.current = null
     screenRef.current = next
     navigation.select(next)
     startTransition(() => {
       setSourceRequest(null)
       setWidgetGuideOpen(false)
-      setBillsOpen(false);setTransfersOpen(false)
+      setSettingsSelection(null)
       if (next !== "settings") setLastMain(next)
       setScreen(next)
       window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
     })
   }, [ready, navigation])
+  const settingsBlocked = configurationOpen && (guard.pending || guard.uncertain)
+  const openSettingsSection = (section: SettingsSection, focus = false) => {
+    if (screen === "settings" && settingsBlocked) return
+    if (screen === "settings" && settingsSection === section && !widgetGuideOpen) return
+    if (screen === "settings" && settingsSection === null) settingsDirectoryY.current = readPageScroll().y
+    selectScreen("settings")
+    if (focus && !duo.landscape) settingsFocus.current = "detail"
+    setWidgetGuideOpen(false)
+    setSettingsSelection(section)
+    window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
+  }
   const openWidgetGuide = () => {
-    positions.current.settings = readPageScroll().y
-    widgetGuideRef.current = true
+    widgetGuideReturn.current = {
+      y: duo.landscape ? document.getElementById("bb-settings-detail")?.scrollTop ?? 0 : readPageScroll().y,
+      wide: duo.landscape,
+    }
     setWidgetGuideOpen(true)
+    settingsFocus.current = "detail"
+    window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
+  }
+  const closeWidgetGuide = () => {
+    setWidgetGuideOpen(false)
     window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
   }
   const returnToWidgets = () => {
     widgetFocusRequested.current = true
-    selectScreen("settings")
+    closeWidgetGuide()
+  }
+  const backFromSettings = () => {
+    if (settingsBlocked) return
+    if (widgetGuideOpen) {
+      closeWidgetGuide()
+    } else if (configurationOpen || (!duo.landscape && settingsSection)) {
+      if (!duo.landscape) settingsFocus.current = settingsSection
+      setSettingsSelection(null)
+      window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))
+    } else {
+      selectScreen(lastMain)
+    }
   }
 
   useEffect(() => {
@@ -151,10 +177,14 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
   useEffect(() => {
     // Public setup pages may return here without browser Back controls. Only
     // this non-secret destination is recognized; fragments never authenticate.
-    const returnToSettings = () => { if (window.location.hash === "#settings") selectScreen("settings") }
+    const returnToSettings = () => {
+      if (window.location.hash !== "#settings") return
+      if (widgetGuideOpen) closeWidgetGuide()
+      else selectScreen("settings")
+    }
     window.addEventListener("hashchange", returnToSettings)
     return () => window.removeEventListener("hashchange", returnToSettings)
-  }, [Boolean(report)])
+  }, [selectScreen, widgetGuideOpen])
 
   const reportIdentity = report ? expenseReportIdentity(report) : ""
   useEffect(() => { setSourceRequest(null) }, [reportIdentity, monthlyReady])
@@ -162,20 +192,37 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
 
   useLayoutEffect(() => {
     displayedScreen.current = screen
-    const y = widgetGuideOpen || configurationOpen ? 0 : positions.current[screen] ?? 0
+    const atSettingsIndex = screen === "settings" && !settingsSection && !duo.landscape
+    const widgetReturn = screen === "settings" && settingsSection === "widgets" && !widgetGuideOpen ? widgetGuideReturn.current : null
+    if (!widgetGuideOpen) widgetGuideReturn.current = null
+    const y = atSettingsIndex ? settingsDirectoryY.current : screen !== "settings" ? positions.current[screen] ?? 0 :
+      widgetReturn && !widgetReturn.wide && !duo.landscape ? widgetReturn.y : 0
     scrollPageTo({ top: y, behavior: "instant" })
-    if (screen === "settings" && !widgetGuideOpen && widgetFocusRequested.current) {
-      widgetFocusRequested.current = false
-      const target = document.querySelector<HTMLElement>(".bb-widget-settings")
-      if (target) {
-        target.tabIndex = -1
-        target.focus({ preventScroll: true })
-        target.scrollIntoView({ block: "start", behavior: "instant" })
+    if (screen === "settings") {
+      const detail = document.getElementById("bb-settings-detail")
+      if (detail) detail.scrollTop = widgetReturn?.wide && duo.landscape ? widgetReturn.y : 0
+      if (!widgetGuideOpen && widgetFocusRequested.current) {
+        widgetFocusRequested.current = false
+        const target = document.querySelector<HTMLElement>(".bb-widget-settings")
+        if (target) {
+          target.tabIndex = -1
+          target.focus({ preventScroll: true })
+          target.scrollIntoView({ block: "start", behavior: "instant" })
+        }
+      } else if (settingsFocus.current) {
+        const focus = settingsFocus.current
+        settingsFocus.current = null
+        const target = focus === "detail"
+          ? detail?.querySelector<HTMLElement>(".bb-shell-settings:not([hidden]) > .bb-settings-detail-heading")
+          : document.querySelector<HTMLElement>(`[data-settings-section="${focus}"]`)
+        if (target) {
+          target.focus({ preventScroll: true })
+          if (focus !== "detail") target.scrollIntoView({ block: "nearest", behavior: "instant" })
+        }
       }
     }
-    // Restoring a page's position must not resize/restart the independent dock.
     scrollState.current = { lastY: readPageScroll().y, travel: 0, compact: navigation.getSnapshot().compact }
-  }, [screen, widgetGuideOpen, configurationOpen])
+  }, [screen, settingsSection, widgetGuideOpen])
 
   useDuoListScroll(duo.enabled,duo.landscape,screen)
 
@@ -244,24 +291,23 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
     <div className="bb-page bb-app-shell k-ios" data-screen={screen} data-keyboard-open={keyboardOpen}
       data-duo-enabled={duo.enabled || undefined}
       data-duo-landscape={duo.landscape || undefined} data-duo-overview={duo.landscape && reportVisible && monthlyReady || undefined}
-      data-duo-bills={duo.landscape && screen === "settings" && configurationOpen || undefined}
-      data-bills-open={screen === 'settings'&&configurationOpen || undefined}
+      data-bills-open={screen === "settings" && configurationOpen || undefined}
       style={duo.landscape ? {"--bb-duo-overlay": `${duo.overlay}px`, "--bb-duo-right-rail": `${duo.rail}px`} as CSSProperties : undefined}>
-      {!duo.landscape && <PullToRefresh screen={screen} canvasKey={settingsTitle} label={configurationOpen?settingsTitle:undefined} blocked={refreshBlocked} />}
+      {!duo.landscape && <PullToRefresh screen={screen} canvasKey={detailTitle} label={configurationOpen?settingsTitle:undefined} blocked={refreshBlocked} />}
       <header className="bb-masthead bb-shell-masthead">
-        {screen === 'settings' ? <div className="bb-settings-masthead-title"><AppHeaderBack label={settingsTitle} disabled={configurationOpen&&(guard.pending||guard.uncertain)} onBack={()=>{
-          if(configurationOpen){widgetGuideRef.current=false;setBillsOpen(false);setTransfersOpen(false)}
-          else if(widgetGuideOpen)selectScreen('settings')
-          else selectScreen(lastMain)
-        }}/><h1 className="bb-settings-screen-heading">{settingsTitle}</h1>{duo.landscape && !configurationOpen && !widgetGuideOpen &&
-          <PageRefreshButton screen="settings" label="Refresh Settings" blocked={refreshBlocked} />}</div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions" && screen !== "shared" && screen !== "savings" && screen !== "reconcile"}
+        {screen === "settings" ? <div className="bb-settings-masthead-title">
+          <AppHeaderBack label={settingsTitle} disabled={settingsBlocked} onBack={backFromSettings} />
+          <h1 className="bb-settings-screen-heading">{settingsTitle}</h1>
+          {duo.landscape && !configurationOpen && !widgetGuideOpen &&
+            <PageRefreshButton screen="settings" label="Refresh Settings" blocked={refreshBlocked} />}
+        </div> : <ReportBrand owner={owner} avatarUrl={avatarUrl} status={brandStatus} statusHidden={!reportVisible && screen !== "transactions" && screen !== "shared" && screen !== "savings" && screen !== "reconcile"}
           onChat={() => setAskOpen(true)} chatRef={askTriggerRef} chatOpen={askOpen && monthlyReady} chatDisabled={!report || !monthlyReady} />}
         <AppHeaderTools askRef={askTriggerRef} askOpen={askOpen && monthlyReady} settingsOpen={screen === "settings"}
           askDisabled={!report || !monthlyReady} settingsDisabled={!report} onAsk={() => setAskOpen(true)} avatarUrl={avatarUrl} showPortrait={screen === 'settings'}
           onSettings={() => {
-            const next=screen === "settings" && !widgetGuideOpen && !configurationOpen ? lastMain : "settings"
-            if(duo.enabled&&next==='settings')recordDisplayFrame('settings-open','manual')
-            selectScreen(next)
+            if (screen === "settings") { backFromSettings(); return }
+            if (duo.enabled) recordDisplayFrame("settings-open", "manual")
+            selectScreen("settings")
           }} />
       </header>
 
@@ -286,39 +332,57 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
         {report && <ReimbursementLedger key={report.ownerName} ownerName={report.ownerName} balanceFirst toastTarget={toastTarget} headerActions={sharedHeaderActions} aliases={report.calendarLogoAliases} fallback={fallback} refreshKey={report.generatedAt} onUpdated={onSharedUpdated} />}
       </main>
       <main className="bb-shell-savings bb-main" aria-label="Savings" hidden={screen !== "savings"}>
-        {report && <SavingsWorkspace key={report.ownerName} report={report} ready={monthlyReady} active={screen==='savings'} headerActions={savingsHeaderActions} toastTarget={toastTarget} onUpdated={onSavingsUpdated} onTransfers={()=>{selectScreen('settings');setTransfersOpen(true)}}/>}
+        {report && <SavingsWorkspace key={report.ownerName} report={report} ready={monthlyReady} active={screen==='savings'} headerActions={savingsHeaderActions} toastTarget={toastTarget} onUpdated={onSavingsUpdated} onTransfers={() => openSettingsSection("transfers")}/>}
       </main>
       <main className="bb-shell-reconcile bb-main" aria-label="Reconcile" hidden={screen !== "reconcile" || !reconciliationVisible}>
         {report && <ReconciliationScreen key={report.ownerName} ownerName={report.ownerName} controller={reconciliation} embeddedHeader wide={duo.landscape && screen==="reconcile"} headerActions={reconcileHeaderActions} statusTarget={reconcileStatusTarget} aliases={report.calendarLogoAliases}/>}
       </main>
-      <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={screen !== "settings" || widgetGuideOpen || configurationOpen}>
-        {report && <>
-        <section className="bb-settings-section" aria-labelledby="bb-appearance-title"><h2 id="bb-appearance-title">Appearance</h2>
-          <div className="bb-setting-row"><span>Duo landscape layout</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Duo landscape layout" aria-checked={duo.enabled} onClick={duo.toggle}><span /></button></div>
-          <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
-          <AmountAppearanceSettings />
-        </section>
-        <section className="bb-settings-section"><h2>Bills</h2><button type="button" className="bb-settings-action" onClick={()=>{positions.current.settings=readPageScroll().y;widgetGuideRef.current=true;setBillsOpen(true);window.dispatchEvent(new CustomEvent('bookiebot:screen-change'))}}>Manage bills &amp; subscriptions</button></section>
-        <section className="bb-settings-section"><h2>Savings transfers</h2><button type="button" className="bb-settings-action" onClick={()=>{positions.current.settings=readPageScroll().y;widgetGuideRef.current=true;setTransfersOpen(true);window.dispatchEvent(new CustomEvent("bookiebot:screen-change"))}}>Manage savings transfers</button></section>
-        <div className="bb-settings-section bb-settings-notifications"><PhoneNotifications embedded refreshActive={!configurationOpen} /></div>
-        <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} refreshActive={!configurationOpen} />
-        <section className="bb-settings-section" aria-labelledby="bb-account-title"><h2 id="bb-account-title">Account</h2>
-          <AccountIdentity ownerName={report.ownerName} active={screen === 'settings' && !configurationOpen && !widgetGuideOpen}/>
-          {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}
-          <button type="button" className="bb-settings-action bb-account-action bb-account-sign-out" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}><span>{signingOut ? "Signing out…" : "Sign out"}</span><LogOut aria-hidden="true"/></button>
-        </section>
-        {householdEnabled&&<HouseholdSettings active={screen==='settings'&&!configurationOpen&&!widgetGuideOpen}/>}
-        <section className="bb-settings-section" aria-labelledby="bb-updates-title"><h2 id="bb-updates-title">About &amp; updates</h2>
-          <div className="bb-setting-row"><span>BookieBot</span><span className="bb-app-version">{initialVersion ? `Version ${initialVersion.slice(0, 8)}` : "Web app"}</span></div>
-          {availableVersion && <button type="button" className="bb-settings-action" disabled={guard.pending || guard.uncertain} onClick={() => window.dispatchEvent(new CustomEvent("bookiebot:request-app-update"))}>Update available · Update now</button>}
-          {duo.enabled&&<DisplayReport key={owner} version={initialVersion}/>}
-        </section>
-        </>}
-      </main>
-      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={screen!=='settings'||!billsOpen}><BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen==='settings'&&billsOpen} amountRequest={billAmountRequest} onAmountConsumed={consumeBillAmount}/></main>}
-      {screen === "settings" && widgetGuideOpen && <main className="bb-shell-settings bb-main" aria-label="Widget setup">
-        <WidgetSetupGuide onBack={() => selectScreen("settings")} onPair={returnToWidgets} />
-      </main>}
+      {report && <SettingsDirectory wide={duo.landscape} active={screen === "settings"} section={settingsSection}
+        owner={owner} dark={theme === "dark"} householdEnabled={householdEnabled} blocked={settingsBlocked}
+        onSelect={section => openSettingsSection(section, true)}>
+        <main className="bb-shell-settings bb-main" aria-label="Settings" hidden={!settingsSection || widgetGuideOpen || configurationOpen}>
+          {settingsSection && !configurationOpen && <SettingsDetailHeading section={settingsSection} />}
+          <section className="bb-settings-section" aria-label="Appearance settings" hidden={settingsSection !== "appearance"}>
+            <div className="bb-setting-row"><span>Duo landscape layout</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Duo landscape layout" aria-checked={duo.enabled} onClick={() => { setSettingsSelection("appearance"); duo.toggle() }}><span /></button></div>
+            <div className="bb-setting-row"><span>Dark mode</span><button type="button" className="bb-setting-switch" role="switch" aria-label="Dark mode" aria-checked={theme === "dark"} onClick={toggleTheme}><span /></button></div>
+            <AmountAppearanceSettings />
+          </section>
+          <div className="bb-settings-section bb-settings-notifications" hidden={settingsSection !== "notifications"}>
+            <PhoneNotifications embedded refreshActive={!configurationOpen && !widgetGuideOpen} />
+          </div>
+          <div className="bb-settings-section" hidden={settingsSection !== "widgets"}>
+            <WidgetSettings ownerName={report.ownerName} defaultMode={preferences.mode} onOpenGuide={openWidgetGuide} refreshActive={!configurationOpen && !widgetGuideOpen} />
+          </div>
+          <div hidden={settingsSection !== "account"}>
+            <div className="bb-settings-profile"><SettingsInitial owner={owner} /><strong>{owner}</strong></div>
+            <section className="bb-settings-section" aria-label="Account sign-in">
+              <AccountIdentity ownerName={owner} active={screen === "settings" && settingsSection === "account"} />
+              {!reconciliationEnabled && reconciliation.error && <div className="bb-settings-note" role="status"><p>{reconciliation.error}</p><button type="button" className="bb-settings-action" disabled={reconciliation.busy} onClick={() => void reconciliation.load()}>Check bank connection</button></div>}
+              <button type="button" className="bb-settings-action bb-account-action bb-account-sign-out" disabled={signingOut} onClick={() => guard.requestAction({ kind: "signout", onProceed: signOut })}><span>{signingOut ? "Signing out…" : "Sign out"}</span><LogOut aria-hidden="true" /></button>
+            </section>
+          </div>
+          {householdEnabled && <div className="bb-settings-section" hidden={settingsSection !== "household"}>
+            <HouseholdSettings active={screen === "settings" && settingsSection === "household"} />
+          </div>}
+          <section className="bb-settings-section" aria-label="App version and updates" hidden={settingsSection !== "about"}>
+            <div className="bb-setting-row"><span>BookieBot</span><span className="bb-app-version">{initialVersion ? `Version ${initialVersion.slice(0, 8)}` : "Web app"}</span></div>
+            {availableVersion && <button type="button" className="bb-settings-action" disabled={guard.pending || guard.uncertain} onClick={() => window.dispatchEvent(new CustomEvent("bookiebot:request-app-update"))}>Update available · Update now</button>}
+            {duo.enabled && <DisplayReport key={owner} version={initialVersion} />}
+          </section>
+        </main>
+        <main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Bills" hidden={!billsOpen}>
+          <SettingsDetailHeading section="bills" />
+          <BillSettings key={report.ownerName} ownerName={report.ownerName} aliases={report.calendarLogoAliases} active={screen === "settings" && billsOpen} amountRequest={billAmountRequest} onAmountConsumed={consumeBillAmount} />
+        </main>
+        <main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Transfers" hidden={!transfersOpen}>
+          <SettingsDetailHeading section="transfers" />
+          <SavingsTransfers key={report.ownerName} ownerName={report.ownerName} active={screen === "settings" && transfersOpen} />
+        </main>
+        {screen === "settings" && widgetGuideOpen && <main className="bb-shell-settings bb-main" aria-label="Widget setup">
+          <SettingsDetailHeading section="widgets" title="Widget setup" />
+          <WidgetSetupGuide onBack={closeWidgetGuide} onPair={returnToWidgets} />
+        </main>}
+      </SettingsDirectory>}
 
       {/* top omits Konsta’s under-bar blur/gradient; CSS anchors this floating bar at the bottom. */}
       {/* Keep the viewport surface stable while resetting fold-specific contact state. */}
@@ -329,8 +393,7 @@ function ExpenseAppShellContent({ report, ownerName = "BookieBot", controls, mon
       {report && <AskBookieBotPanel open={askOpen && monthlyReady} openerRef={askTriggerRef} onClose={() => setAskOpen(false)} month={questionMonth ?? `${report.year}-${String(report.month).padStart(2, "0")}`} mode={preferences.mode} onShowSource={showSource} />}
       <AppUpdatePrompt initialVersion={initialVersion} onAvailabilityChange={setAvailableVersion} />
       <div ref={setToastTarget} />
-      {report&&<main className="bb-shell-settings bb-shell-bills bb-main" aria-label="Transfers" hidden={screen!=="settings"||!transfersOpen}><SavingsTransfers key={report.ownerName} ownerName={report.ownerName} active={screen==="settings"&&transfersOpen}/></main>}
-      <BillCheckin key={owner} owner={owner} enabled={Boolean(report)&&monthlyReady} blocked={askOpen||widgetGuideOpen||keyboardOpen||signingOut||reportBusy} onEnter={request=>{setBillAmountRequest(request);setWidgetGuideOpen(false);selectScreen('settings');setBillsOpen(true)}}/>
+      <BillCheckin key={owner} owner={owner} enabled={Boolean(report)&&monthlyReady} blocked={askOpen||widgetGuideOpen||keyboardOpen||signingOut||reportBusy} onEnter={request => { setBillAmountRequest(request); openSettingsSection("bills") }}/>
     </div>
   </AppNavigationContext.Provider>
 }

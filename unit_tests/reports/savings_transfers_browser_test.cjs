@@ -4,7 +4,7 @@ const {fixture,engines,tap}=require('./duo_layout_browser_test.cjs');
 const {press}=require('./bill_pane_fit_browser_test.cjs');
 const panel=page=>page.locator('main[aria-label="Transfers"]');
 const editor=page=>panel(page).locator('.bb-bills-editor[data-open=true]');
-async function enter(page){await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await press(page.getByRole('button',{name:'Manage savings transfers',exact:true}));await panel(page).locator('.bb-bills-row').first().waitFor()}
+async function enter(page){await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await press(page.getByRole('button',{name:'Transfers',exact:true}));await panel(page).locator('.bb-bills-row').first().waitFor()}
 async function fit(page){return editor(page).evaluate(n=>{const b=n.getBoundingClientRect(),footer=n.querySelector('.bi-step-review[aria-hidden=false] .bi-editor-footer')??n.querySelector('.bi-editor-footer');return {scroll:n.scrollHeight,client:n.clientHeight,height:b.height,footer:footer?.getBoundingClientRect().toJSON(),items:[...n.querySelectorAll('button,input,select')].filter(x=>!x.closest('[inert]')&&x.getBoundingClientRect().height>0).map(x=>{const r=x.getBoundingClientRect();return {name:x.getAttribute('aria-label')??x.textContent,inside:r.top>=b.top-1&&r.bottom<=b.bottom+1&&r.x>=b.x-1&&r.right<=b.right+1,hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest('button,input,select')===x}})}})}
 (async()=>{let count=0;for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){
  const browser=await engine.launch({headless:true});try{for(const c of [{width:320,height:740,dark:true,rail:0},{width:382,height:740,dark:false,rail:0},{width:867,height:480,dark:false,rail:0},{width:951,height:648,dark:true,rail:84}].filter(c=>!process.env.ONLY_WIDTH||c.width===Number(process.env.ONLY_WIDTH))){
@@ -21,7 +21,7 @@ async function fit(page){return editor(page).evaluate(n=>{const b=n.getBoundingC
    if(lost){lost=false;pending=body;await route.abort('failed');return}pending=null;return route.fulfill({json:result});
   }});
   try{
-   await enter(page);assert.equal(await page.locator('.bb-settings-screen-heading').innerText(),'Transfers');
+   await enter(page);assert.equal(await panel(page).locator('.bb-settings-detail-heading').innerText(),'Transfers');
    if(c.width>=800){assert(await panel(page).locator('[data-bill-id=transfer-0]').isDisabled());assert(!(await panel(page).getByRole('button',{name:'Refresh transfers',exact:true}).isDisabled()),'A read-only refresh can recheck a foreign financial claim');foreign=false;await press(panel(page).getByRole('button',{name:'Refresh transfers',exact:true}));assert(!(await panel(page).locator('[data-bill-id=transfer-0]').isDisabled()));}
    await press(panel(page).locator('[data-bill-id=transfer-0]'));await panel(page).getByRole('textbox',{name:'Amount',exact:true}).fill('175');await panel(page).getByRole('combobox',{name:'Savings goal',exact:true}).selectOption('goal-1');
    assert.equal(writes.length,0);

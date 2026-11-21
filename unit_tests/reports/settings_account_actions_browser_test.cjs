@@ -27,8 +27,8 @@ function checkRows(value){
     const {page,errors,unexpected}=await fixture(browser,width,height,dark);let mode='unlinked',starts=0;
     await page.route('**/app/account',route=>mode==='unavailable'?route.fulfill({status:503,json:{error:'Unavailable'}}):route.fulfill({json:{id:'fixture-account',name:'Brian',googleEnabled:true,google:{connected:mode==='linked',email:mode==='linked'?email:null}}}));
     await page.route('**/app/auth/google/start',route=>{assert.equal(route.request().postDataJSON().action,'link');starts++;return route.fulfill({status:503,json:{error:'Sign-in is temporarily unavailable. Try again.'}})});
-    const card=page.locator('section[aria-labelledby="bb-account-title"]');
-    const settings=async()=>{await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await card.getByRole('heading',{name:'Account',exact:true}).waitFor();};
+    const card=page.locator('section[aria-label="Account sign-in"]');
+    const settings=async()=>{await tap(page,page.getByRole('button',{name:'Settings',exact:true}));if(width<800)await tap(page,page.getByRole('button',{name:'Account',exact:true}));await card.waitFor();};
     await settings();const link=card.getByRole('button',{name:'Link Google account',exact:true}),signout=card.getByRole('button',{name:'Sign out',exact:true});
     await link.waitFor();await reveal(card);checkRows(await geometry(card));
     assert.notEqual((await geometry(card)).buttons[0].color,(await geometry(card)).buttons[1].color,'Sign out has a distinct destructive affordance');

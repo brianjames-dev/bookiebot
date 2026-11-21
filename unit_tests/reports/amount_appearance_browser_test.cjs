@@ -63,6 +63,7 @@ async function geometry(page,alignment,size,emphasis){
         else if(name==='/app/goals')value={goals:[]}
         else if(name==='/app/notifications')value={enabled:false,publicKey:'B'+'A'.repeat(86),preferences:{weekly:true,upcoming:false,showAmounts:false,hour:10}}
         else if(name==='/app/widgets/settings')value={connections:[],scriptUrl:'/app/widgets/script',setupInstructionsUrl:'/app/widgets/help'}
+        else if(name==='/app/account/changes')value={revision:0}
         else if(name==='/app/version')value={version:'amount-fixture'}
         else if(name.includes('avatar'))return route.fulfill({contentType:'image/png',body:fs.readFileSync(path.join(root,'assets/avatars/avatar7.png'))})
         else{unexpected.push(`${request.method()} ${url}`);return route.fulfill({status:404,json:{error:'Unknown fixture'}})}
@@ -75,27 +76,29 @@ async function geometry(page,alignment,size,emphasis){
       const height=await page.locator('.bb-chart-carousel-band').evaluate(node=>node.getBoundingClientRect().height)
       await page.getByRole('button',{name:'Settings',exact:true}).click()
       const settings=page.getByRole('main',{name:'Settings',exact:true})
+      await page.getByRole('button',{name:'Appearance',exact:true}).click()
       await settings.waitFor({state:'visible'})
       const toggle=settings.getByRole('switch',{name:'Raised cents',exact:true})
       assert.equal(await toggle.getAttribute('aria-checked'),'true')
       assert.ok(await toggle.evaluate(el=>{const r=el.getBoundingClientRect();return r.height>=44&&r.width>=44}))
-      assert.equal(await settings.locator('section[aria-labelledby="bb-appearance-title"]').locator('select,input').count(),0,'Appearance exposes one simple cents toggle')
+      assert.equal(await settings.locator('section[aria-label="Appearance settings"]').locator('select,input').count(),0,'Appearance exposes one simple cents toggle')
       await toggle.click()
       assert.equal(await toggle.getAttribute('aria-checked'),'false')
-      await settings.getByRole('button',{name:'Back',exact:true}).click()
+      await page.getByRole('button',{name:'Overview',exact:true}).click()
       await geometry(page,'uniform',50,55)
       assert.equal(await page.locator('.bb-chart-carousel-band').evaluate(node=>node.getBoundingClientRect().height),height,'Appearance does not resize the common graph section')
       await page.reload();await page.locator('.bb-metrics-grid').waitFor()
       assert.equal(await page.locator('.bb-metrics-grid .bb-amount-fraction').count(),0,'Full-size selection survives reload')
       await page.getByRole('button',{name:'Settings',exact:true}).click()
+      await page.getByRole('button',{name:'Appearance',exact:true}).click()
       assert.equal(await toggle.getAttribute('aria-checked'),'false')
       await toggle.focus();await page.keyboard.press('Space')
       assert.equal(await toggle.getAttribute('aria-checked'),'true')
       const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),appearanceKey)
       assert.deepEqual(saved,{version:1,raisedCents:true})
-      await settings.getByRole('button',{name:'Back',exact:true}).click()
+      await page.getByRole('button',{name:'Overview',exact:true}).click()
       await geometry(page,'raised',50,55)
-      if(width===390&&dark){await page.screenshot({path:`/private/tmp/bookiebot-amount-overview-${engine.name()}.png`});await page.getByRole('button',{name:'Settings',exact:true}).click();await settings.screenshot({path:`/private/tmp/bookiebot-amount-settings-${engine.name()}.png`})}
+      if(width===390&&dark){await page.screenshot({path:`/private/tmp/bookiebot-amount-overview-${engine.name()}.png`});await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Appearance',exact:true}).click();await settings.screenshot({path:`/private/tmp/bookiebot-amount-settings-${engine.name()}.png`})}
       long=true;await page.goto('https://bookie.test/app/expenses')
       await page.locator('.bb-metrics-grid').waitFor({state:'visible'})
       const fitted=await geometry(page,'raised',50,55)

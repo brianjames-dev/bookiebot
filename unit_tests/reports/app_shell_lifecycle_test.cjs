@@ -25,6 +25,7 @@ const win = { ...events('window'), scrollY: 0, innerHeight: 800, navigator: { on
 }
 const doc = { ...events('document'), body: {}, visibilityState: 'visible', activeElement: new Element(),
   documentElement: { dataset: {}, style: {}, scrollHeight: 6000, classList: {add(){},remove(){}} },
+  getElementById: () => null,
   querySelector: selector => selector === '.bb-shell-shared .bb-reimbursement-section' ? sharedTarget : selector === '.bb-widget-settings' ? widgetTarget : null,
 }
 const konsta = new Module(path.join(frontend, '__shell_konsta.cjs'), module)
@@ -158,7 +159,7 @@ async function main() {
   assert.equal(toolPanes.length, 1, 'Settings retains its glass surface; the portrait owns chat')
   assert.deepEqual(toolPanes.map(pane => pane.findAllByType('button').map(node => node.props['aria-label'])), [['Settings']])
   assert.equal(tree.root.findAll(node => node.type === 'button' && node.props['aria-label'] === 'Talk to BookieBot').length, 1)
-  const navigationBar = tree.root.findByType('nav')
+  const navigationBar = tree.root.findByProps({ 'aria-label': 'Main navigation' })
   assert.equal(navigationBar.children.length, 1, 'Floating navigation renders only its pane container, without an under-bar blur or gradient')
   for(const node of navigationBar.findAll(n=>n.type==='button'&&n.props['data-nav-screen'])) {
     assert.ok(node.props['aria-label'],'Icon-only tabs retain their accessible name')
@@ -218,20 +219,22 @@ async function main() {
   assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Reimbursements')
   const disclosure = tree.root.findAllByType('button').filter(visible).find(node => node.props.className === 'sr-row-main')
   await run(() => disclosure.props.onClick()); await tap(tree, 'Record received'); await fill(tree, 'Amount ($)', '37.25'); await fill(tree, 'Note', 'Payment draft')
-  await tap(tree, 'Settings'); await tap(tree, 'Notification fixture')
+  await tap(tree, 'Settings')
   assert.equal(button(tree, 'Settings').props['aria-current'], 'page')
   assert.ok(visible(tools), 'Header tools remain accessible on Settings')
   assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Settings','The top layer names the active Settings screen')
   assert.equal(tree.root.findAllByProps({className:'bb-report-brand'}).filter(visible).length,0,'Settings replaces the BookieBot brand')
   assert.ok(button(tree,'Back').props.className.includes('bb-shell-icon'),'Back shares the header tool control')
   assert.equal(text(button(tree,'Back')),'Settings','The connected capsule includes the contextual screen title')
+  await tap(tree, 'Notifications'); await tap(tree, 'Notification fixture'); await tap(tree, 'Back')
+  await tap(tree, 'Widgets')
   // Widget setup is a temporary view, not a document navigation or form reset.
   await tap(tree, 'Pair a widget'); await fill(tree, 'Widget name', 'Private widget draft')
   const widgetReadsBeforeGuide = widgetReads, financialReadsBeforeGuide = { ...reads }
   win.scrollY = 640; await tap(tree, 'Setup & widgets')
   assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 0)
   assert.ok(button(tree, 'Back to Settings')); assert.equal(button(tree, 'Pair a widget'), undefined)
-  assert.equal(tree.root.findAll(node => node.type === 'main' && !node.props.hidden).length, 1)
+  assert.equal(tree.root.findAll(node => (node.type === 'main' || node.props.role === 'main') && visible(node)).length, 1)
   win.scrollY = 310; await tap(tree, 'Back to Settings')
   assert.equal(win.scrollY, 640); assert.equal(input(tree, 'Widget name').props.value, 'Private widget draft')
   await run(() => form(tree).props.onSubmit({ preventDefault() {} }))
@@ -241,19 +244,19 @@ async function main() {
   win.scrollY = 700; await tap(tree, 'Setup & widgets'); await tap(tree, 'Settings')
   assert.equal(screen(tree), 'settings'); assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'The gear returns from setup without leaving Settings or replacing its code')
   await tap(tree, 'Setup & widgets'); assert.equal(tree.root.findAllByType('h1').filter(visible).map(text).join(''),'Widget setup'); win.scrollY = 360; await tap(tree, 'Transactions'); await tap(tree, 'Settings')
-  assert.equal(win.scrollY, 700); assert.equal(setupCode(), retainedCode, 'A tab detour returns to the original Settings position, not guide scroll')
+  assert.equal(win.scrollY, 0); await tap(tree, 'Widgets'); assert.equal(setupCode(), retainedCode, 'A tab detour returns to the directory and retains the widget code')
   await tap(tree, 'Setup & widgets'); await tap(tree, 'Get a setup code')
   assert.equal(widgetFocuses, 1); assert.equal(widgetScrolls, 1); assert.equal(win.scrollY, 480)
   assert.equal(setupCode(), retainedCode); assert.equal(widgetWrites.length, 1, 'Returning to pairing never creates another grant')
-  assert.equal(widgetReads, widgetReadsBeforeGuide); assert.deepEqual(reads, financialReadsBeforeGuide)
-  assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true)
-  assert.equal(guard.dirty, true, 'Hidden forms and pairing codes stay registered with the work guard')
   await tap(tree, 'Done')
+  assert.equal(widgetReads, widgetReadsBeforeGuide); assert.deepEqual(reads, financialReadsBeforeGuide)
+  await tap(tree, 'Back'); await tap(tree, 'Notifications'); assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true); await tap(tree, 'Back')
+  assert.equal(guard.dirty, true, 'Hidden forms and pairing codes stay registered with the work guard')
   for (const name of ['Overview', 'Transactions', 'Shared', 'Savings', 'Settings']) await tap(tree, name)
   assert.equal(reads.goals, 1); assert.equal(reads.reimbursements, 1, 'Navigating all screens never recreates financial controllers')
   assert.equal(rawReport(tree).props['data-report-instance'], initialReportInstance)
-  assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true)
-  assert.equal(tree.root.findAll(node => node.type === 'main' && !node.props.hidden).length, 1)
+  await tap(tree, 'Notifications'); assert.equal(button(tree, 'Notification fixture').props['aria-pressed'], true); await tap(tree, 'Back')
+  assert.equal(tree.root.findAll(node => (node.type === 'main' || node.props.role === 'main') && visible(node)).length, 1)
   await tap(tree, 'Back'); assert.equal(screen(tree), 'savings', 'Settings returns to the last financial screen')
   assert.equal(input(tree, 'Goal name').props.value, 'Trip draft')
 
@@ -286,23 +289,24 @@ async function main() {
 
   // Hidden financial drafts still guard Settings. Dismissed update availability remains actionable here.
   await tap(tree, 'Dismiss update notice for now'); await tap(tree, 'Settings')
-  await tap(tree, 'Update available · Update now'); assert.equal(reloads, 0); assert.ok(button(tree, 'Discard and update'))
+  await tap(tree, 'About & updates'); await tap(tree, 'Update available · Update now'); assert.equal(reloads, 0); assert.ok(button(tree, 'Discard and update'))
   await tap(tree, 'Keep editing'); assert.equal(guard.dirty, true)
-  await tap(tree, 'Sign out'); assert.equal(signouts, 0); assert.ok(button(tree, 'Discard and sign out'))
+  await tap(tree, 'Back'); await tap(tree, 'Account'); await tap(tree, 'Sign out'); assert.equal(signouts, 0); assert.ok(button(tree, 'Discard and sign out'))
   await tap(tree, 'Keep editing'); await tap(tree, 'Shared')
   pending = deferred(); await run(() => form(tree).props.onSubmit({ preventDefault() {} })); assert.equal(guard.pending, true)
-  await tap(tree, 'Settings'); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
-  await tap(tree, 'Sign out'); assert.equal(signouts, 0); assert.equal(button(tree, 'Discard and sign out'), undefined)
+  await tap(tree, 'Settings'); await tap(tree, 'About & updates'); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
+  await tap(tree, 'Back'); await tap(tree, 'Account'); await tap(tree, 'Sign out'); assert.equal(signouts, 0); assert.equal(button(tree, 'Discard and sign out'), undefined)
   await tap(tree, 'Keep editing'); await run(() => pending.reject(Error('Response lost')))
+  await tap(tree, 'Back'); await tap(tree, 'About & updates');
   assert.equal(guard.uncertain, true); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
   await tap(tree, 'Savings'); assert.equal(input(tree, 'Goal name').props.value, 'Trip draft')
   await tap(tree, 'Shared'); pending = deferred(); await tap(tree, 'Retry this record'); assert.deepEqual(writes[0], writes[1])
   await run(() => pending.resolve(response({ enabled: true, ownerKey: owner, currency: 'USD', allocations: [allocation], events: [] })))
   assert.equal(guard.uncertain, false)
-  await tap(tree, 'Settings'); await tap(tree, 'Update available · Update now'); await tap(tree, 'Discard and update')
+  await tap(tree, 'Settings'); await tap(tree, 'About & updates'); await tap(tree, 'Update available · Update now'); await tap(tree, 'Discard and update')
   assert.equal(reloads, 1); assert.equal(guard.dirty, false)
   await tap(tree, 'Savings'); assert.equal(form(tree), undefined, 'Explicit discard closes the retained new-goal form')
-  await tap(tree, 'Settings'); await tap(tree, 'Sign out'); assert.equal(signouts, 1)
+  await tap(tree, 'Settings'); await tap(tree, 'Account'); await tap(tree, 'Sign out'); assert.equal(signouts, 1)
   await run(() => tree.unmount())
 
   // Public guide return links use a single allowlisted, non-authenticating hash.
@@ -317,12 +321,12 @@ async function main() {
   await tap(tree, 'Savings'); win.scrollY = 210
   await run(() => { win.location.hash = '#settings'; win.dispatchEvent(new Event('hashchange')) })
   assert.equal(screen(tree), 'settings')
-  await tap(tree, 'Setup & widgets')
+  await tap(tree, 'Widgets'); await tap(tree, 'Setup & widgets')
   await run(() => win.dispatchEvent(new Event('hashchange')))
   assert.ok(button(tree, 'Pair a widget'), 'An explicit Settings hash returns from guide to Settings')
   await run(() => { win.location.hash = '#bbw_pair_private'; win.dispatchEvent(new Event('hashchange')) })
   assert.equal(screen(tree), 'settings', 'Unknown/credential-like fragments neither route nor authenticate')
-  await tap(tree, 'Back'); assert.equal(screen(tree), 'savings'); assert.equal(win.scrollY, 210)
+  await tap(tree, 'Back'); await tap(tree, 'Back'); assert.equal(screen(tree), 'savings'); assert.equal(win.scrollY, 210)
   assert.equal(win.location.hash, '#bbw_pair_private', 'App navigation does not rewrite browser history or fragments')
   await run(() => tree.unmount())
   win.location.hash = ''; widgetConnections = []
@@ -355,10 +359,10 @@ async function main() {
   assert.deepEqual(reads, beforeReviewReads); assert.equal(rawReport(tree).props['data-report-instance'], beforeReviewReport)
   await tap(tree, 'Reconcile'); bankRequest = deferred(); await run(() => tree.root.findByProps({'aria-label':'Refresh Reconcile'}).props.onClick())
   assert.equal(guard.pending, true, 'Bank checks participate in the real update/signout work guard')
-  await tap(tree, 'Settings'); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
+  await tap(tree, 'Settings'); await tap(tree, 'About & updates'); assert.equal(button(tree, 'Update available · Update now').props.disabled, true)
   await run(() => bankRequest.resolve(response({ enabled: true, checkedAt: '2026-09-09T20:00:00Z', items: [] })))
   bankRequest = null; assert.equal(guard.pending, false)
-  await tap(tree, 'Back'); assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 220)
+  await tap(tree, 'Back'); await tap(tree, 'Back'); assert.equal(screen(tree), 'reconcile'); assert.equal(win.scrollY, 220)
   bankEnabled = false
   await run(() => win.dispatchEvent(new Event('focus')))
   assert.equal(screen(tree), 'overview'); assert.equal(button(tree, 'Reconcile'), undefined)
@@ -396,7 +400,7 @@ async function main() {
   const initialShell = tree.root.findByType(ExpenseAppShell)
   const initialMasthead = tree.root.findByProps({className:'bb-masthead bb-shell-masthead'})
   const initialHeader = tree.root.findByProps({className:'bb-page-header bb-report-header'})
-  const initialNav = tree.root.findByType('nav')
+  const initialNav = tree.root.findByProps({ 'aria-label': 'Main navigation' })
   assert.equal(tree.root.findAllByProps({className:'bb-app-loading-sheet'}).length,0)
   assert.equal(tree.root.findAllByProps({className:'bb-app-welcome'}).length,0)
   assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,1,'Startup has one centered loading indicator')
@@ -413,7 +417,7 @@ async function main() {
   assert.equal(tree.root.findByType(ExpenseAppShell),initialShell,'Resolving an initially unknown owner keeps the same shell')
   assert.equal(tree.root.findByProps({className:'bb-masthead bb-shell-masthead'}),initialMasthead)
   assert.equal(tree.root.findByProps({className:'bb-page-header bb-report-header'}),initialHeader,'The real month/view header persists')
-  assert.equal(tree.root.findByType('nav'),initialNav,'The real navigation persists')
+  assert.equal(tree.root.findByProps({ 'aria-label': 'Main navigation' }),initialNav,'The real navigation persists')
   assert.equal(tree.root.findAllByProps({className:'bb-report-loading'}).length,0)
   const resource=load(src('reimbursement-display-state.ts')).reimbursementDisplay
   const previousResource=resource.read('Brian'),beforeRefreshes=session.refreshes

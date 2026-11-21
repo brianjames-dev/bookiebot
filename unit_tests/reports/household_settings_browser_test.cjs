@@ -17,7 +17,7 @@ async function act(page,button){await button.evaluate(el=>el.scrollIntoView({blo
    if(name.endsWith('/invite'))return route.fulfill({json:{token:'x'.repeat(43)}});
    return route.abort();
   });
-  await tap(page,page.getByRole('button',{name:'Settings',exact:true}));const card=page.getByRole('region',{name:'Household settings'});
+  await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Household',exact:true}));const card=page.getByRole('region',{name:'Household settings'});
   await card.getByRole('button',{name:'Create household',exact:true}).waitFor();const before=finances;
   await act(page,card.getByRole('button',{name:'Create household',exact:true}));await card.getByLabel('Household name',{exact:true}).fill('Our household');
   await act(page,card.getByRole('button',{name:'Review',exact:true}));await card.getByRole('heading',{name:'Review household',exact:true}).waitFor();

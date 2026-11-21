@@ -7,7 +7,7 @@ const source={id:'rent-fixture',type:'fixed',name:'Rent',amountCents:20000,caden
 const membership=(status='pending',role='payer')=>({id:'shared-rent',revision:status==='active'?2:1,status,role,payerName:role==='payer'?'Brian':'Hannah',memberName:role==='payer'?'Hannah':'Brian',state:{purchaseTotalCents:20000,payerShareCents:10000,memberShareCents:10000,receivedCents:2000,remainingCents:8000,repaymentStatus:'partial',paymentStatus:'confirmed',paymentDate:'2026-11-22',predicted:false,allocationIds:['fixture-allocation'],month:'2026-11'}});
 const open=page=>page.locator('.bb-bills-editor[data-open=true]');
 const settle=page=>page.waitForFunction(()=>![...document.querySelectorAll('.bb-bills-editor[data-open=true]')].some(el=>el.getAnimations({subtree:true}).some(a=>a.playState==='running'&&a.effect.getTiming().iterations!==Infinity)));
-async function billsPage(page){await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));await page.locator('.bb-bills-row').waitFor();}
+async function billsPage(page){await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));await page.locator('.bb-bills-row').waitFor();}
 ;(async()=>{let count=0;
  for(const engine of engines.filter(e=>!process.env.ONLY_ENGINE||e.name()===process.env.ONLY_ENGINE)){
   const browser=await engine.launch({headless:true});try{
@@ -67,13 +67,14 @@ async function billsPage(page){await tap(page,page.getByRole('button',{name:'Set
     state.empty=true;state.reject=true;
     await page.evaluate(()=>sessionStorage.setItem('bookiebot:bill-sharing:brian',JSON.stringify({billId:'shared:gone',command:{action:'stop',shareId:'gone',requestId:'fixture-rejected-sharing',reviewVersion:'old'}})));
     await page.reload();await page.locator('.bb-metrics-grid').waitFor();
-    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Manage bills & subscriptions',exact:true}));
+    await tap(page,page.getByRole('button',{name:'Settings',exact:true}));await tap(page,page.getByRole('button',{name:'Bills',exact:true}));
     await page.getByText('A bill-sharing change needs verification.',{exact:true}).waitFor();
     await tap(page,page.getByRole('button',{name:'Retry same confirmation',exact:true}));
     await page.getByText('This sharing change was not applied.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('bookiebot:bill-sharing:brian')),null);
     await tap(page,page.locator('.bb-bills-recovery').getByRole('button',{name:'Close',exact:true}));
     await tap(page,page.getByRole('button',{name:'Back',exact:true}));
+    if(width<800)await tap(page,page.getByRole('button',{name:'Account',exact:true}));
     await page.getByRole('button',{name:'Link Google account',exact:true}).waitFor();
     await tap(page,portrait);await page.getByRole('heading',{name:'Talk to BookieBot',exact:true}).waitFor();await page.waitForTimeout(500);await tap(page,page.getByRole('button',{name:'Close Talk to BookieBot',exact:true}));await page.waitForTimeout(300);
     const dialogs=[];page.on('dialog',async dialog=>{dialogs.push(dialog.type());await dialog.dismiss()});
