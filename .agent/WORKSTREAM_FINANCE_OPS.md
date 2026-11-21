@@ -1,3 +1,5 @@
+2026-11-20 Receipt icon and folded account spacing — match the checkmark to Back and restore the standard inline inset between the Savings account panel and its guide line. Manual checks are in STATUS.
+
 2026-11-20 Cross-tab presentation pass — include the saved budget source on checked Reconcile details, stack repayment status and keep the split-share actions inline. Share the toast viewport and repayment arrows with Transactions and Reimbursements. Match the folded Savings surface to native row editors. Manual checks are in STATUS.
 
 2026-11-20 Shifted split bill — resolve the payer's source range before deduplicating Transactions and keep neighboring bill rows independent. The November Water allocation's cached coordinate was repaired through the existing projected-version guard. Original bank match, workbook amounts, action lineage and cash events are preserved. Device steps are in STATUS.

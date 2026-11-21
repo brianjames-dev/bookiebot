@@ -22,6 +22,15 @@ async function checkVisibility(page, step, expectRetained = false) {
   assert.deepEqual(result.leaks, [], step + ' paints only the active editor');
 }
 
+async function inlineGuideGap(editor) {
+  return editor.evaluate(node => {
+    const expansion = node.closest('.bi-expansion');
+    const guide = getComputedStyle(expansion, '::before');
+    return node.getBoundingClientRect().left - expansion.getBoundingClientRect().left
+      - parseFloat(guide.left) - parseFloat(guide.width);
+  });
+}
+
 async function verify(browser, width, height, dark) {
   const month = new Date().toLocaleDateString('en-CA', {timeZone: 'America/Los_Angeles'}).slice(0, 7);
   const shown = {...report, year: Number(month.slice(0, 4)), month: Number(month.slice(5))};
@@ -40,6 +49,7 @@ async function verify(browser, width, height, dark) {
     const button = name => app.getByRole('button', {name, exact: typeof name === 'string'});
     await page.emulateMedia({reducedMotion: 'no-preference'});
     await button('View Emergency fund').click();
+    const goalGap = width < 800 ? await inlineGuideGap(app.locator('[data-owner="goal:goal-0"] .sg-editor')) : null;
     await button('Edit goal').click();
     await app.getByRole('textbox', {name: 'Goal name'}).fill('First draft');
     await button('View Japan trip').click();
@@ -58,6 +68,11 @@ async function verify(browser, width, height, dark) {
 
     if (width >= 800) await button('Close savings details').click();
     await button(/Ally Savings.*10,000/).click();
+    const accountEditor = app.locator('[data-owner="account:cash"] .sg-editor');
+    if (goalGap !== null) {
+      assert(goalGap > 0, 'The native goal editor leaves space beside the guide');
+      assert.equal(await inlineGuideGap(accountEditor), goalGap, 'Closed account editors match the goal inset');
+    }
     await button('Edit account').click();
     await app.locator('.si-institution-field').filter({visible: true}).click();
     await app.getByRole('searchbox', {name: 'Bank or institution'}).fill('Chase');
@@ -65,6 +80,7 @@ async function verify(browser, width, height, dark) {
     await button('Back').click();
     await app.getByRole('heading', {name: 'Edit account', exact: true}).waitFor();
     await checkVisibility(page, 'Returning from institutions to Edit account');
+    if (goalGap !== null) assert.equal(await inlineGuideGap(accountEditor), goalGap, 'Nested account screens keep the same inset');
     assert.deepEqual(errors, []);
     assert.deepEqual(unexpected, []);
   } catch (error) {
