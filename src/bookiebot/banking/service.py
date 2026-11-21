@@ -1038,25 +1038,20 @@ class BankingService:
                 )
 
         if item.matched_sheet_ref:
+            pulls = [pull for pull in scheduled_pulls if pull.occurrence_ref == item.matched_sheet_ref]
             if item.status in {"confirmed", "matched"}:
                 # A saved occurrence is already identified. A later price
                 # change must not rerank it or replace its confirmed amount.
-                pulls = [pull for pull in scheduled_pulls if pull.occurrence_ref == item.matched_sheet_ref]
-                if len(pulls) != 1:
-                    return None
-                pull = pulls[0]
-                return ActionLogCandidate(
-                    action_id=f"schedule:{pull.source_type}:{pull.occurrence_ref}", sheet_ref=pull.occurrence_ref,
-                    action_type="schedule", date=pull.pull_date, amount=abs(item.transaction.amount),
-                    label=f"{pull.name} ({pull.source_type})", confidence=item.confidence, notes="saved occurrence",
-                )
+                pulls = [replace(pull, amount=abs(item.transaction.amount), amount_recorded=True) for pull in pulls]
+            # Bills can supply both due-date and off-cycle hints for one
+            # occurrence. Reuse their existing ranking and deduplication.
             candidates = find_scheduled_pull_candidates(
                 item.transaction,
-                scheduled_pulls,
+                pulls,
                 window_days=14,
-                limit=25,
+                limit=1,
             )
-            return next((candidate for candidate in candidates if candidate.sheet_ref == item.matched_sheet_ref), None)
+            return candidates[0] if candidates else None
         return None
 
     def confirm_reconciliation_schedule_match(

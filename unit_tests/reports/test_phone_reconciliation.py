@@ -302,9 +302,9 @@ async def test_exact_confirmation_is_metadata_only_and_repeat_is_safe(client):
 
 
 @pytest.mark.asyncio
-async def test_checked_entry_displays_the_claimed_schedule_after_price_changes(client, monkeypatch):
+async def test_checked_entry_displays_the_claimed_schedule_with_off_cycle_hints_and_price_changes(client, monkeypatch):
     from bookiebot.banking.reconciliation import ScheduledPullCandidate
-    item = seed(client)
+    item = seed(client, merchant="Water")
     connect(client)
     pull = ScheduledPullCandidate("bill", "Water", 12.34, now_pacific().date(), "bill:water", amount_recorded=True)
     pulls = [pull]
@@ -316,11 +316,14 @@ async def test_checked_entry_displays_the_claimed_schedule_after_price_changes(c
         "operation": "confirm", "id": item.id, "version": before["version"], "suggestionId": before["suggestions"][0]["id"],
     })
     assert result.status == 200, await result.text()
-    pulls[:] = [replace(pull, amount=15.00), replace(pull, source_ref="bill:other", name="Other", amount=12.34)]
+    due_date = pull.pull_date + timedelta(days=1 if pull.pull_date.day == 1 else -1)
+    pulls[:] = [replace(pull, amount=150.00, pull_date=due_date), replace(pull, amount=150.00),
+                replace(pull, source_ref="bill:other", name="Other", amount=12.34)]
     checked = await details(client, item.id)
     assert checked["suggestions"] == []
     assert checked["matchedEntry"]["item"] == "Water (bill)"
     assert checked["matchedEntry"]["amountCents"] == 1234
+    assert checked["matchedEntry"]["date"] in {due_date.isoformat(), pull.pull_date.isoformat()}
     assert checked["matchedEntry"]["category"] == "Scheduled payment"
 
 
