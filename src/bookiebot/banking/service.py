@@ -956,6 +956,7 @@ class BankingService:
         *,
         actor_key: str | None,
         limit: int = 100,
+        action_log: list[LoggedAction] | None = None,
     ) -> list[ReconciliationReportMatch]:
         del owner_key
         matched_items = [
@@ -967,7 +968,7 @@ class BankingService:
         action_candidates: dict[str, ActionLogCandidate] = {}
         action_people: dict[str, str] = {}
         if actor_key and any(item.matched_action_log_id for item in matched_items):
-            for logged in read_active_logged_actions(actor_key):
+            for logged in action_log if action_log is not None else read_active_logged_actions(actor_key):
                 candidate = action_log_candidate_by_id(logged)
                 if candidate is not None:
                     label, person = _report_action_details(logged, candidate)
@@ -1037,17 +1038,25 @@ class BankingService:
                 )
 
         if item.matched_sheet_ref:
+            if item.status in {"confirmed", "matched"}:
+                # A saved occurrence is already identified. A later price
+                # change must not rerank it or replace its confirmed amount.
+                pulls = [pull for pull in scheduled_pulls if pull.occurrence_ref == item.matched_sheet_ref]
+                if len(pulls) != 1:
+                    return None
+                pull = pulls[0]
+                return ActionLogCandidate(
+                    action_id=f"schedule:{pull.source_type}:{pull.occurrence_ref}", sheet_ref=pull.occurrence_ref,
+                    action_type="schedule", date=pull.pull_date, amount=abs(item.transaction.amount),
+                    label=f"{pull.name} ({pull.source_type})", confidence=item.confidence, notes="saved occurrence",
+                )
             candidates = find_scheduled_pull_candidates(
                 item.transaction,
                 scheduled_pulls,
                 window_days=14,
                 limit=25,
             )
-            selected = next((candidate for candidate in candidates if candidate.sheet_ref == item.matched_sheet_ref), None)
-            if selected is not None and item.status in {'confirmed', 'matched'}:
-                # A later recurring-price edit must not rewrite a saved payment's amount.
-                return replace(selected, amount=abs(item.transaction.amount))
-            return selected
+            return next((candidate for candidate in candidates if candidate.sheet_ref == item.matched_sheet_ref), None)
         return None
 
     def confirm_reconciliation_schedule_match(

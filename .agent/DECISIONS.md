@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — Keep checked budget details tied to the saved reconciliation claim
+
+Resolve checked details on demand through the existing owner-scoped match report and reuse the phone's action cache. Display the saved schedule occurrence and confirmed amount even if its recurring price changes. A missing source leaves the original match checked and displays that its details are unavailable. This read does not participate in confirmation or modify the saved claim.
+
 ## 2026-11-20 — Use verified bill source positions when merging Transactions rows
 
 For a split bill on a personal budget tab, prefer the month tab's full source and amount anchors after validating the expected bill label and columns. Where the anchors are absent, use the original owner-scoped payment action only when its row contains the unique exact bill label and current cash amount. Resolve before claiming physical rows so an unrelated neighbor cannot inherit the split. A display read never writes a correction to Sheets or the reimbursement ledger.

@@ -2,14 +2,14 @@ import {ReimbursementSaveButton} from './reimbursement-feedback'
 import {ReimbursementOptions,HistoryFilter,SelectionClose,BalanceSides,ReimbursementResetFlow,useShortReimbursementPane} from "./reimbursement-tools"
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { ArrowDownLeft, ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
+import { ArrowUpRight, CheckCheck, ChevronDown, ChevronRight, Clock3 } from "lucide-react"
 import { TransactionIcon } from "./daily-transactions"
 import { transactionCategory, type DailyTransaction } from "./transaction-identity"
 import { EditorExpansion, EditorScenes } from "./transaction-editor-workspace"
 import { useAppWorkStatus } from "./app-work-guard"
 import { useReimbursementPage } from "./reimbursement-pagination"
 import { useAppNavigation } from "./app-navigation"
-import { RepaymentAllocation } from "./repayment-allocation"
+import { RepaymentAllocation, RepaymentDirectionIcon } from "./repayment-allocation"
 import { ChangeMotionContext, ChangedMoney, ChangedText } from "./transaction-value-motion"
 import { reimbursementMethod, reimbursementMotionKey, useReimbursementValueMotion } from "./reimbursement-value-motion"
 import { canReverseLedgerEvent, defaultOffsetEntries, IncomingPayment, LedgerRow, ledgerTotals, ResetEditor,
@@ -193,7 +193,7 @@ function BalanceRow({ item, selected, onSelect, disabled, selectDisabled, snapsh
   </>
   return <ChangeMotionContext.Provider value={plan}><div className="sr-row-group" data-feedback={plan ? "animating" : undefined}><button type="button" className="sr-row-main" aria-expanded={opened} aria-label={`${item.item || item.category}, ${money(item.outstandingCents)} ${item.outstandingCents ? isPayer ? "owed to you" : "you owe" : "settled"}`} disabled={selectDisabled} data-selected={opened} onClick={() => onSelect(item.id)}>
     <TransactionIcon entry={entry} aliases={aliases} eager/><span className="sr-row-copy"><strong title={entry.location || entry.item}>{entry.location || entry.item || entry.category}</strong><span><span className="sr-category" style={{ '--bb-category-color': `hsl(var(--category-${category.token},var(--muted-foreground)))` } as CSSProperties}>{category.label}</span> · {dateLabel(item.expenseDate)} · {person(isPayer ? item.partnerOwner : item.payerOwner)}</span></span>
-    <span className="sr-row-value"><strong><ChangedMoney value={money(shown.outstandingCents || shown.partnerShareCents)} motionKey={key + "remaining"}/></strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : isPayer ? <><ArrowUpRight/>Owed</> : <><ArrowDownLeft/>Due</>}</small></span><ChevronDown className="sr-row-chevron" aria-hidden="true"/>
+    <span className="sr-row-value"><strong><ChangedMoney value={money(shown.outstandingCents || shown.partnerShareCents)} motionKey={key + "remaining"}/></strong><small data-side={isPayer ? "to" : "from"} data-settled={!item.outstandingCents}>{!item.outstandingCents ? <><CheckCheck/>Settled</> : <><RepaymentDirectionIcon incoming={isPayer}/>{isPayer ? "Owed" : "Due"}</>}</small></span><ChevronDown className="sr-row-chevron" aria-hidden="true"/>
   </button><ReimbursementDetailHost wide={wide} pane={detailPane}><div className="sr-detail-host" data-open={opened} data-feedback={plan ? "animating" : undefined}><EditorExpansion open={opened} retain>
     <LedgerRow allocation={item} events={ownEvents} reversibleIds={reversibleIds} owner={snapshot.ownerKey} open={opened} onOpenChange={() => onSelect(item.id)} disabled={disabled} run={run} detailOnly detailSummary={detailSummary} compact={!wide} incomePayerCents={snapshot.splitOptions?.[item.id]?.incomePayerCents}/>
   </EditorExpansion></div></ReimbursementDetailHost>

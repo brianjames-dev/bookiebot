@@ -237,6 +237,10 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
             except (ReimbursementConflictError, ReimbursementNotFoundError, ReimbursementValidationError) as exc:
                 suggestion["sharedAmount"] = {"blocked": str(exc)}
     row["suggestions"].sort(key=lambda entry: entry["confidence"], reverse=True)
+    if item and row["status"] == "checked" and (item.matched_action_log_id or item.matched_sheet_ref):
+        matched = _matched_entry(service, owner, actor, item, fresh=fresh)
+        if matched:
+            row["matchedEntry"] = matched
     receipt = _receipt_link(owner, actor, item)
     if receipt:
         row['receipt'] = receipt
@@ -258,6 +262,25 @@ def detail(service: BankingService, owner: str, actor: str, review_id: int, *, f
     if _version(current_transaction, current_item) != _version(transaction, item):
         raise ReviewRejected("This transaction changed. Check again.")
     return row, candidates, transaction, item
+
+
+def _matched_entry(service: BankingService, owner: str, actor: str, item: ReconciliationItem,
+                   *, fresh: bool) -> dict[str, Any] | None:
+    try:
+        actions = _review_actions(service, owner, actor, fresh=fresh) if item.matched_action_log_id else []
+        matches = service.reconciliation_report_matches(owner, [item], actor_key=actor, action_log=actions)
+    except Exception:
+        # A temporarily unavailable sheet does not reopen the saved match.
+        logger.exception("Matched budget entry details unavailable")
+        return None
+    if not matches:
+        return None
+    match = matches[0]
+    if match.matched_amount is None or not match.matched_date or not match.matched_name:
+        return None
+    category = {"schedule": "Scheduled payment", "spreadsheet group": "Grouped entries"}.get(match.source_type, "Logged entry")
+    return {"item": match.matched_name[:500], "date": match.matched_date,
+            "amountCents": round(match.matched_amount * 100), "category": category}
 
 
 def _receipt_link(owner, actor, item):

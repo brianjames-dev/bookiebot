@@ -149,6 +149,10 @@
 .bi-product:is(.bb-transactions,.bb-bills,.sr-balance-first) { --bi-padding:12px; --bi-radius:14px; --bi-gap:8px; --bi-field-height:32px; --bi-tint-strength:4%; --bi-right-inset:10px; }
 .bi-product:is(.bb-transactions,.bb-bills) .bi-editor { border-radius:var(--bi-radius); padding-block:4px; }
 .bi-undo-overlay { position:fixed; z-index:80; padding-bottom:calc(110px + env(safe-area-inset-bottom)); border-radius:0; }
+.bb-app-shell[data-duo-landscape="true"] .bi-undo-overlay {
+  right:var(--bb-duo-overlay, 0px);
+  padding-bottom:calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 16px);
+}
 
 .bi-undo-popup>#bi-undo-title { flex:1; min-width:0; }
 .bi-undo-overlay[data-modal=false] { pointer-events:none;background:transparent; }
