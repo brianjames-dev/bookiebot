@@ -111,7 +111,7 @@ async function styles(editor,inputName){return editor.evaluate((el,name)=>{
      assert.equal(await panel.getByRole('button',{name:'Edit this charge / split',exact:true}).count(),0);
      await transition(page,panel.getByRole('button',{name:'Review',exact:true}),reduced,'Settings → recurring review');
      await transition(page,panel.getByRole('button',{name:'Back',exact:true}),reduced,'Recurring review → settings');
-     assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);assert(reviews.every(r=>['update','delete','amount','adopt'].includes(r.operation)));
+     assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);assert.deepEqual(reviews.map(r=>r.operation),['amount','update','end','update']);
      console.log('PASS Bills native parity',engine.name(),width,dark?'dark':'light',reduced?'reduced':'motion');cases++;
     }catch(error){await page.screenshot({path:'/private/tmp/bookiebot-bill-editor-parity-failure.png'});throw error}finally{await page.close()}
    }
