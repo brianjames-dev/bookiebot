@@ -115,13 +115,19 @@
   overflow: clip;
 }
 .bb-app-shell[data-duo-landscape=true][data-screen=settings] > .bb-shell-masthead {
+  grid-column: 1;
   grid-row: 1;
   height: var(--bb-duo-masthead);
   min-height: 0;
+  pointer-events: none;
+}
+.bb-app-shell[data-duo-landscape=true] .bb-settings-masthead-title > .bb-settings-title-pane {
+  pointer-events: auto;
 }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-workspace {
   display: grid;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 1 / -1;
   grid-template-columns: minmax(0, var(--bb-settings-sidebar-width)) 1px minmax(0, 1fr);
   min-height: 0;
   width: 100%;
@@ -134,7 +140,8 @@
   scrollbar-color: hsl(var(--border)) transparent;
 }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-sidebar {
-  padding: 7px clamp(14px, 2.7vw, 26px) 16px var(--bb-duo-inset);
+  padding: calc(var(--bb-duo-masthead) + 7px) clamp(14px, 2.7vw, 26px) 16px var(--bb-duo-inset);
+  scroll-padding-block-start: var(--bb-duo-masthead);
   background: color-mix(in srgb, hsl(var(--card)) 50%, hsl(var(--background)));
 }
 .bb-settings-divider {
@@ -168,6 +175,7 @@
 .bb-settings-divider:focus-visible::after { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-detail {
   --bb-settings-dock-clearance: calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 10px);
+  margin-block-start: var(--bb-duo-masthead);
   padding: 14px var(--bb-duo-right-inset) var(--bb-settings-dock-clearance) clamp(16px, 3.6vw, 35px);
 }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-detail > .bb-shell-settings { gap: 14px; width: 100%; }
