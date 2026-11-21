@@ -184,6 +184,7 @@
 .ss-parent-item{position:relative;min-width:0;border-bottom:1px solid hsl(var(--border))}
 .ss-parent-item>.sa-account-row{border-bottom:0}
 .ss-parent-item .sg-editor.bi-editor{margin:0 0 12px}
+.sw-root[data-wide=false] .ss-parent-item[data-owner^="account:"] .sg-editor.bi-editor{margin-inline-start:var(--bi-surface-start,28px)}
 .ss-parent-item>.bi-expansion .sg-editor-host{min-width:0}
 .ss-summary-editor{margin-bottom:18px}
 .ss-summary-editor .sg-editor.bi-editor{margin-left:0}

@@ -64,6 +64,7 @@
 .bb-reconcile-receipt .rp-payment-summary > div:nth-child(odd) { text-align:left; }
 .bb-reconcile-receipt .bb-reconcile-native-actions { flex-wrap:nowrap; gap:8px; }
 .bb-reconcile-receipt .bb-reconcile-native-actions > button { white-space:nowrap; }
+.bb-reconcile-receipt .bb-reconcile-native-actions > .bi-primary > svg { width:14px; height:14px; flex:none; }
 .bb-reconcile[data-wide=true] .bb-reconcile-receipt .rp-purchase { padding-inline-end:48px; }
 .bb-reconcile-share-review { margin: 16px 0; display: grid; gap: 14px; }
 .bb-reconcile-share-review > div { display: grid; gap: 4px; }

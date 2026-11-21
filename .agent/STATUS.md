@@ -1,5 +1,13 @@
 # Agent Status
 
+## Receipt icon and folded account spacing (2026-11-20)
+
+The Reconcile receipt checkmark matches the 14px Back arrow. Folded Savings account editors reuse the inline inset so the guide line sits outside the raised panel throughout the account flow.
+
+The icon-size and guide-gap regressions failed against the previous bundle and passed in Chromium and WebKit with the fix. The local suite passed 3,570 tests (918 optional PostgreSQL skips). Frontend and Python type checks and the production asset build passed.
+
+Manual check. Open a shared match in Reconcile and compare the two footer icons. Fold the DUO, expand a Savings account, then open Edit account and the institution picker. The gap between the guide and card should stay consistent.
+
 ## Reconcile, Savings and repayment presentation (2026-11-20)
 
 Checked Reconcile details resolve the saved budget entry through the existing match report. The comparison card shows the entry name, date, and amount, with the repayment pill below match status. The split-share summary uses Back and Mark as received on one row. The latter opens the existing receipt confirmation.
@@ -657,6 +665,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of the receipt icon size and guide spacing in folded Savings accounts.
 
 Native acceptance of the matched budget card, compact editor treatments, and centered Undo in both DUO poses. See the presentation entry above.
 

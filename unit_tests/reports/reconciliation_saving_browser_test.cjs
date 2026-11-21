@@ -441,7 +441,9 @@ async function verifyDesktopAndReceiptRefresh(browser) {
       await mark.waitFor()
       const [left, right] = await Promise.all([back.boundingBox(), mark.boundingBox()])
       assert(left.x < right.x && Math.abs(left.y - right.y) < 1, 'Back and Mark as received share one row')
-      assert.equal(await mark.locator('.lucide-check').count(), 1)
+      const [arrow, check] = await Promise.all([back.locator('svg').boundingBox(), mark.locator('.lucide-check').boundingBox()])
+      assert.equal(check.width, arrow.width, 'The receipt checkmark matches the Back arrow size')
+      assert.equal(check.height, arrow.height)
     }
     await checkReceiptButtons(receiptActions)
     assert.equal(await receipt.getByRole('button', { name: 'Confirm received record' }).count(), 0)
