@@ -151,6 +151,46 @@ def validate_named_anchors(names: dict[str, Any], sheet_id: int, full: str,
             raise ProjectionConflictError("An expense cell is no longer attached to its linked row. Review it before syncing.")
 
 
+def personal_bill_source_row(allocation: dict[str, Any], rows: list[list[str]], metadata: dict[str, Any],
+                             *, logged_row: int | None = None) -> int | None:
+    """Locate a personal bill using the existing anchors or a verified legacy action."""
+    fields = allocation.get("sourceColumnMap", {})
+    expected = allocation.get("sourceValues", {})
+    if (allocation["sourceWorksheet"] != "income" or allocation["accounting"] != "cash_v1"
+            or not expected.get("item") or not {"item", "amount"} <= fields.keys()):
+        return None
+    first, last = min(fields.values()), max(fields.values())
+    full = _name("source", allocation["id"])
+    cells = SheetsProjection._source_anchors(allocation)
+    names = {value["name"]: value for value in metadata.get("namedRanges", [])}
+    if full in names or any(name in names for name in cells.values()):
+        sheet_id = next((sheet["properties"]["sheetId"] for sheet in metadata.get("sheets", [])
+                         if sheet["properties"]["title"] == allocation["sourceSheetTitle"]), None)
+        if sheet_id is None:
+            return None
+        try:
+            validate_named_anchors(names, sheet_id, full, fields, cells)
+        except ProjectionConflictError:
+            return None
+        row = names[full]["range"].get("startRowIndex", 0) + 1
+        if 0 < row <= len(rows) and _identity_matches(rows[row - 1][first - 1:last], fields, expected):
+            return row
+        return None
+
+    if logged_row is None:
+        return None
+    matches = []
+    for row, values in enumerate(rows, 1):
+        if len(values) < fields["amount"] or not _identity_matches(values[first - 1:last], fields, expected):
+            continue
+        try:
+            if _cents(values[fields["amount"] - 1]) == allocation["grossCents"] - allocation["settledCents"]:
+                matches.append(row)
+        except ProjectionConflictError:
+            continue
+    return logged_row if matches == [logged_row] else None
+
+
 class SheetsProjection:
     def __init__(self, client: Any):
         self.client = client

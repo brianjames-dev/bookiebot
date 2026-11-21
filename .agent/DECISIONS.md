@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-20 — Use verified bill source positions when merging Transactions rows
+
+For a split bill on a personal budget tab, prefer the month tab's full source and amount anchors after validating the expected bill label and columns. Where the anchors are absent, use the original owner-scoped payment action only when its row contains the unique exact bill label and current cash amount. Resolve before claiming physical rows so an unrelated neighbor cannot inherit the split. A display read never writes a correction to Sheets or the reimbursement ledger.
+
 ## 2026-11-20 — Share receipt acknowledgements across the expense app
 
 The matched receipt request returns the saved canonical ledger before Sheets projection. The existing recovery path reads the durable pending projection and the Undo path may queue against the returned financial state. The owner-scoped app ledger shares accepted snapshots and presentation-only inverse state with both editors. Use the shell-level Reimbursements toast for the acknowledgement so the countdown survives switching screens. Superseded reads cannot roll back either a save or a local inverse.

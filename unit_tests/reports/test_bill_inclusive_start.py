@@ -46,7 +46,7 @@ def transactions(saved, monkeypatch, month='2026-11', as_of=datetime(2026,11,13,
     monkeypatch.setattr(tx, 'get_budget_spreadsheet_id_for_user', lambda *args: 'personal')
     monkeypatch.setattr(tx, 'get_shared_expenses_spreadsheet_id', lambda *args: 'shared')
     monkeypatch.setattr(tx.shared, 'enabled', lambda: False)
-    monkeypatch.setattr(tx, 'read_workbook_tabs', lambda client, book, titles:
+    monkeypatch.setattr(tx, 'read_workbook_tabs', lambda client, book, titles, **kwargs:
         {title:deepcopy(saved.client.http_client.rows[title]) for title in titles if title in saved.client.http_client.rows}
         if book == 'personal' else {title:[] for title in titles if not title.startswith('_')})
     return tx.load_transactions(B, month, fresh=True)

@@ -99,7 +99,7 @@ def test_transactions_transition_at_pacific_midnight_with_same_source_and_no_wri
     history = [undo._LOG_HEADERS, ["original-bill", "2026-11-01T12:00:00-08:00", B, "active", "", json.dumps(asdict(action))]] if logged else []
     snapshot = deepcopy([personal, history])
     requests = []
-    def read(_client, book, titles):
+    def read(_client, book, titles, *, metadata_out=None):
         requests.append((book, titles))
         return ({"November": personal, "_BookieBot Bill Schedule": schedule()}
                 if book == "personal" else {"November": [], "_BookieBot Action Log - 2026-11": history})

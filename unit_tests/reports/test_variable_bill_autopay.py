@@ -13,8 +13,8 @@ from unit_tests.reimbursements.test_store import access as access, payment
 @pytest.mark.parametrize('native', [False, True])
 def test_invoice_and_early_reimbursement_stay_scheduled_until_saved_autopay(bill, monkeypatch, native):
     read = tx.read_workbook_tabs
-    def workbook(*args):
-        tables = deepcopy(read(*args))
+    def workbook(*args, **kwargs):
+        tables = deepcopy(read(*args, **kwargs))
         if 'November' in tables and '_BookieBot Bill Schedule' in tables:
             tables['_BookieBot Bill Schedule'][1][3] = '22'
         return tables

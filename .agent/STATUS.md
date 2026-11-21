@@ -1,5 +1,13 @@
 # Agent Status
 
+## Shifted split bill in Transactions (2026-11-20)
+
+Transactions now resolves the original payer's split bill against its verified workbook named ranges before merging ledger and workbook rows. For an unanchored legacy row, require the owner's recorded payment action and a single exact bill and cash match. Preserve unrelated payments with the same amount.
+
+The production Water allocation's cached source position was corrected from November row 21 to the verified row 22. The $97.96 gross amount, $63.41 budget amount, $34.55 reimbursement, and financial version were verified before and after the metadata repair. Focused bill and reimbursement regressions, 3,569 local tests (918 optional PostgreSQL skips), and Python type checks pass. The task PR tracks CI and release verification.
+
+Manual check. Open Transactions for November 2026 and expand November 18. Expect three entries totaling $231.64, including one Water charge for $63.41. In Reconcile, the $97.96 City of Santa Rosa charge still matches the original Water entry. Check its share to see the existing $34.55 reimbursement.
+
 ## Reconcile payment feedback across tabs (2026-11-20)
 
 Confirming a receipt from a matched share returns the canonical saved payment immediately and leaves its durable sheet projection to existing recovery. Transactions and Reimbursements use the same owner-scoped state. The shell keeps one timed reimbursement Undo toast available when switching tabs or folding. Applying Undo repaints both tabs while the request is pending. Stale display reads cannot replace a newer save or an in-flight inverse.
@@ -637,6 +645,8 @@ All eight September 6 audit batches are implemented and verified locally. Each b
 
 
 ## On Deck
+
+Native acceptance of the November 18 Water row, daily total, and original bank match. See the shifted split bill entry above.
 
 Native acceptance of the shared Reconcile receipt and Undo feedback. See the first entry and docs/RECONCILIATION.md.
 

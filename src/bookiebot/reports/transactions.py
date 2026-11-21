@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import calendar
 from contextlib import contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import date, datetime, timezone
 from functools import lru_cache
 import hashlib
@@ -18,6 +18,7 @@ from bookiebot.reports.app_access import PostgresAppAccessStore, build_app_acces
 from bookiebot.reports.phone_history import parse_phone_report_month
 from bookiebot.reports.worksheet_reads import read_workbook_tabs
 from bookiebot.reports.transaction_repayments import accounted_amount, attach_repayment, purchase_context, repayment_details, display_rows, receipt_addresses
+from bookiebot.reimbursements.projection import personal_bill_source_row
 from bookiebot.reimbursements import service as shared
 from bookiebot.sheets import undo
 from bookiebot.sheets.auth import get_gspread_client
@@ -222,6 +223,34 @@ def _manual_actions(actor: str, month: str, expenses: list[list[str]], personal:
                         new_values=[cell(personal,row,col+3)], metadata={"type":"savings", "category":"monthly savings"}, description="Cash savings"))
 
 
+def _bill_source_positions(allocations: list[dict[str, Any]], history: list[undo.LoggedAction],
+                           personal_rows: list[list[str]], metadata: dict[str, Any], *,
+                           owner: str, workbook: str, year: int, title: str) -> dict[str, int]:
+    actions = {entry.id: entry.action for entry in history}
+    positions = {}
+    for value in allocations:
+        if (value["payerOwner"] != owner or value["sourceYear"] != year or value["sourceSheetTitle"] != title
+                or value["sourceWorksheet"] != "income" or value.get("sourceSpreadsheetId") != workbook):
+            continue
+        source = actions.get(value["sourceActionId"])
+        logged_row = (source.row if source and source.worksheet == "income" and undo._transaction_type(source) == "payment"
+                      and undo._fixed_budget_target_matches(None, source, values=personal_rows) else None)
+        row = personal_bill_source_row(value, personal_rows, metadata, logged_row=logged_row)
+        if row is not None:
+            positions[value["id"]] = row
+    return positions
+
+
+def _at_bill_source(value: dict[str, Any], action: undo.UndoAction) -> bool:
+    # Only a bill with the expected label and amount column can claim the row.
+    # Other personal entries (including income) may reuse a shifted coordinate.
+    label = value.get("sourceValues", {}).get("item")
+    if not label or value["sourceWorksheet"] != "income":
+        return True
+    return (action.metadata.get("type") == "payment" and action.metadata.get("exact_source_label") == label
+            and value["sourceColumnMap"].get("amount") in action.columns)
+
+
 def _subscription_rows(actor: str, month: str, rows: list[list[str]], *, as_of: date) -> list[dict[str, Any]]:
     """Read scheduled charge occurrences without creating editable sheet sources."""
     from bookiebot.reports.expense_breakdown import (
@@ -320,7 +349,9 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
             numbers = [p.month for p in periods] if periods else list(range(1, (now_pacific().month if year == now_pacific().year else 12) + 1))
             titles = [calendar.month_name[number] for number in numbers]
             logs = [f"_BookieBot Action Log - {year:04d}-{number:02d}" for number in numbers]
-            personal = read_workbook_tabs(client, get_budget_spreadsheet_id_for_user(actor, year), [*titles, "_BookieBot Bill Schedule", "Subscriptions", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges", transfer_ledger.TRANSFER_TAB])
+            workbook = get_budget_spreadsheet_id_for_user(actor, year)
+            metadata: dict[str, Any] = {}
+            personal = read_workbook_tabs(client, workbook, [*titles, "_BookieBot Bill Schedule", "Subscriptions", "_BookieBot Subscription Schedule", "_BookieBot Bill Charges", transfer_ledger.TRANSFER_TAB], metadata_out=metadata)
             if transfer_plans is None and (year, max(numbers,default=1)) >= (transfer_ledger.TRANSFER_EPOCH.year, transfer_ledger.TRANSFER_EPOCH.month):
                 transfer_plans = (transfer_ledger.decode(personal.get(transfer_ledger.TRANSFER_TAB, []))
                     if year == transfer_ledger.TRANSFER_STORAGE_YEAR else transfer_ledger.read_all(actor,client=client,today=as_of))
@@ -350,18 +381,28 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
                 active = undo._dedupe_actions_by_lineage(undo.canonical_logged_actions([
                     entry for entry in history if entry.status == "active" and entry.action.metadata.get("type") not in {"system_state", "delete"}
                 ], history=history), history)
+                positions = _bill_source_positions(allocations, history, personal[title], metadata,
+                                                   owner=owner, workbook=workbook, year=year, title=title)
+                manual_actions = list(_manual_actions(actor, period, shared_rows[title], personal[title], bills))
+                manual_bills = {entry.action.row: entry.action for entry in manual_actions
+                                if entry.action.worksheet == "income" and entry.action.metadata.get("type") == "payment"}
                 occupied = set()
-                for logged, manual in [(entry, False) for entry in active] + [(entry, True) for entry in _manual_actions(actor, period, shared_rows[title], personal[title], bills)]:
+                for logged, manual in [(entry, False) for entry in active] + [(entry, True) for entry in manual_actions]:
                     a = logged.action
+                    allocation_id = a.metadata.get("allocation_id", "")
+                    if allocation_id in positions:
+                        a = replace(a, row=positions[allocation_id])
+                        logged = replace(logged, action=a)
                     if manual:
                         managed = [value for value in allocations if value["payerOwner"] == owner and value["sourceYear"] == year
                                    and value["sourceSheetTitle"] == title and value["sourceWorksheet"] == a.worksheet
-                                   and value["sourceRow"] == a.row and (a.worksheet != "expense" or value["category"] == a.metadata.get("category"))]
+                                   and positions.get(value["id"], value["sourceRow"]) == a.row and _at_bill_source(value, a)
+                                   and (a.worksheet != "expense" or value["category"] == a.metadata.get("category"))]
                         if len(managed) > 1:
                             raise RuntimeError("Ambiguous managed transaction source")
                         if managed:
                             logged.id = managed[0]["sourceActionId"]
-                            overlaid = undo._allocation_action(logged, managed[0])
+                            overlaid = undo._allocation_action(logged, {**managed[0], "sourceRow": a.row})
                             if overlaid is None:
                                 continue
                             logged, a = overlaid, overlaid.action
@@ -373,6 +414,11 @@ def load_transactions(actor: str, month: str, *, fresh: bool = False, include_sc
                                         or _normalized_label(value.get("partnerSourceLabel") or value["category"]) == _normalized_label(a.metadata.get("category", ""))) for value in allocations):
                                 a.metadata["linked_repayment"] = "true"
                     address = (a.worksheet, a.row, a.metadata.get("category", "") if a.worksheet == "expense" else "")
+                    canonical_bill = allocation_by_id.get(allocation_id) if a.worksheet == "income" else None
+                    if (canonical_bill and canonical_bill.get("sourceValues", {}).get("item")
+                            and (a.row not in manual_bills or not _at_bill_source(canonical_bill, manual_bills[a.row]))):
+                        # An unresolved stale coordinate cannot suppress another entry.
+                        address = (a.worksheet, a.row, logged.id)
                     if address in occupied:
                         continue
                     rows = shared_rows[title] if a.worksheet == "expense" else personal[title]
