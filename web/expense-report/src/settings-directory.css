@@ -6,20 +6,6 @@
   min-width: 0;
   margin-inline: auto;
 }
-.bb-page[data-screen=settings] > .bb-shell-masthead::before {
-  content: "";
-  position: fixed;
-  z-index: 55;
-  pointer-events: none;
-  inset: 0 0 auto;
-  height: calc(max(18px, env(safe-area-inset-top, 0px)) + 54px);
-  background: hsl(var(--background) / .95);
-  border-bottom: 1px solid hsl(var(--border) / .45);
-}
-.bb-page[data-screen=settings][data-duo-landscape=true] > .bb-shell-masthead::before {
-  right: var(--bb-duo-overlay);
-  height: var(--bb-duo-masthead);
-}
 .bb-settings-index { display: grid; gap: 16px; padding-block: 10px; }
 .bb-settings-index-group { min-width: 0; }
 .bb-settings-index-group h2 {
@@ -118,8 +104,7 @@
 .bb-settings-detail .bb-setting-row + .bb-setting-row { border-top: 1px solid var(--bb-settings-rule); }
 .bb-settings-detail .bb-settings-section :is(.bb-widget-heading, [aria-label="Household settings"]) > h2 { display: none; }
 .bb-settings-detail .bb-notification-embedded-state h2 { display: none; }
-.bb-settings-detail .bb-notification-embedded-state { justify-content: flex-end; }
-.bb-settings-detail .bb-widget-heading:empty, .bb-settings-detail .bb-widget-heading:not(:has(button)) { display: none; }
+.bb-settings-detail .bb-widget-heading { display: none; }
 .bb-settings-detail .bb-setting-row > .bb-app-version { text-align: end; }
 
 .bb-page[data-duo-landscape=true][data-screen=settings] {
@@ -130,13 +115,19 @@
   overflow: clip;
 }
 .bb-app-shell[data-duo-landscape=true][data-screen=settings] > .bb-shell-masthead {
+  grid-column: 1;
   grid-row: 1;
   height: var(--bb-duo-masthead);
   min-height: 0;
+  pointer-events: none;
+}
+.bb-app-shell[data-duo-landscape=true] .bb-settings-masthead-title > .bb-settings-title-pane {
+  pointer-events: auto;
 }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-workspace {
   display: grid;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 1 / -1;
   grid-template-columns: minmax(0, var(--bb-settings-sidebar-width)) 1px minmax(0, 1fr);
   min-height: 0;
   width: 100%;
@@ -149,7 +140,8 @@
   scrollbar-color: hsl(var(--border)) transparent;
 }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-sidebar {
-  padding: 7px clamp(14px, 2.7vw, 26px) 16px var(--bb-duo-inset);
+  padding: calc(var(--bb-duo-masthead) + 7px) clamp(14px, 2.7vw, 26px) 16px var(--bb-duo-inset);
+  scroll-padding-block-start: var(--bb-duo-masthead);
   background: color-mix(in srgb, hsl(var(--card)) 50%, hsl(var(--background)));
 }
 .bb-settings-divider {
@@ -183,6 +175,7 @@
 .bb-settings-divider:focus-visible::after { outline: 2px solid hsl(var(--primary)); outline-offset: 2px; }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-detail {
   --bb-settings-dock-clearance: calc(var(--bb-duo-nav-height) + var(--bb-duo-nav-bottom) + 10px);
+  margin-block-start: var(--bb-duo-masthead);
   padding: 14px var(--bb-duo-right-inset) var(--bb-settings-dock-clearance) clamp(16px, 3.6vw, 35px);
 }
 .bb-app-shell[data-duo-landscape=true] .bb-settings-detail > .bb-shell-settings { gap: 14px; width: 100%; }
@@ -197,25 +190,3 @@
 .bb-app-shell:not([data-duo-landscape=true])[data-screen=settings] > .bb-shell-masthead {
   min-height: calc(max(18px, env(safe-area-inset-top, 0px)) + 62px);
 }
-/* The schedule list is a category detail. Opening a row gives its existing
-   list and editor both panes, without remounting either controller. */
-.bb-app-shell[data-duo-landscape=true] .bb-settings-detail:has(> .bb-shell-bills:not([hidden])) { overflow: hidden; }
-.bb-app-shell[data-duo-landscape=true] .bb-settings-detail > .bb-shell-bills {
-  grid-template-rows: auto minmax(0, 1fr);
-  height: 100%;
-  min-height: 0;
-}
-.bb-app-shell[data-duo-landscape=true] .bb-shell-bills:not(:has(.bb-bill-editor-workspace[data-present=true])) .bb-bills {
-  grid-template-columns: minmax(0, 1fr);
-}
-.bb-app-shell[data-duo-landscape=true] .bb-shell-bills:not(:has(.bb-bill-editor-workspace[data-present=true])) :is(.bb-bills-list, .bb-bills-notices) { margin: 0; }
-.bb-app-shell[data-duo-landscape=true] .bb-shell-bills .bb-bill-editor-workspace[data-present=false] { display: none; }
-.bb-app-shell[data-duo-landscape=true] .bb-settings-workspace:has(.bb-shell-bills:not([hidden]) .bb-bill-editor-workspace[data-present=true]) > :is(.bb-settings-sidebar, .bb-settings-divider) { display: none; }
-.bb-app-shell[data-duo-landscape=true] .bb-settings-detail:has(.bb-shell-bills:not([hidden]) .bb-bill-editor-workspace[data-present=true]) {
-  grid-column: 1 / -1;
-  padding: 0;
-}
-.bb-app-shell[data-duo-landscape=true] .bb-shell-bills:has(.bb-bill-editor-workspace[data-present=true]) {
-  grid-template-rows: minmax(0, 1fr);
-}
-.bb-app-shell[data-duo-landscape=true] .bb-shell-bills:has(.bb-bill-editor-workspace[data-present=true]) > .bb-settings-detail-heading { display: none; }

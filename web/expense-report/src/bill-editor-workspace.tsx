@@ -1,60 +1,45 @@
-import {useLayoutEffect,useRef,useState,type ReactNode} from 'react'
-import {EditorExpansion} from './transaction-editor-workspace'
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { EditorExpansion } from "./transaction-editor-workspace"
 
-// Preserve presentation positions and one material through pane handoffs.
-export const billSelectionMotion={duration:440,easing:'cubic-bezier(.2,.8,.25,1)'}
-type Entry={id:string;order:number;isNew:boolean;node:ReactNode}
-type Props={billId:string;open:boolean;order:number;isNew:boolean;wide:boolean;locked:boolean;children:ReactNode;onClosed?:()=>void;onAnchorsChange?:(ids:string[])=>void;editorLabel?:string;emptyText?:string}
-
-function BillEditorEntry({entry,open,wide,locked,onClosed,editorLabel}:{entry:Entry;open:boolean;wide:boolean;locked:boolean;onClosed:()=>void;editorLabel:string}){
- const element=useRef<HTMLElement>(null),latest=useRef({open,onClosed}),motion=useRef<Animation|null>(null)
- const [ready,setReady]=useState(wide)
- const state=useRef({initialized:false,wide,open,generation:0})
- latest.current={open,onClosed}
- useLayoutEffect(()=>{if(open)setReady(true)},[open])
- useLayoutEffect(()=>{
-  const node=element.current!,s=state.current,generation=++s.generation,transform=getComputedStyle(node).transform
-  motion.current?.cancel();motion.current=null
-  const changed=s.initialized&&s.open!==open,newVisit=!s.initialized
-  const folded=s.initialized&&s.wide!==wide;s.initialized=true;s.open=open;s.wide=wide
-  const settle=()=>{node.dataset.billMoving='false';if(!open&&wide){node.style.visibility='hidden';latest.current.onClosed()}else{node.style.visibility='visible';node.style.transform='none'}}
-  if(!wide||folded||matchMedia('(prefers-reduced-motion: reduce)').matches||(!changed&&!newVisit)){settle();return}
-  node.dataset.billMoving='true'
-  node.style.visibility='visible'
-  const viewport=node.parentElement!,incoming=viewport.querySelector<HTMLElement>('[data-bill-slot][data-open=true]')
-  // A returning pane can be entering from the left. Its outgoing neighbour
-  // must then exit right, so their edges stay together throughout a reversal.
-  const backward=incoming&&incoming.getBoundingClientRect().left<viewport.getBoundingClientRect().left-.5
-  const from=newVisit?'translateX(100%)':transform,to=open?'translateX(0%)':`translateX(${backward?100:-100}%)`
-  const animation=node.animate([{transform:from},{transform:to}],{...billSelectionMotion,fill:'both'})
-  motion.current=animation
-  animation.finished.then(()=>{if(s.generation!==generation)return;node.style.transform=to;animation.cancel();motion.current=null;settle()}).catch(()=>{})
-  // React runs cleanup before the next layout effect. Commit the current
-  // presentation before cancelling, so reversals do not restart at zero.
-  return()=>{++s.generation;node.style.transform=getComputedStyle(node).transform;animation.cancel()}
- },[open,wide])
- useLayoutEffect(()=>{const media=matchMedia('(prefers-reduced-motion: reduce)'),settle=()=>{if(!media.matches)return;motion.current?.cancel();motion.current=null;const node=element.current;if(node){node.dataset.billMoving='false';node.style.visibility=latest.current.open?'visible':'hidden';if(latest.current.open)node.style.transform='none'}if(!latest.current.open)latest.current.onClosed()};media.addEventListener('change',settle);return()=>media.removeEventListener('change',settle)},[])
- return <section ref={element} className="bb-bills-editor" aria-label={editorLabel} aria-hidden={!open} data-bill-slot={entry.id} data-new={entry.isNew} data-open={open} data-present="true" inert={!open||locked} style={{order:entry.order}}>
-  <EditorExpansion open={wide||open&&ready} onCollapsed={()=>{if(!latest.current.open)latest.current.onClosed()}}>{entry.node}</EditorExpansion>
- </section>
+type Entry = { id: string; order: number; isNew: boolean; node: ReactNode }
+type Props = {
+  billId: string; open: boolean; order: number; isNew: boolean; locked: boolean; children: ReactNode
+  onClosed?: () => void; onAnchorsChange?: (ids: string[]) => void; editorLabel?: string
 }
 
-/** Keep each live editor mounted through folding; retain outgoing row content
- * until its simultaneous collapse or eased pane motion finishes. */
-export function BillEditorWorkspace({billId,open,order,isNew,wide,locked,children,onClosed,onAnchorsChange,emptyText='Choose a bill to manage it.',editorLabel='Bill editor'}:Props){
- const records=useRef(new Map<string,Entry>()),active=useRef<string|null>(null),previousWide=useRef(wide),root=useRef<HTMLDivElement>(null)
- const [,redraw]=useState(0)
- active.current=open?billId:null
- if(open)records.current.set(billId,{id:billId,order,isNew,node:children})
- const remove=(id:string)=>{if(active.current===id)return;if(records.current.delete(id)){redraw(v=>v+1);if(!records.current.size)onClosed?.()}}
- useLayoutEffect(()=>{
-  if(previousWide.current!==wide){previousWide.current=wide;let removed=false;for(const id of records.current.keys())if(id!==active.current){records.current.delete(id);removed=true}if(removed){redraw(v=>v+1);if(!records.current.size)onClosed?.()}}
-  const list=root.current?.closest('.bb-bills')
-  for(const row of list?.querySelectorAll<HTMLElement>('.bb-bills-row[data-bill-id]')??[])row.dataset.editorAnchor=String(records.current.has(row.dataset.billId!))
-  onAnchorsChange?.([...records.current.keys()])
- })
- return <div className="bb-bill-editor-workspace" ref={root} data-present={records.current.size>0}>
-  {[...records.current.values()].map(entry=><BillEditorEntry key={entry.id} entry={entry} open={open&&entry.id===billId} wide={wide} locked={locked} editorLabel={editorLabel} onClosed={()=>remove(entry.id)}/>)}
-  {!records.current.size&&<section className="bb-bills-editor bb-bills-editor-empty" aria-label={editorLabel} data-open="false"><p className="bb-bills-empty">{emptyText}</p></section>}
- </div>
+function BillEditorEntry({ entry, open, locked, onClosed, editorLabel }: {
+  entry: Entry; open: boolean; locked: boolean; onClosed: () => void; editorLabel: string
+}) {
+  const [ready, setReady] = useState(false)
+  useLayoutEffect(() => { if (open) setReady(true) }, [open])
+
+  return <section className="bb-bills-editor" aria-label={editorLabel} aria-hidden={!open}
+    data-bill-slot={entry.id} data-new={entry.isNew} data-open={open} inert={!open || locked} style={{ order: entry.order }}>
+    <EditorExpansion open={open && ready} onCollapsed={onClosed}>{entry.node}</EditorExpansion>
+  </section>
+}
+
+/** Retain each outgoing row through its collapse, including concurrent opens. */
+export function BillEditorWorkspace({ billId, open, order, isNew, locked, children, onClosed, onAnchorsChange, editorLabel = "Bill editor" }: Props) {
+  const records = useRef(new Map<string, Entry>()), active = useRef<string | null>(null), root = useRef<HTMLDivElement>(null)
+  const [, redraw] = useState(0)
+  active.current = open ? billId : null
+  if (open) records.current.set(billId, { id: billId, order, isNew, node: children })
+
+  const remove = (id: string) => {
+    if (active.current === id || !records.current.delete(id)) return
+    redraw(value => value + 1)
+    if (!records.current.size) onClosed?.()
+  }
+  useLayoutEffect(() => {
+    const list = root.current?.closest(".bb-bills")
+    for (const row of list?.querySelectorAll<HTMLElement>(".bb-bills-row[data-bill-id]") ?? []) {
+      row.dataset.editorAnchor = String(records.current.has(row.dataset.billId!))
+    }
+    onAnchorsChange?.([...records.current.keys()])
+  })
+  return <div className="bb-bill-editor-workspace" ref={root}>
+    {[...records.current.values()].map(entry => <BillEditorEntry key={entry.id} entry={entry}
+      open={open && entry.id === billId} locked={locked} editorLabel={editorLabel} onClosed={() => remove(entry.id)} />)}
+  </div>
 }

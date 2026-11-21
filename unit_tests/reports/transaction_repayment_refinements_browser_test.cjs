@@ -45,7 +45,19 @@ async function drag(page,start,end){await page.mouse.move(start.x,start.y);await
       await page.waitForTimeout(100);const shape=await fields(detail);assert(Math.abs(shape.heights[0]-shape.heights[1])<.1,JSON.stringify(shape));assert.equal(shape.left[0],shape.left[1]);assert.equal(shape.top[0],shape.top[1]);assert.deepEqual(shape.embedded,['0px','0px','0px','0px']);assert.deepEqual(shape.primary[0],shape.primary[1]);assert.deepEqual(shape.cancel[0],shape.cancel[1]);assert.deepEqual(shape.footerMargins,['8px','8px']);assert(Math.abs(shape.bottom[0]-shape.bottom[1])<.1);
       const guide=await group.locator('.bb-daily-day-entries').evaluate(el=>{const row=el.querySelector('.bi-selected-row[data-editing="true"]'),inner=row.querySelector('.bi-expansion');return {parent:getComputedStyle(el,'::before').display,inner:getComputedStyle(inner,'::before').display,left:parseFloat(getComputedStyle(inner,'::before').left),height:el.getBoundingClientRect().height,rowHeight:row.getBoundingClientRect().height};});assert.notEqual(guide.parent,'none');assert.notEqual(guide.inner,'none','Each nested editor has its own guide');assert.equal(guide.left,4,'The child guide follows the left edge, not the logo center');assert(guide.height>=guide.rowHeight);
      }
-     await detail.getByRole('button',{name:'Edit split',exact:true}).click();await detail.getByRole('textbox',{name:"Brian's share amount",exact:true}).fill('40.00');await detail.getByRole('button',{name:'Review split',exact:true}).click();await detail.getByRole('button',{name:'Confirm split',exact:true}).waitFor();await detail.getByRole('button',{name:'Back',exact:true}).click();await detail.getByRole('button',{name:'Cancel',exact:true}).click();await detail.getByRole('button',{name:'Close',exact:true}).click();
+     await detail.getByRole('button',{name:'Edit split',exact:true}).click();
+     const options = detail.locator('.sp-split-options summary');
+     await options.click();
+     const remove = detail.getByRole('button',{name:'Remove split',exact:true});
+     await remove.waitFor();
+     const menu = await remove.evaluate(button => {
+      const surface = getComputedStyle(button.parentElement), action = getComputedStyle(button);
+      return [surface.borderRadius,surface.boxShadow,action.minHeight];
+     });
+     assert.deepEqual(menu,['16px','none','44px'],'Split options use the themed surface and a full-height action');
+     await options.click();
+     await remove.waitFor({state:'hidden'});
+     await detail.getByRole('textbox',{name:"Brian's share amount",exact:true}).fill('40.00');await detail.getByRole('button',{name:'Review split',exact:true}).click();await detail.getByRole('button',{name:'Confirm split',exact:true}).waitFor();await detail.getByRole('button',{name:'Back',exact:true}).click();await detail.getByRole('button',{name:'Cancel',exact:true}).click();await detail.getByRole('button',{name:'Close',exact:true}).click();
      assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);cases++;console.log('PASS refinement',engine.name(),width,dark?'dark':'light');
      if(process.env.BOOKIEBOT_DUO_SHOTS){fs.mkdirSync(process.env.BOOKIEBOT_DUO_SHOTS,{recursive:true});await cue.click();await page.waitForTimeout(100);await page.screenshot({path:process.env.BOOKIEBOT_DUO_SHOTS+`/refinement-${engine.name()}-${width}-${dark?'dark':'light'}.png`});}
     }catch(error){await page.screenshot({path:'/private/tmp/bookiebot-repayment-refinement-failure.png'});throw error}finally{await page.close()}

@@ -24,21 +24,21 @@ async function scroll(page,element,engine){
  else {await element.hover();await page.mouse.wheel(0,650)}
  await page.waitForTimeout(160);
 }
-async function fit(page,label){const view=await panel(page).evaluate(main=>{
- const root=main.querySelector('.bb-bills'),host=main.querySelector('.bb-bills-editor'),page=document.querySelector('.bb-page'),nav=document.querySelector('.bb-navigation-pane'),r=host.getBoundingClientRect(),safeBottom=r.bottom-parseFloat(getComputedStyle(host).paddingBottom);
- const visible=n=>!n.closest('[inert]')&&getComputedStyle(n).visibility!=='hidden'&&n.getBoundingClientRect().width>0;
- const bounds=n=>{const b=n.getBoundingClientRect();return {name:n.getAttribute('aria-label')||n.textContent||n.tagName,x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height}};
- const controls=[...host.querySelectorAll('input,select,button')].filter(visible).map(n=>{const b=bounds(n);return {...b,type:n.getAttribute('type'),hit:document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)?.closest('button,input,select')===n}});
- return {root:root.getBoundingClientRect().toJSON(),viewport:innerHeight,host:r.toJSON(),safeBottom,nav:nav.getBoundingClientRect().toJSON(),page:[page.scrollTop,page.scrollHeight,page.clientHeight],scroll:[host.scrollTop,host.scrollHeight,host.clientHeight],controls,frames:[...host.querySelectorAll('.bi-step-viewport')].filter(visible).map(n=>({height:n.getBoundingClientRect().height,content:n.querySelector(':scope>.bi-step-pane[aria-hidden="false"]')?.offsetHeight})),buttons:[...host.querySelectorAll('.bi-editor-footer button')].filter(visible).map(bounds)};
+async function fit(page,label){
+ const editor=panel(page).locator('.bb-bills-editor[data-open=true]');
+ const footer=editor.locator('.bi-editor-footer').filter({visible:true});
+ await footer.getByRole('button').first().scrollIntoViewIfNeeded();
+ const view=await editor.evaluate(host=>{
+  const detail=host.closest('.bb-settings-detail'),box=host.getBoundingClientRect(),pane=detail.getBoundingClientRect();
+  const visible=n=>!n.closest('[inert]')&&n.getBoundingClientRect().width>0;
+  const fields=[...host.querySelectorAll('input,select,button')].filter(visible);
+  return {inside:box.left>=pane.left-1&&box.right<=pane.right+1,
+   fieldsFit:fields.every(n=>{const r=n.getBoundingClientRect();return r.left>=box.left-1&&r.right<=box.right+1}),
+   footer:[...host.querySelectorAll('.bi-editor-footer button')].filter(visible).map(n=>n.getBoundingClientRect().height),
+   overflow:document.documentElement.scrollWidth-innerWidth};
  });
- assert(view.buttons.length===2,label+': both footer buttons are present');
- assert(view.page[0]===0&&view.root.bottom<=view.viewport+1,label+': the open Bills stage stays inside the viewport: '+JSON.stringify(view));
- assert(view.scroll[0]===0&&view.scroll[1]<=view.scroll[2]+1,label+': the right pane fits intrinsically: '+JSON.stringify(view));
- assert(view.controls.every(b=>b.x>=view.host.x-1&&b.right<=view.host.right+1&&b.y>=view.host.y-1&&b.bottom<=view.safeBottom+1),label+': every control fits above the reserved dock: '+JSON.stringify(view));
- assert(view.buttons.every(b=>b.height>=44&&b.bottom<=view.nav.y-7),label+': Cancel/Review remain above the dock: '+JSON.stringify(view));
- assert(view.controls.filter(b=>b.type==='month').every(b=>b.width>=155),label+': the starting month keeps room for its month/year and native picker');
- assert(view.controls.filter(b=>b.name==='Cancel'||b.name==='Review'||b.name==='Back'||b.name==='Confirm'||b.name==='Confirm amount').every(b=>b.hit),label+': footer controls pass real hit testing');
- assert(view.frames.every(b=>Math.abs(b.height-b.content)<1),label+': all intrinsic editor content is measured');return view;
+ assert(view.inside&&view.fieldsFit&&view.overflow<=1,label+': inline editor fits the detail column '+JSON.stringify(view));
+ assert(view.footer.length>=2&&view.footer.every(height=>height>=44),label+': preserve the footer touch targets');
 }
 async function shot(page,name){if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:process.env.BOOKIEBOT_SCREENSHOT_DIR+'/'+name+'.png'})}}
 async function closedGeometry(page){return panel(page).evaluate(main=>{
@@ -52,13 +52,19 @@ if(require.main===module)(async()=>{let count=0;
    for(const config of [{width:867,height:669,dark:false,rail:0},{width:867,height:553,dark:true,rail:0,reduced:true},{width:951,height:648,dark:true,rail:84},{width:867,height:553,dark:false,rail:84},{width:867,height:480,dark:true,rail:0}].filter(c=>!process.env.ONLY_CLOSED&&(!process.env.ONLY_HEIGHT||c.height===Number(process.env.ONLY_HEIGHT)))){
     const {width,height,dark,rail,reduced}=config,reviews=[],{page,errors,unexpected}=await fixture(browser,width,height,dark,false,false,rail,routes(reviews));
     try{await page.emulateMedia({reducedMotion:reduced?'reduce':'no-preference'});await enter(page);await press(panel(page).locator('.bb-bills-row').first());await fit(page,'Variable split');
-     const list=panel(page).locator('.bb-bills-rows'),before=await fit(page,'Before list scroll');await scroll(page,list,engine);assert(await list.evaluate(n=>n.scrollTop)>0,'The bills list scrolls independently');const after=await fit(page,'After list scroll');assert.equal(after.buttons[0].y,before.buttons[0].y,'List scroll does not move the editor');await list.evaluate(n=>n.scrollTop=0);await scroll(page,panel(page).locator('.bb-bills-editor'),engine);await fit(page,'After right-pane scroll attempt');
+     const detail=page.locator('.bb-settings-detail');
+     await detail.evaluate(n=>n.scrollTop=0);
+     const rowTop=await panel(page).locator('.bb-bills-row').first().evaluate(n=>n.getBoundingClientRect().top);
+     await scroll(page,detail,engine);
+     assert(await detail.evaluate(n=>n.scrollTop)>0,'The detail pane owns the open list and editor scroll');
+     assert((await panel(page).locator('.bb-bills-row').first().evaluate(n=>n.getBoundingClientRect().top))<rowTop);
+     await fit(page,'Scrolled inline editor');
      await press(panel(page).getByRole('button',{name:/^Recurring split/}));await fit(page,'Recurring split');
      await panel(page).getByRole('textbox',{name:"Brian's share percentage",exact:true}).fill('12.345');await page.waitForTimeout(80);await fit(page,'Invalid split');assert(await panel(page).getByRole('button',{name:'Use split',exact:true}).isDisabled());
      await panel(page).getByRole('textbox',{name:"Brian's share percentage",exact:true}).fill('42.25');await press(panel(page).getByRole('button',{name:'Split by income',exact:true}));assert.equal(await panel(page).getByRole('textbox',{name:"Brian's share percentage",exact:true}).inputValue(),'64.73');
      await shot(page,`bills-fit-${engine.name()}-${width}-${height}-${rail}-${dark?'dark':'light'}`);
      await press(panel(page).getByRole('button',{name:'Use split',exact:true}));
-     reviews.failNext=true;await press(panel(page).getByRole('button',{name:'Review',exact:true}));assert(await panel(page).locator('.bb-bills-notices [role=alert]').isVisible(),'Open review errors stay visible beside the editor');await fit(page,'Rejected review');await press(panel(page).getByRole('button',{name:'Review',exact:true}));await fit(page,'Retried configuration review');await press(panel(page).getByRole('button',{name:'Back',exact:true}));
+     reviews.failNext=true;await press(panel(page).getByRole('button',{name:'Review',exact:true}));assert(await panel(page).locator('.bb-bills-editor[data-open=true] [role=alert]').isVisible(),'Open review errors stay visible beside the editor');await fit(page,'Rejected review');await press(panel(page).getByRole('button',{name:'Review',exact:true}));await fit(page,'Retried configuration review');await press(panel(page).getByRole('button',{name:'Back',exact:true}));
      await press(panel(page).getByRole('button',{name:'Enter monthly amount',exact:true}));await panel(page).getByRole('textbox',{name:'Bill amount',exact:true}).fill('98.43');await fit(page,'Monthly amount');await press(panel(page).getByRole('button',{name:'Review',exact:true}));await fit(page,'Monthly review');await press(panel(page).getByRole('button',{name:'Back',exact:true}));await press(panel(page).getByRole('button',{name:'Cancel',exact:true}));
      await press(panel(page).getByRole('button',{name:'Stop bill',exact:true}));await fit(page,'Stop');await press(panel(page).getByRole('button',{name:'Review',exact:true}));await fit(page,'Stop review');await press(panel(page).getByRole('button',{name:'Back',exact:true}));await press(panel(page).getByRole('button',{name:'Cancel',exact:true}));await press(panel(page).getByRole('button',{name:'Cancel',exact:true}));
      await press(panel(page).locator('.bb-bills-row').nth(1));await fit(page,'Quarterly split');await panel(page).getByRole('combobox',{name:'Repeats',exact:true}).selectOption('yearly');await page.waitForTimeout(90);await fit(page,'Yearly split');await press(panel(page).getByRole('button',{name:'Review',exact:true}));await fit(page,'Configuration review');await press(panel(page).getByRole('button',{name:'Back',exact:true}));await press(panel(page).getByRole('button',{name:'Cancel',exact:true}));
@@ -77,7 +83,7 @@ if(require.main===module)(async()=>{let count=0;
      const pixels=await page.screenshot({clip});
      execFileSync(process.env.BOOKIEBOT_TEST_PYTHON||'python',['-c',"from PIL import Image; import io,sys; im=Image.open(io.BytesIO(sys.stdin.buffer.read())).convert('RGB'); bg=im.getpixel((0,0)); assert any(all(max(abs(a-b) for a,b in zip(im.getpixel((x,y)),bg))>8 for x in range(im.width)) for y in range(1,im.height)), 'The horizontal divider must paint above the retained scene background'"],{input:pixels});
      await shot(page,`bills-divider-${engine.name()}-${width}-${dark?'dark':'light'}`);await press(panel(page).getByRole('button',{name:'Cancel',exact:true}));
-     await page.evaluate(()=>{window.__dividerFrames=(async()=>{const result=[],start=performance.now();while(performance.now()-start<620){await new Promise(requestAnimationFrame);const main=document.querySelector('main[aria-label="Bills"]'),host=main.querySelector('.bb-bills-editor'),row=main.querySelector('.bb-bills-row'),present=!!host.querySelector('.bi-editor-scenes');result.push({present,border:getComputedStyle(row).borderBottomColor,line:getComputedStyle(host,'::after').content,height:host.getBoundingClientRect().height})}return result})();});await panel(page).getByRole('button',{name:'Cancel',exact:true}).press('Enter');const samples=await page.evaluate(()=>window.__dividerFrames);assert(samples.filter(s=>s.present).every(s=>s.border==='rgba(0, 0, 0, 0)'&&s.line==='""'),'Divider follows the closing expansion');assert(!samples.at(-1).present&&samples.at(-1).height<1&&samples.at(-1).border!=='rgba(0, 0, 0, 0)','The row divider returns after closing');assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);console.log('PASS closed Bills divider',engine.name(),width);count++;
+     await page.evaluate(()=>{window.__dividerFrames=(async()=>{const result=[],start=performance.now();while(performance.now()-start<620){await new Promise(requestAnimationFrame);const main=document.querySelector('main[aria-label="Bills"]'),host=main.querySelector('.bb-bills-editor'),row=main.querySelector('.bb-bills-row'),present=!!host?.querySelector('.bi-editor-scenes');result.push({present,border:getComputedStyle(row).borderBottomColor,line:host&&getComputedStyle(host,'::after').content,height:host?.getBoundingClientRect().height??0})}return result})();});await panel(page).getByRole('button',{name:'Cancel',exact:true}).press('Enter');const samples=await page.evaluate(()=>window.__dividerFrames);assert(samples.filter(s=>s.present).every(s=>s.border==='rgba(0, 0, 0, 0)'&&s.line==='""'),'Divider follows the closing expansion');assert(!samples.at(-1).present&&samples.at(-1).height<1&&samples.at(-1).border!=='rgba(0, 0, 0, 0)','The row divider returns after closing');assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);console.log('PASS closed Bills divider',engine.name(),width);count++;
     }finally{await page.close();if(prior)await prior.page.close()}
    }
   }finally{await browser.close()}

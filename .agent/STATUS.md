@@ -1,5 +1,17 @@
 # Agent Status
 
+## Settings follow-up (2026-11-21)
+
+Settings keeps its glass controls over the content, with the page-wide header fill removed. The open DUO sidebar reaches the top of the canvas and scrolls under the floating Back control. Bills and Transfers use inline editors in both DUO layouts. Their open views keep the category sidebar and use one scrolling content pane. Only Bills and Transfers offer manual refresh within Settings. Closed DUO uses pull-to-refresh, and open DUO uses the toolbar arrow. Widgets reads its status when opened and offers a retry for an unavailable or uncertain result.
+
+Phone notification choices save individually. Selecting the first weekday or enabling Payment reminders can prompt for iOS permission. Weekly Summary accepts multiple weekdays, and Payment Reminders supports the due date or one or two days before. Existing Monday and next-day settings retain their schedule. Clearing all types stops delivery while preserving the phone's other notification preferences.
+
+Widgets, report options, Savings, Reimbursements, and Transaction split options share the app's rounded card surface and action styles. Notifications and Widgets also share the same styled select controls while keeping native pickers.
+
+The full local suite passed 3,573 tests with 918 optional PostgreSQL skips. Python and frontend types and the production build passed. Chromium and WebKit passed Settings routing, refresh scoping, sidebar resizing, inline Bills and Transfers, and notification controls at widths down to 320px. PR #226 tracks CI and deployment.
+
+Manual check. In open DUO, scroll the category sidebar under the glass Back control and check that the sidebar reaches the top. Open Bills and Transfers in both DUO poses, refresh using the control for that pose, and fold with an editor open. In Notifications, choose two weekdays and a payment reminder lead time, reopen Settings to verify they persisted, then clear the types if delivery is unwanted. Check that the other Settings pages have no refresh control. Compare the Widgets, Reimbursements, Savings, and Transaction split ellipsis menus without confirming any actions.
+
 ## Inset Groups Settings (2026-11-20)
 
 Settings has a grouped category directory in compact layouts. Back returns to that directory before leaving Settings. Open DUO defaults to Account and keeps the directory beside the active category. Resize the sidebar by dragging or pressing its arrow keys. Pointer drag clears focus and prevents text selection. The split uses the existing usable viewport and right system gutter.

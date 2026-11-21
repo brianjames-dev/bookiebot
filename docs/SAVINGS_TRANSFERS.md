@@ -74,12 +74,10 @@ tabs or record contributions.
 
 ## Native acceptance
 
-In closed DUO, editors expand below their row with the native guide/divider; row
-switches close/open concurrently. Open DUO uses the existing Bills pane geometry,
-independent left scroll and a fixed right editor above the dock. The form and
-single review fit the 480px short landscape height. Native editor slides, pane
-handoffs, Cancel/Back, draft retention and folding are shared with Bills.
-Closed uses pull-to-refresh; open has its rotating refresh button.
+In both DUO orientations, editors expand below their row with the native guide
+and divider. Row switches animate together. The open Settings sidebar remains
+available beside the scrolling detail pane. Closed DUO uses pull-to-refresh,
+and open DUO uses the toolbar refresh button.
 
 Create a legitimate future transfer, inspect Review, then confirm. Check Current
 versus Projected, its separate Category Mix slice, Calendar event and goal history.

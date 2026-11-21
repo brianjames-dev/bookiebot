@@ -16,14 +16,36 @@ const snapshot = {
 async function check(engine, { width, rail, dark, household }) {
   const browser = await engine.launch()
   try {
+    let billReads = 0
     const { page, errors, unexpected } = await fixture(browser, 382, 740, dark, false, false, rail, {
       config: { householdEnabled: household },
       bills: route => {
         assert.equal(route.request().method(), "GET")
+        billReads++
         return route.fulfill({ json: snapshot })
       },
+      transfers: route => {
+        assert.equal(route.request().method(), "GET")
+        return route.fulfill({ json: { ownerName: "Brian", today: "2026-11-20", year: 2026, settingsVersion: "fixture",
+          goals: [], transfers: [{ id: "saving", revision: 1, name: "Savings deposit", amountCents: 2500,
+            frequency: "monthly", startsOn: "2026-12-01", effectiveFrom: "2026-11-20",
+            goalId: "", fromAccount: "Checking", toAccount: "Savings", active: true, nextDate: "2026-12-01" }] } })
+      },
       request: async route => {
-        if (new URL(route.request().url()).pathname !== "/app/household") return false
+        const { pathname } = new URL(route.request().url())
+        if (pathname === "/app/notifications") {
+          await route.fulfill({ json: { enabled: true, publicKey: "B" + "A".repeat(86),
+            preferences: { weekly: true, weeklyDays: [0, 4], upcoming: true, reminderDaysBefore: 2, showAmounts: false, hour: 10 } } })
+          return true
+        }
+        if (pathname === "/app/widgets/settings") {
+          assert.equal(route.request().method(), "GET")
+          await route.fulfill({ json: { connections: [{ id: "widget", label: "Small Widget", mode: "projected", status: "active",
+            createdAt: "2026-11-20", expiresAt: "2026-12-20", lastUsedAt: "2026-11-21" }],
+          scriptUrl: "/app/widgets/script", setupInstructionsUrl: "/app/widgets/help" } })
+          return true
+        }
+        if (pathname !== "/app/household") return false
         assert.equal(route.request().method(), "GET")
         await route.fulfill({ json: { account: { id: "fixture", name: "Brian" }, provider: "sheets", household: null } })
         return true
@@ -34,14 +56,24 @@ async function check(engine, { width, rail, dark, household }) {
     const category = name => directory.getByRole("button", { name, exact: true })
     const detail = page.locator(".bb-settings-detail")
     const content = label => page.getByRole("main", { name: label, exact: true })
+    const presentation = (locator, properties) => locator.evaluate((element, properties) => {
+      const styles = getComputedStyle(element)
+      return properties.map(property => styles[property])
+    }, properties)
+    const selectStyle = ["appearance", "borderRadius", "backgroundImage", "minHeight"]
+    const menuStyle = ["backgroundColor", "borderColor", "borderRadius", "boxShadow", "padding"]
+    const actionStyle = ["color", "borderRadius", "minHeight", "fontSize"]
 
     await tap(page, button("Settings"))
     await directory.waitFor()
+    assert.equal(await page.locator(".bb-pull-refresh-space").count(), 0, "Settings directory has no pull gesture")
+    assert.equal(await page.locator(".bb-shell-masthead").evaluate(el => getComputedStyle(el, "::before").content), "none")
     assert.deepEqual(await directory.getByRole("button").evaluateAll(rows => rows.map(row => row.getAttribute("aria-label"))),
       ["Account", ...(household ? ["Household"] : []), "Bills", "Transfers", "Appearance", "Notifications", "Widgets", "About & updates"])
     assert.equal(await detail.isVisible(), false, "Closed Settings starts on the directory")
     await tap(page, category("Appearance"))
     await page.getByRole("switch", { name: "Raised cents" }).waitFor()
+    assert.equal(await page.locator(".bb-pull-refresh-space").count(), 0, "Appearance has no pull gesture")
     assert.equal(await directory.isVisible(), false, "Only the selected category is visible in closed DUO")
     assert.equal(await button("Link Google account").isVisible(), false)
     await tap(page, button("Back"))
@@ -52,6 +84,26 @@ async function check(engine, { width, rail, dark, household }) {
     await page.locator('.bb-page[data-duo-landscape="true"]').waitFor()
     await content("Settings").getByRole("heading", { name: "Account", exact: true }).waitFor()
     assert.equal(await category("Account").getAttribute("aria-current"), "page")
+    assert.equal(await button("Refresh Settings").count(), 0)
+    const sidebar = await page.locator(".bb-settings-sidebar").boundingBox()
+    const back = await button("Back").boundingBox()
+    const firstRow = await category("Account").boundingBox()
+    assert(Math.abs(sidebar.y) < 1, "The open sidebar reaches the top of the canvas")
+    assert(back.y >= sidebar.y && back.x + back.width <= sidebar.x + sidebar.width, "Back floats over the sidebar")
+    assert(firstRow.y >= back.y + back.height, "The first category starts below the floating Back control")
+    assert(await button("Back").evaluate(control => {
+      const rect = control.getBoundingClientRect()
+      return control.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2))
+    }), "The floating Back button remains tappable over the sidebar")
+    await page.setViewportSize({ width, height: 480 })
+    const sidebarPane = page.locator(".bb-settings-sidebar")
+    await page.waitForFunction(() => document.querySelector(".bb-settings-sidebar").clientHeight === 480)
+    await sidebarPane.evaluate(pane => { pane.scrollTop = 160 })
+    assert((await category("Account").boundingBox()).y < back.y + back.height, "Sidebar rows can scroll behind Back")
+    assert(Math.abs((await button("Back").boundingBox()).y - back.y) < 1, "Back stays fixed as the sidebar scrolls")
+    await sidebarPane.evaluate(pane => { pane.scrollTop = 0 })
+    await page.setViewportSize({ width, height: 669 })
+    await page.waitForFunction(() => document.querySelector(".bb-settings-sidebar").clientHeight === 669)
     const divider = page.getByRole("separator", { name: "Settings sidebar width" })
     await divider.press("ArrowRight")
     assert.equal(await divider.getAttribute("aria-valuenow"), "41")
@@ -94,21 +146,81 @@ async function check(engine, { width, rail, dark, household }) {
       await tap(page, category("Household"))
       await button("Create household").waitFor()
     }
+    await tap(page, category("Notifications"))
+    assert.equal(await button("Friday").getAttribute("aria-pressed"), "true")
+    assert.equal(await button("Wednesday").getAttribute("aria-pressed"), "false")
+    assert.equal(await page.getByLabel("Payment reminder timing").inputValue(), "2")
+    assert.equal(await button("Send a test").count(), 0)
+    assert.equal(await button("Enable on this phone").count(), 0)
+    await page.setViewportSize({ width: 320, height: 740 })
+    await page.locator('.bb-page:not([data-duo-landscape])').waitFor()
+    assert(await detail.evaluate(pane => pane.scrollWidth <= pane.clientWidth + 1),
+      "Notification preferences and registration errors fit a narrow screen")
+    const timing = page.getByLabel("Payment reminder timing")
+    assert((await timing.boundingBox()).width >= 136, "The selected reminder timing stays readable")
+    const timingStyle = await presentation(timing, selectStyle)
+    await page.setViewportSize({ width, height: 669 })
+    await page.locator('.bb-page[data-duo-landscape="true"]').waitFor()
+    await tap(page, category("Widgets"))
+    await button("Pair a widget").waitFor()
+    assert.equal(await button("Refresh widgets").count(), 0)
+    assert.deepEqual(await presentation(page.getByLabel("Budget view for Small Widget"), selectStyle), timingStyle)
+    const widgetMenuButton = button("Small Widget options")
+    await tap(page, widgetMenuButton)
+    const widgetMenu = page.locator('.bb-widget-settings .bb-report-menu-panel[data-open="true"]')
+    const widgetPanelStyle = await presentation(widgetMenu, menuStyle)
+    assert.equal(widgetPanelStyle[3], "none", "Options surfaces have no underglow")
+    const removeStyle = await presentation(widgetMenu.getByRole("button", { name: "Remove", exact: true }), actionStyle)
+    await widgetMenu.getByRole("button", { name: "Remove", exact: true }).press("Escape")
+    assert.equal(await widgetMenuButton.getAttribute("aria-expanded"), "false")
+    await tap(page, category("Transfers"))
+    const transfers = content("Transfers")
+    await tap(page, transfers.locator(".bb-bills-row").first())
+    await transfers.getByRole("textbox", { name: "Amount", exact: true }).waitFor()
+    assert.equal(await directory.isVisible(), true, "Transfers leaves the category sidebar available while editing")
+    assert.equal(await button("Refresh transfers").count(), 1)
+    await transfers.getByRole("button", { name: "Cancel", exact: true }).click()
     await tap(page, category("Bills"))
     const bills = content("Bills")
     await bills.getByText("Internet", { exact: true }).waitFor()
     assert.equal(await category("Bills").getAttribute("aria-current"), "page")
     assert.equal(await directory.isVisible(), true, "The schedule list starts on the right, with the category index visible")
+    const refresh = page.waitForResponse(response => response.url().includes("/app/bills?fresh=1"))
+    await button("Refresh bills").click()
+    await refresh
     await tap(page, bills.locator(".bb-bills-row").first())
     const name = bills.getByRole("textbox", { name: "Name", exact: true })
     await name.fill("Internet draft")
+    assert.equal(await directory.isVisible(), true, "Bills leaves the category sidebar available while editing")
+    assert(await bills.evaluate(main => {
+      const row = main.querySelector(".bb-bills-row").getBoundingClientRect()
+      const editor = main.querySelector(".bb-bills-editor[data-open=true]").getBoundingClientRect()
+      return editor.top >= row.bottom - 1 && Math.abs(editor.left - row.left) < 1
+    }), "The editor sits inline beneath its row")
     await page.setViewportSize({ width: 382, height: 740 })
     await page.locator('.bb-page:not([data-duo-landscape])').waitFor()
     assert.equal(await name.inputValue(), "Internet draft")
+    assert.equal(await bills.locator(".bb-bills-refresh").count(), 0)
+    await page.locator(".bb-pull-refresh-space").waitFor({ state: "attached" })
+    await page.locator(".bb-page").evaluate(shell => { shell.scrollTop = 0 })
+    const beforePull = billReads
+    await bills.locator(".bb-bills-row").first().evaluate(target => {
+      const fire = (type, y) => {
+        const event = new Event(type, { bubbles: true, cancelable: true })
+        const points = [{ identifier: 1, clientX: 50, clientY: y }]
+        Object.defineProperties(event, { touches: { value: type === "touchend" ? [] : points }, changedTouches: { value: points } })
+        target.dispatchEvent(event)
+      }
+      fire("touchstart", 100)
+      fire("touchmove", 430)
+      fire("touchend", 430)
+    })
+    await page.waitForFunction(() => document.querySelector(".bb-pull-refresh")?.dataset.phase === "done")
+    assert.equal(billReads, beforePull + 1)
     await page.setViewportSize({ width, height: 669 })
     await page.locator('.bb-page[data-duo-landscape="true"]').waitFor()
     assert.equal(await name.inputValue(), "Internet draft")
-    await tap(page, bills.getByRole("button", { name: "Cancel", exact: true }))
+    await bills.getByRole("button", { name: "Cancel", exact: true }).click()
     await directory.waitFor()
     assert.equal(Number(await divider.getAttribute("aria-valuenow")), draggedWidth)
     await tap(page, category("Appearance"))
@@ -120,6 +232,11 @@ async function check(engine, { width, rail, dark, household }) {
     await directory.waitFor()
     await tap(page, button("Back"))
     await page.locator('.bb-page[data-screen="overview"]').waitFor()
+    await tap(page, button("Shared"))
+    await tap(page, button("Reimbursement options"))
+    const sharedMenu = page.getByRole("dialog", { name: "Options", exact: true })
+    assert.deepEqual(await presentation(sharedMenu, menuStyle), widgetPanelStyle)
+    assert.deepEqual(await presentation(sharedMenu.getByRole("button", { name: "Reset balances", exact: true }), actionStyle), removeStyle)
     assert.deepEqual(errors, [])
     assert.deepEqual(unexpected, [])
     console.log("PASS grouped Settings, category routing, resize, gutter, fold and draft", engine.name(), width)

@@ -11,7 +11,7 @@
 .bb-goals-section button:hover { background: hsl(var(--muted)); }
 .bb-goals-section button:disabled { opacity: .5; cursor: default; }
 .bb-goals-section .bb-goals-new { border: 0; padding: 0; white-space: nowrap; }
-.bb-goals-section .bb-goals-new:hover, .bb-goals-section .bb-report-menu-trigger:hover { background: transparent; color: hsl(var(--primary)); }
+.bb-goals-section .bb-goals-new:hover { background: transparent; color: hsl(var(--primary)); }
 .bb-goals-note, .bb-goals-empty { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.55; }
 .bb-goals-note { margin: 10px 0; }
 .bb-goals-empty { padding: 8px 0; }
@@ -28,10 +28,7 @@
 .bb-goal-chevron { width: 14px; height: 14px; stroke: hsl(var(--muted-foreground)); stroke-width: 1.3; fill: none; transition: transform var(--bb-motion-duration) var(--bb-motion-ease); }
 .bb-goal-toggle[aria-expanded="true"] .bb-goal-chevron { transform: rotate(90deg); }
 .bb-goal-heading > .bb-report-menu { flex-shrink: 0; }
-.bb-goals-section .bb-report-menu-trigger { width: 44px; height: 44px; padding: 12px; border: 0; }
-.bb-goals-section .bb-report-menu-action { width: 100%; border: 0; padding: 10px; text-align: left; font-size: 13px; }
-.bb-goals-section .bb-report-menu-action:hover { background: hsl(var(--foreground) / .06); }
-.bb-goals-section .bb-goal-archive-action { border-top: 1px solid hsl(var(--border)); border-radius: 0; margin-top: 4px; }
+.bb-goals-section .bb-goal-archive-action { color: hsl(var(--destructive)); }
 .bb-goals-archived > .bb-details-content[data-state="open"], .bb-goals-archived > .bb-details-content[data-state="open"] > .bb-details-content-inner { overflow: visible; }
 /* Keep the archive's inner spacing in its clipped child, not in the closed
    disclosure's box beneath the footer button. */

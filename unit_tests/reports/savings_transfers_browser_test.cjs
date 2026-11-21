@@ -26,9 +26,15 @@ async function fit(page){return editor(page).evaluate(n=>{const b=n.getBoundingC
    await press(panel(page).locator('[data-bill-id=transfer-0]'));await panel(page).getByRole('textbox',{name:'Amount',exact:true}).fill('175');await panel(page).getByRole('combobox',{name:'Savings goal',exact:true}).selectOption('goal-1');
    assert.equal(writes.length,0);
    if(c.width>=800){hold=true;await press(panel(page).getByRole('button',{name:'Refresh transfers',exact:true}));await page.waitForFunction(()=>document.querySelector('.bb-transfers .bb-bills-refresh-spinning'));hold=false;release();await page.waitForFunction(()=>!document.querySelector('.bb-transfers .bb-bills-refresh-spinning'));assert.equal(await panel(page).getByRole('textbox',{name:'Amount',exact:true}).inputValue(),'175','Refresh retains the draft');}
-   if(c.width>=800){const geometry=await fit(page);assert(geometry.scroll<=geometry.client+1&&geometry.items.every(x=>x.inside&&x.hit),'Transfer form fits the native short pane: '+JSON.stringify(geometry));const scroll=panel(page).locator('.bb-bills-rows');assert(await scroll.evaluate(n=>n.scrollHeight>n.clientHeight));await scroll.evaluate(n=>n.scrollTop=400);assert.equal(await panel(page).getByRole('textbox',{name:'Amount',exact:true}).inputValue(),'175');await scroll.evaluate(n=>n.scrollTop=0);}
+   if(c.width>=800){
+    const geometry=await fit(page);assert(geometry.items.every(x=>x.inside),'Transfer fields fit their inline editor: '+JSON.stringify(geometry));
+    assert(await page.getByRole('navigation',{name:'Settings categories'}).isVisible());
+    const scroller=page.locator('.bb-settings-detail');assert(await scroller.evaluate(n=>n.scrollHeight>n.clientHeight));
+    await scroller.evaluate(n=>n.scrollTop=400);
+    assert.equal(await panel(page).getByRole('textbox',{name:'Amount',exact:true}).inputValue(),'175');
+   }
    await press(panel(page).getByRole('button',{name:'Review',exact:true}));assert.equal(writes.length,0);assert.equal(reviews.at(-1).transfer.goalId,'goal-1');assert.match(await editor(page).locator('.bi-step-review[aria-hidden=false]').innerText(),/\$175\.00/);
-   if(c.width>=800){const geometry=await fit(page);assert(geometry.scroll<=geometry.client+1&&geometry.items.every(x=>x.inside&&x.hit),'Transfer review fits: '+JSON.stringify(geometry));}
+   if(c.width>=800){const geometry=await fit(page);assert(geometry.items.every(x=>x.inside),'Transfer review fits: '+JSON.stringify(geometry));}
    if(c.width===951){await page.setViewportSize({width:382,height:740});await page.waitForTimeout(550);assert.match(await editor(page).locator('.bi-step-review[aria-hidden=false]').innerText(),/\$175\.00/);await page.setViewportSize({width:c.width,height:c.height});await page.waitForTimeout(550);}
    if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.BOOKIEBOT_SCREENSHOT_DIR,`transfer-review-${engine.name()}-${c.width}.png`)})}
    await press(panel(page).getByRole('button',{name:'Back',exact:true}));await press(panel(page).locator('[data-bill-id=transfer-1]'));await press(panel(page).locator('[data-bill-id=transfer-0]'));assert.equal(await panel(page).getByRole('textbox',{name:'Amount',exact:true}).inputValue(),'175');

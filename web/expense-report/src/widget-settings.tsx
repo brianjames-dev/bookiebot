@@ -2,8 +2,7 @@ import {ReportLoading} from "./report-loading"
 import { useEffect, useId, useRef, useState } from "react"
 import { CollapsibleContent } from "./components/ui/motion"
 import { ReportMenu } from "./components/ui/report-menu"
-import { RefreshCw } from "lucide-react"
-import { usePageRefresh } from "./page-refresh"
+import { Trash2 } from "lucide-react"
 import { useAppWorkStatus } from "./app-work-guard"
 import "./widget-settings.css"
 
@@ -11,7 +10,7 @@ type WidgetMode = "current" | "projected"
 interface Connection { id: string; label: string; mode: WidgetMode; status: "pending" | "active"; createdAt: string; expiresAt: string; lastUsedAt: string | null }
 interface Pairing { id: string; setupCode: string; expiresAt: string }
 interface Settings { connections: Connection[]; scriptUrl: string; setupInstructionsUrl: string }
-interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void; refreshActive?: boolean }
+interface WidgetSettingsProps { ownerName: string; defaultMode: WidgetMode; onOpenGuide: () => void; active?: boolean }
 const endpoint = "/app/widgets/settings"
 const isDate = (value: unknown): value is string => typeof value === "string" && Number.isFinite(Date.parse(value))
 const isMode = (value: unknown): value is WidgetMode => value === "current" || value === "projected"
@@ -73,7 +72,7 @@ export function WidgetSettings(props: WidgetSettingsProps) {
   return <WidgetSettingsContent key={props.ownerName} {...props} />
 }
 
-function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshActive = true }: WidgetSettingsProps) {
+function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, active = true }: WidgetSettingsProps) {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -130,8 +129,8 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
       if (!active()) return
       if (body) setNeedsRefresh(true)
       setError(body?.operation === "pair"
-        ? "Couldn’t confirm pairing. Refresh widgets before trying again, then remove any unused pending pairing."
-        : caught instanceof Error ? caught.message : "Couldn’t load widgets. Refresh widgets to try again.")
+        ? "Couldn’t confirm pairing. Check widget status before trying again, then remove any unused pending pairing."
+        : caught instanceof Error ? caught.message : "Couldn’t load widgets. Try again.")
       return false
     } finally {
       window.clearTimeout(timer)
@@ -139,13 +138,11 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
     }
   }
 
-  const pageRefresh = usePageRefresh(refreshActive ? "settings" : null, { refresh: () => run(), disabled: busy || loading })
-
   useEffect(() => {
     mounted.current = true
-    void run()
     return () => { mounted.current = false; copyGeneration.current++; operation.current?.abort(); operation.current = null }
   }, [])
+  useEffect(() => { if (active) void run() }, [active])
 
   useEffect(() => {
     if (!pairing) return
@@ -169,7 +166,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
   }
   const canCreate = Boolean(settings && settings.connections.length < 5 && !busy && !needsRefresh && !pairing)
   return <section className="bb-settings-section bb-widget-settings" aria-labelledby={`${id}-title`}>
-    <div className="bb-widget-heading"><h2 id={`${id}-title`}>Widgets</h2>{!pageRefresh && <button className="bb-icon-button bb-widget-refresh" type="button" disabled={busy} aria-busy={busy} onClick={() => void run()} aria-label="Refresh widgets" title="Refresh widgets"><RefreshCw aria-hidden="true" /></button>}</div>
+    <h2 id={`${id}-title`} className="bb-widget-heading">Widgets</h2>
     {loading && <ReportLoading label="Loading widgets…"/>}
     {settings && <div className="bb-widget-connections">
       {settings.connections.length === 0 && <p className="bb-settings-note bb-widget-empty">No widgets paired yet.</p>}
@@ -180,11 +177,11 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
               {connection.status === "pending" ? "Awaiting setup" : connection.lastUsedAt ? "Connected" : "Paired · Run in Scriptable"}
             </span>
           </div>
-          <select aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
+          <select className="bb-option-select" aria-label={`Budget view for ${connection.label}`} value={connection.mode} disabled={busy || needsRefresh} onChange={event => { if (event.target.value !== connection.mode) void run({ operation: "mode", id: connection.id, mode: event.target.value }) }}><option value="current">Current</option><option value="projected">Projected</option></select>
           <ReportMenu label={`${connection.label} options`} disabled={busy || needsRefresh} closeOnSelect>
             <strong className="bb-widget-menu-label">{connection.label}</strong>
             <p className="bb-widget-menu-note">{connection.status === "pending" ? `Setup expires ${dateLabel(connection.expiresAt)}` : connection.lastUsedAt ? `Last checked ${dateLabel(connection.lastUsedAt)}` : "Run BookieBot in Scriptable to check the first preview."}</p>
-            <button className="bb-report-menu-action" type="button" disabled={busy || needsRefresh} onClick={() => setConfirmRevoke(connection.id)}>Remove</button>
+            <button className="bb-report-menu-action bb-option-destructive" type="button" disabled={busy || needsRefresh} onClick={() => setConfirmRevoke(connection.id)}><Trash2 aria-hidden="true" />Remove</button>
           </ReportMenu>
         </div>
         <CollapsibleContent open={confirmRevoke === connection.id}><div className="bb-widget-revoke"><p>Remove access for {connection.label}? You’ll need to pair it again.</p><div className="bb-widget-actions"><button className="bb-toolbar-button" type="button" disabled={busy || needsRefresh} onClick={() => void run({ operation: "revoke", id: connection.id })}>Remove widget access</button><button className="bb-settings-action" type="button" disabled={busy} onClick={() => setConfirmRevoke(null)}>Keep widget</button></div></div></CollapsibleContent>
@@ -198,7 +195,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
     <CollapsibleContent open={formOpen} id={`${id}-form`}>
       <form className="bb-widget-form" onSubmit={event => { event.preventDefault(); if (canCreate && label.trim()) void run({ operation: "pair", label: label.trim(), mode }) }}>
         <label>Widget name<input autoComplete="off" maxLength={60} value={label} disabled={busy} onChange={event => setLabel(event.target.value)} /></label>
-        <label>Budget view<select aria-label="New widget budget view" value={mode} disabled={busy} onChange={event => setMode(event.target.value as WidgetMode)}><option value="current">Current</option><option value="projected">Projected</option></select></label>
+        <label>Budget view<select className="bb-option-select" aria-label="New widget budget view" value={mode} disabled={busy} onChange={event => setMode(event.target.value as WidgetMode)}><option value="current">Current</option><option value="projected">Projected</option></select></label>
         <div className="bb-widget-actions"><button className="bb-toolbar-button" type="submit" disabled={!canCreate || !label.trim()}>Create setup code</button><button className="bb-settings-action" type="button" disabled={busy} onClick={discard}>Cancel</button></div>
       </form>
     </CollapsibleContent>
@@ -212,6 +209,7 @@ function WidgetSettingsContent({ ownerName, defaultMode, onOpenGuide, refreshAct
       </div>}
     </CollapsibleContent>
     {error && <p className="bb-widget-error" role="alert">{error}</p>}
+    {(needsRefresh || (!settings && error)) && <button type="button" className="bb-toolbar-button" disabled={busy} onClick={() => void run()}>Check widget status</button>}
     {message && <p className="bb-settings-note" role="status">{message}</p>}
   </section>
 }

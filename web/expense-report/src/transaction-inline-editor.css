@@ -25,7 +25,7 @@
 .bi-expansion-clip { min-height:0; overflow:hidden; }
 .bi-editor { min-width:0; margin-left:var(--bi-surface-start,28px); margin-bottom:var(--bi-bottom-gap,8px); padding:8px var(--bi-right-inset,10px) 8px 8px; border-radius:var(--bi-radius); background:var(--bi-panel-surface); }
 .bi-editor:is([data-design="grouped"],[data-design="joined"],[data-design="levels"],[data-design="circles"]) { border-radius:0 0 var(--bi-radius) var(--bi-radius); }
-.bi-product .bi-editor button { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:8px 12px; border-radius:10px; border:0; font:inherit; font-size:13px; font-weight:500; cursor:inherit; }
+.bi-product .bi-editor button:not(:where(.bb-report-menu-action)) { display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:8px 12px; border-radius:10px; border:0; font:inherit; font-size:13px; font-weight:500; cursor:inherit; }
 .bi-step-viewport { position:relative; overflow:hidden; min-width:0; }
 .bi-step-pane { position:absolute; inset:0 0 auto; min-width:0; visibility:hidden; background:var(--bi-panel-surface); }
 /* WAAPI exclusively owns these surfaces. The app's universal reduced-motion

@@ -1,5 +1,9 @@
 # Agent Decisions
 
+## 2026-11-21 — Schedule notification types independently
+
+A weekday selection or Payment reminders setting is the user's opt-in and can start the native permission request. Keep the browser subscription and its authenticated session binding while preferences are all off, and skip those phones in the delivery scheduler. The existing preferences record carries weekdays and payment lead days, with Monday and one day as compatibility defaults for older records. Delivery stays scoped to the existing owner and retains per-day claims. Bills and Transfers now use inline editors in both orientations, superseding the dedicated two-pane editor in the Inset Groups decision.
+
 ## 2026-11-20 · Grouped Settings navigation
 
 Use one category directory for compact drill-in and open-DUO detail navigation. Account is the default open detail. Sidebar width is adjustable within the usable viewport. Keep one instance of each controller so folding and switching panels cannot spawn duplicate editors or discard retained widget setup state. Bills and Transfers use the full schedule editor workspace when a row is open so selecting another schedule remains possible. Return to the category list when the editor closes. Category navigation continues to use the existing save and recovery guards.

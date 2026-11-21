@@ -72,7 +72,7 @@ The icon-only Konsta navigation bar uses a neutral translucent surface, fine gla
 
 Open **Settings** from the gear. In closed DUO, choose a category to see its controls. Tap **Back** to return to the category list. In open DUO, Account opens on the right with the category list on the left. Drag the divider to adjust the width, or focus it and use the arrow keys. Selecting a different category updates the right pane.
 
-Bills and Transfers open their lists in the right pane. Selecting a row opens the existing two-pane editor. Close the editor to return to the category layout. Your selected category follows you when folding or reopening the DUO.
+Bills and Transfers open their lists in the right pane. Their editors expand beneath the selected row in both orientations. Your selected category and draft follow you when folding or reopening the DUO. Within Settings, only Bills and Transfers have manual refresh. Pull down when folded and use the toolbar refresh arrow when unfolded.
 
 ## Duo landscape layout
 
@@ -94,20 +94,17 @@ Turn the preference off to use the standard responsive layout. After updating fr
 
 ## Bills
 
-Settings → Bills opens subscriptions, variable bills and fixed bills. Configure recurring amounts and splits for eligible current/future charges onward, or enter monthly variable amounts. After a successful recurring save, an already-hit current charge gets its own optional review inside Bills. The connected Back/title capsule follows the current Settings page. Closed DUO uses concurrent inline editor expansion and pull-to-refresh; open landscape uses a slower bill-selection crossfade, independently scrolling left rows, a full-height right editor and Refresh beside Add bill. The native right strip stays clear. See [Bills](BILLS.md).
+Settings → Bills opens subscriptions, variable bills and fixed bills. Configure recurring amounts and splits for eligible current/future charges onward, or enter monthly variable amounts. After a successful recurring save, an already-hit current charge gets its own optional review inside Bills. The connected Back/title capsule follows the current Settings page. Bill editors expand inline in both orientations. Pull down to refresh in closed DUO. In open landscape, use Refresh beside Add bill. The native right strip stays clear. See [Bills](BILLS.md).
 
 ## Optional phone notifications
 
-If Enable previously showed “Change notifications from BookieBot,” load the available app update first, then tap **Enable on this phone** again. Existing iPhone permission can be reused; the section must say **On** and confirm the save. Change one preference and refresh to confirm it persists. Reinstalling the Home Screen icon is unnecessary.
+Notifications require an installed Home Screen web app on **iOS 16.4 or later**. Selecting your first notification type lets iOS ask for permission. [WebKit explains the requirement](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
 
-Notifications require an installed Home Screen web app on **iOS 16.4 or later** and an explicit permission request from a button tap. [WebKit explains the requirement](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+1. Open BookieBot from its **Home Screen icon** and go to **Settings → Notifications**.
+2. Under **Weekly summary**, select the weekdays you want. Turn on **Payment reminders** to choose the due date, one day before, or two days before.
+3. Pick a delivery time in Pacific time. Turn on **Show Lock Screen amounts** only if you want amounts included.
 
-1. Open BookieBot from its **Home Screen icon**, then open **Settings → Notifications** using the header gear.
-2. Choose the notifications and delivery hour. The initial selection is **Weekly check-in · Mondays**, at **10 AM Pacific**. **Scheduled payments · day before** is optional and additional to Discord reminders.
-3. Leave **Show amounts on the Lock Screen** off for private, generic messages. Tap **Enable on this phone**, then allow notifications when iOS asks. Nothing subscribes until you do this.
-4. Optionally tap **Send a test**. This explicitly sends one generic test to this phone; setup does not send a test automatically. Check Notification Center and iPhone Focus settings if a test accepted by the push service is not visible.
-
-After enabling, changes save automatically; **Save preferences** can retry a failed save. At least one notification type stays selected while On; use **Turn off** to stop this phone's notifications. Each phone/session has separate settings. Signout, session expiry, or `/expense_app_reset` stops future sends; after reconnecting, enable notifications again if desired. Notifications already delivered may remain in Notification Center. Delivery depends on the running server, push service, and iPhone settings; reminders describe schedules rather than confirmed bank activity.
+Your choices save per phone. Clear all weekdays and switch Payment reminders off to stop delivery. Previously enabled Monday summaries keep their schedule. Signing out, session expiry, or an access reset stops future sends. Payment reminders describe scheduled activity.
 
 ## Personal savings
 

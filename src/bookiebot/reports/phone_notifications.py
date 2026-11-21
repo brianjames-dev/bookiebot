@@ -64,6 +64,8 @@ async def _save(request: web.Request) -> web.Response:
             raise ValueError("Invalid notification request.")
         preferences = validate_preferences(body.get("preferences"))
         if "subscription" in body:
+            if not (preferences["weekly"] or preferences["upcoming"]):
+                raise ValueError("Select a notification before subscribing.")
             subscription = validate_subscription(body["subscription"])
             await asyncio.to_thread(lambda: build_phone_notification_store().subscribe(token_hash, session, subscription, preferences))
         else:
@@ -164,14 +166,15 @@ def _due_kind(preferences: dict, current: datetime) -> list[str]:
     if current.hour != preferences["hour"]:
         return []
     kinds = []
-    if preferences["weekly"] and current.weekday() == 0:
+    if preferences["weekly"] and current.weekday() in preferences["weeklyDays"]:
         kinds.append("weekly")
     if preferences["upcoming"]:
         kinds.append("upcoming")
     return kinds
 
 
-def notification_payload(kind: str, report: dict, current: datetime, *, show_amounts: bool) -> dict | None:
+def notification_payload(kind: str, report: dict, current: datetime, *, show_amounts: bool,
+                         reminder_days_before: int = 1) -> dict | None:
     """Only explicit amount opt-in permits numbers on a lock screen."""
     key = f"{kind}:{current.date().isoformat()}"
     if kind == "weekly":
@@ -182,15 +185,16 @@ def notification_payload(kind: str, report: dict, current: datetime, *, show_amo
                 amount = report.get("metrics", {}).get("personalOutflows", 0)
             body = f"${float(amount):,.2f} spent this month. Open BookieBot for your weekly check-in."
     else:
-        tomorrow = current.date() + timedelta(days=1)
+        payment_day = current.date() + timedelta(days=reminder_days_before)
+        when = ("today", "tomorrow", "in 2 days")[reminder_days_before]
         events = [event for event in report.get("calendarEvents", [])
-                  if event.get("kind") in ("bill", "subscription") and event.get("day") == tomorrow.day]
+                  if event.get("kind") in ("bill", "subscription") and event.get("day") == payment_day.day]
         if not events:
             return None
-        body = "You have scheduled payments tomorrow. Open BookieBot to review them."
+        body = f"You have scheduled payments {when}. Open BookieBot to review them."
         if show_amounts:
             amount = sum(float(event.get("amount", 0)) for event in events)
-            body = f"{len(events)} scheduled payment{'s' if len(events) != 1 else ''} tomorrow, estimated ${amount:,.2f}."
+            body = f"{len(events)} scheduled payment{'s' if len(events) != 1 else ''} {when}, estimated ${amount:,.2f}."
     return {"title": "BookieBot", "body": body, "tag": key, "url": "/app/expenses"}
 
 
@@ -220,14 +224,16 @@ async def send_due_phone_notifications(app: web.Application, current: datetime |
                 event_key = f"{kind}:{current.date().isoformat()}"
                 if not await asyncio.to_thread(store.can_attempt, token_hash, event_key, stamp):
                     continue
-                month_date = current.date() + timedelta(days=1 if kind == "upcoming" else 0)
+                lead = preferences["reminderDaysBefore"]
+                month_date = current.date() + timedelta(days=lead if kind == "upcoming" else 0)
                 report_key = (session.actor_key, month_date.year, month_date.month)
                 if report_key not in reports:
                     reports[report_key] = await app[_REPORT_BUILDS].data(dict(
                         actor_key=session.actor_key, owner_name=owner.name,
                         persons=default_expense_report_persons(owner.name, list(owner.expense_persons)),
                         year=month_date.year, month=month_date.month))
-                payload = notification_payload(kind, reports[report_key], current, show_amounts=preferences["showAmounts"])
+                payload = notification_payload(kind, reports[report_key], current, show_amounts=preferences["showAmounts"],
+                                               reminder_days_before=lead)
                 if payload is None:
                     if await asyncio.to_thread(store.claim, token_hash, event_key, stamp):
                         await asyncio.to_thread(store.complete, token_hash, event_key, stamp, accepted=False)

@@ -32,7 +32,7 @@ async function geometry(page){return page.evaluate(()=>{
   const retained=await panel.locator('.bb-bill-editor-workspace').evaluate(el=>(window.__billEditor=el,true));assert(retained);
   await tap(page,icloud);await settle(page);assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'iCloud Storage');
   await tap(page,pge);await settle(page);assert.equal(await panel.getByRole('textbox',{name:'Name',exact:true}).inputValue(),'PG&E fixed');assert.equal(await panel.getByRole('combobox',{name:'Type',exact:true}).inputValue(),'fixed');
-  assert(await panel.locator('.bb-bill-editor-workspace').evaluate(el=>el===window.__billEditor),'Changing bills retains the workspace while bill surfaces crossfade');
+  assert(await panel.locator('.bb-bill-editor-workspace').evaluate(el=>el===window.__billEditor),'Changing bills retains the workspace while the inline editors animate');
  }
  const reviewButton=panel.getByRole('button',{name:'Review',exact:true});await reviewButton.scrollIntoViewIfNeeded();await tap(page,reviewButton);
  // A native double-tap must not spill through to confirmation while the review
@@ -43,7 +43,7 @@ async function geometry(page){return page.evaluate(()=>{
  if(width>=800){await tap(page,icloud);await settle(page);await tap(page,pge);await settle(page);assert(await panel.getByRole('heading',{name:'Review bill',exact:true}).isVisible(),'Returning to another bill retains the prepared review');}
  await page.setViewportSize({width:width<800?867:382,height:669});await settle(page);assert.equal(commands.length,0,'Folding is presentation only');assert(await confirm.isVisible());await page.setViewportSize({width,height:669});await settle(page);
  if(process.env.BOOKIEBOT_SCREENSHOT_DIR){fs.mkdirSync(process.env.BOOKIEBOT_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.BOOKIEBOT_SCREENSHOT_DIR}/bill-refinement-${engine.name()}-${width}-${dark?'dark':'light'}.png`,fullPage:true})}
- await tap(page,confirm);await panel.locator('.bb-bills-editor[data-open="false"]').waitFor({state:'attached'});assert.equal(commands.length,1,'A separate explicit confirmation writes exactly once');
+ await tap(page,confirm);await panel.locator('.bb-bills-editor').waitFor({state:'detached'});assert.equal(commands.length,1,'A separate explicit confirmation writes exactly once');
  assert.equal(commands[0].reviewVersion,'rv1');assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);await page.close();cases++;
  }}finally{await browser.close()}}
  console.log(`${cases} Bills refinement browser cases passed`)

@@ -12,7 +12,8 @@ from urllib.parse import urlsplit
 
 from bookiebot.reports.app_access import AppAccessStore, AppSession, PostgresAppAccessStore, build_app_access_store
 
-DEFAULT_PREFERENCES = {"weekly": True, "upcoming": False, "showAmounts": False, "hour": 10}
+DEFAULT_PREFERENCES = {"weekly": True, "weeklyDays": [0], "upcoming": False, "reminderDaysBefore": 1,
+                       "showAmounts": False, "hour": 10}
 _HOSTS = {"fcm.googleapis.com", "updates.push.services.mozilla.com"}
 _APPLE_HOST = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+push\.apple\.com\Z")
 
@@ -63,8 +64,16 @@ def validate_preferences(value: Any) -> dict[str, Any]:
     hour = value.get("hour")
     if type(hour) is not int or not 7 <= hour <= 21:
         raise ValueError("Choose a notification hour between 7 AM and 9 PM Pacific.")
-    if not result["weekly"] and not result["upcoming"]:
-        raise ValueError("Choose a notification type, or turn notifications off.")
+    days = value.get("weeklyDays", [0] if result["weekly"] else [])
+    if (not isinstance(days, list) or len(days) > 7
+            or any(type(day) is not int or not 0 <= day <= 6 for day in days)
+            or len(set(days)) != len(days) or (result["weekly"] and not days)):
+        raise ValueError("Choose the days for your spending summary.")
+    lead = value.get("reminderDaysBefore", 1)
+    if type(lead) is not int or lead not in (0, 1, 2):
+        raise ValueError("Choose when to receive payment reminders.")
+    result["weeklyDays"] = sorted(days) if result["weekly"] else []
+    result["reminderDaysBefore"] = lead
     result["hour"] = hour
     return result
 
@@ -104,7 +113,8 @@ class PhoneNotificationStore:
     def settings(self, token_hash: str) -> dict[str, Any]:
         with self.access.connect() as connection:
             row = connection.execute("SELECT preferences FROM app_push_subscriptions WHERE session_hash = ?", (token_hash,)).fetchone()
-        return {"enabled": row is not None, "preferences": json.loads(row["preferences"]) if row else dict(DEFAULT_PREFERENCES)}
+        saved = json.loads(row["preferences"]) if row else {**DEFAULT_PREFERENCES, "weekly": False, "weeklyDays": []}
+        return {"enabled": row is not None, "preferences": validate_preferences(saved)}
 
     def subscribe(self, token_hash: str, session: AppSession, subscription: dict, preferences: dict) -> None:
         now = int(time.time())
